@@ -1,0 +1,628 @@
+HISTORIAS DE USUARIO: TechAcademyBA,,,,,,,
+ÉPICA,N° H/U,TÍTULO,DESCRIPCIÓN,CRITERIOS DE ACEPTACIÓN,PRIORIDAD,ESTIMACIÓN,OBSERVACIONES
+1- Catálogo de Cursos y Comisiones,1,Alta Curso,"Como administrador, quiero dar de alta un curso con nombre y código únicos, para eliminar la duplicidad de nombres (""Python Inicial"" / ""Py 101"" / ""Curso Python"").","Escenario: Alta exitosa
+Dado que soy administrador y no existe un curso con el mismo nombre ni código
+Cuando completo nombre y código y confirmo el alta
+Entonces el curso se crea y aparece en el catálogo único de cursos
+
+Escenario: Código o nombre duplicado
+Dado que ya existe un curso con el mismo código o nombre (sin distinguir mayúsculas, espacios ni guiones, p. ej. CUR-101 y CUR101)
+Cuando intento guardar el nuevo curso
+Entonces el sistema rechaza el alta y muestra el curso existente
+
+Escenario: Datos obligatorios faltantes
+Dado que dejo vacío el nombre o el código
+Cuando intento guardar
+Entonces el sistema no crea el curso e indica los campos obligatorios",Must,2,
+,2,Alta Comision,"Como administrador, quiero abrir comisiones de un curso asignando docente, días, horarios y arancel, para organizar la oferta académica.","Escenario: Apertura exitosa
+Dado un curso existente y un docente registrado
+Cuando completo docente, días, horarios, arancel y cupo máximo y confirmo
+Entonces se crea la comisión asociada al curso, con código y denominación unificados
+
+Escenario: Datos obligatorios faltantes
+Dado que omito docente, días, horarios, arancel o cupo
+Cuando intento guardar la comisión
+Entonces el sistema no la crea y marca los campos faltantes
+
+Escenario: Arancel inválido
+Dado que ingreso un arancel negativo o no numérico
+Cuando intento guardar
+Entonces el sistema rechaza el valor e informa el error",Must,3,
+,3,Editar curso,"Como administrador, quiero editar el nombre, código o descripción de un curso ya existente, para corregir errores de carga sin tener que dar de baja el curso y perder su historial de comisiones asociadas.","Escenario: Edición exitosa
+Dado un curso con comisiones asociadas
+Cuando modifico nombre, código o descripción con valores no duplicados y guardo
+Entonces los cambios se guardan y las comisiones y su historial siguen asociados al curso
+
+Escenario: Código duplicado
+Dado que el nuevo código ya pertenece a otro curso
+Cuando intento guardar
+Entonces el sistema rechaza el cambio e informa el conflicto",Could,1,
+,4,Editar comision,"Como administrador, quiero editar los datos de una comisión (docente, días, horarios, arancel o cupo máximo), para corregir o actualizar la oferta sin afectar las inscripciones ya registradas, considerando que una reducción de cupo no puede dejar el número de inscriptos por debajo del nuevo límite.","Escenario: Edición exitosa
+Dado una comisión con inscripciones registradas
+Cuando modifico docente, días, horarios, arancel o cupo máximo y guardo
+Entonces los cambios se guardan y las inscripciones y pagos ya registrados no se modifican
+
+Escenario: Cupo por debajo de los inscriptos
+Dado una comisión con 15 inscriptos confirmados
+Cuando intento reducir el cupo máximo a un valor menor a 15
+Entonces el sistema rechaza el cambio e informa la cantidad actual de inscriptos",Could,3,
+,5,Definir cupos,"Como administrador, quiero definir el cupo máximo de una comisión según la capacidad de la sala de Zoom, para no superar el límite técnico.","Escenario: Cupo válido
+Dado que estoy creando o editando una comisión
+Cuando ingreso un cupo máximo entero mayor a cero
+Entonces el cupo se guarda como límite de inscripciones de la comisión
+
+Escenario: Cupo inválido
+Dado que ingreso cero, un número negativo o un valor no numérico
+Cuando intento guardar
+Entonces el sistema rechaza el valor e informa que el cupo debe ser un entero positivo",Must,2,
+,6,Visualizar cupos disponibles,"Como administrador, quiero ver en tiempo real las vacantes disponibles por comisión, para saber si puedo seguir inscribiendo alumnos.","Escenario: Vacantes calculadas
+Dado una comisión con cupo máximo 20 y 12 inscriptos confirmados
+Cuando consulto el listado de comisiones
+Entonces se muestran 8 vacantes disponibles para esa comisión
+
+Escenario: Actualización tras inscripción
+Dado una comisión con 8 vacantes
+Cuando se confirma una nueva inscripción y vuelvo a consultar
+Entonces la comisión muestra 7 vacantes sin ningún recálculo manual",Must,2,
+,7,Bloquear comisiones llenas,"Como administrador, quiero que el sistema bloquee nuevas inscripciones al llegar al cupo máximo, para evitar sobrecupo.","Escenario: Comisión completa
+Dado una comisión sin vacantes disponibles
+Cuando intento inscribir a un alumno
+Entonces el sistema rechaza la inscripción e informa que la comisión está completa
+
+Escenario: Último lugar disponible
+Dado una comisión con una sola vacante
+Cuando inscribo a un alumno
+Entonces la inscripción se confirma y la comisión pasa a figurar como completa",Must,1,
+,8,Asignar modalidad a una comisión,"Como administrador, quiero especificar la modalidad (virtual/presencial/híbrido) y la sede de una comisión, para reflejar cursos que requieren presencialidad obligatoria (ej. refrigeración, electricidad domiciliaria) frente a cursos que pueden dictarse por virtualidad.","Escenario: Modalidad virtual
+Dado que estoy creando o editando una comisión
+Cuando selecciono modalidad virtual y guardo
+Entonces la modalidad se guarda y se muestra en el listado de comisiones sin exigir sede
+
+Escenario: Modalidad presencial o híbrida
+Dado que selecciono modalidad presencial o híbrida
+Cuando intento guardar sin indicar sede
+Entonces el sistema rechaza el guardado y solicita seleccionar una sede
+
+Escenario: Presencial con sede
+Dado que selecciono modalidad presencial o híbrida e indico una sede
+Cuando guardo
+Entonces la comisión queda registrada con su modalidad y sede",Must,2,
+2- Gestión de Docentes,9,Alta Docente,"Como administrador, quiero dar de alta a un profesor con sus datos de contacto y credenciales de acceso (mail), para que pueda ingresar a su panel y ser asignado a comisiones.","Escenario: Alta exitosa
+Dado que el mail y el DNI del docente no están registrados
+Cuando completo nombre, apellido, DNI, mail y teléfono y confirmo
+Entonces el docente se crea con acceso por su mail y puede ser asignado a comisiones
+
+Escenario: Mail o DNI ya registrado
+Dado un docente existente con el mismo mail o DNI
+Cuando intento registrar al nuevo docente
+Entonces el sistema rechaza el alta e informa el dato duplicado
+
+Escenario: Ingreso al panel
+Dado un docente dado de alta
+Cuando inicia sesión con sus credenciales
+Entonces accede a su panel de profesor",Must,3,
+,10,Buscar docente,"Como administrador quiero buscar los docentes registrados, mostrando sus datos personales y las comisiones a los que están asignados.","Escenario: Búsqueda con resultados
+Dado docentes registrados en el sistema
+Cuando busco por nombre, apellido, DNI o mail
+Entonces se listan los docentes coincidentes con sus datos personales y las comisiones a las que están asignados
+
+Escenario: Búsqueda sin resultados
+Dado que ningún docente coincide con el criterio
+Cuando ejecuto la búsqueda
+Entonces el sistema informa que no se encontraron docentes",Should,2,
+,11,Editar datos docente,"Como administrador, quiero cambiar los datos personales del docente, sea nombre, apellido, dni, mail, teléfono, contraseña, etc. Para forzar cambios en su cuenta, previniendo pérdidas de acceso por parte del personal docente.","Escenario: Edición de datos personales
+Dado un docente registrado
+Cuando modifico nombre, apellido, DNI, mail o teléfono y guardo
+Entonces los cambios se guardan y el docente conserva sus comisiones asignadas
+
+Escenario: Cambio de contraseña
+Dado un docente que perdió el acceso
+Cuando defino una nueva contraseña desde su ficha
+Entonces el docente puede ingresar con la nueva contraseña y la anterior deja de ser válida
+
+Escenario: Dato duplicado
+Dado que el nuevo DNI o mail pertenece a otro usuario
+Cuando intento guardar
+Entonces el sistema rechaza el cambio e informa el conflicto",Could,3,
+,12,Controlar clases dictadas por el profesor,"Como administrador, quiero ver la cantidad de clases dictadas por cada profesor en un período, para poder controlar los jornales a pagar (la liquidación final la sigue haciendo un tercero externo).","Escenario: Consulta por período
+Dado un docente con clases dictadas en el período
+Cuando selecciono el docente y un rango de fechas
+Entonces se muestra la cantidad de clases dictadas por comisión dentro del período
+
+Escenario: Período sin clases
+Dado un docente sin clases dictadas en el rango
+Cuando realizo la consulta
+Entonces el sistema muestra cero clases dictadas
+
+Escenario: Rango inválido
+Dado que la fecha de inicio es posterior a la de fin
+Cuando intento consultar
+Entonces el sistema rechaza el rango e informa el error",Won't,5,
+3 - Alumnos e Inscripciones,13,Alta Alumno,"Como administrador, quiero registrar a un alumno con DNI/Pasaporte, nombre, email y teléfono, para tener un padrón único. ","Escenario: Alta exitosa
+Dado que el DNI/Pasaporte y el email no están registrados
+Cuando completo DNI/Pasaporte, nombre, email y teléfono y confirmo
+Entonces el alumno se crea en el padrón único
+
+Escenario: Envío de credenciales
+Dado que el alumno se registró correctamente
+Cuando finaliza el alta
+Entonces el sistema le envía un mail con su usuario y una contraseña generada automáticamente para ingresar a ver sus datos
+
+Escenario: Falla en el envío del mail
+Dado que el alta se completó pero el mail no pudo enviarse
+Cuando finaliza el alta
+Entonces el alumno queda registrado y el sistema informa al administrador que el envío falló
+
+Escenario: Documento duplicado
+Dado un alumno existente con el mismo DNI/Pasaporte o email
+Cuando intento registrar al nuevo alumno
+Entonces el sistema rechaza el alta y muestra el alumno existente
+
+Escenario: Email inválido
+Dado que ingreso un email con formato incorrecto
+Cuando intento guardar
+Entonces el sistema rechaza el alta e indica el error de formato",Must,3,Enviar mail al usuario de su registro junto con una contraseña automática para ingresar a ver sus datos? como cuando te registran en el siu
+,14,Inscribir alumno,"Como administrador, quiero inscribir a un alumno a una comisión, para vincularlo con un curso concreto.","Escenario: Inscripción exitosa
+Dado un alumno registrado y una comisión con vacantes
+Cuando inscribo al alumno en la comisión
+Entonces la inscripción queda vinculada a la comisión y su curso, y las vacantes disminuyen en uno
+
+Escenario: Inscripción repetida
+Dado un alumno ya inscripto en esa comisión
+Cuando intento inscribirlo nuevamente
+Entonces el sistema rechaza la operación e informa que ya está inscripto
+
+Escenario: Comisión completa
+Dado una comisión sin vacantes
+Cuando intento inscribir a un alumno
+Entonces el sistema rechaza la inscripción por falta de cupo",Must,3,
+,15,Asignar categoría de cobro,"Como administrador, quiero asignar una categoría de inscripción (particular, becado parcial, becado total, corporativo), para reflejar su condición real de pago.","Escenario: Categoría particular o becado total
+Dado una inscripción en curso
+Cuando selecciono la categoría particular o becado total
+Entonces la categoría se guarda; becado total queda exento de pago
+
+Escenario: Becado parcial
+Dado una inscripción en curso
+Cuando selecciono becado parcial e ingreso un porcentaje de descuento válido (entre 1 y 99)
+Entonces la categoría y el porcentaje se guardan y el arancel a abonar se calcula con el descuento
+
+Escenario: Porcentaje inválido
+Dado que selecciono becado parcial
+Cuando ingreso un porcentaje fuera del rango o no numérico
+Entonces el sistema rechaza el valor e informa el error
+
+Escenario: Corporativo
+Dado que selecciono la categoría corporativo
+Cuando no asocio una empresa registrada
+Entonces el sistema rechaza el guardado y solicita seleccionar la empresa",Must,3,
+,16,Buscar alumno,"Como administrador, quiero buscar un alumno por DNI o email, para consultar su situación rápidamente.","Escenario: Alumno encontrado
+Dado un alumno registrado
+Cuando busco por su DNI o email
+Entonces se muestra su ficha con datos de contacto, comisión, categoría de inscripción y estado de habilitación
+
+Escenario: Alumno inexistente
+Dado que no existe un alumno con ese DNI o email
+Cuando ejecuto la búsqueda
+Entonces el sistema informa que no se encontraron resultados",Must,1,
+,17,Editar datos alumno,"Como administrador, quiero editar los datos personales del alumno (DNI, Nombre, contraseña, mail, etc), para recuperar cuentas en caso de pérdida de acceso.","Escenario: Edición exitosa
+Dado un alumno registrado
+Cuando modifico DNI, nombre, mail o teléfono y guardo
+Entonces los cambios se guardan y sus inscripciones y pagos siguen asociados al mismo legajo
+
+Escenario: Recuperación de acceso
+Dado un alumno que perdió su contraseña
+Cuando defino una nueva contraseña desde su ficha
+Entonces el alumno puede ingresar con la nueva contraseña y la anterior deja de ser válida
+
+Escenario: Dato duplicado
+Dado que el nuevo DNI o mail pertenece a otro alumno
+Cuando intento guardar
+Entonces el sistema rechaza el cambio e informa el conflicto",Should,3,
+4 - Cuentas Corporativas,18,Alta Empresa,"Como administrador, quiero dar de alta una empresa con Razón Social, CUIT y necesidad de Factura A, para gestionar paquetes cerrados.","Escenario: Alta exitosa
+Dado que el CUIT no está registrado
+Cuando completo Razón Social, un CUIT válido e indico si requiere Factura A
+Entonces la empresa se crea y queda disponible para asociar paquetes y empleados
+
+Escenario: CUIT duplicado
+Dado una empresa existente con el mismo CUIT
+Cuando intento registrar la nueva empresa
+Entonces el sistema rechaza el alta y muestra la empresa existente
+
+Escenario: CUIT inválido
+Dado que ingreso un CUIT con formato o dígito verificador incorrecto
+Cuando intento guardar
+Entonces el sistema rechaza el alta e informa el error",Must,3,
+,19,Cargar empleados de empresa en curso formal,"Como administrador, quiero cargar la nómina de empleados de una empresa únicamente cuando la empresa contrata un curso formal con inscripción, vinculando a cada empleado como becado parcial o total, para diferenciarlo de una charla corporativa cerrada que no genera alumnos en el sistema.","Escenario: Carga de nómina en curso formal
+Dado una empresa que contrató un curso formal con inscripción y una comisión con vacantes suficientes
+Cuando cargo los empleados (DNI, nombre, email, teléfono) y los clasifico como becado parcial o total
+Entonces se crea una inscripción por empleado vinculada a la empresa y a la comisión
+
+Escenario: Empleado ya registrado
+Dado un empleado cuyo DNI ya existe en el padrón de alumnos
+Cuando cargo su nómina
+Entonces se vincula al alumno existente sin duplicar su registro
+
+Escenario: Empleados exceden el cupo
+Dado que la nómina supera las vacantes de la comisión
+Cuando intento confirmar la carga
+Entonces el sistema rechaza la operación e informa las vacantes disponibles
+
+Escenario: Charla corporativa cerrada
+Dado que la empresa contrató una charla corporativa sin inscripción formal
+Cuando gestiono su cuenta
+Entonces el sistema no genera alumnos ni solicita nómina para esa contratación",Should,8,
+,20,Buscar alumno corporativo,"Como administrador, quiero buscar una cuenta corporativa por CUIT o razón social, para auditar su estado.","Escenario: Empresa encontrada
+Dado una empresa registrada
+Cuando busco por CUIT o razón social (total o parcial)
+Entonces se muestra su ficha con datos fiscales, requerimiento de Factura A, nómina y estado de pago
+
+Escenario: Empresa inexistente
+Dado que ninguna empresa coincide con el criterio
+Cuando ejecuto la búsqueda
+Entonces el sistema informa que no se encontraron resultados",Should,3,
+5- Cobranzas y Pagos,21,Registrar pago manualmente,"Como administrador, quiero registrar un pago manual (fecha, importe, medio de pago), para dejar constancia de la cobranza.","Escenario: Pago registrado
+Dado que soy administrador
+Cuando ingreso fecha, importe mayor a cero y medio de pago y confirmo
+Entonces el pago queda registrado con esos datos
+
+Escenario: Datos obligatorios faltantes
+Dado que omito fecha, importe o medio de pago
+Cuando intento guardar
+Entonces el sistema no registra el pago e indica los campos faltantes
+
+Escenario: Importe o fecha inválidos
+Dado que ingreso un importe menor o igual a cero o una fecha futura
+Cuando intento guardar
+Entonces el sistema rechaza el registro e informa el error",Must,2,
+,22,Cargar datos del titular de pago,"Como administrador, quiero cargar los datos del titular real de la transferencia (nombre/CUIT), aunque sea un tercero, para no perder la trazabilidad del pago.","Escenario: Titular distinto del alumno
+Dado un pago en carga cuyo titular es un tercero (familiar, empresa u otro)
+Cuando ingreso nombre y CUIT del titular de la transferencia
+Entonces los datos del titular se guardan junto al pago y se muestran en su detalle
+
+Escenario: Titular fuera del padrón
+Dado que el titular no es alumno
+Cuando guardo el pago
+Entonces el titular no se incorpora al padrón de alumnos ni altera los datos del alumno beneficiario
+
+Escenario: CUIT inválido
+Dado que ingreso un CUIT con formato incorrecto
+Cuando intento guardar
+Entonces el sistema rechaza el dato e informa el error",Must,2,
+,23,Atribuir pago a alumno,"Como administrador, quiero imputar un pago al alumno correcto (o a la cuenta de la empresa) independientemente de quién figure como titular de la transferencia, para resolver el desacople pagador/alumno.","Escenario: Imputación a un alumno
+Dado un pago registrado y un alumno inscripto
+Cuando imputo el pago al alumno, sea cual sea el titular de la transferencia
+Entonces el pago se asocia al legajo del alumno y se refleja en su historial de pagos
+
+Escenario: Imputación a una empresa
+Dado un pago registrado y una empresa con paquete contratado
+Cuando imputo el pago a la empresa
+Entonces el pago se asocia a la cuenta de la empresa y no a un alumno individual
+
+Escenario: Pago dividido entre varios alumnos
+Dado un pago que cubre a más de un alumno
+Cuando distribuyo el importe entre ellos
+Entonces cada alumno recibe su monto imputado y la suma no supera el importe del pago
+
+Escenario: Imputación excedida
+Dado que el monto a imputar supera el saldo sin imputar del pago
+Cuando intento confirmar
+Entonces el sistema rechaza la operación e informa el saldo disponible",Must,3,
+,24,Diferenciar pagos,"Como administrador, quiero marcar un comprobante como Acreditado u Observado, para diferenciar pagos válidos de dudosos.","Escenario: Comprobante acreditado
+Dado un comprobante registrado y validado
+Cuando lo marco como Acreditado
+Entonces su estado queda Acreditado, visible en el listado de pagos y en la ficha del alumno
+
+Escenario: Comprobante observado
+Dado un comprobante ilegible o pendiente de validación
+Cuando lo marco como Observado
+Entonces su estado queda Observado y el pago no se considera válido para habilitar
+
+Escenario: Cambio de estado
+Dado un pago en estado Observado
+Cuando lo cambio a Acreditado
+Entonces el sistema actualiza el estado y registra usuario y fecha del cambio",Must,3,
+,25,Informar estado Factura A,"Como administrador, quiero dejar constancia de si se emitió o no la Factura A solicitada, para el seguimiento fiscal.","Escenario: Factura A emitida
+Dado una empresa que requiere Factura A
+Cuando marco la factura como emitida
+Entonces el estado queda registrado como Emitida y es visible en la ficha de la empresa
+
+Escenario: Factura A pendiente
+Dado una empresa que requiere Factura A sin emitir
+Cuando consulto su ficha
+Entonces figura como Pendiente de emisión
+
+Escenario: Empresa sin Factura A
+Dado una empresa que no requiere Factura A
+Cuando consulto su ficha
+Entonces el sistema no muestra seguimiento de factura pendiente",Should,5,
+,26,Acreditar pagos automáticamente,"Como administrador, quiero que los pagos hechos por pasarela (44) se acrediten automáticamente sin carga manual, para reducir el trabajo de conciliación.","Escenario: Pago aprobado por pasarela
+Dado un alumno que pagó mediante la pasarela
+Cuando la pasarela confirma el pago
+Entonces el sistema registra el pago, lo marca como Acreditado y lo imputa al alumno sin carga manual
+
+Escenario: Pago rechazado por pasarela
+Dado un pago rechazado o cancelado en la pasarela
+Cuando la pasarela informa el resultado
+Entonces el sistema no lo acredita y el estado del alumno no cambia
+
+Escenario: Notificación duplicada
+Dado que la pasarela envía dos veces la confirmación del mismo pago
+Cuando el sistema la procesa
+Entonces el pago se registra una sola vez",Won't,8,
+6- Habilitación y Control de Accesos,27,Determinar estado automáticamente,"Como administrador, quiero que el sistema determine automáticamente si un alumno está Habilitado o Bloqueado según una regla de negocio fija, para eliminar la revisión manual del home banking.","Escenario: Alumno particular al día
+Dado un alumno particular con pago Acreditado que cubre la cuota vigente
+Cuando el sistema evalúa su estado
+Entonces el alumno queda Habilitado
+
+Escenario: Pago pendiente, cuota vencida u observado
+Dado un alumno sin pago, con cuota vencida o con comprobante Observado o Rechazado
+Cuando el sistema evalúa su estado
+Entonces el alumno queda Bloqueado
+
+Escenario: Becado total
+Dado un alumno con beca total registrada formalmente
+Cuando el sistema evalúa su estado
+Entonces el alumno queda Habilitado sin requerir pago
+
+Escenario: Becado parcial
+Dado un alumno con beca parcial
+Cuando el sistema evalúa su estado
+Entonces queda Habilitado solo si el pago del arancel con descuento está Acreditado; en caso contrario queda Bloqueado
+
+Escenario: Alumno corporativo
+Dado un empleado inscripto bajo una empresa
+Cuando el sistema evalúa su estado
+Entonces queda Habilitado si el paquete de la empresa está cancelado y Bloqueado si está impago o falta la nómina
+
+Escenario: Recálculo automático
+Dado un alumno Bloqueado por un comprobante Observado
+Cuando el administrador marca el pago como Acreditado
+Entonces el estado pasa a Habilitado sin intervención manual",Should,8,
+,28,Ver estado de todos los alumnos,"Como administrador, quiero ver el estado de habilitación con un indicador visual claro (verde/rojo) junto con la causa si es que está en rojo, para decidir de un vistazo de quién puede recibir el link.","Escenario: Alumno habilitado
+Dado un alumno Habilitado
+Cuando consulto el listado de alumnos
+Entonces se muestra un indicador verde junto a su nombre
+
+Escenario: Alumno bloqueado con causa
+Dado un alumno Bloqueado
+Cuando consulto el listado
+Entonces se muestra un indicador rojo y la causa (p. ej. pago pendiente, cuota vencida, comprobante observado, empresa impaga)
+
+Escenario: Filtro por comisión
+Dado una comisión con alumnos habilitados y bloqueados
+Cuando filtro el listado por esa comisión
+Entonces se muestran solo sus alumnos con el estado de cada uno
+
+Escenario: Estado forzado
+Dado un alumno con estado forzado manualmente
+Cuando consulto el listado
+Entonces se indica que el estado fue forzado y se muestra el motivo registrado",Must,3,
+,29,Emitir certificados,"Como administrador, quiero verificar y emitir los certificados a los alumnos habilitados que, segun el profesor, deban recibir certificación.","Escenario: Emisión exitosa
+Dado un alumno Habilitado marcado por el profesor para certificación
+Cuando emito su certificado
+Entonces el certificado se genera y queda disponible en el panel del alumno
+
+Escenario: Alumno no marcado o bloqueado
+Dado un alumno que no fue marcado por el profesor o que está Bloqueado
+Cuando intento emitir su certificado
+Entonces el sistema rechaza la emisión e informa el motivo",Won't,5,
+,30,Forzar estado habilitación,"Como administrador, quiero poder forzar manualmente el estado de habilitación de un alumno (con motivo registrado), para cubrir excepciones que la regla automática no contempla","Escenario: Forzado con motivo
+Dado un alumno cuyo estado automático es Bloqueado (o Habilitado)
+Cuando fuerzo el estado contrario e ingreso un motivo
+Entonces el estado forzado se aplica, prevalece sobre la regla automática y se registra usuario, fecha y motivo
+
+Escenario: Forzado sin motivo
+Dado que intento forzar el estado
+Cuando dejo el motivo vacío
+Entonces el sistema rechaza la operación y solicita el motivo
+
+Escenario: Retorno a regla automática
+Dado un alumno con estado forzado
+Cuando quito el estado forzado
+Entonces el estado vuelve a calcularse según la regla automática",Should,3,
+,31,Copiar manualmente correos habilitados,"Como administrador, quiero poder copiar manualmente la lista de correos de habilitados de una comisión, como respaldo si el envío automático del link falla.","Escenario: Copia de correos
+Dado una comisión con alumnos Habilitados y Bloqueados
+Cuando presiono el botón de copiar correos habilitados
+Entonces se copian al portapapeles solo los emails de los alumnos Habilitados, listos para pegar en un envío manual
+
+Escenario: Sin alumnos habilitados
+Dado una comisión sin alumnos Habilitados
+Cuando presiono el botón de copiar
+Entonces el sistema informa que no hay correos para copiar",Could,1,
+7- Panel del Profesor,32,Ver estado de alumnos de mi comision,"Como profesor, quiero ver la nómina de mi comisión con el estado de habilitación de cada alumno, en modo lectura.","Escenario: Nómina de mi comisión
+Dado que soy profesor asignado a una comisión
+Cuando ingreso a su detalle
+Entonces veo la nómina de alumnos con su estado Habilitado o Bloqueado
+
+Escenario: Solo lectura
+Dado que consulto la nómina
+Cuando intento modificar el estado de un alumno
+Entonces el sistema no ofrece la edición y los datos permanecen sin cambios
+
+Escenario: Comisión ajena
+Dado una comisión a la que no estoy asignado
+Cuando intento acceder a su nómina
+Entonces el sistema deniega el acceso",Could,2,
+,33,Cargar y distribuir link de la clase,"Como profesor, quiero cargar el link de la clase del día en mi panel, para que el sistema lo distribuya automáticamente a los alumnos habilitados de esa comisión.","Escenario: Carga y distribución
+Dado una clase del día en mi comisión y un link válido
+Cuando cargo el link y confirmo
+Entonces el link queda disponible en el panel y se envía por mail únicamente a los alumnos Habilitados de esa comisión
+
+Escenario: Alumno bloqueado
+Dado un alumno Bloqueado de la comisión
+Cuando se distribuye el link
+Entonces el alumno no recibe el link ni puede verlo en su panel
+
+Escenario: Link inválido
+Dado que ingreso un texto que no es una URL válida
+Cuando intento guardar
+Entonces el sistema rechaza el link e informa el error
+
+Escenario: Comisión ajena
+Dado una comisión a la que no estoy asignado
+Cuando intento cargar un link
+Entonces el sistema deniega la operación",Must,3,
+,34,Tomar asistencia,"Como profesor, quiero tomar asistencia (presente/ausente) por clase.","Escenario: Registro de asistencia
+Dado una clase de mi comisión
+Cuando marco a cada alumno inscripto como Presente o Ausente y guardo
+Entonces la asistencia queda registrada para esa clase y fecha, con el total de presentes y ausentes
+
+Escenario: Corrección
+Dado una asistencia ya registrada
+Cuando modifico el estado de un alumno y guardo
+Entonces el registro se actualiza y los totales se recalculan",Could,3,
+,35,Cargar notas,"Como profesor, quiero cargar notas finales y que el sistema determine Aprobado/No aprobado/Pendiente.","Escenario: Alumno aprobado
+Dado un alumno al que cargo una nota igual o superior a la nota mínima exigida
+Cuando guardo la nota
+Entonces su resultado queda Aprobado
+
+Escenario: Alumno no aprobado
+Dado un alumno al que cargo una nota inferior a la mínima
+Cuando guardo la nota
+Entonces su resultado queda No aprobado
+
+Escenario: Sin nota cargada
+Dado un alumno sin nota
+Cuando consulto el acta
+Entonces su resultado figura como Pendiente
+
+Escenario: Nota inválida
+Dado que ingreso una nota fuera de rango o no numérica
+Cuando intento guardar
+Entonces el sistema rechaza el valor e informa el error",Won't,3,
+,36,Consultar seguimiento de clases dictadas,"Como profesor, quiero consultar mi propio historial de clases dictadas, para verificar que coincide con lo que se informa a la secretaría.","Escenario: Historial propio
+Dado un profesor con clases dictadas
+Cuando consulto mi historial
+Entonces se listan solo mis clases con fecha y comisión
+
+Escenario: Filtro por período
+Dado un rango de fechas
+Cuando filtro el historial
+Entonces se muestran únicamente las clases dentro del rango
+
+Escenario: Coincidencia con secretaría
+Dado las clases registradas de un profesor
+Cuando se comparan la vista del profesor y la de la secretaría
+Entonces ambas muestran la misma cantidad de clases",Won't,3,
+,37,Habilitar emisión de certificados,"Como profesor, quiero cerrar el acta y habilitar la emisión de certificados a los alumnos aprobados.","Escenario: Cierre de acta
+Dado una comisión con todas las notas cargadas
+Cuando cierro el acta
+Entonces se habilita la emisión de certificados para todos los alumnos Aprobados
+
+Escenario: Notas pendientes
+Dado una comisión con alumnos en estado Pendiente
+Cuando intento cerrar el acta
+Entonces el sistema rechaza el cierre e informa los alumnos sin nota
+
+Escenario: Acta cerrada
+Dado un acta ya cerrada
+Cuando intento modificar una nota
+Entonces el sistema no permite la edición",Won't,3,
+8- Panel del Alumno,38,Consultar datos cursada,"Como alumno, quiero ver los datos de mi cursada (docente, horarios, cronograma).","Escenario: Consulta de cursada
+Dado que soy alumno inscripto en una comisión
+Cuando ingreso a mi panel
+Entonces veo docente, días, horarios, cronograma y categoría de inscripción de mi cursada
+
+Escenario: Sin inscripciones
+Dado un alumno sin inscripciones
+Cuando ingreso a mi panel
+Entonces el sistema informa que no tengo cursadas activas
+
+Escenario: Datos propios
+Dado que consulto mi cursada
+Cuando navego el panel
+Entonces solo veo información de mis propias inscripciones",Should,2,
+,39,Acceder al link de la clase virtual,"Como alumno, quiero acceder al link de la clase virtual desde la plataforma o desde mail","Escenario: Alumno habilitado con link cargado
+Dado que estoy Habilitado y el profesor cargó el link de la clase
+Cuando ingreso a mi panel
+Entonces veo el botón de ingreso a la clase y también recibo el link por mail
+
+Escenario: Alumno bloqueado
+Dado que estoy Bloqueado
+Cuando ingreso a mi panel
+Entonces no veo el link y se muestra mi estado de bloqueo
+
+Escenario: Link no cargado
+Dado que estoy Habilitado y el profesor aún no cargó el link
+Cuando ingreso a mi panel
+Entonces el sistema informa que el link todavía no está disponible",Should,2,
+,40,Consultar historial y estado de los pagos,"Como alumno, quiero consultar el historial de mis pagos y el estado de cada comprobante.","Escenario: Historial de pagos
+Dado un alumno con pagos imputados
+Cuando consulto mi historial
+Entonces veo fecha, importe, medio de pago y estado (Acreditado, Observado o Rechazado) de cada pago, e indicación de si lo realizó un tercero
+
+Escenario: Sin pagos
+Dado un alumno sin pagos registrados
+Cuando consulto mi historial
+Entonces el sistema informa que no hay pagos registrados
+
+Escenario: Datos propios
+Dado que consulto mis pagos
+Cuando navego el historial
+Entonces solo veo pagos imputados a mi legajo",Could,3,
+,41,Consultar historia académica y certificados,"Como alumno, quiero ver mi historial de cursos finalizados y descargar mis certificados.","Escenario: Historial académico
+Dado un alumno con cursos finalizados
+Cuando consulto mi historia académica
+Entonces veo código de comisión, fecha de finalización y resultado (Aprobado o No aprobado) de cada curso
+
+Escenario: Descarga de certificado
+Dado un curso Aprobado con certificado emitido
+Cuando selecciono descargar
+Entonces se descarga el certificado en formato digital
+
+Escenario: Curso no aprobado
+Dado un curso No aprobado o sin certificado emitido
+Cuando consulto el curso
+Entonces el sistema no ofrece la descarga",Won't,3,
+,42,Consultar estado habilitación propia,"Como alumno, quiero consultar mi estado de habilitación, junto con la causa si no estoy habilitado, para ahorrarle consultas a administración.","Escenario: Estado habilitado
+Dado que estoy Habilitado
+Cuando consulto mi estado
+Entonces veo un indicador verde con la leyenda Habilitado
+
+Escenario: Estado bloqueado con causa
+Dado que estoy Bloqueado
+Cuando consulto mi estado
+Entonces veo un indicador rojo y la causa del bloqueo, coincidente con la que ve la administración",Should,2,
+,43,Cambiar datos personales,"Como alumno, quiero cambiar mis datos de usuario como email, contraseña o número telefónico.","Escenario: Cambio de datos permitidos
+Dado que soy alumno autenticado
+Cuando modifico mi email o teléfono y guardo
+Entonces los datos se actualizan y se reflejan en mi perfil
+
+Escenario: Cambio de contraseña
+Dado que ingreso mi contraseña actual y una nueva contraseña confirmada
+Cuando guardo
+Entonces la contraseña se actualiza y la anterior deja de ser válida
+
+Escenario: Datos no editables
+Dado que consulto mi perfil
+Cuando intento editar mi DNI o el ID asignado por el sistema
+Entonces el sistema no permite la modificación
+
+Escenario: Email duplicado
+Dado que el nuevo email pertenece a otro usuario
+Cuando intento guardar
+Entonces el sistema rechaza el cambio e informa el conflicto",Could,3,"El ID dado por el sistema, o el DNI no pueden ser cambiados por el usuario. El nombre no sé."
+,44,Pagar la cuota desde la plataforma,"Como alumno, quiero pagar mi cuota directamente desde el sistema mediante una pasarela de pago, para no depender de enviar comprobantes por WhatsApp.","Escenario: Pago aprobado
+Dado un alumno con una cuota pendiente
+Cuando paga desde la plataforma y la pasarela aprueba la operación
+Entonces el pago se registra como Acreditado, se imputa a la cuota y su estado de habilitación se actualiza
+
+Escenario: Pago rechazado o cancelado
+Dado un alumno que inicia el pago
+Cuando la pasarela lo rechaza o el alumno lo cancela
+Entonces no se registra como acreditado y la cuota sigue pendiente
+
+Escenario: Medios alternativos
+Dado un alumno que prefiere no usar la pasarela
+Cuando informa su pago por WhatsApp
+Entonces el administrador puede seguir registrándolo y acreditándolo manualmente",Won't,13,"No es el unico medio de pago. Se podrá seguir usando whatsapp, lo cubre la acreditacion manual"
+,,,,,,,
+,,,,,total solo must,44,
+,,,,,total sin contar won't,101,
+,,,,,Total,144,
+,,,,,,,
+,,,,,,,
+,,,,,Must,18,
+,,,,,Should,10,
+,,,,,Could,8,
+,,,,,Won't,8,
