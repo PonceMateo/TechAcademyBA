@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { SECCIONES_ALUMNO } from '../alumno/navegacion'
 import { SECCIONES_DOCENTE } from '../docente/navegacion'
 import { SECCIONES_ADMIN } from './navegacion'
 
@@ -76,7 +77,12 @@ function componentesImportados(archivo) {
  * Administración es texto fijo. Son las únicas pantallas de las tres secciones con esa excepción, y
  * las dos existen solo porque el tablero no tiene historia que la cubra.
  */
-const SIN_DATOS_POR_DISENO = ['AdminLayout.jsx', 'DashboardPage.jsx', 'TeacherLayout.jsx']
+const SIN_DATOS_POR_DISENO = [
+  'AdminLayout.jsx',
+  'DashboardPage.jsx',
+  'TeacherLayout.jsx',
+  'StudentLayout.jsx',
+]
 
 describe('la frontera de datos se respeta en las pantallas de los tres shells', () => {
   it.each(SHELLS.map((shell) => [shell.etiqueta, shell.directorio]))(
@@ -126,15 +132,19 @@ describe('los tres shells comparten los componentes', () => {
     expect(sinCompartidos).toEqual([])
   })
 
-  it('los armazones de las secciones montadas salen del mismo componente compartido', () => {
-    const armazones = ['admin/AdminLayout.jsx', 'docente/TeacherLayout.jsx']
-      .map((ruta) => join(RAIZ_SRC, ruta))
-      .filter((ruta) => existsSync(ruta))
+  it('los tres armazones salen del mismo componente compartido', () => {
+    const armazones = [
+      'admin/AdminLayout.jsx',
+      'docente/TeacherLayout.jsx',
+      'alumno/StudentLayout.jsx',
+    ].map((ruta) => join(RAIZ_SRC, ruta))
 
-    // Con los shells montados, todos tienen que usar `ShellFrame`: es lo que convierte "los shells
-    // comparten los mismos componentes" en una afirmación sobre el código y no una impresión.
-    expect(armazones).toHaveLength(2)
+    // Con los tres shells montados, los tres tienen que usar `ShellFrame`: es lo que convierte "los
+    // shells comparten los mismos componentes" en una afirmación sobre el código y no en una
+    // impresión mirando la pantalla.
+    expect(armazones).toHaveLength(3)
     for (const armazon of armazones) {
+      expect(existsSync(armazon), `${armazon} no existe`).toBe(true)
       expect(readFileSync(armazon, 'utf8')).toMatch(/import\s*\{\s*ShellFrame\s*\}/)
     }
   })
@@ -182,6 +192,11 @@ describe('las pantallas de cada shell dibujan con los componentes compartidos', 
       'ESPACIO DOCENTE',
       SECCIONES_DOCENTE.filter((seccion) => seccion.ruta).map((seccion) => seccion.ruta),
     ],
+    [
+      'ALUMNO',
+      'ESPACIO ALUMNO',
+      SECCIONES_ALUMNO.filter((seccion) => seccion.ruta).map((seccion) => seccion.ruta),
+    ],
   ])(
     'la sección de %s marca sus pantallas con tarjetas y botones compartidos',
     async (rol, tituloMenu, rutas) => {
@@ -215,7 +230,7 @@ describe('las tres raíces de rol', () => {
   it.each([
     ['ADMIN', '/admin', 'MENÚ OPERATIVO'],
     ['DOCENTE', '/docente', 'ESPACIO DOCENTE'],
-    ['ALUMNO', '/alumno', 'Espacio Alumno'],
+    ['ALUMNO', '/alumno', 'ESPACIO ALUMNO'],
   ])('deja entrar a %s por su raíz y lo muestra dentro de su shell', async (rol, ruta, marca) => {
     resetDataSource()
     stubBackend()

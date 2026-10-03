@@ -46,6 +46,13 @@ const ACENTOS = Object.freeze({
     inactivo: 'text-teal-100 hover:bg-teal-800',
     titulo: 'text-teal-200',
   }),
+  alumno: Object.freeze({
+    tono: TONO.TERRACOTA,
+    panel: 'bg-orange-900',
+    activo: 'bg-orange-700',
+    inactivo: 'text-orange-100 hover:bg-orange-800',
+    titulo: 'text-orange-200',
+  }),
 })
 
 export function ShellFrame({

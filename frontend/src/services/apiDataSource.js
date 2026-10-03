@@ -40,6 +40,9 @@ const PATHS = Object.freeze({
   asistencia: '/comisiones/:codigo/asistencia',
   perfilDocente: '/docentes/mi-perfil',
   linkClase: '/clases/link',
+  inscripcionesAlumno: '/alumno/inscripciones',
+  pagosAlumno: '/alumno/pagos',
+  perfilAlumno: '/alumno/mi-perfil',
 })
 
 async function request(path, { method = 'GET', body, query, params } = {}) {
@@ -170,6 +173,24 @@ export function createApiDataSource() {
         method: 'POST',
         body: { comision: comisionCodigo, url },
       })
+    },
+
+    async listarInscripcionesAlumno() {
+      return request(PATHS.inscripcionesAlumno)
+    },
+
+    async obtenerDetalleInscripcion(comisionCodigo) {
+      return request(PATHS.inscripcionesAlumno, {
+        params: { codigo: comisionCodigo },
+      })
+    },
+
+    async listarPagosAlumno() {
+      return request(PATHS.pagosAlumno)
+    },
+
+    async obtenerPerfilAlumno() {
+      return request(PATHS.perfilAlumno)
     },
   }
 }

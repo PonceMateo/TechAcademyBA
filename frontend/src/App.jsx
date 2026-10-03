@@ -9,6 +9,11 @@ import { TeachersPage } from './admin/TeachersPage'
 import { RequireRole } from './auth/RequireRole'
 import { FORBIDDEN_PATH, LOGIN_PATH, homePathForRole } from './auth/roleRoutes'
 import { SESSION_STATUS, SessionProvider, useSession } from './auth/SessionContext'
+import { CourseDetailPage } from './alumno/CourseDetailPage'
+import { StudentCoursesPage } from './alumno/StudentCoursesPage'
+import { StudentLayout } from './alumno/StudentLayout'
+import { StudentPaymentsPage } from './alumno/StudentPaymentsPage'
+import { StudentProfilePage } from './alumno/StudentProfilePage'
 import { AttendancePage } from './docente/AttendancePage'
 import { CommissionDetailPage } from './docente/CommissionDetailPage'
 import { TeacherCommissionsPage } from './docente/TeacherCommissionsPage'
@@ -16,7 +21,6 @@ import { TeacherLayout } from './docente/TeacherLayout'
 import { TeacherProfilePage } from './docente/TeacherProfilePage'
 import { TeacherStudentsPage } from './docente/TeacherStudentsPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
-import { LandingPage } from './pages/LandingPage'
 import { LoadingPage } from './pages/LoadingPage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -41,10 +45,10 @@ function RootRedirect() {
  * Tabla de ruteo. Cada sección declara su rol una vez, acá; las pantallas cuelgan debajo de estas
  * tres rutas sin cambiar quién puede verlas (M10).
  *
- * **Cada sección cuelga de su layout y el layout no sabe qué pantalla hay.** El shell de
- * Administración tiene sus seis pantallas, el de Docente sus cuatro, y `/alumno` sigue con la
- * pantalla de marcador de posición hasta que llegue el grupo 11. Agregar una pantalla es agregar una
- * ruta hija: ni el armazón ni el guard de rol cambian.
+ * **Cada sección cuelga de su layout y el layout no sabe qué pantalla hay.** Administración tiene sus
+ * seis pantallas, Docente cuatro y Alumno cuatro; `/docente/notas`, `/alumno/pagar-la-cuota` y
+ * `/alumno/certificados` no existen, porque los ítems Won't no son enlaces (D20). Agregar una
+ * pantalla es agregar una ruta hija: ni el armazón ni el guard de rol cambian.
  */
 export function AppRoutes() {
   return (
@@ -88,10 +92,15 @@ export function AppRoutes() {
         path="/alumno"
         element={
           <RequireRole allowedRoles={['ALUMNO']}>
-            <LandingPage />
+            <StudentLayout />
           </RequireRole>
         }
-      />
+      >
+        <Route index element={<StudentCoursesPage />} />
+        <Route path="cursos/:codigo" element={<CourseDetailPage />} />
+        <Route path="pagos" element={<StudentPaymentsPage />} />
+        <Route path="perfil" element={<StudentProfilePage />} />
+      </Route>
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

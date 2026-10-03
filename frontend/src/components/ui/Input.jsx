@@ -7,6 +7,10 @@ import { MARCA_UI } from './paleta'
  * importa: la `Sede` es obligatoria solo para modalidad `Presencial` o `Híbrido` (historia #8), y
  * el error tiene que aparecer pegado al campo que lo produjo, no al pie del formulario.
  *
+ * **Un campo deshabilitado se ve deshabilitado y lo dice.** `disabled` pinta el control apagado y
+ * `leyenda` escribe por qué —`solo lectura` en el `DNI` y el `Nombre` del alumno—, porque un campo
+ * que se ve igual que los demás y no acepta el foco obliga a probarlo para enterarse.
+ *
  * Un `Input` es un campo con etiqueta. La casilla de la factura tipo A y los selectores multiples
  * de la pantalla de cobranzas no son esto: son `Campo` con su propio control adentro, y por eso
  * el componente acepta `children` para el control cuando hace falta algo que no sea un input.
@@ -22,6 +26,8 @@ export function Input({
   obligatorio = false,
   requerido = false,
   autoComplete,
+  disabled = false,
+  leyenda = null,
   className = '',
   children,
   ...resto
@@ -37,6 +43,9 @@ export function Input({
             *
           </span>
         )}
+        {leyenda !== null && (
+          <span className="ml-2 text-xs font-normal text-slate-500">({leyenda})</span>
+        )}
       </label>
 
       {children ?? (
@@ -48,10 +57,11 @@ export function Input({
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          disabled={disabled}
           aria-required={requerido || obligatorio || undefined}
           aria-describedby={describedBy}
           aria-invalid={error ? 'true' : undefined}
-          className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 ${className}`}
+          className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${className}`}
           {...resto}
         />
       )}

@@ -107,3 +107,26 @@ export function obtenerLinkClase(comisionCodigo) {
 export function guardarLinkClase(datos) {
   return getDataSource().guardarLinkClase(datos)
 }
+
+/**
+ * Inscripciones del alumno con su acceso (11.2). Siempre un arreglo: la lista vacía es el caso que
+ * la pantalla tiene que saber pintar, con un mensaje y no con un hueco.
+ */
+export function listarInscripcionesAlumno() {
+  return getDataSource().listarInscripcionesAlumno()
+}
+
+/** Detalle de una inscripción del alumno (11.3), o `null` si no está inscripto en esa comisión. */
+export function obtenerDetalleInscripcion(comisionCodigo) {
+  return getDataSource().obtenerDetalleInscripcion(comisionCodigo)
+}
+
+/** Comprobantes imputados al alumno (11.4). No incluye pagos de empresas ni cheques sin imputar. */
+export function listarPagosAlumno() {
+  return getDataSource().listarPagosAlumno()
+}
+
+/** Ficha del alumno del ejemplo (11.5). */
+export function obtenerPerfilAlumno() {
+  return getDataSource().obtenerPerfilAlumno()
+}

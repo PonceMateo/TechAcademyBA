@@ -7,6 +7,7 @@ import {
   DESTINO_IMPUTACION,
   DOCENTES,
   EMPRESAS,
+  INSCRIPCIONES,
   LINKS_DE_CLASE,
   SEDES,
 } from '../mocks'
@@ -78,6 +79,7 @@ export function createMockDataSource() {
     cobranzas: copiar(COBRANZAS),
     asistencias: copiar(ASISTENCIAS),
     links: copiar(LINKS_DE_CLASE),
+    inscripciones: copiar(INSCRIPCIONES),
   }
 
   /** El padrón de una comisión: los alumnos que tiene, con el acceso que ya viene derivado (D9). */
@@ -87,11 +89,60 @@ export function createMockDataSource() {
     return store.alumnos.filter((alumno) => normalizeCode(alumno.comision.codigo) === codigo)
   }
 
+  /**
+   * La inscripción del alumno del ejemplo con su ficha, o `undefined` si no tiene ninguna.
+   *
+   * La inscripción y el alumno son datos que ya existen por separado: la inscripción guarda lo de la
+   * comisión y el padrón guarda el documento, el email y el acceso. Cruzarlos acá es lo que permite
+   * que forzar un bloqueo desde la pantalla de la secretaría se vea en la del alumno.
+   */
+  function inscripcionDelAlumno() {
+    return store.inscripciones
+      .map((inscripcion) => ({
+        inscripcion,
+        alumno: store.alumnos.find((candidato) => candidato.id === inscripcion.alumno_id),
+      }))
+      .find(({ alumno }) => alumno !== undefined)
+  }
+
   /** La fila del catálogo de una comisión, o `undefined` si el código no existe. */
   function comision(comisionCodigo) {
     const codigo = normalizeCode(comisionCodigo)
 
     return store.comisiones.find((candidata) => normalizeCode(candidata.codigo) === codigo)
+  }
+
+  /**
+   * Si una comisión existe, dentro o fuera del subconjunto del catálogo.
+   *
+   * `comisiones.js` tiene cinco de las diez comisiones del cliente, así que "no está en el catálogo de
+   * ejemplo" no es "no existe": `CUR-102` es la comisión de la alumna del ejemplo y vive en
+   * `inscripciones.js`. La comprobación de verdad la va a hacer el backend —un 404 o un 403 según a
+   * quién se le pregunte—; acá alcanza con no rechazar un código que el ejemplo conoce.
+   */
+  function existeComision(comisionCodigo) {
+    const codigo = normalizeCode(comisionCodigo)
+
+    return (
+      store.comisiones.some((candidata) => normalizeCode(candidata.codigo) === codigo) ||
+      store.inscripciones.some(
+        (inscripcion) => normalizeCode(inscripcion.comision.codigo) === codigo,
+      )
+    )
+  }
+
+  /**
+   * El link de clase guardado para una comisión, o `null` si el docente todavía no lo cargó.
+   *
+   * Vive como función del store y no como método del objeto devuelto porque lo necesitan dos
+   * respuestas —la del docente y la del alumno—, y llamarse a uno mismo con `this` depende de cómo
+   * se invoque la función.
+   */
+  function linkGuardado(comisionCodigo) {
+    const codigo = normalizeCode(comisionCodigo)
+    const guardado = store.links.find((link) => normalizeCode(link.comision) === codigo)
+
+    return guardado?.url ?? null
   }
 
   return {
@@ -361,10 +412,7 @@ export function createMockDataSource() {
      * detalle del alumno: es el mismo dato, y por eso vive en la frontera y no en una pantalla.
      */
     async obtenerLinkClase(comisionCodigo) {
-      const codigo = normalizeCode(comisionCodigo)
-      const guardado = store.links.find((link) => normalizeCode(link.comision) === codigo)
-
-      return { link: guardado?.url ?? null }
+      return { link: linkGuardado(comisionCodigo) }
     },
 
     /**
@@ -376,9 +424,7 @@ export function createMockDataSource() {
      * reparte el docente a los habilitados por correo.
      */
     async guardarLinkClase({ comisionCodigo, url }) {
-      const encontrada = comision(comisionCodigo)
-
-      if (encontrada === undefined) {
+      if (!existeComision(comisionCodigo)) {
         return { ok: false, error: 'La comisión no existe.' }
       }
       if (!esUrl(url)) {
@@ -388,9 +434,9 @@ export function createMockDataSource() {
         }
       }
 
-      const codigo = normalizeCode(encontrada.codigo)
+      const codigo = normalizeCode(comisionCodigo)
       const indice = store.links.findIndex((link) => normalizeCode(link.comision) === codigo)
-      const registro = { comision: encontrada.codigo, url: String(url).trim() }
+      const registro = { comision: String(comisionCodigo).trim(), url: String(url).trim() }
 
       if (indice === -1) {
         store.links.push(registro)
@@ -399,6 +445,120 @@ export function createMockDataSource() {
       }
 
       return { ok: true, link: registro.url }
+    },
+
+    /**
+     * Inscripciones del alumno del ejemplo con su acceso (11.2 y 11.3).
+     *
+     * **Devuelve un arreglo aunque haya una sola inscripción.** El shell dibuja una tarjeta por
+     * inscripción y el spec exige el estado vacío para el alumno sin cursos, así que la forma de la
+     * respuesta no cambia con la cantidad: una lista vacía es el caso que la pantalla tiene que
+     * saber pintar, no una excepción.
+     *
+     * **El acceso viaja con la inscripción y es el derivado (D9).** No se calcula nada acá: el
+     * forzado que haga la secretaría se ve en la tarjeta del alumno porque las dos pantallas leen el
+     * mismo registro.
+     */
+    async listarInscripcionesAlumno() {
+      const propia = inscripcionDelAlumno()
+
+      if (propia === undefined) {
+        return []
+      }
+
+      const { inscripcion, alumno } = propia
+
+      return [
+        {
+          codigo: inscripcion.comision.codigo,
+          nombre_curso: inscripcion.comision.nombre,
+          docente_nombre: inscripcion.comision.docente_nombre,
+          horario: inscripcion.comision.horario_legible,
+          categoria: alumno.categoria,
+          porcentaje_beca: alumno.porcentaje_beca,
+          acceso: { ...alumno.acceso },
+        },
+      ]
+    },
+
+    /**
+     * Detalle de una inscripción del alumno (11.3): lo de la comisión, el cronograma, los próximos
+     * encuentros y el link de clase. `null` cuando el alumno no está inscripto en esa comisión, que
+     * es lo que impide que un alumno abra el curso de otro.
+     */
+    async obtenerDetalleInscripcion(comisionCodigo) {
+      const propia = inscripcionDelAlumno()
+
+      if (propia === undefined) {
+        return null
+      }
+
+      const { inscripcion, alumno } = propia
+      if (normalizeCode(inscripcion.comision.codigo) !== normalizeCode(comisionCodigo)) {
+        return null
+      }
+
+      const comision = { ...inscripcion.comision }
+
+      return {
+        comision,
+        categoria: alumno.categoria,
+        porcentaje_beca: alumno.porcentaje_beca,
+        acceso: { ...alumno.acceso },
+        cronograma: { ...inscripcion.cronograma },
+        proximos_encuentros: inscripcion.proximos_encuentros.map((encuentro) => ({ ...encuentro })),
+        link: linkGuardado(comision.codigo),
+      }
+    },
+
+    /**
+     * Comprobantes del alumno (11.4). Solo los que están imputados a él: el pago de una empresa y
+     * el cheque que todavía no tiene a quién imputarse no aparecen, aunque el historial de la
+     * secretaría los tenga (D7 deja la imputación de destino único).
+     */
+    async listarPagosAlumno() {
+      const propia = inscripcionDelAlumno()
+
+      if (propia === undefined) {
+        return []
+      }
+
+      const { alumno } = propia
+
+      return store.cobranzas
+        .filter(
+          (cobranza) =>
+            cobranza.imputacion?.destino === DESTINO_IMPUTACION.ALUMNO &&
+            normalizeCode(cobranza.imputacion.nombre) === normalizeCode(alumno.nombre),
+        )
+        .map((cobranza) => ({
+          ...cobranza,
+          // En este dominio el pagador puede no ser el alumno (D7), y la fila tiene que decirlo.
+          pagado_por_tercero:
+            normalizeCode(cobranza.pagador.nombre) !== normalizeCode(alumno.nombre),
+        }))
+    },
+
+    /**
+     * Ficha del alumno del ejemplo (11.5). Los cuatro datos que muestra el perfil y nada más: el
+     * documento y el nombre llegan como datos, y que no se puedan editar es una decisión de la
+     * pantalla —los campos deshabilitados—, no una bandera que el servicio le pase.
+     */
+    async obtenerPerfilAlumno() {
+      const propia = inscripcionDelAlumno()
+
+      if (propia === undefined) {
+        return null
+      }
+
+      const { alumno } = propia
+
+      return {
+        nombre: alumno.nombre,
+        documento: alumno.documento,
+        email: alumno.email,
+        telefono: alumno.telefono ?? null,
+      }
     },
   }
 }

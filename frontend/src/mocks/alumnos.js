@@ -35,6 +35,10 @@ export const ALUMNOS = markAsExample([
     documento: '40.112.233',
     tipo_documento: TIPO_DOCUMENTO.DNI,
     email: 'cami_rod@hotmail.com',
+    // Es la única alumna con teléfono, y es a propósito: el perfil del alumno muestra `Email` y
+    // `Teléfono` como los dos campos editables, y la planilla del cliente solo tiene el teléfono de
+    // ella. Para los demás no se inventa uno.
+    telefono: '011 4788-1122',
     comision: { codigo: 'CUR-102', nombre: 'Desarrollo Web Full Stack' },
     categoria: CATEGORIA_INSCRIPCION.BECADO_PARCIAL,
     porcentaje_beca: 50,

@@ -827,6 +827,51 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Shell de Alumno (work unit 9, grupo 11)
+
+### M29 — La inscripción del alumno vive en su propia colección y no en el catálogo de comisiones
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `src/mocks/inscripciones.js` guarda la inscripción del alumno del ejemplo —`CUR-102`
+  con su docente, sus dos formas de horario, el arancel, el cronograma y los próximos encuentros— y
+  se cruza con la fila de `ALUMNOS` para el documento, el email, el teléfono y el acceso. La
+  comisión **no** se agrega a `comisiones.js`.
+- **Por qué:** `comisiones.js` es un subconjunto de cinco de las diez comisiones del cliente y
+  `mocks.test.js` verifica que sus totales den 160 lugares, 43 ocupados y 117 vacantes, que es lo que
+  sostiene el `27%` del tablero. Meter `CUR-102` ahí cambiaría tres números verificados por una fila
+  que el catálogo de Administración no muestra. La inscripción lleva lo que la pantalla del alumno
+  necesita y el catálogo no usa.
+- **Consecuencia:** `guardarLinkClase` no puede comprobar la existencia de una comisión mirando solo
+  el catálogo, porque `CUR-102` no está ahí. Comprueba las dos colecciones; la comprobación de verdad
+  la va a hacer el backend con su 404 o su 403.
+- **Dónde:** `frontend/src/mocks/inscripciones.js`, `frontend/src/mocks/comisiones.js`,
+  `frontend/src/services/mockDataSource.js`.
+
+### M30 — El teléfono de la alumna del ejemplo es el único dato de contacto que se agrega
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `ALUMNOS` suma `telefono: '011 4788-1122'` a Camila Rodríguez, y a nadie más.
+- **Por qué:** el spec del shell de alumno exige que el perfil muestre `Teléfono` con ese valor, y la
+  planilla del cliente lo tiene para ella. Los otros cinco alumnos del padrón no tienen teléfono
+  registrado, así que el campo queda en `null` para ellos y no se inventa uno.
+- **Dónde:** `frontend/src/mocks/alumnos.js`.
+
+### M31 — `Input` acepta campos deshabilitados con leyenda
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el `Input` compartido acepta `disabled` y `leyenda`. El perfil del alumno los usa para
+  `DNI` y `Nombre`, que el spec pide deshabilitados con la leyenda `solo lectura`.
+- **Por qué:** la regla "estos dos no se editan" tiene que verse, no solo cumplirse. Un campo apagado
+  sin explicación parece un error de la pantalla, y un campo que se ve igual que los editables obliga
+  a probarlo para enterarse de que no funciona. La leyenda va en la etiqueta, así que forma parte del
+  nombre accesible del campo y un lector de pantalla la anuncia con el rótulo.
+- **Dónde:** `frontend/src/components/ui/Input.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`.
+
+---
+
 ## Configuración del repositorio
 
 ### R1 — `opencode.json` declara Context7 sin API key
