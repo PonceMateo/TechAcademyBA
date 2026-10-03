@@ -465,6 +465,99 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
   422 de FastAPI es "Field required", que es el texto del framework, no del producto.
 - **Dónde:** `app/schemas/auth.py`, `app/api/auth.py`.
 
+## Frontend (work unit 5, grupo 7)
+
+### M10 — La tabla de ruteo tiene una raíz por rol
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** las tres secciones cuelgan de `/admin`, `/docente` y `/alumno`. `/` redirige a
+  la sección del rol que entra o al login, `/login` es la pantalla de acceso, `/403` es el
+  rechazo por rol y `*` es el 404. El destino de entrada de cada rol vive en una tabla,
+  `ROLE_HOME_PATHS` en `src/auth/roleRoutes.js`, y la usan la redirección de entrada, el
+  logout y los enlaces de las pantallas de error.
+- **Por qué:** D14 afirma que "la tabla de ruteo ya queda en su forma final", pero `design.md`
+  **nunca la escribió**. Es un hueco de `design.md`, no una decisión que el documento tomara y
+  omitiera. Sin una raíz acordada por rol, los grupos 9, 10 y 11 no tenían un prefijo donde
+  colgar sus pantallas y cada uno iba a inventar el suyo. El prefijo identifica quién entra,
+  no cómo se llama la sección: `ADMIN` se muestra como `Secretaría` (D3).
+- **Alternativa descartada:** una raíz común (`/panel`) con la sección deducida del rol.
+  Deja la URL igual para los tres roles y vuelve ambiguo cualquier enlace a una pantalla.
+- **Consecuencia:** los grupos 9, 10 y 11 agregan rutas **debajo** de estas tres, sin mover la
+  raíz. `/403` y `*` son públicas a propósito: una ruta inexistente tiene que poder responder
+  404 sin sesión.
+- **Dónde:** `frontend/src/App.jsx`, `frontend/src/auth/roleRoutes.js`.
+
+### M11 — El token se guarda en `sessionStorage`
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el token que devuelve `POST /auth/login` se guarda en `sessionStorage`, con la
+  clave `techacademy.token`. No se usa `localStorage`.
+- **Por qué:** el token alcanza para actuar como la cuenta (D2) y la secretaría comparte la
+  máquina —el pie del prototipo dice `Terminal Interna 04`. Con `sessionStorage`, recargar la
+  página no cierra la sesión, pero cerrar el navegador sí, y el token no queda en disco para
+  el próximo que use el equipo. Con `localStorage`, una cuenta abierta seguiría viva al día
+  siguiente en una máquina compartida.
+- **Lo que esto NO es:** una sesión confiable. El backend resuelve el token contra la base en
+  cada request (M7), así que uno alterado, vencido o de una cuenta dada de baja no abre nada.
+  Guardarlo es para no perder la sesión al recargar, no para decidir permisos.
+- **Riesgo asumido:** con dos pestañas abiertas, cerrar sesión en una no cierra la otra. Es el
+  comportamiento conocido de `sessionStorage` y es aceptable en un scaffold; si molesta, se
+  pasa a una cookie de sesión y se revisa CORS.
+- **Dónde:** `frontend/src/auth/tokenStorage.js`.
+
+### M12 — El cliente de autenticación vive en `src/auth/`, no en `src/services/`
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el cliente HTTP del backend —las dos rutas de D14— vive en
+  `src/auth/authClient.js`, junto con el contexto de sesión, la tabla de ruteo y la protección
+  por rol. `src/services/` queda para los datos de las pantallas, que es lo que D13 describe.
+- **Por qué:** D13 habla de la frontera de datos de **las pantallas**; D14 deja una sola
+  llamada de red, el login, y dice que el cliente HTTP queda "deliberadamente mínimo". Meter
+  el login en la fábrica de `src/services/` obligaría a que esa fábrica fuera real siempre, y
+  `VITE_API_MODE` dejaría de describir lo que la aplicación hace.
+- **Consecuencia:** el grupo 8 no toca `src/auth/`. La verificación de que ningún componente
+  importa mocks sigue valiendo: los componentes leen del contexto, no de una capa de datos.
+- **Dónde:** `frontend/src/auth/authClient.js`, `frontend/src/config/api.js`.
+
+### M13 — El contexto de sesión es el dueño de la redirección
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `SessionProvider` navega: `signIn` lleva a la sección del rol y `signOut` al
+  login. `RequireRole` manda al login a quien no tiene sesión y a `/403` al rol que no
+  corresponde. El contexto queda **dentro** del router, así que los tests lo montan con
+  `MemoryRouter`.
+- **Por qué:** la redirección por rol es una regla del proyecto, no una decisión de cada
+  pantalla. Si el contexto no la aplica, los tres shells de los grupos 9, 10 y 11 pueden
+  cerrarse sin volver al login y ningún test lo nota hasta que alguien lo prueba a mano.
+- **Alternativa descartada:** que `signIn` devuelva la ruta y la navegue cada pantalla. Es más
+  puro y deja el mismo bug esperando en tres archivos.
+- **Dónde:** `frontend/src/auth/SessionContext.jsx`, `frontend/src/auth/RequireRole.jsx`.
+
+### M14 — Versiones del stack de frontend, y `npm ci` en la imagen
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** Node 22, React 19, React Router 8, Vite 8, Tailwind CSS 4 (por plugin de Vite,
+  sin `tailwind.config.js`), ESLint 10 en configuración plana, Prettier 3, Vitest 5 y React
+  Testing Library. Se versiona `package-lock.json` y `frontend/Dockerfile` instala con
+  `npm ci` en lugar de `npm install`.
+- **Por qué:** `design.md` fija Python y PostgreSQL pero **no** fija Node ni ninguna
+  biblioteca del frontend, así que las versiones son una elección de este work unit y hay
+  que confirmarlas. Tailwind 4 se conecta por plugin de Vite: menos configuración que la
+  cadena de PostCSS de la versión 3. `npm ci` instala exactamente el árbol resuelto, así que
+  la imagen de hoy y la de dentro de un mes instalan lo mismo; el `npm install` anterior
+  movía el árbol en silencio. El propio `frontend/Dockerfile` anticipaba este cambio para
+  cuando existiera el lockfile.
+- **Pendiente:** Node 22 sigue sin confirmación del equipo, que es lo que el comentario del
+  `frontend/Dockerfile` ya decía. Si el equipo fija otra versión, cambian la imagen base y la
+  lista de dependencias.
+- **Dónde:** `frontend/package.json`, `frontend/Dockerfile`, `frontend/vite.config.js`,
+  `frontend/eslint.config.js`.
+
 ---
 
 ## Configuración del repositorio

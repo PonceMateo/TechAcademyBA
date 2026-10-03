@@ -1,0 +1,6 @@
+/*
+ * Tailwind CSS v4 se conecta por plugin de Vite, no por PostCSS: la configuración vive
+ * acá y en el plugin `@tailwindcss/vite` de `vite.config.js`. No hay
+ * `tailwind.config.js`, y es lo esperado en esta versión.
+ */
+@import 'tailwindcss';

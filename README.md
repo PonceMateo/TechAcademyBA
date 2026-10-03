@@ -3,11 +3,11 @@
 Sistema de gestión de una academia de cursos: cursos y comisiones, padrón de docentes y
 alumnos, cobranzas y habilitación de acceso a las clases virtuales.
 
-> **Estado: es un scaffold, no el producto.** El login es real de punta a punta y el modelo de
-> datos está completo. **Ninguna historia de usuario está implementada**: las pantallas se
-> maquetan más adelante con datos de ejemplo. Los valores que veas en el maquetado son
-> *placeholders*, no datos del negocio; la secretaría carga los reales cuando el sistema sea
-> funcional. Las decisiones de por qué están en
+> **Estado: es un scaffold, no el producto.** El login es real de punta a punta, el ruteo por
+> rol ya está y el modelo de datos está completo. **Ninguna historia de usuario está
+> implementada**: las pantallas se maquetan más adelante con datos de ejemplo. Los valores
+> que veas en el maquetado son *placeholders*, no datos del negocio; la secretaría carga los
+> reales cuando el sistema sea funcional. Las decisiones de por qué están en
 > [`docs/decisions.md`](docs/decisions.md) y el alcance en
 > [`openspec/changes/bootstrap-initial-scaffold/`](openspec/changes/bootstrap-initial-scaffold/).
 
@@ -20,18 +20,18 @@ alumnos, cobranzas y habilitación de acceso a las clases virtuales.
 ## Levantar el proyecto
 
 ```bash
-docker compose up -d db backend
+docker compose up -d
 ```
 
-El backend queda en `http://127.0.0.1:8000` y la base en `127.0.0.1:5432`. Para ver qué está
-pasando:
+El backend queda en `http://127.0.0.1:8000`, la interfaz en `http://127.0.0.1:5173` y la
+base en `127.0.0.1:5432`. Para ver qué está pasando:
 
 ```bash
 docker compose ps
 docker compose logs -f backend
 ```
 
-Los dos puertos están publicados **solo** en el bucle local: no exponen nada a la red.
+Los puertos están publicados **solo** en el bucle local: no exponen nada a la red.
 
 ### Migraciones
 
@@ -60,6 +60,28 @@ docker compose run --rm backend python -m app.services.seed
 El comando es **idempotente**: podés correrlo las veces que quieras. La segunda corrida
 actualiza las cuentas en lugar de duplicarlas.
 
+## Entrar por la interfaz
+
+Con los tres servicios arriba, abrir `http://127.0.0.1:5173` y entrar con cualquiera de las
+tres cuentas de la tabla de abajo. El login es **real de punta a punta**: el navegador llama
+a `POST /auth/login` y a `GET /auth/me` contra el backend de verdad, a través del proxy
+`/api` del servidor de desarrollo (decisión D14).
+
+Cada rol entra a su sección y solo a la suya:
+
+| Rol | A dónde entra | Qué pasa si abre la sección de otro |
+|---|---|---|
+| `ADMIN` | `/admin` | pantalla 403 |
+| `DOCENTE` | `/docente` | pantalla 403 |
+| `ALUMNO` | `/alumno` | pantalla 403 |
+
+Sin sesión, cualquier ruta protegida manda al login. Una ruta que no existe responde 404.
+
+> **Ocultar rutas no es proteger.** El frontend esconde la pantalla de un rol ajeno, pero la
+> autorización es del backend, que es el que resuelve la cuenta contra la base en cada
+> request (M7) y devuelve 401 o 403. Que la interfaz no muestre una pantalla no reemplaza
+> esa comprobación: los endpoints de prueba de abajo siguen siendo los que la verifican.
+
 ## Cuentas de demostración
 
 Las tres tienen la misma contraseña. Son públicas y son de demostración: no sirven en ningún
@@ -79,6 +101,10 @@ implementa ese flujo, y con el indicador prendido nadie llegaría a su pantalla 
 
 Estos son los dos únicos endpoints que la interfaz va a usar. El resto del frontend consume
 datos de ejemplo (decisión D14).
+
+Los ejemplos pegan al backend por su puerto. La interfaz no lo hace: usa
+`http://127.0.0.1:5173/api`, que es el mismo proxy `/api` que usa el navegador. Los dos
+caminos devuelven lo mismo.
 
 Obtener el token:
 
@@ -134,6 +160,8 @@ pueda verificar de verdad, y se reemplazan por las pantallas reales cuando llegu
 
 ## Pruebas y linter
 
+Backend:
+
 ```bash
 docker compose run --rm backend pytest
 docker compose run --rm backend ruff check .
@@ -143,6 +171,19 @@ Las pruebas corren contra **PostgreSQL real**, nunca SQLite: el esquema usa `num
 índices únicos sobre columnas normalizadas y CHECKs que SQLite no tiene, así que una suite en
 SQLite pasaría y la migración fallaría después (decisión D15). La base de pruebas se crea sola
 y se descarta en cada corrida.
+
+Frontend:
+
+```bash
+docker compose run --rm frontend npm run lint
+docker compose run --rm frontend npm run test
+docker compose run --rm frontend npm run build
+docker compose run --rm frontend npm run format
+```
+
+Los tres primeros son los que corren en integración continua. `format` es Prettier, que
+reescribe los archivos: `npm run format:check` los verifica sin tocar nada. La interfaz no
+tiene **TypeScript**: es JavaScript con JSX, y `npm run lint` cubre los `.js` y los `.jsx`.
 
 ## Configuración
 
@@ -162,10 +203,16 @@ Las que más se tocan:
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Vigencia del token, en minutos | `480` (ocho horas) |
 | `CORS_ORIGINS` | Orígenes del navegador permitidos, separados por coma | `http://localhost:5173` |
 | `EMAIL_BACKEND` | Implementación de envío de correo | `log` |
+| `VITE_API_BASE_URL` | Ruta que el navegador usa para llamar al backend | `/api` |
+| `VITE_API_PROXY_TARGET` | A quién reenvía el proxy `/api` de Vite | `http://backend:8000` |
 
 `JWT_SECRET_KEY` no tiene un valor real por defecto a propósito: si falta, la aplicación no
 arranca. Generá uno propio con
 `python -c "import secrets; print(secrets.token_urlsafe(48))"` antes de cualquier despliegue.
+
+En el navegador **no** hace falta configurar CORS: el servidor de desarrollo de Vite hace
+proxy de `/api` hacia el backend, así que el pedido sale del mismo origen que la página
+(decisión D14).
 
 ## Estructura
 
@@ -180,18 +227,32 @@ backend/
     tests/        suite de pruebas
   alembic/        migraciones
 docs/             glosario del cliente y registro de decisiones
-frontend/         la interfaz (todavía no está)
+frontend/
+  src/
+    auth/         cliente HTTP del login, contexto de sesión, tabla de ruteo, rutas por rol
+    config/       origen del backend que consume el navegador
+    pages/        pantallas: login, sección de cada rol, 403 y 404
+    test/         arranque de la aplicación para los tests y backend falso
+  index.html      punto de entrada del documento
+  vite.config.js  plugins, proxy de `/api` y configuración de Vitest
+  eslint.config.js, .prettierrc.json
 openspec/         el change que define el alcance de este trabajo
 ```
+
+Lo que **todavía no** existe en `frontend/src/` es `mocks/` y `services/`: son la capa de
+datos intercambiable de la decisión D13, y llegan con el grupo 8. Hoy las pantallas leen del
+contexto de sesión y nada más.
 
 El flujo de trabajo del equipo está en [`AGENTS.md`](AGENTS.md) y la terminología del cliente
 en [`docs/glossary.md`](docs/glossary.md).
 
 ## Qué falta todavía
 
-- **La interfaz.** No hay frontend: no existe `frontend/`, así que `docker compose up -d` solo
-  levanta la base y el backend. Viene en el work unit 5.
-- **Las pantallas.** Ninguna historia de usuario está implementada.
+- **Las pantallas.** El login, la sesión y el ruteo por rol funcionan de punta a punta, pero
+  **ninguna historia de usuario está implementada**: las secciones de los tres shells están
+  vacías y se maquetan en los work units siguientes.
+- **La capa de datos del frontend.** `src/services/` y los componentes reutilizables vienen
+  con el grupo 8.
 - **El proveedor de correo.** Solo existe la implementación que escribe en el log.
 - **Los datos reales.** No se importa nada de la planilla del cliente: la carga de los datos
   históricos se hace a mano al final del MVP, por decisión del equipo.

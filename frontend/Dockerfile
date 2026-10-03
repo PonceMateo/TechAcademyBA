@@ -11,14 +11,15 @@ ENV NODE_ENV=development \
 
 WORKDIR /app
 
-# package.json arrives with work unit 5. npm install is used instead of npm ci on purpose:
-# there is no committed lockfile yet. Once package-lock.json exists, switching to npm ci is
-# a one-line change that makes builds reproducible.
+# package.json and package-lock.json arrive with work unit 5. `npm ci` is what the earlier
+# version of this file anticipated for the moment the lockfile existed: it installs exactly
+# the resolved tree, so an image built today and one built in a month install the same
+# versions. `npm install` would silently move the tree forward instead.
 #
 # The installed modules live in /app/node_modules. docker-compose.yml masks that path with a
 # named volume, because the bind mount of the source would otherwise hide them on the host.
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # The application source arrives through the bind mount declared in docker-compose.yml.
 EXPOSE 5173
