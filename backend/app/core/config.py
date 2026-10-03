@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
+    # Costo de cómputo de bcrypt. Es lento por diseño y el valor de producción tiene que
+    # ser alto; la suite lo baja con `BCRYPT_ROUNDS` (ver `app/tests/__init__.py`) para no
+    # pagar el costo de producción en cada hash. El mínimo de la biblioteca es 4.
+    bcrypt_rounds: int = Field(default=12, ge=4, le=31)
 
     # --- API ----------------------------------------------------------------
     # `NoDecode` desactiva el parseo JSON que pydantic-settings le hace a los campos

@@ -370,6 +370,101 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
   `btrim` solo recorta espacios: un valor que sea un tabulador también está vacío.
 - **Dónde:** `app/models/base.py` (`no_vacio`), y las tablas que las usan.
 
+### M5 — La dependencia de autorización por rol vive en `app/api/deps.py`
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** D1 reserva `app/core` para configuración, seguridad y dependencias. La parte
+  criptográfica de la autenticación —hash de contraseñas y firma del token— quedó en
+  `app/core/security.py`, que es la base de la pirámide. Las dependencias de FastAPI que
+  resuelven la **cuenta** (`get_current_user` y `require_roles(...)`) quedaron en
+  `app/api/deps.py`, junto a las rutas que las usan.
+- **Por qué:** `get_current_user` necesita `app.models.Usuario`, y `app/core` no puede
+  importar `app.models`: la prueba de capas del work unit 3
+  (`test_layers.py::test_las_capas_no_se_importan_entre_si_de_modo_inesperado`) lo verifica
+  y lo considera un invariante, no una preferencia. La lectura que respeta D1 y ese
+  invariante a la vez es que `core` aloja la seguridad y las dependencias que no dependen del
+  dominio —`get_db` ya es una— y la capa de API aloja las que sí.
+- **Alternativa descartada:** aflojar la prueba de capas para meter `require_roles` en
+  `app/core`. Habría sido cambiar una decisión del work unit 3 para acomodar un archivo
+  nuevo, y la prueba existe justo para que nadie lo haga por comodidad.
+- **Consecuencia:** `require_roles` sigue siendo reutilizable por cualquier endpoint, que es
+  lo que exige la spec: todas las rutas viven en `app/api`.
+- **Dónde:** `app/core/security.py`, `app/api/deps.py`, `app/services/auth.py`.
+
+### M6 — El correo de acceso de una cuenta es el mismo que su correo de padrón
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la carga inicial crea el `docente` y su `usuario` (o el `alumno` y su
+  `usuario`) con **la misma dirección de correo**, y al validar la unicidad cruzada de M1
+  excluye los registros de la propia persona con `exclude_docente_id` /
+  `exclude_alumno_id` / `exclude_usuario_id`.
+- **Por qué:** D4 hace de `usuario` la identidad única y el login es por correo, así que la
+  misma persona tiene que tener la misma dirección en los dos lados. Los `exclude_*` ya
+  existen para esto —están pensados para que "un docente pueda guardar su propio perfil sin
+  que su propia fila lo bloquee"— y son el mecanismo correcto, no un parche. Además, la
+  cuenta se busca **antes** de validar la unicidad: si se validara después, la segunda
+  corrida de la carga encontraría su propia cuenta y se declararía en conflicto consigo misma,
+  y la idempotencia de 6.2 se rompería.
+- **Efecto aceptado:** la dirección de una persona queda escrita en dos tablas. Es
+  intencional: es la misma persona y el índice único de cada padrón sigue sosteniendo la
+  unicidad dentro de cada uno. La unicidad **cruzada** entre `docente` y `alumno` la sigue
+  verificando el servicio, como en M1.
+- **Dónde:** `app/services/seed.py`.
+
+### M7 — El token afirma la identidad; la base manda sobre la cuenta
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `get_current_user` resuelve el `sub` del token contra `usuario` en **cada**
+  request. El claim `rol` se lee pero no decide: el rol que manda es el de la fila. Una
+  cuenta con `is_active = false`, o que ya no existe, produce el mismo `401` genérico que un
+  token roto.
+- **Por qué:** el token es stateless (D2), pero "sin estado de sesión" no significa "sin
+  fuente de verdad". Con el claim solamente, una cuenta dada de baja seguiría operando
+  hasta que venciera el token —hasta ocho horas— y `must_change_password` sería una foto del
+  momento del login en lugar del valor vigente. El costo es una consulta por request sobre
+  una tabla de identidad con índice por clave primaria.
+- **Alternativa descartada:** confiar en el claim `rol` y no consultar la base. Es más rápido,
+  y es exactamente el diseño que hace que revocar un acceso tarde horas.
+- **Consecuencia:** un token falsificado con `rol: ADMIN` sobre una cuenta `ALUMNO` sigue
+  siendo rechazado con 403 por la ruta de administración. Hay una prueba que lo comprueba.
+- **Dónde:** `app/api/deps.py`.
+
+### M8 — El costo de bcrypt es configurable, y la suite lo baja
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `BCRYPT_ROUNDS` (12 por defecto, mínimo 4) determina el costo de cómputo de
+  bcrypt. `app/tests/__init__.py` lo baja a 4 antes de que se importe nada de la aplicación.
+- **Por qué:** `design.md` lo anticipa en *Riesgos*: bcrypt es lento **por diseño** y con el
+  costo de producción la suite de autenticación casi se duplica sin ganar nada. La mitigación
+  es de la suite, no del entorno: la variable no está en `docker-compose.yml` ni en `.env`, así
+  que el contenedor y la máquina del equipo siguen usando 12.
+- **Pendiente:** `BCRYPT_ROUNDS` todavía no está documentado en `.env.example`, que es de la
+  tarea 2.4 y está fuera del alcance de este work unit. Hay que agregarlo cuando alguien
+  toque ese archivo.
+- **Guardia:** `test_security.py::test_la_suite_no_paga_el_costo_de_produccion` falla si el
+  ajuste de `app/tests/__init__.py` deja de aplicarse, en vez de dejar que la suite se ponga
+  lenta en silencio.
+- **Dónde:** `app/core/config.py`, `app/core/security.py`, `app/tests/__init__.py`.
+
+### M9 — `POST /auth/login` acepta `email` y `password`, en inglés
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el cuerpo del login es `{"email": "...", "password": "..."}`. La spec de
+  `auth-and-roles` escribe "acepte `email` y `contraseña`" en una oración en español; el
+  nombre del campo del contrato se resolvió en inglés.
+- **Por qué:** la convención del equipo es que los identificadores, el código y los paths van
+  en inglés, y que solo las entidades de dominio van en español sin tildes (D19). `password`
+  no es una entidad de dominio: es un campo del contrato de la API, del mismo lado que
+  `access_token` o `must_change_password`, que la propia spec escribe en inglés.
+- **Consecuencia:** el texto de la interfaz sigue siendo es-AR. Lo que el usuario lee en un
+  422 de FastAPI es "Field required", que es el texto del framework, no del producto.
+- **Dónde:** `app/schemas/auth.py`, `app/api/auth.py`.
+
 ---
 
 ## Configuración del repositorio

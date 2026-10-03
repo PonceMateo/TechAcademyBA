@@ -115,13 +115,39 @@ def db_session(engine) -> Generator[Session, None, None]:
 
 @pytest.fixture
 def client() -> Iterator[object]:
-    """Cliente HTTP de prueba contra la aplicación, sin autenticación."""
+    """Cliente HTTP de prueba contra la aplicación, sin autenticación.
+
+    No toca la base. Sirve para las rutas que no la necesitan, como `/health`. Para las que
+    sí, está `api_client`.
+    """
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def api_client(db_session: Session) -> Iterator[object]:
+    """Cliente HTTP conectado a la base de pruebas.
+
+    Sin esto, una ruta que recibe `get_db` abre su propia sesión contra `SessionLocal`, que
+    apunta a la base de **desarrollo**: la prueba leería y escribiría datos de la máquina
+    del equipo. Se sobreescribe la dependencia con la sesión que la prueba ya va a
+    descartar, así que el aislamiento de D15 sigue valiendo para las rutas HTTP.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.core.database import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = lambda: db_session
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
 
 
 def _run_alembic(database_url: str, *args: str, must_succeed: bool = True) -> None:

@@ -16,6 +16,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.core.security import crear_token_acceso, hashear_password
 from app.models.catalogo import Comision, Curso, Sede
 from app.models.clases import Asistencia, Clase, OverrideHabilitacion
 from app.models.cobranza import Cobranza, Factura, Imputacion, Pagador
@@ -36,6 +37,10 @@ from app.models.enums import (
 from app.models.inscripciones import ContratoCorporativo, Empresa, Inscripcion, NominaEmpleado
 from app.models.padron import Alumno, Docente, Usuario
 from app.services.normalization import normalize_code, normalize_document, normalize_name
+
+#: Contraseña de las cuentas que arman las fábricas. Las pruebas de autenticación la usan
+#: para comprobar que el login acepta lo que corresponde y rechaza lo demás.
+PASSWORD_DE_PRUEBA = "Prueba1234!"
 
 #: Pesos de la regla de dígito verificador de CUIT/CUIL de AFIP.
 _CUIT_PESOS = (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)
@@ -168,17 +173,18 @@ def crear_usuario_admin(
     *,
     email: str = "admin@techacademy.invalid",
     nombre: str = "Secretaria BA",
+    is_active: bool = True,
+    must_change_password: bool = False,
 ) -> Usuario:
     return _persistir(
         session,
         Usuario(
             email=email,
             nombre=nombre,
-            # Nunca es la contraseña en claro: D5/D2 exigen un hash, y la verificación
-            # real llega en el work unit 5 con bcrypt.
-            password_hash="$2b$12$placeholder-hash-not-a-real-password",
+            password_hash=hashear_password(PASSWORD_DE_PRUEBA),
             rol=Rol.ADMIN.value,
-            must_change_password=False,
+            must_change_password=must_change_password,
+            is_active=is_active,
         ),
     )
 
@@ -188,6 +194,8 @@ def crear_usuario_docente(
     *,
     docente: Docente | None = None,
     email: str = "rita.molina.login@techacademy.invalid",
+    is_active: bool = True,
+    must_change_password: bool = True,
 ) -> Usuario:
     docente = docente or crear_docente(session, email="rita.molina@techacademy.invalid")
     return _persistir(
@@ -195,11 +203,52 @@ def crear_usuario_docente(
         Usuario(
             email=email,
             nombre=f"{docente.nombre} {docente.apellido}",
-            password_hash="$2b$12$placeholder-hash-not-a-real-password",
+            password_hash=hashear_password(PASSWORD_DE_PRUEBA),
             rol=Rol.DOCENTE.value,
+            must_change_password=must_change_password,
+            is_active=is_active,
             docente_id=docente.id,
         ),
     )
+
+
+def crear_usuario_alumno(
+    session: Session,
+    *,
+    alumno: Alumno | None = None,
+    email: str = "agustina.benitez.login@techacademy.invalid",
+    is_active: bool = True,
+    must_change_password: bool = True,
+) -> Usuario:
+    """Falta en el padrón de pruebas hasta el work unit 5: `ALUMNO` es uno de los tres
+    roles y sin esta cuenta no se puede probar la autorización por rol."""
+    alumno = alumno or crear_alumno(session, email="agustina.benitez@techacademy.invalid")
+    return _persistir(
+        session,
+        Usuario(
+            email=email,
+            nombre=alumno.nombre,
+            password_hash=hashear_password(PASSWORD_DE_PRUEBA),
+            rol=Rol.ALUMNO.value,
+            must_change_password=must_change_password,
+            is_active=is_active,
+            alumno_id=alumno.id,
+        ),
+    )
+
+
+def token_de_prueba(usuario: Usuario, **kwargs) -> str:
+    """Token firmado para una cuenta ya persistida."""
+    return crear_token_acceso(
+        usuario_id=usuario.id,
+        rol=usuario.rol,
+        email=usuario.email,
+        **kwargs,
+    )
+
+
+def encabezado_de_autorizacion(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def crear_empresa(
