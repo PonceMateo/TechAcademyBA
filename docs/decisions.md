@@ -969,7 +969,7 @@ con el cliente o entre los tres del equipo.
 | P6 | Datos que exige un alumno del exterior | Cliente | La historia #47 entra solo con pasaporte. |
 | P7 | Dígito verificador del CUIL | Cliente | El dato es obligatorio y único, pero el equipo no pidió validarlo. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
-| P10 | Firma de la Definition of Done | Equipo | La tarea 12.4 pide una grabación de pantalla o una lista firmada **en el pull request**, y todavía no hay PR. La lista quedó escrita en `docs/verificacion-definition-of-done.md` y falta firmarla. |
+| P10 | Firma de la Definition of Done | Equipo | Se firmó el recorrido el 2026-10-03, en local y después de que el PR #45 saliera mergeado, así que la firma quedó en `docs/verificacion-definition-of-done.md` y no en el PR. La fila de **revisión de la lista** sigue sin firmar: la hace alguien distinto de quien recorrió la interfaz. |
 
 ### P9 — Resuelto: el remoto sí existe y la integración continua ya corrió
 
