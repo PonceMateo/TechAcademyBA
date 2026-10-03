@@ -13,7 +13,7 @@ alumnos, cobranzas y habilitación de acceso a las clases virtuales.
 El README tiene dos partes. **Si querés usar el sistema, andá directo a
 [Levantar el proyecto](#levantar-el-proyecto).** Lo demás es para el equipo que lo desarrolla.
 
-**Índice**
+## **Índice**
 
 - **Para usar el sistema**
   [Requisitos](#requisitos) ·
@@ -33,7 +33,6 @@ El README tiene dos partes. **Si querés usar el sistema, andá directo a
   [Configuración](#configuración) ·
   [Documentos](#documentos-del-proyecto)
 
----
 
 # Para usar el sistema
 
