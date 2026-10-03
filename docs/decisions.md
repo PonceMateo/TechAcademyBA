@@ -296,6 +296,82 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Correcciones al modelo de dominio
+
+### M1 — La unicidad global de email se sostiene en base y en servicio, no solo en base
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** D5 declara que `usuario.email`, `docente.email` y `alumno.email`
+  son únicos cada uno, "lo que garantiza unicidad global de email entre los tres
+  padrones". **Eso no es cierto a nivel de base de datos**: un índice único es por
+  tabla, así que tres índices únicos no impiden que una dirección esté en dos
+  padrones a la vez. Lo que sí se sostiene:
+  - cada padrón es único contra sí mismo, por índice único en base;
+  - `usuario.email` es único de forma global, y es la tabla de identidad;
+  - la unicidad **cruzada** entre `docente` y `alumno` la verifica
+    `app/services/emails.py`, dentro de la transacción de alta, y lanza
+    `EmailAlreadyRegistered`.
+- **Por qué:** no se eligió una tabla `email_reservado` ni una clave foránea
+  cruzada entre `docente` y `alumno` porque las dos cosas agregan estructura para
+  sostener una restricción que además depende de una regla de negocio ("¿una persona
+  puede ser docente y alumna a la vez?"), y esa pregunta sigue abierta en el
+  diseño. Si el cliente la confirma, la función de servicio alcanza y la base no
+  cambia.
+- **Efecto colateral aceptado:** un `INSERT` directo a `docente` o a `alumno` con un
+  email que ya existe en el otro padrón entra sin quejarse. El acceso directo a la
+  base es del equipo, igual que el riesgo que ya asume D8 con el saldo de una
+  cobranza.
+- **Dónde:** `app/models/padron.py`, `app/services/emails.py`.
+
+### M2 — `comision` no tiene columna `estado`
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la tabla de entidades de `design.md` lista `estado` en `comision`, pero
+  el mismo documento, en *Gaps abiertos* #14, deja constancia de que los siete estados
+  de comisión que tiene la planilla del cliente **no se modelan** porque ninguna
+  historia Must ni Should los necesita. Modelar una columna de estado sin conjunto de
+  valores definido sería dejar un enum libre, que es exactamente el problema del Excel
+  que el proyecto quiere reemplazar. La baja lógica va con `activo`.
+- **Por qué:** la lectura que respeta las dos afirmaciones es que `estado` no se
+  modela. Si aparece una historia que lo necesite, se abre junto con ella.
+- **Dónde:** `app/models/catalogo.py`.
+
+### M3 — `nomina_empleado.tipo_contrato` existe para sostener una restricción
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `nomina_empleado` tiene una columna desnormalizada `tipo_contrato`, con
+  clave foránea compuesta contra `contrato_corporativo(id, tipo)` y un CHECK
+  `tipo_contrato = 'CURSO_FORMAL'`. La regla "una charla cerrada no genera nómina"
+  (historia #19) queda así en la base y no solo en el servicio: un `INSERT` directo no
+  la puede esquivar.
+- **Por qué:** la alternativa era validar la regla en el servicio, que es lo que hace
+  D8 con el saldo de una cobranza, pero ahí el riesgo asumido es acotado a "nadie
+  escribe por SQL directo". Acá la alternativa era dejar el único rastro de la charla
+  en el propio `audit_log`. Cuesta una columna.
+- **Costo:** `contrato_corporativo` necesita `UNIQUE (id, tipo)`, que es redundante
+  contra la clave primaria pero es lo que permite la clave foránea compuesta.
+- **Dónde:** `app/models/inscripciones.py`.
+
+### M4 — "Obligatorio" incluye la cadena vacía
+
+- **Fecha:** 2026-10-02
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** los campos que la spec declara obligatorios llevan, además de
+  `NOT NULL`, un CHECK `columna ~ '[^[:space:]]'`: `curso.codigo`, `curso.nombre`,
+  `sede.nombre`, `comision.codigo`, `comision.dias_horarios`, `docente.cuil`,
+  `docente.email`, `docente.nombre`, `docente.apellido`, `alumno.nombre`,
+  `alumno.email`, `usuario.email`, `usuario.nombre`.
+- **Por qué:** `NOT NULL` solo rechaza la ausencia de valor. Una cadena vacía o de
+  espacios es un campo obligatorio no informado, y la historia #1 pide que el sistema
+  lo indique. La expresión es una clase de carácter y no `length(btrim(...))` porque
+  `btrim` solo recorta espacios: un valor que sea un tabulador también está vacío.
+- **Dónde:** `app/models/base.py` (`no_vacio`), y las tablas que las usan.
+
+---
+
 ## Configuración del repositorio
 
 ### R1 — `opencode.json` declara Context7 sin API key
