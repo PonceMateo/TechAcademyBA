@@ -10,6 +10,7 @@
  * archivo que exporta un componente y además una constante rompe la regla de recarga en caliente
  * de `eslint-plugin-react-refresh`.
  */
+export { Avatar } from './Avatar'
 export { Badge } from './Badge'
 export { Button } from './Button'
 export { Card } from './Card'

@@ -20,6 +20,24 @@ export function resetDataSource() {
 }
 
 /**
+ * Deja la fuente de datos de ejemplo con algunas funciones reemplazadas.
+ *
+ * **Para los estados que el ejemplo no tiene, y no para probar la frontera.** Hay estados que el
+ * cliente no registró y que el spec nonetheless exige ver: un alumno sin inscripciones, un
+ * comprobante pagado por un tercero, una comisión con cuatro bloqueados. Agregar filas de ejemplo
+ * para cada uno sería inventar datos de negocio para poder mirarlos; acá se cambia quién responde
+ * una función, que es exactamente lo que la frontera permite (D13).
+ *
+ * Lo que se reemplaza es puntual: el resto sigue viniendo del ejemplo, así que la pantalla dibuja
+ * los datos reales del maqueteado y solo el estado que el test necesita.
+ */
+export function stubDataSource(overrides) {
+  const base = createDataSource({ modo: API_MODE.MOCK })
+
+  return configurarFuenteDeDatos({ ...base, ...overrides })
+}
+
+/**
  * Arranque de la aplicación para los tests: el mismo árbol que monta `main.jsx`, pero con
  * `MemoryRouter` y una ruta inicial explícita, para poder empezar en `/admin` sin que haya
  * que navegar hasta ahí.

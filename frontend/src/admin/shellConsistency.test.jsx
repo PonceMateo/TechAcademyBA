@@ -1,9 +1,10 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { SECCIONES_DOCENTE } from '../docente/navegacion'
 import { SECCIONES_ADMIN } from './navegacion'
 
 /**
@@ -17,21 +18,42 @@ import { SECCIONES_ADMIN } from './navegacion'
  * **Por qué el atributo `data-ui`.** En el DOM, una tabla escrita a mano y una que viene de `Table`
  * son indistinguibles. Si la comprobación dependiera del HTML, la mitad estructural de esta prueba
  * no se podría escribir. El atributo es lo que hace verificable el "comparten los mismos
- * componentes" y lo usan también los grupos 10 y 11.
+ * componentes" y lo usan los grupos 10 y 11.
  *
- * **Lo que todavía no se puede verificar:** que el shell de Docente y el de Alumno dibujen con los
- * componentes compartidos. Esos shells llegan en los grupos 10 y 11; hoy siguen siendo la pantalla
- * de marcador de posición. Lo que sí se verifica es que las tres raíces `/admin`, `/docente` y
- * `/alumno` siguen debajo del mismo guard de rol y comparten los componentes de sesión.
+ * **Qué mira ahora.** Con los tres shells montados, la prueba afirma dos cosas más: que las
+ * pantallas de los tres directorios —`admin`, `docente` y `alumno`— leen sus datos por el servicio y
+ * no por los mocks, y que los tres armazones salen del mismo `ShellFrame`. Lo segundo es lo que
+ * hace que "los tres shells comparten los mismos componentes" sea una afirmación sobre el código y
+ * no una impresión mirando la pantalla.
  */
 
 const RAIZ_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Pantallas de administración: los archivos `.jsx` del directorio, sin tests. */
-function pantallasAdmin() {
-  return readdirSync(join(RAIZ_SRC, 'admin'))
+/** Los tres directorios de pantallas, con la etiqueta que los identifica en los mensajes. */
+const SHELLS = Object.freeze([
+  { etiqueta: 'administración', directorio: 'admin' },
+  { etiqueta: 'docente', directorio: 'docente' },
+  { etiqueta: 'alumno', directorio: 'alumno' },
+])
+
+/** Pantallas de un shell: los archivos `.jsx` del directorio, sin tests. */
+function pantallasDe(directorio) {
+  const ruta = join(RAIZ_SRC, directorio)
+
+  if (!existsSync(ruta)) {
+    return []
+  }
+
+  return readdirSync(ruta)
     .filter((nombre) => nombre.endsWith('.jsx') && !nombre.includes('.test.'))
-    .map((nombre) => join(RAIZ_SRC, 'admin', nombre))
+    .map((nombre) => join(ruta, nombre))
+}
+
+/** Pantallas de los tres shells, con la ruta relativa a `src/` para los mensajes. */
+function pantallasDeTodosLosShells() {
+  return SHELLS.flatMap(({ etiqueta, directorio }) =>
+    pantallasDe(directorio).map((archivo) => ({ etiqueta, archivo })),
+  )
 }
 
 /** Nombres de los componentes de `src/components/ui/` que cada pantalla importa. */
@@ -49,33 +71,40 @@ function componentesImportados(archivo) {
   )
 }
 
-describe('la frontera de datos se respeta en las pantallas de administración', () => {
-  it('ninguna pantalla de administración importa de src/mocks/', () => {
-    const culpables = pantallasAdmin()
-      .filter((archivo) => /from\s*['"][^'"]*mocks/.test(readFileSync(archivo, 'utf8')))
-      .map((archivo) => relative(RAIZ_SRC, archivo))
+/**
+ * Los armazones y los tableros no piden datos: un armazón dibuja el menú y el tablero de
+ * Administración es texto fijo. Son las únicas pantallas de las tres secciones con esa excepción, y
+ * las dos existen solo porque el tablero no tiene historia que la cubra.
+ */
+const SIN_DATOS_POR_DISENO = ['AdminLayout.jsx', 'DashboardPage.jsx', 'TeacherLayout.jsx']
 
-    expect(culpables).toEqual([])
-  })
+describe('la frontera de datos se respeta en las pantallas de los tres shells', () => {
+  it.each(SHELLS.map((shell) => [shell.etiqueta, shell.directorio]))(
+    'ninguna pantalla de %s importa de src/mocks/',
+    (_etiqueta, directorio) => {
+      const culpables = pantallasDe(directorio)
+        .filter((archivo) => /from\s*['"][^'"]*mocks/.test(readFileSync(archivo, 'utf8')))
+        .map((archivo) => relative(RAIZ_SRC, archivo))
 
-  it('ninguna pantalla de administración alcanza el módulo de datos de ejemplo por otra vía', () => {
-    const alcanzables = pantallasAdmin().filter((archivo) =>
-      /from\s*'[^']*mocks/.test(readFileSync(archivo, 'utf8')),
-    )
+      expect(culpables).toEqual([])
+    },
+  )
+
+  it('ninguna pantalla alcanza el módulo de datos de ejemplo por otra vía', () => {
+    const alcanzables = pantallasDeTodosLosShells()
+      .filter(({ archivo }) => /from\s*'[^']*mocks/.test(readFileSync(archivo, 'utf8')))
+      .map(({ etiqueta, archivo }) => `${etiqueta}: ${relative(RAIZ_SRC, archivo)}`)
 
     expect(alcanzables).toEqual([])
   })
 
   it('todas las pantallas leen sus datos por src/services/', () => {
-    const sinServicio = pantallasAdmin()
+    const sinServicio = pantallasDeTodosLosShells()
       .filter(
-        (archivo) => !/from\s*'[^']*services\/dataService'/.test(readFileSync(archivo, 'utf8')),
+        ({ archivo }) => !/from\s*'[^']*services\/dataService'/.test(readFileSync(archivo, 'utf8')),
       )
-      .map((archivo) => relative(RAIZ_SRC, archivo))
-      // El armazón y el tablero no piden datos: el tablero es texto fijo y el armazón dibuja el menú.
-      .filter(
-        (ruta) => !['AdminLayout.jsx', 'DashboardPage.jsx'].some((salte) => ruta.endsWith(salte)),
-      )
+      .map(({ etiqueta, archivo }) => `${etiqueta}: ${relative(RAIZ_SRC, archivo)}`)
+      .filter((descripcion) => !SIN_DATOS_POR_DISENO.some((salte) => descripcion.endsWith(salte)))
 
     expect(sinServicio).toEqual([])
   })
@@ -83,21 +112,42 @@ describe('la frontera de datos se respeta en las pantallas de administración', 
 
 describe('los tres shells comparten los componentes', () => {
   it('ninguna pantalla dibuja tabla, insignia o estado con su propia implementación', () => {
-    const sinCompartidos = pantallasAdmin()
-      .filter((archivo) => componentesImportados(archivo).length === 0)
-      .map((archivo) => relative(RAIZ_SRC, archivo))
-      .filter((ruta) => !ruta.endsWith('DashboardPage.jsx'))
+    const sinCompartidos = pantallasDeTodosLosShells()
+      .filter(({ archivo }) => componentesImportados(archivo).length === 0)
+      .map(({ etiqueta, archivo }) => `${etiqueta}: ${relative(RAIZ_SRC, archivo)}`)
+      // El tablero de Administración es texto fijo y los armazones no dibujan nada: dibujan el menú y
+      // le pasan la pantalla al armazón compartido. Que los tres armazones usen `ShellFrame` lo
+      // afirma la prueba de abajo.
+      .filter(
+        (descripcion) =>
+          !descripcion.endsWith('DashboardPage.jsx') && !descripcion.includes('Layout.jsx'),
+      )
 
     expect(sinCompartidos).toEqual([])
   })
 
-  it('no deja una segunda implementación de tabla o insignia en el código', () => {
+  it('los armazones de las secciones montadas salen del mismo componente compartido', () => {
+    const armazones = ['admin/AdminLayout.jsx', 'docente/TeacherLayout.jsx']
+      .map((ruta) => join(RAIZ_SRC, ruta))
+      .filter((ruta) => existsSync(ruta))
+
+    // Con los shells montados, todos tienen que usar `ShellFrame`: es lo que convierte "los shells
+    // comparten los mismos componentes" en una afirmación sobre el código y no una impresión.
+    expect(armazones).toHaveLength(2)
+    for (const armazon of armazones) {
+      expect(readFileSync(armazon, 'utf8')).toMatch(/import\s*\{\s*ShellFrame\s*\}/)
+    }
+  })
+
+  it('no deja una segunda implementación de tabla, insignia ni avatar en el código', () => {
     const implementacionesPropias = readdirSync(join(RAIZ_SRC, 'components', 'ui')).filter(
-      (nombre) => /^(Table|Badge|StatusIndicator|Button|Input|Modal|Card)\./.test(nombre),
+      (nombre) => /^(Table|Badge|StatusIndicator|Button|Input|Modal|Card|Avatar)\./.test(nombre),
     )
 
-    // Solo puede haber un archivo por componente compartido, y los que existen son los del grupo 8.
+    // Solo puede haber un archivo por componente compartido. `Avatar` llegó con los shells de
+    // docente y de alumno, que muestran las iniciales en el pie y en la ficha de perfil.
     expect(implementacionesPropias.sort()).toEqual([
+      'Avatar.jsx',
       'Badge.jsx',
       'Button.jsx',
       'Card.jsx',
@@ -109,7 +159,7 @@ describe('los tres shells comparten los componentes', () => {
   })
 })
 
-describe('el shell de Administración dibuja con los componentes compartidos', () => {
+describe('el tablero de Administración dibuja con los componentes compartidos', () => {
   beforeEach(async () => {
     resetDataSource()
     stubBackend()
@@ -122,20 +172,41 @@ describe('el shell de Administración dibuja con los componentes compartidos', (
     expect(document.querySelectorAll('[data-ui="badge"]').length).toBeGreaterThan(0)
     expect(document.querySelectorAll('[data-ui="button"]').length).toBeGreaterThan(0)
   })
+})
 
-  it.each(SECCIONES_ADMIN.map((seccion) => [seccion.etiqueta, seccion.ruta]))(
-    'la pantalla de %s dibuja con los componentes compartidos',
-    async (_etiqueta, ruta) => {
-      resetDataSource()
-      stubBackend()
-      const { unmount } = renderAppAs('ADMIN', ruta)
+describe('las pantallas de cada shell dibujan con los componentes compartidos', () => {
+  it.each([
+    ['ADMIN', 'MENÚ OPERATIVO', SECCIONES_ADMIN.map((seccion) => seccion.ruta)],
+    [
+      'DOCENTE',
+      'ESPACIO DOCENTE',
+      SECCIONES_DOCENTE.filter((seccion) => seccion.ruta).map((seccion) => seccion.ruta),
+    ],
+  ])(
+    'la sección de %s marca sus pantallas con tarjetas y botones compartidos',
+    async (rol, tituloMenu, rutas) => {
+      for (const ruta of rutas) {
+        resetDataSource()
+        stubBackend()
+        const { unmount } = renderAppAs(rol, ruta)
 
-      await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
+        await screen.findByRole('navigation', { name: tituloMenu })
 
-      expect(document.querySelectorAll('[data-ui="card"]').length).toBeGreaterThan(0)
-      expect(document.querySelectorAll('[data-ui="button"]').length).toBeGreaterThan(0)
+        // Las pantallas piden sus datos por el servicio, así que el armazón aparece antes que la
+        // pantalla: hay que esperar a que la pantalla haya dibujado.
+        await waitFor(() =>
+          expect(
+            document.querySelectorAll('[data-ui="card"]').length,
+            `${ruta} sin tarjetas`,
+          ).toBeGreaterThan(0),
+        )
+        expect(
+          document.querySelectorAll('[data-ui="button"]').length,
+          `${ruta} sin botones`,
+        ).toBeGreaterThan(0)
 
-      unmount()
+        unmount()
+      }
     },
   )
 })
@@ -143,7 +214,7 @@ describe('el shell de Administración dibuja con los componentes compartidos', (
 describe('las tres raíces de rol', () => {
   it.each([
     ['ADMIN', '/admin', 'MENÚ OPERATIVO'],
-    ['DOCENTE', '/docente', 'Espacio Docente'],
+    ['DOCENTE', '/docente', 'ESPACIO DOCENTE'],
     ['ALUMNO', '/alumno', 'Espacio Alumno'],
   ])('deja entrar a %s por su raíz y lo muestra dentro de su shell', async (rol, ruta, marca) => {
     resetDataSource()
@@ -154,5 +225,21 @@ describe('las tres raíces de rol', () => {
     await screen.findByText(marca)
     // El botón de cerrar sesión es el mismo componente en las tres secciones.
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['DOCENTE', '/admin'],
+    ['DOCENTE', '/alumno'],
+    ['ALUMNO', '/admin'],
+    ['ALUMNO', '/docente'],
+  ])('rechaza con 403 que %s entre por %s', async (rol, rutaAjena) => {
+    resetDataSource()
+    stubBackend()
+
+    renderAppAs(rol, rutaAjena)
+
+    expect(
+      await screen.findByRole('heading', { name: 'No tenés acceso a esta sección' }),
+    ).toBeInTheDocument()
   })
 })

@@ -13,8 +13,10 @@
  * información del cliente ya se haya migrado.
  */
 export { CATALOGO_TOTAL_COMISIONES, COMISIONES, SEDES } from './comisiones'
+export { ASISTENCIAS } from './asistencias'
 export { COBRANZAS, DESTINO_IMPUTACION } from './cobranzas'
 export { ALUMNOS } from './alumnos'
+export { LINKS_DE_CLASE } from './clases'
 export { DOCENTES } from './docentes'
 export { EMPRESAS } from './empresas'
 export { IS_PLACEHOLDER_DATA, PLACEHOLDER_DATA_NOTICE } from './placeholderNotice'

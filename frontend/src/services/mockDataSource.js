@@ -1,11 +1,13 @@
 import {
   ALUMNOS,
+  ASISTENCIAS,
   CATALOGO_TOTAL_COMISIONES,
   COBRANZAS,
   COMISIONES,
   DESTINO_IMPUTACION,
   DOCENTES,
   EMPRESAS,
+  LINKS_DE_CLASE,
   SEDES,
 } from '../mocks'
 import { normalizeCode, normalizeCuit, normalizeDocumento } from '../domain/normalize'
@@ -19,13 +21,32 @@ import { normalizeCode, normalizeCuit, normalizeDocumento } from '../domain/norm
  * un componente.
  *
  * **Los datos salen de `src/mocks/` y no al revés.** El store se arma una vez por instancia desde
- * las colecciones congeladas de ejemplo y después se copia: registrar una cobranza agrega una fila
- * a la pantalla sin tocar el módulo de datos de ejemplo, que es lo único que no debería ensuciarse
- * con lo que hace un usuario.
+ * las colecciones congeladas de ejemplo y después se copia: registrar una cobranza o cargar un link
+ * de clase agrega una fila a la pantalla sin tocar el módulo de datos de ejemplo, que es lo único
+ * que no debería ensuciarse con lo que hace un usuario.
  *
  * **Ninguna función calcula un agregado de negocio.** Filtra, ordena y devuelve. Las vacantes
  * vienen calculadas en el mock (D10) y el estado de habilitación viene por registro (D9).
  */
+
+/** Es el docente del maqueteado: el único al que el shell de Docente le muestra comisiones. */
+const DOCENTE_DEL_MAQUETADO = 1
+
+/**
+ * La validación del link de clase vive acá y no en la pantalla.
+ *
+ * Es la misma regla que va a validar el backend, y una pantalla que la tuviera escrita calcularía
+ * distinto del servidor el día que difieran. `new URL` es la validación: exige un esquema y un
+ * host, así que `zoom.us/j/123` se rechaza por no traer `https://` y `el link de mañana` también.
+ */
+function esUrl(valor) {
+  try {
+    const url = new URL(String(valor))
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
 
 function copiar(registros) {
   return registros.map((registro) => ({ ...registro }))
@@ -55,6 +76,22 @@ export function createMockDataSource() {
     empresas: copiar(EMPRESAS),
     sedes: copiar(SEDES),
     cobranzas: copiar(COBRANZAS),
+    asistencias: copiar(ASISTENCIAS),
+    links: copiar(LINKS_DE_CLASE),
+  }
+
+  /** El padrón de una comisión: los alumnos que tiene, con el acceso que ya viene derivado (D9). */
+  function padron(comisionCodigo) {
+    const codigo = normalizeCode(comisionCodigo)
+
+    return store.alumnos.filter((alumno) => normalizeCode(alumno.comision.codigo) === codigo)
+  }
+
+  /** La fila del catálogo de una comisión, o `undefined` si el código no existe. */
+  function comision(comisionCodigo) {
+    const codigo = normalizeCode(comisionCodigo)
+
+    return store.comisiones.find((candidata) => normalizeCode(candidata.codigo) === codigo)
   }
 
   return {
@@ -210,6 +247,158 @@ export function createMockDataSource() {
             alumno.acceso.estado === 'HABILITADO',
         )
         .map((alumno) => alumno.email)
+    },
+
+    /**
+     * Comisiones asignadas al docente del maqueteado, con los contadores de acceso de cada una
+     * (10.2).
+     *
+     * **Los contadores salen del padrón que la pantalla muestra, no de otra cuenta.** El escenario
+     * del spec pide que el indicador `ALUMNOS HABILITADOS` y la celda `1 habilitado` de la fila
+     * coincidan; derivarlos de la misma lista hace que no puedan contradecirse. Y el padrón es el
+     * que el cliente nombró alumno por alumno —dos filas—, no las veintitrés inscripciones que
+     * registra el catálogo, que es lo que el spec prohíbe completar de a inventar.
+     */
+    async obtenerComisionesAsignadas() {
+      return store.comisiones
+        .filter((candidata) => candidata.docente_id === DOCENTE_DEL_MAQUETADO)
+        .map((candidata) => {
+          const alumnos = padron(candidata.codigo)
+          const habilitados = alumnos.filter((alumno) => alumno.acceso.estado === 'HABILITADO')
+
+          return {
+            codigo: candidata.codigo,
+            nombre_curso: candidata.curso.nombre,
+            docente_nombre: candidata.docente_nombre,
+            horario: candidata.horario_legible,
+            proxima_clase: candidata.proxima_clase ?? null,
+            habilitados: habilitados.length,
+            bloqueados: alumnos.length - habilitados.length,
+          }
+        })
+    },
+
+    /**
+     * Padrón de una comisión para el detalle del docente (10.3). Es de solo lectura: la función no
+     * ofrece ninguna forma de cambiar el acceso de un alumno, y eso no es una omisión de la
+     * pantalla sino del contrato de datos.
+     */
+    async obtenerPadronComision(comisionCodigo) {
+      const encontrada = comision(comisionCodigo)
+
+      if (encontrada === undefined) {
+        return null
+      }
+
+      return {
+        codigo: encontrada.codigo,
+        nombre_curso: encontrada.curso.nombre,
+        horario: encontrada.horario_legible,
+        alumnos: copiar(padron(encontrada.codigo)),
+      }
+    },
+
+    /**
+     * Asistencia de la clase del día (10.4). Las marcas de las clases ya dictadas vienen del
+     * ejemplo y la del día se cambia en pantalla: el guardado no persiste nada, porque la fuente
+     * del cliente no declara cuántas clases tiene el curso y el maqueteado no inventa ese dato.
+     */
+    async obtenerAsistenciaComision(comisionCodigo) {
+      const encontrada = comision(comisionCodigo)
+      const asistencia = store.asistencias.find(
+        (candidata) => normalizeCode(candidata.comision) === normalizeCode(encontrada?.codigo),
+      )
+
+      if (encontrada === undefined || asistencia === undefined) {
+        return null
+      }
+
+      const filas = padron(encontrada.codigo).map((alumno) => ({
+        alumno_id: alumno.id,
+        nombre: alumno.nombre,
+        marcas: { ...(asistencia.marcas[alumno.id] ?? {}) },
+      }))
+
+      return {
+        codigo: encontrada.codigo,
+        nombre_curso: encontrada.curso.nombre,
+        sesion: { ...asistencia.sesion },
+        clases: asistencia.clases.map((clase) => ({ ...clase })),
+        filas,
+      }
+    },
+
+    /**
+     * Ficha del docente del maqueteado con sus comisiones (10.5). El contacto va tal como lo
+     * registra el cliente: `catedra` y la sede de referencia. El correo y el teléfono existen en el
+     * padrón de docentes pero no se devuelven, porque el spec prohíbe mostrarlos en esta pantalla y
+     * una función que los trae invita a que alguien los muestre.
+     */
+    async obtenerPerfilDocente() {
+      const docente = store.docentes.find((candidata) => candidata.id === DOCENTE_DEL_MAQUETADO)
+      const comisiones = store.comisiones.filter((candidata) => candidata.docente_id === docente.id)
+      const primera = comisiones[0]
+
+      return {
+        nombre: docente.nombre,
+        especialidad: docente.catedra,
+        // La sede de referencia es la de la comisión en la que da clases: el padrón de docentes no
+        // tiene columna de sede y no se le inventa una.
+        sede: store.sedes.find((sede) => sede.id === primera.sede_id)?.nombre ?? null,
+        comisiones: comisiones.map((candidata) => ({
+          codigo: candidata.codigo,
+          nombre_curso: candidata.curso.nombre,
+          horario: candidata.horario_legible,
+          // El modelo no tiene columna de estado de comisión (M2): la que existe es
+          // `cerrada_por_cupo`, y de ahí sale la etiqueta que ve el docente.
+          estado: candidata.cerrada_por_cupo ? 'Cerrada por cupo' : 'Activa',
+        })),
+      }
+    },
+
+    /**
+     * Link de clase de una comisión (10.3 y 11.3). Lo lee el detalle del docente y lo lee el
+     * detalle del alumno: es el mismo dato, y por eso vive en la frontera y no en una pantalla.
+     */
+    async obtenerLinkClase(comisionCodigo) {
+      const codigo = normalizeCode(comisionCodigo)
+      const guardado = store.links.find((link) => normalizeCode(link.comision) === codigo)
+
+      return { link: guardado?.url ?? null }
+    },
+
+    /**
+     * Carga del link de clase (10.3). Valida la URL y devuelve un resultado explícito en lugar de
+     * lanzar: la pantalla tiene que poder mostrar el error pegado al campo y no confirmar nada, y
+     * eso es más claro con un resultado que con una excepción (D17 usa la misma forma).
+     *
+     * Guardar un link no toca el acceso de ningún alumno: el link es único por clase del día y lo
+     * reparte el docente a los habilitados por correo.
+     */
+    async guardarLinkClase({ comisionCodigo, url }) {
+      const encontrada = comision(comisionCodigo)
+
+      if (encontrada === undefined) {
+        return { ok: false, error: 'La comisión no existe.' }
+      }
+      if (!esUrl(url)) {
+        return {
+          ok: false,
+          error: 'El link de la clase tiene que ser una URL válida, con http:// o https://.',
+        }
+      }
+
+      const codigo = normalizeCode(encontrada.codigo)
+      const indice = store.links.findIndex((link) => normalizeCode(link.comision) === codigo)
+      const registro = { comision: encontrada.codigo, url: String(url).trim() }
+
+      if (indice === -1) {
+        store.links.push(registro)
+      } else {
+        store.links[indice] = registro
+      }
+
+      return { ok: true, link: registro.url }
     },
   }
 }

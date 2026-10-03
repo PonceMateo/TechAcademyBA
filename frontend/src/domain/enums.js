@@ -58,6 +58,21 @@ export const TIPO_DOCUMENTO = Object.freeze({
 })
 
 /**
+ * Los dos estados de una marca de asistencia.
+ *
+ * **Este enum todavía no está en el backend.** El modelo no tiene tabla de asistencia: es una de las
+ * pantallas del prototype que ninguna historia carga todavía (D10 deriva las cantidades, y la lista
+ * no se persiste en el scaffold). Vive acá y no en `src/mocks/` porque lo usan las dos puntas —el
+ * dato de ejemplo y la pantalla—, y si estuviera en los mocks, la pantalla tendría que importarlos
+ * para nombrarlo (D13). Cuando exista el modelo, esta entrada pasa a ser copia del enum de Python
+ * como las de arriba.
+ */
+export const ESTADO_ASISTENCIA = Object.freeze({
+  PRESENTE: 'PRESENTE',
+  AUSENTE: 'AUSENTE',
+})
+
+/**
  * Etiquetas de medio de pago. El spec de `admin-shell` obliga a que el formulario y la
  * columna `MEDIO` del historial usen **el mismo** conjunto de rótulos, tomado del dominio: el
  * prototipo los rotulaba distinto en los dos lugares y eso se resolvió a favor del vocabulario

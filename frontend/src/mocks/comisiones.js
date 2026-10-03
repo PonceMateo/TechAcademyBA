@@ -34,6 +34,16 @@ const RAW_COMISIONES = [
     docente_id: 1,
     docente_nombre: 'Profe Martín',
     dias_horarios: 'Mar y Jue 19 a 21 hs',
+    // Las dos formas del mismo horario. `dias_horarios` es la columna corta del catálogo de
+    // Administración; `horario_legible` es la que muestran los shells de docente y de alumno, con
+    // el punto medio. No se deriva del corto con operaciones de texto porque un horario no se
+    // parte por espacios: sale escrito. Solo lo llevan las comisiones que esos shells muestran, que
+    // son las asignadas al docente del maqueteado.
+    horario_legible: 'Mar y Jue · 19 a 21 hs',
+    // Próxima clase del docente del maqueteado. La planilla del cliente no tiene columna de
+    // próximo evento: es dato de referencia, y por eso va como texto y no como fecha que el
+    // navegador pueda deserializar (P5 cubre el cronograma real).
+    proxima_clase: 'Hoy · 19:00',
     cupo_maximo: 30,
     inscriptos: 23,
     arancel: 45000,

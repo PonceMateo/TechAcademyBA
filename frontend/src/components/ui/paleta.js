@@ -17,6 +17,10 @@ export const TONO = Object.freeze({
   VIOLETA: 'violeta',
   MAGENTA: 'magenta',
   CELESTE: 'celeste',
+  // El acento del shell de Docente. El spec lo llama `verde azulado`, que es el nombre de
+  // Tailwind para ese color: el nombre del tono y el de la clase coinciden a propósito, para
+  // que quien busque el color en el proyecto encuentre las dos cosas juntas.
+  VERDE_AZULADO: 'verde azulado',
 })
 
 export const CLASES_BADGE = Object.freeze({
@@ -27,6 +31,7 @@ export const CLASES_BADGE = Object.freeze({
   [TONO.VIOLETA]: 'bg-violet-100 text-violet-800 ring-violet-600/20',
   [TONO.MAGENTA]: 'bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-600/20',
   [TONO.CELESTE]: 'bg-sky-100 text-sky-800 ring-sky-600/20',
+  [TONO.VERDE_AZULADO]: 'bg-teal-100 text-teal-800 ring-teal-600/20',
 })
 
 /**

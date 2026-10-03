@@ -35,14 +35,25 @@ const PATHS = Object.freeze({
   cobranzas: '/cobranzas',
   habilitacion: '/habilitaciones/consulta',
   override: '/habilitaciones/override',
+  comisionesAsignadas: '/docentes/mis-comisiones',
+  padronComision: '/comisiones/:codigo/alumnos',
+  asistencia: '/comisiones/:codigo/asistencia',
+  perfilDocente: '/docentes/mi-perfil',
+  linkClase: '/clases/link',
 })
 
-async function request(path, { method = 'GET', body, query } = {}) {
-  const search = query
-    ? `?${new URLSearchParams(
-        Object.entries(query).filter(([, valor]) => valor !== undefined && valor !== ''),
-      ).toString()}`
-    : ''
+async function request(path, { method = 'GET', body, query, params } = {}) {
+  // Los `:nombre` del camino se reemplazan con `params`. Es lo que permite que `PATHS` declare
+  // una ruta por recurso sin que cada método escriba el `encodeURIComponent` de su código.
+  const ruta = String(path).replace(/:([a-zA-Z]+)/g, (_, nombre) =>
+    encodeURIComponent(params?.[nombre] ?? ''),
+  )
+  const search =
+    query && Object.keys(query).length > 0
+      ? `?${new URLSearchParams(
+          Object.entries(query).filter(([, valor]) => valor !== undefined && valor !== ''),
+        ).toString()}`
+      : ''
 
   const headers = {}
   if (body !== undefined) {
@@ -55,7 +66,7 @@ async function request(path, { method = 'GET', body, query } = {}) {
 
   let response
   try {
-    response = await fetch(`${API_BASE_URL}${path}${search}`, {
+    response = await fetch(`${API_BASE_URL}${ruta}${search}`, {
       method,
       headers,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -66,7 +77,7 @@ async function request(path, { method = 'GET', body, query } = {}) {
 
   if (!response.ok) {
     throw new DataSourceError(
-      `La API respondió ${response.status} a ${method} ${path}.`,
+      `La API respondió ${response.status} a ${method} ${ruta}.`,
       response.status,
     )
   }
@@ -132,6 +143,33 @@ export function createApiDataSource() {
     async listarEmailsHabilitados(comisionCodigo) {
       const alumnos = await request(PATHS.alumnos, { query: { comision: comisionCodigo } })
       return alumnos.filter((alumno) => alumno.acceso?.estado === 'HABILITADO').map((a) => a.email)
+    },
+
+    async obtenerComisionesAsignadas() {
+      return request(PATHS.comisionesAsignadas)
+    },
+
+    async obtenerPadronComision(comisionCodigo) {
+      return request(PATHS.padronComision, { params: { codigo: comisionCodigo } })
+    },
+
+    async obtenerAsistenciaComision(comisionCodigo) {
+      return request(PATHS.asistencia, { params: { codigo: comisionCodigo } })
+    },
+
+    async obtenerPerfilDocente() {
+      return request(PATHS.perfilDocente)
+    },
+
+    async obtenerLinkClase(comisionCodigo) {
+      return request(PATHS.linkClase, { query: { comision: comisionCodigo } })
+    },
+
+    async guardarLinkClase({ comisionCodigo, url }) {
+      return request(PATHS.linkClase, {
+        method: 'POST',
+        body: { comision: comisionCodigo, url },
+      })
     },
   }
 }

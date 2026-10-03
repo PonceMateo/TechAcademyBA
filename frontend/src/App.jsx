@@ -9,6 +9,12 @@ import { TeachersPage } from './admin/TeachersPage'
 import { RequireRole } from './auth/RequireRole'
 import { FORBIDDEN_PATH, LOGIN_PATH, homePathForRole } from './auth/roleRoutes'
 import { SESSION_STATUS, SessionProvider, useSession } from './auth/SessionContext'
+import { AttendancePage } from './docente/AttendancePage'
+import { CommissionDetailPage } from './docente/CommissionDetailPage'
+import { TeacherCommissionsPage } from './docente/TeacherCommissionsPage'
+import { TeacherLayout } from './docente/TeacherLayout'
+import { TeacherProfilePage } from './docente/TeacherProfilePage'
+import { TeacherStudentsPage } from './docente/TeacherStudentsPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
 import { LandingPage } from './pages/LandingPage'
 import { LoadingPage } from './pages/LoadingPage'
@@ -35,9 +41,10 @@ function RootRedirect() {
  * Tabla de ruteo. Cada sección declara su rol una vez, acá; las pantallas cuelgan debajo de estas
  * tres rutas sin cambiar quién puede verlas (M10).
  *
- * El shell de Administración ya existe y sus seis pantallas cuelgan de `AdminLayout` con rutas
- * hijas: el layout no sabe qué pantalla hay, la dibuja. Los shells de Docente y de Alumno siguen
- * con la pantalla de marcador de posición hasta que lleguen los grupos 10 y 11.
+ * **Cada sección cuelga de su layout y el layout no sabe qué pantalla hay.** El shell de
+ * Administración tiene sus seis pantallas, el de Docente sus cuatro, y `/alumno` sigue con la
+ * pantalla de marcador de posición hasta que llegue el grupo 11. Agregar una pantalla es agregar una
+ * ruta hija: ni el armazón ni el guard de rol cambian.
  */
 export function AppRoutes() {
   return (
@@ -66,10 +73,17 @@ export function AppRoutes() {
         path="/docente"
         element={
           <RequireRole allowedRoles={['DOCENTE']}>
-            <LandingPage />
+            <TeacherLayout />
           </RequireRole>
         }
-      />
+      >
+        <Route index element={<TeacherCommissionsPage />} />
+        <Route path="alumnos" element={<TeacherStudentsPage />} />
+        <Route path="alumnos/:codigo" element={<CommissionDetailPage />} />
+        <Route path="asistencia" element={<AttendancePage />} />
+        <Route path="perfil" element={<TeacherProfilePage />} />
+      </Route>
+
       <Route
         path="/alumno"
         element={

@@ -7,9 +7,12 @@
  *
  * La etiqueta visible es distinta de la ruta: Administración y Secretaría son el mismo rol (D3) y
  * la interfaz lo llama siempre `Secretaría`, pero la URL identifica quién entra (M10).
+ *
+ * `exacta` marca la sección raíz: sin ella, `/admin` sería el prefijo de las otras cinco rutas y
+ * el menú dejaría `Dashboard` y `Cursos y Comisiones` marcados a la vez.
  */
 export const SECCIONES_ADMIN = Object.freeze([
-  Object.freeze({ clave: 'dashboard', etiqueta: 'Dashboard', ruta: '/admin' }),
+  Object.freeze({ clave: 'dashboard', etiqueta: 'Dashboard', ruta: '/admin', exacta: true }),
   Object.freeze({ clave: 'cursos', etiqueta: 'Cursos y Comisiones', ruta: '/admin/cursos' }),
   Object.freeze({ clave: 'docentes', etiqueta: 'Docentes', ruta: '/admin/docentes' }),
   Object.freeze({

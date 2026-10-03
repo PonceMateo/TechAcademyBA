@@ -711,6 +711,122 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Shell de Docente (work unit 8, grupo 10)
+
+### M24 — El armazón de los tres shells es un componente compartido, no tres copias
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `src/components/shell/ShellFrame.jsx` dibuja panel lateral, barra superior,
+  contenido y pie de las tres secciones. `AdminLayout`, `TeacherLayout` y `StudentLayout` solo
+  pasan rótulos, ítems de menú y acento; el acento es un nombre por shell (`secretaria`, `docente`,
+  `alumno`) que `ACENTOS` traduce a la vez al tono del chip y a las clases del panel. El ítem
+  deshabilitado se dibuja en el armazón como texto con la insignia `Próximamente` y sin ruta.
+  `Avatar` llega como componente compartido nuevo, porque el pie y la ficha de perfil muestran las
+  iniciales en las tres secciones.
+- **Por qué:** 8.3 y 9.8 dicen que las tres secciones dibujan con los mismos componentes, y eso no
+  era verificable: cada shell iba a tener su propio archivo de layout y "comparten componentes" iba
+  a quedar como una afirmación sobre `Table` y `Badge` solamente. Con un armazón solo, la prueba de
+  9.8 puede afirmar sobre el armazón que los tres usan —lo verifica leyendo que los tres importan
+  `ShellFrame`— y un ítem Won't deshabilitado tiene una sola implementación en todo el proyecto.
+  El acento además no puede quedar a medias: un solo nombre decide los dos colores.
+- **Alternativa descartada:** dejar `AdminLayout` como estaba y escribir `TeacherLayout` y
+  `StudentLayout` copiándolo. Es el camino corto y produce tres archivos que divergen: el primero
+  que agregue un ítem deshabilitado, un aviso de contraseña o un pie nuevo deja a los otros dos
+  diciendo que la función no existe.
+- **Consecuencia:** `SECCIONES_ADMIN` gana `exacta: true` en la entrada raíz, porque el `end` del
+  enlace raíz era una regla escrita en el layout y ahora es un dato de la sección.
+- **Dónde:** `frontend/src/components/shell/ShellFrame.jsx`,
+  `frontend/src/components/ui/Avatar.jsx`, `frontend/src/components/ui/paleta.js`,
+  `frontend/src/admin/AdminLayout.jsx`, `frontend/src/docente/TeacherLayout.jsx`,
+  `frontend/src/alumno/StudentLayout.jsx`.
+
+### M25 — En los shells de docente y de alumno conviven el nombre de la sesión y el del maqueteado
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el pie de los shells de docente y de alumno muestra las iniciales y el nombre que
+  fija el spec —`PM` / `Profe Martín` y `CR` / `Camila Rodríguez`—, y la barra superior de las tres
+  secciones muestra `session.nombre`, como ya hacía el shell de Administración. Los dos nombres
+  conviven en pantalla y no se oculta ninguno.
+- **Por qué:** los specs fijan el pie como literal, y el nombre de la sesión es lo único que le dice
+  a la persona cuál de las tres cuentas está abierta. Que sean dos textos distintos no es una
+  decisión de diseño: es que las cuentas de demostración del backend son `Rita Molina` para el rol
+  docente y `Agustina Benítez` para el alumno, mientras que el prototype trabaja con `Profe Martín`
+  y `Camila Rodríguez`. Se consideró sacar el nombre de la barra y se descartó: `SessionContext`
+  comprueba la restauración de sesión verificando que el nombre de `GET /auth/me` aparezca en
+  pantalla, y `src/auth/` no se toca en este change (M12). Adonde una prueba limita el diseño, el
+  diseño cede; lo que no corresponde es romper una prueba de un directorio ajeno.
+- **Supuesto asumido:** hasta que exista el endpoint que resuelve la cuenta al padrón (M17), el shell
+  muestra la persona de referencia en el pie y la cuenta en la barra. Es una concesión de entorno de
+  demostración, como la de D18 con la contraseña.
+- **Pendiente:** cuando exista el endpoint, el pie sale de la sesión y no de una constante de
+  navegación, y los dos nombres pasan a ser uno. Si el cliente quiere que las cuentas de
+  demostración sean las mismas personas del maqueteado, es un cambio del seed del backend y no del
+  frontend.
+- **Dónde:** `frontend/src/docente/navegacion.js`, `frontend/src/alumno/navegacion.js`,
+  `frontend/src/components/shell/ShellFrame.jsx`.
+
+### M26 — Los horarios del docente y del alumno son un campo más del ejemplo, no una derivación
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `CUR-101` suma `horario_legible` (`Mar y Jue · 19 a 21 hs`) y `proxima_clase`
+  (`Hoy · 19:00`) al lado del `dias_horarios` corto del catálogo, y la inscripción del alumno suma
+  `horario_legible` y `horario_prolongado`. Los datos de ejemplo de asistencia, cronograma y
+  próximos encuentros van en `src/mocks/asistencias.js` y `src/mocks/inscripciones.js`.
+- **Por qué:** los shells de docente y de alumno muestran el horario con punto medio
+  (`Mar y Jue · 19 a 21 hs`) y en algunos lugares desarrollado (`Lunes y miércoles · 18:30 a
+  21:30`), y la columna del catálogo muestra la forma corta. Un horario no se parte por espacios:
+  derivarlo con operaciones de texto sobre `Mar y Jue 19 a 21 hs` se rompe el día que una comisión
+  diga `Sábados 10 a 13 hs` y que nadie sepa cuál era cuál. Es el mismo criterio con el que M21
+  completó `modalidad` y `sede`.
+- **Dato de referencia, no dato de negocio:** `proxima_clase`, el cronograma y los temas de clase
+  no están en la planilla del cliente. Van como referencia y P5 sigue siendo el pendiente que los
+  carga de verdad.
+- **Dónde:** `frontend/src/mocks/comisiones.js`, `frontend/src/mocks/asistencias.js`,
+  `frontend/src/mocks/inscripciones.js`.
+
+### M27 — El ejemplo no tiene link de clase cargado, y la validación de URL vive en el servicio
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `src/mocks/clases.js` arranca con la colección `LINKS_DE_CLASE` vacía.
+  `guardarLinkClase` valida la URL en la implementación de datos y devuelve `{ ok, error }` en lugar
+  de lanzar; la pantalla muestra el error pegado al campo y no confirma nada. La carga del link no
+  cambia el acceso de ningún alumno.
+- **Por qué:** con el ejemplo sin link, el shell del alumno abre en el estado en que está de verdad
+  un alumno recién inscripto —habilitado, con el profesor todavía sin publicar el link—, que es uno
+  de los tres estados que el spec exige cubrir; los otros dos se alcanzan con las propias acciones
+  del maqueteado: el docente carga el link y el alumno ve el botón, y la secretaría fuerza un
+  bloqueo con `forzarBloqueoManual`. Agregar un link de ejemplo para que el botón se viera desde el
+  primer clic sería inventar el estado que el cliente todavía no tiene.
+- **Por qué un resultado y no una excepción:** la pantalla tiene que poder mostrar el error sin
+  confirmar la carga, y eso se lee mejor con un resultado explícito que con un `try/catch` (D17 usa
+  la misma forma para el envío de correo). La validación está en el servicio y no en la pantalla
+  porque es la misma regla que va a validar el backend.
+- **Dónde:** `frontend/src/mocks/clases.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/docente/CommissionDetailPage.jsx`.
+
+### M28 — `ESTADO_ASISTENCIA` va en `src/domain/enums.js` aunque el backend no lo tenga
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** los dos valores `PRESENTE` y `AUSENTE` viven en `src/domain/enums.js`, junto a los
+  enums que sí son copia del backend, y no en `src/mocks/asistencias.js`.
+- **Por qué:** los usan las dos puntas —el dato de ejemplo y la pantalla—, y si el enum estuviera en
+  los mocks la pantalla tendría que importarlos para nombrarlos, que es justo lo que D13 prohíbe.
+  La alternativa era repetir el literal en los dos archivos, que es peor: dos lugares donde el
+  valor puede quedar desincronizado.
+- **Consecuencia:** ese enum es el único del archivo que todavía no existe en Python. El comentario
+  del módulo lo dice, porque un archivo que dice "copia del backend" y tiene una entrada que no
+  copia nada se vuelve una fuente de verdad falsa. Cuando exista el modelo, la entrada pasa a ser
+  copia del enum de Python como las demás.
+- **Dónde:** `frontend/src/domain/enums.js`, `frontend/src/mocks/asistencias.js`,
+  `frontend/src/docente/AttendancePage.jsx`.
+
+---
+
 ## Configuración del repositorio
 
 ### R1 — `opencode.json` declara Context7 sin API key

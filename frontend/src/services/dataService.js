@@ -70,3 +70,40 @@ export function forzarBloqueoManual(datos) {
 export function listarEmailsHabilitados(comisionCodigo) {
   return getDataSource().listarEmailsHabilitados(comisionCodigo)
 }
+
+/**
+ * Comisiones asignadas al docente que entra, con los contadores de acceso de cada una (10.2).
+ * Los contadores salen del mismo padrón que la fila muestra, para que el indicador y la celda no
+ * puedan contradecirse.
+ */
+export function obtenerComisionesAsignadas() {
+  return getDataSource().obtenerComisionesAsignadas()
+}
+
+/** Padrón de solo lectura de una comisión (10.3). */
+export function obtenerPadronComision(comisionCodigo) {
+  return getDataSource().obtenerPadronComision(comisionCodigo)
+}
+
+/** Asistencia de la clase del día de una comisión (10.4). */
+export function obtenerAsistenciaComision(comisionCodigo) {
+  return getDataSource().obtenerAsistenciaComision(comisionCodigo)
+}
+
+/** Ficha del docente con sus comisiones (10.5). */
+export function obtenerPerfilDocente() {
+  return getDataSource().obtenerPerfilDocente()
+}
+
+/**
+ * Link de clase de una comisión. Lo leen los dos shells: el docente para ver si lo cargó y el
+ * alumno para entrar a la clase.
+ */
+export function obtenerLinkClase(comisionCodigo) {
+  return getDataSource().obtenerLinkClase(comisionCodigo)
+}
+
+/** Carga del link de clase (10.3). Devuelve `{ ok, error }` en vez de lanzar. */
+export function guardarLinkClase(datos) {
+  return getDataSource().guardarLinkClase(datos)
+}
