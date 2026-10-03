@@ -616,13 +616,65 @@ Escenario: Medios alternativos
 Dado un alumno que prefiere no usar la pasarela
 Cuando informa su pago por WhatsApp
 Entonces el administrador puede seguir registrándolo y acreditándolo manualmente",Won't,13,"No es el unico medio de pago. Se podrá seguir usando whatsapp, lo cubre la acreditacion manual"
+5- Cobranzas y Pagos,45,Registrar causa del comprobante no acreditado,"Como administrador, quiero registrar el motivo por el que un comprobante queda en estado Observado o Rechazado, para distinguir si el problema es el comprobante, un pago pendiente de acreditacion o una deuda del alumno, y resolverlo sin revisar el home banking.","Escenario: Comprobante ilegible
+Dado que tengo un comprobante que no se puede leer
+Cuando lo registro como Observado con la causa ""Documento ilegible""
+Entonces la cobranza queda en estado Observado con esa causa registrada
+
+Escenario: Causa obligatoria
+Dado que un comprobante no esta Acreditado
+Cuando intento guardarlo sin cargar la causa
+Entonces el sistema rechaza el guardado e informa que la causa es obligatoria
+
+Escenario: Deuda del alumno
+Dado que un alumno tiene un pago pendiente
+Cuando registro el comprobante con la causa ""Saldo pendiente""
+Entonces la cobranza queda Rechazada y se distingue de un comprobante ilegible
+
+Escenario: Causa visible en el historial
+Dado un alumno con una cobranza no acreditada
+Cuando consulto su historial de pagos
+Entonces veo el estado y la causa registrada",Should,3,Agregada en la revision de bootstrap-initial-scaffold; sin issue en GitHub por decision del equipo.
+1- Catálogo de Cursos y Comisiones,46,Administrar sedes,"Como administrador, quiero dar de alta y consultar las sedes donde se dictan las comisiones, para poder asignarle una sede a una comision al abrirla.","Escenario: Alta de sede
+Dado que soy administrador y no existe una sede con ese nombre
+Cuando completo nombre y direccion y confirmo el alta
+Entonces la sede se crea y queda disponible para asignar
+
+Escenario: Sede duplicada
+Dado que ya existe una sede con el mismo nombre (sin distinguir mayusculas, espacios ni guiones)
+Cuando intento guardarla
+Entonces el sistema rechaza el alta e informa la sede existente
+
+Escenario: Listado de sedes
+Dado que hay sedes registradas
+Cuando abro el selector de sede al crear o editar una comision
+Entonces se listan las sedes disponibles",Should,2,Agregada en la revision de bootstrap-initial-scaffold; sin issue en GitHub por decision del equipo.
+3 - Alumnos e Inscripciones,47,Alta de alumno del exterior,"Como administrador, quiero registrar un alumno que no tiene DNI y se identifica con pasaporte, para poder inscribirlo sin inventar un documento que no posee.","Escenario: Alta con pasaporte
+Dado que soy administrador y el alumno se identifica con pasaporte
+Cuando completo sus datos con tipo de documento Pasaporte y numero de pasaporte
+Entonces el alumno queda registrado sin DNI
+
+Escenario: Documento obligatorio
+Dado que no completo el tipo ni el numero de documento
+Cuando intento guardar el alta
+Entonces el sistema rechaza el guardado e informa que se necesita un documento
+
+Escenario: Busqueda por pasaporte
+Dado un alumno registrado con pasaporte
+Cuando lo busco por su numero de pasaporte
+Entonces se muestra su ficha con su comision, categoria y estado de habilitacion
+
+Escenario: Alcance pendiente de definicion
+Dado que el cliente requiere ademas datos de residencia, visa o condicion de migracion
+Cuando se definan esos datos con el cliente
+Entonces esta historia se actualiza con los campos correspondientes",Won't,3,Agregada en la revision de bootstrap-initial-scaffold; sin issue en GitHub por decision del equipo.
 ,,,,,,,
 ,,,,,total solo must,44,
-,,,,,total sin contar won't,101,
-,,,,,Total,144,
+,,,,,total sin contar won't,106,
+,,,,,Total,152,
 ,,,,,,,
 ,,,,,,,
 ,,,,,Must,18,
-,,,,,Should,10,
+,,,,,Should,12,
 ,,,,,Could,8,
-,,,,,Won't,8,
+,,,,,Won't,9,

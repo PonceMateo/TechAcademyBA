@@ -1,0 +1,86 @@
+# Configuración del backend de TechAcademy BA.
+#
+# La clave `dev` de `[project.optional-dependencies]` es obligatoria: `backend/Dockerfile`
+# instala con `pip install -e ".[dev]"` (work unit 2). No se debe cambiar a
+# `[dependency-groups]`, porque pip no lee esa tabla al resolver un extra.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "techacademyba-backend"
+version = "0.1.0"
+description = "Backend de TechAcademy BA"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    # `backend/Dockerfile` arranca con `uvicorn app.main:app` y FastAPI no lo trae
+    # consigo: sin declararlo acá el contenedor no levanta.
+    "uvicorn[standard]>=0.30,<1.0",
+    "sqlalchemy>=2.0,<3.0",
+    "alembic>=1.13,<2.0",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.5,<3.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "PyJWT>=2.9,<3.0",
+    "bcrypt>=4.2,<6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9.0",
+    "httpx>=0.27,<1.0",
+    "ruff>=0.7,<1.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+namespaces = false
+
+# ==========================================
+# Linter
+# ==========================================
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "alembic"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "W",   # warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "N",   # pep8-naming
+    "C4",  # comprehensions
+    "SIM", # simplify
+]
+ignore = [
+    # D19: los nombres de dominio van en español sin tildes. El validador de nombres de
+    # ruff no entiende `Curso`, `Comision` ni `Inscripcion` y los marca como clase en
+    # minúscula, cuando para este proyecto son entidades de dominio.
+    "N801",
+    "N818",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Las migraciones y el environment de Alembic se generan con nombres propios y no
+# cumplen las convenciones de nombres que ruff exige en el resto del código.
+"alembic/*" = ["N", "E402", "F401"]
+# Los tests declaran fixtures que ruff no reconoce como uso.
+"app/tests/*" = ["N806"]
+
+# ==========================================
+# Testing
+# ==========================================
+# D15: pytest contra PostgreSQL real, nunca SQLite. unittest no se usa en el proyecto.
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["app/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra --strict-markers --strict-config"

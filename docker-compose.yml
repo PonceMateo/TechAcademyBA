@@ -1,0 +1,127 @@
+# Entorno de desarrollo de TechAcademy BA.
+#
+# Variables: todas salen de `.env` en la raíz (Compose lo carga automáticamente para
+# interpolar) y tienen un valor por defecto, así que `docker compose up -d` funciona en una
+# máquina recién clonada sin ningún paso previo. `.env.example` documenta los mismos
+# nombres. Ningún valor de este archivo es un secreto real: son credenciales de una base
+# local que solo escucha en 127.0.0.1.
+
+name: techacademyba
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-techacademy}
+      POSTGRES_USER: ${POSTGRES_USER:-techacademy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-techacademy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Publicado solo en el bucle local: alcanza para psql y para las herramientas del
+      # editor, y no expone la base a la red.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      # Doble $ para que la interpolación de Compose lo deje pasar al shell del contenedor.
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -h 127.0.0.1
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+
+      # El host del default es `db`, el nombre del servicio, porque adentro de Compose no
+      # existe localhost. Si se define DATABASE_URL en `.env` manda ese valor, así que la
+      # variable se puede apuntar a cualquier base sin tocar este archivo.
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-techacademy}:${POSTGRES_PASSWORD:-techacademy}@db:5432/${POSTGRES_DB:-techacademy}}
+
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-insecure-placeholder-change-me}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+
+      # D17: el proveedor de correo se elige después. El único backend disponible hoy
+      # registra el envío en el log y no contacta a nadie.
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-log}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@techacademy.invalid}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-TechAcademy BA}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # Sin curl en la imagen: el propio intérprete hace la consulta.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      # D13: la fábrica de src/services resuelve mock o API con esta variable.
+      VITE_API_MODE: ${VITE_API_MODE:-mock}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+      # D14: el proxy de /api apunta al backend por nombre de servicio.
+      VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://backend:8000}
+      # Docker Desktop sobre Windows y macOS no emite eventos de archivo en los bind mounts,
+      # así que sin polling la recarga automática no se dispara. Se puede poner en false
+      # desde .env en Linux.
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-true}
+    volumes:
+      - ./frontend:/app
+      # El volumen con nombre tapa /app/node_modules: sin esto, el bind mount del código
+      # ocultaría las dependencias instaladas en la imagen. Docker inicializa el volumen con
+      # el contenido de la imagen la primera vez, así que las dependencias llegan igual.
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      # service_started y no service_healthy a propósito: el frontend usa datos de ejemplo
+      # (D14) y no debe dejar de arrancar porque el backend esté caído.
+      backend:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  frontend_node_modules:

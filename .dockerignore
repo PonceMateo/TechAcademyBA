@@ -1,0 +1,41 @@
+# Contexto de build del backend.
+#
+# Sin esto, `docker build` manda el código del host al daemon, incluido `__pycache__`,
+# `.pytest_cache`, `.ruff_cache`, el `.env` real y cualquier `*.egg-info`. El `.env`
+# real es lo peor de los tres: un `.dockerignore` que lo deja pasar termina metiendo el
+# secreto de firma del token en una imagen.
+#
+# `.env.example` sí se copia a propósito: documenta las variables y no tiene secretos.
+
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Artefactos de Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.sqlite
+*.sqlite3
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node: el backend no lo usa, pero un node_modules colado acá pesa y confunde.
+node_modules/
