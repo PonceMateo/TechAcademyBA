@@ -560,6 +560,82 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Capa de datos y componentes (work unit 6, grupo 8)
+
+### M15 — Cada registro de ejemplo viaja sellado con `_ejemplo`
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** todas las colecciones de `src/mocks/` se construyen con `markAsExample()`, que
+  congela cada registro y le agrega `_ejemplo: true`. El sello viaja a través de la capa de
+  servicios. Además, `src/domain/` replica los enums del backend y las funciones de
+  normalización de D6, y `src/utils/formato.js` concentrates el formato de moneda y fecha.
+- **Por qué:** D22 exige que los datos del maquetado se identifiquen como tales, y un comentario
+  no sobrevive a que alguien copie una fila. El sello es lo que hace verificable el "están
+  marcados como tal" de 8.1 sin depender de la confianza. Congelar evita que una pantalla ensucie
+  el módulo de datos de ejemplo por accidente.
+- **Alternativa descartada:** un banner de "datos de ejemplo" arriba de cada pantalla. Es visible,
+  pero no distingue un registro de ejemplo de uno real si mañana conviven, que es exactamente lo
+  que D22 quiere evitar.
+- **Consecuencia:** el frontend tiene su propia copia de los enums del dominio. Es una fuente que
+  puede desincronizarse, así que el riesgo es real: se acepta mientras la única fuente de datos
+  sea el mock, y desaparece cuando las respuestas sean las de la API.
+- **Dónde:** `frontend/src/mocks/`, `frontend/src/domain/enums.js`,
+  `frontend/src/domain/normalize.js`, `frontend/src/utils/formato.js`.
+
+### M16 — El importe del comprobante ilegible es `null` en el ejemplo, y el modelo exige número
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la cobranza del 19/05/2026 se registra con `importe: null` y causa
+  `comprobante ilegible`. El modelo exige `importe > 0` con el CHECK `cobranza_importe_positivo`,
+  así que esa fila **no podría crearse** contra la base real.
+- **Por qué:** es lo que el cliente tiene. La celda de la planilla está vacía porque el número
+  nunca pudo leerse, y el caso vale justamente por eso: es la diferencia entre "no pagó" y "no se
+  pudo leer". Ocultar el hueco con un cero convertiría el ejemplo en un cobro de $0.
+- **Pendiente:** qué hace la historia de alta de cobranza con un comprobante ilegible: si se
+  rechaza hasta poder leer el importe, si se registra con el importe en null y se relaxes el
+  CHECK, o si hay un estado más. Es una decisión de la historia #21 con la #45, no de este change.
+- **Dónde:** `frontend/src/mocks/cobranzas.js`, `backend/app/models/cobranza.py`.
+
+### M17 — Las rutas de la implementación real son provisionales y viven en un solo mapa
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `src/services/apiDataSource.js` llama a endpoints que **todavía no existen**
+  (`/comisiones`, `/docentes`, `/alumnos`, `/empresas`, `/sedes`, `/cobranzas`,
+  `/habilitaciones/consulta`, `/habilitaciones/override`). Los caminos están en una constante
+  `PATHS` y se corrigen en un solo lugar cuando exista el endpoint real.
+- **Por qué:** D13 pide que cambiar de implementación no obligue a tocar las pantallas, y eso solo
+  se demuestra si existe una implementación alternativa. Los caminos son los que corresponde por
+  recurso y verbo, pero **definir un contrato de API es una propuesta de OpenSpec**, no una
+  decisión de este work unit: si se fijaran acá, el primer endpoint real los confirmaría o los
+  contradiría.
+- **Pendiente:** cuando se escriba el primer endpoint del padrón, los caminos y las formas de
+  respuesta se confirman o se corrigen, y ahí corresponde una entrada con la forma real. El riesgo
+  que `design.md` avisa —que un campo del ejemplo no exista en la API— aparece en ese momento y
+  no después.
+- **Dónde:** `frontend/src/services/apiDataSource.js`, `frontend/src/services/dataSourceFactory.js`.
+
+### M18 — La frontera de datos se verifica sobre el código, y los componentes compartidos se marcan
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** dos verificaciones que no son de render. `src/mocks/mocksBoundary.test.js` lee el
+  código de `src/**` y falla si algún archivo fuera de `src/services/` importa de `src/mocks/`
+  (8.4). Y cada componente de `src/components/ui/` lleva `data-ui="<nombre>"` en su raíz, que es lo
+  que permite afirmar en 9.8 que los tres shells dibujan con los mismos componentes.
+- **Por qué:** ninguna prueba de render detecta una importación colada. El día que aparezca la
+  API, una pantalla que importara mocks directamente seguiría funcionando en verde y habría que
+  reescribirla, que es la pérdida de trabajo exacta que D13 vino a evitar. Y en el DOM, un `<table>`
+  escrito a mano es indistinguible de uno que viene de `Table`, así que el atributo es lo único que
+  hace verificable la mitad de 9.8.
+- **Alternativa descartada:** forbidding por regla de ESLint. Da un mensaje en el editor y nada en
+  la CI si alguien la desactiva; el test falla siempre.
+- **Dónde:** `frontend/src/mocks/mocksBoundary.test.js`, `frontend/src/components/ui/paleta.js`.
+
+---
+
 ## Configuración del repositorio
 
 ### R1 — `opencode.json` declara Context7 sin API key
