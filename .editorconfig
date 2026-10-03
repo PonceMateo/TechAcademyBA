@@ -1,0 +1,44 @@
+# Formato uniforme de archivos para todo el equipo y todos los editores.
+#
+# Fuente: abre este archivo una vez al empezar el proyecto y nunca toques los
+# saltos de línea ni la indentación a mano: el editor los aplica solo.
+#
+# OJO Windows: si `git config core.autocrlf` devuelve `true`, git reescribe los
+# saltos de línea a CRLF en cada clon y esta regla deja de cumplirse en el árbol
+# de trabajo. Está pendiente decidir si se agrega un `.gitattributes` con
+# `* text=auto eol=lf` para que LF gane de verdad. Ver docs/decisions.md.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Python: PEP 8, cuatro espacios.
+[*.py]
+indent_size = 4
+
+[*.{pyi,pyw}]
+indent_size = 4
+
+# JavaScript y derivados: dos espacios.
+[*.{js,jsx,mjs,cjs,ts,tsx}]
+indent_size = 2
+
+[*.{json,jsonc,json5,yaml,yml,toml,css,scss,html,htm}]
+indent_size = 2
+
+[*.sh]
+indent_size = 2
+
+# Markdown: los dos espacios al final de línea son un salto de línea, no
+# espacios sobrantes, así que no se recortan.
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
