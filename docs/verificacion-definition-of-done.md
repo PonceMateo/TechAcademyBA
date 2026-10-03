@@ -116,7 +116,7 @@ que no tener lista.
 |---|---|
 | El recorrido visual a ojo, con el navegador abierto | En el entorno donde se hizo este work unit no había navegador automatizable. La evidencia automatizada es el render de arriba, que no es una mirada: es una aserción que falla. **Después, el equipo lo recorre a mano en el navegador y reporta que funciona** (ver más abajo). |
 | El ingreso tipeando el formulario del login en el navegador | El login se verificó contra el backend real con las tres cuentas, no desde el formulario. `LoginPage.test.jsx` cubre el render del formulario. |
-| El pull request de la tarea 12.5 | El remoto existe y la rama está pusheada, pero el PR no está abierto: lo abre el equipo. |
+| El pull request de la tarea 12.5 | El PR se abrió después de este work unit, como **#45**, y salió mergeado el 2026-10-03. El recorrido de arriba se hizo en local, antes de que existiera el PR. |
 
 ## Verificación posterior, del equipo
 
