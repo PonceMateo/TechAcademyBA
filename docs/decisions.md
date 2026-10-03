@@ -903,6 +903,51 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Integración continua y verificación (work unit 10, grupo 12)
+
+### R3 — La CI corre sobre los runners de GitHub, no con `docker compose`
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `.github/workflows/ci.yml` define dos jobs. El de backend usa
+  `actions/setup-python` con 3.12 y declara PostgreSQL 16 en `services:`; el de
+  frontend usa `actions/setup-node` con 22. Los comandos son exactamente los que
+  el equipo corre en local y en el mismo directorio: `ruff check .`, `pytest`,
+  `npm ci`, `npm run lint`, `npm run test` y `npm run build`. El job de backend
+  define `DATABASE_URL`, `TEST_DATABASE_URL` y `JWT_SECRET_KEY`.
+- **Por qué:** la alternativa era `docker compose run --rm backend pytest` dentro
+  del workflow, que reutiliza el `compose` y garantiza que la CI es bit a bit el
+  entorno local. Se descartó porque obliga a construir las dos imágenes y a
+  levantar los tres servicios en cada corrida para ejecutar dos comandos, y
+  porque un fallo de dependencias aparece como un fallo de build de imagen en
+  lugar de como un `pip install` que falta. Con `setup-python` y `setup-node` los
+  comandos son los del día a día y la diferencia con la máquina queda escrita y
+  acotada: **solo cambia dónde vive PostgreSQL**, que localmente es el servicio
+  `db` del compose y en el runner es un `services:` del job.
+- **Consecuencia:** `app/tests/conftest.py` crea la base de pruebas solo cuando
+  `TEST_DATABASE_URL` **no** está definida. La CI la define, así que el workflow
+  tiene que crearla antes de `pytest`: lo hace con `psycopg`, que ya es
+  dependencia del proyecto, para no depender de que el runner traiga `psql`.
+- **Pendiente:** la caché de `pip` quedó desactivada. `backend/` no tiene
+  `requirements.txt` y cachear por `pyproject.toml` no se pudo verificar sin una
+  corrida real del workflow, así que no se agregó algo que no se probó.
+- **Dónde:** `.github/workflows/ci.yml`, `backend/app/tests/conftest.py`.
+
+### R4 — Los tiempos que se documentan van con su condición de medición
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el README anota cuánto tarda el setup con la fecha, la máquina y
+  la condición en que se midió —en este caso, con la caché de capas de Docker
+  ya tibia— y separa lo medido de lo no medido.
+- **Por qué:** un tiempo sin la condición con que se midió no es una
+  medición, es una promesa. La primera corrida en una máquina limpia depende de
+  la velocidad de la conexión y no se puede medir en la máquina del equipo, así
+  que anotarla como si estuviera medida sería mentir por omisión.
+- **Dónde:** `README.md`, sección "Levantar el proyecto".
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven
@@ -918,6 +963,8 @@ con el cliente o entre los tres del equipo.
 | P6 | Datos que exige un alumno del exterior | Cliente | La historia #47 entra solo con pasaporte. |
 | P7 | Dígito verificador del CUIL | Cliente | El dato es obligatorio y único, pero el equipo no pidió validarlo. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
+| P9 | Remoto de Git del repositorio | Equipo | Sin remoto no hay `push`, no hay pull request y la integración continua nunca corrió: `.github/workflows/ci.yml` existe como archivo, no como historial de la pestaña Actions. |
+| P10 | Firma de la Definition of Done | Equipo | La tarea 12.4 pide una grabación de pantalla o una lista firmada **en el pull request**, y todavía no hay PR. La lista quedó escrita en `docs/verificacion-definition-of-done.md` y falta firmarla. |
 
 ### Detalle de P8 — `core.autocrlf` contra `.editorconfig`
 

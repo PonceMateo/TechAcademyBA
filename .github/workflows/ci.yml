@@ -1,0 +1,125 @@
+# Integración continua de TechAcademy BA.
+#
+# **Los comandos son los mismos que el equipo corre en local, en los mismos directorios.**
+# El contenedor del backend tiene `/app` como raíz de `backend/` y el del frontend tiene
+# `/app` como raíz de `frontend/`, así que `ruff check .`, `pytest`, `npm run lint`,
+# `npm run test` y `npm run build` significan exactamente lo mismo acá y en la máquina.
+# Un job que pasa en GitHub no es un job distinto del que se corre local: es el mismo.
+#
+# La diferencia, y es a propósito, es dónde corre PostgreSQL. Localmente es el servicio
+# `db` de `docker-compose.yml`; acá es un `services:` del propio runner, con la misma
+# imagen mayor (D15: la suite corre contra PostgreSQL real, nunca contra SQLite).
+#
+# `JWT_SECRET_KEY` es obligatorio porque la configuración no tiene valor por defecto
+# utilizable (D2). El de acá es un placeholder de una sola ejecución: no es un secreto y
+# no sirve para nada fuera de este job.
+
+name: CI
+
+# Sin filtros de rama: el flujo corre en cada push y en cada pull request (spec
+# `dev-infrastructure`, "Ejecución en push y pull request").
+on:
+  push:
+  pull_request:
+
+# Un push nuevo deja obsoleto el run anterior de la misma rama. Cancelarlo ahorra minutos
+# sin perder información: el run cancelado queda en el historial con su estado.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (ruff + pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: techacademy
+          POSTGRES_PASSWORD: techacademy
+          POSTGRES_DB: techacademy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U techacademy -d techacademy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      # Mismas credenciales que el servicio `db` de `docker-compose.yml`. El host cambia
+      # de `db` a `localhost` porque acá el runner accede al puerto publicado del service.
+      DATABASE_URL: postgresql+psycopg://techacademy:techacademy@localhost:5432/techacademy
+      # `app/tests/conftest.py` crea la base de pruebas cuando no se le pasa una: con
+      # `TEST_DATABASE_URL` definida asume que la base ya existe, así que el paso de abajo
+      # la crea. Es una base distinta de la de desarrollo, igual que en local.
+      TEST_DATABASE_URL: postgresql+psycopg://techacademy:techacademy@localhost:5432/techacademy_test
+      # Placeholder de una sola ejecución: la aplicación no arranca sin secreto de firma.
+      JWT_SECRET_KEY: solo-integracion-continua-no-es-un-secreto-real
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 3.12 es lo que fija `backend/pyproject.toml` (`requires-python = ">=3.12,<3.13"`) y
+      # lo que usa la imagen del backend.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Mismo comando que `backend/Dockerfile`: la aplicación y las herramientas de
+      # desarrollo (pytest, httpx, ruff) salen del extra `dev`.
+      - name: Instalar dependencias
+        run: pip install -e ".[dev]"
+
+      # `postgres` es el nombre de la base de mantenimiento del service. Se usa psycopg, que
+      # ya es dependencia del proyecto, para no depender de que el runner traiga `psql`.
+      - name: Crear la base de pruebas
+        run: >-
+          python -c "import psycopg;
+          psycopg.connect('postgresql://techacademy:techacademy@localhost:5432/postgres',
+          autocommit=True).execute('CREATE DATABASE techacademy_test')"
+
+      - name: Linter
+        run: ruff check .
+
+      - name: Pruebas
+        run: pytest
+
+  frontend:
+    name: Frontend (lint + vitest + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 es lo que exige `frontend/package.json` (`engines.node >= 22.12.0`) y lo que
+      # usa la imagen del frontend (M14).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` y no `npm install`: instala el árbol exacto que resuelve el lockfile, que
+      # es lo que hace la imagen del frontend (M14).
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Linter
+        run: npm run lint
+
+      - name: Pruebas
+        run: npm run test
+
+      - name: Build de producción
+        run: npm run build
