@@ -16,19 +16,17 @@ Este README tiene dos partes. **Si querés usar el sistema, andá directo a
 [Levantar el proyecto](#levantar-el-proyecto).** Todo lo demás es para el equipo que lo
 desarrolla.
 
----
+## Para usar el sistema
 
-# Para usar el sistema
+### Requisitos
 
-## Requisitos
-
-Lo único que hace falta es **Docker Desktop** (o Docker Engine con Compose v2) instalado y
+Lo único que hace falta es **Docker Desktop** _(o Docker Engine con Compose v2)_ instalado y
 corriendo, y un navegador. No hace falta instalar Python ni Node: los dos corren dentro de
 contenedores.
 
 Si no lo tenés, se descarga de [docker.com](https://www.docker.com/products/docker-desktop/).
 
-## Levantar el proyecto
+### Levantar el proyecto
 
 Tres comandos, en este orden. El primero tarda más la primera vez porque descarga las
 imágenes:
@@ -45,17 +43,17 @@ actualiza las cuentas en lugar de duplicarlas. Un detalle de la carga inicial: e
 las credenciales **se registra en el log y no se envía a nadie**, porque el proyecto todavía
 no eligió proveedor de correo (D17).
 
-Después de eso, abrí **<http://127.0.0.1:5173>** en el navegador.
+Después de eso, abrí **<http://127.0.0.1:5173>** en el navegador para ver el Frontend.
+Los tres servicios quedan escuchando en estos puertos, todos publicados **solo** en el bucle local: no exponen nada a la red.
 
-> **Cuánto tarda.** Medido en la máquina del equipo el 2026-10-03, con la caché de capas de
-> Docker ya tibia: `build` 34 s, `up -d` 12 s, migraciones 5 s y carga inicial 5 s, o sea
-> **60 s de principio a fin**. La primera corrida en una máquina limpia, sin imágenes
-> construidas, además descarga `python:3.12-slim`, `node:22-slim` y `postgres:16-alpine` e
-> instala las dependencias de las dos imágenes: eso **no está medido** porque depende de la
-> conexión. La spec se pone en menos de diez minutos; el número de arriba es el del camino
-> medido, no una promesa.
+| Servicio | Dónde | Cómo se entra |
+|---|---|---|
+| Interfaz | <http://127.0.0.1:5173> | Se abre en el navegador |
+| Backend | <http://127.0.0.1:8000> | `GET /health` para ver que responde |
+| Documentación de la API | <http://127.0.0.1:8000/docs> | Solo con `DEBUG=true`, que es el default |
+| Base de datos | `127.0.0.1:5432` | `docker compose exec db psql -U techacademy -d techacademy` |
 
-## Cuentas de demostración
+### Cuentas de demostración
 
 Las tres tienen la misma contraseña. Son públicas y son de demostración: no sirven en ningún
 otro entorno.
@@ -67,21 +65,9 @@ otro entorno.
 | Alumno | `agustina.benitez@techacademy.invalid` | `Demo2026!` | Cursos, pagos y perfil |
 
 El login es **real de punta a punta**: el navegador llama al backend de verdad. Cada rol entra
-a su sección y solo a la suya:
+a su sección y solo a la suya.
 
-| Rol | A dónde entra | Qué pasa si abre la sección de otro |
-|---|---|---|
-| `ADMIN` | `/admin` | pantalla 403 |
-| `DOCENTE` | `/docente` | pantalla 403 |
-| `ALUMNO` | `/alumno` | pantalla 403 |
-
-Sin sesión, cualquier ruta protegida manda al login. Una ruta que no existe responde 404.
-
-> **Ocultar rutas no es proteger.** El frontend esconde la pantalla de un rol ajeno, pero la
-> autorización es del backend, que es el que resuelve la cuenta contra la base en cada
-> request (M7) y devuelve 401 o 403.
-
-## Si algo no funciona
+### Si algo no funciona
 
 | Síntoma | Qué mirar |
 |---|---|
@@ -123,10 +109,8 @@ Los puertos están publicados **solo** en el bucle local: no exponen nada a la r
 - **Git**, para trabajar sobre ramas.
 - **Docker Desktop** o Docker Engine con Compose v2. Sigue siendo obligatorio: aunque
   tengas Python y Node instalados, los comandos de este README corren en contenedores.
-- **Un editor.** Los dos stacks son cosas que ya existen: JavaScript con Vite en el
-  frontend, Python con FastAPI en el backend.
 - **GitHub CLI**, opcional. Solo para consultar el backlog y los pull requests desde la
-  terminal; ver [Herramientas opcionales](#herramientas-opcionales).
+  terminal.
 
 `README` de las convenciones del equipo: [`AGENTS.md`](AGENTS.md).
 
@@ -357,31 +341,6 @@ arranca. Generá uno propio con
 En el navegador **no** hace falta configurar CORS: el servidor de desarrollo de Vite hace
 proxy de `/api` hacia el backend, así que el pedido sale del mismo origen que la página
 (decisión D14).
-
-## Herramientas opcionales
-
-**Ninguna hace falta para desarrollar.** Git, Docker y un editor alcanzan para trabajar en
-este proyecto. GitHub CLI está recomendada solo para consultar el backlog y los pull
-requests desde la terminal, y es opcional: lo mismo se hace en la web de GitHub.
-
-Con [GitHub CLI](https://cli.github.com/) 2.x en el PATH:
-
-```bash
-gh auth login
-gh auth refresh -s project
-```
-
-| Comando | Qué hace |
-|---|---|
-| `gh auth login` | Abre el flujo de autenticación en el navegador y guarda el token en el almacén de credenciales del sistema. |
-| `gh auth refresh -s project` | Le **agrega** el alcance `project` al token ya guardado, que es lo que da lectura y escritura sobre los proyectos de usuario y de organización. El alcance por defecto de `gh` no lo incluye. |
-
-Con eso, el backlog se consulta desde la terminal:
-
-```bash
-gh issue list
-gh pr list
-```
 
 ## Documentos del proyecto
 
