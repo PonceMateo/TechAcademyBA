@@ -29,7 +29,11 @@ describe('contexto de sesión', () => {
     await waitFor(() => {
       expect(window.sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('token-ADMIN')
     })
-    expect(await screen.findByText(/Secretaria BA/)).toBeInTheDocument()
+    // El nombre de la cuenta se muestra en el pie del shell de Secretaría, así que se afirma
+    // sobre el pie y no sobre el texto suelto: el mismo nombre aparece también en la barra
+    // superior.
+    const pie = await screen.findByRole('contentinfo')
+    expect(pie).toHaveTextContent('Secretaria BA')
   })
 
   it('no guarda la sesión cuando las credenciales no sirven', async () => {

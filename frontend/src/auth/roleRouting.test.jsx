@@ -17,6 +17,10 @@ import {
  * Los tres destinos se prueban con las tres cuentas de demostración, no con tres cadenas
  * inventadas: si el backend cambia el nombre de un rol, la tabla de ruteo deja de estar
  * bien y estos tests lo dicen.
+ *
+ * **Cada sección se reconoce por su propia marca.** Administración ya tiene el shell del grupo 9,
+ * así que su marca es el panel `MENÚ OPERATIVO`; Docente y Alumno siguen con la pantalla de
+ * marcador de posición, cuya marca es el título de la sección.
  */
 describe('redirección por rol', () => {
   beforeEach(() => {
@@ -29,7 +33,7 @@ describe('redirección por rol', () => {
     await fillLoginForm(accountForRole('ADMIN'))
 
     await waitFor(() => expect(currentPath()).toBe('/admin'))
-    expect(await screen.findByRole('heading', { name: 'Secretaría' })).toBeInTheDocument()
+    expect(await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })).toBeInTheDocument()
   })
 
   it('lleva a Docente a su sección', async () => {

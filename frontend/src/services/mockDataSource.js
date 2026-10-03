@@ -1,5 +1,6 @@
 import {
   ALUMNOS,
+  CATALOGO_TOTAL_COMISIONES,
   COBRANZAS,
   COMISIONES,
   DESTINO_IMPUTACION,
@@ -63,6 +64,15 @@ export function createMockDataSource() {
       return copiar(store.comisiones)
     },
 
+    /**
+     * Totales del catálogo del cliente. El chip `10 en el catálogo` y el indicador `COMISIONES`
+     * del tablero muestran el mismo número, así que sale de acá y no de cada pantalla: si uno
+     * midiera las cinco filas de ejemplo y el otro el total, se contradirían.
+     */
+    async obtenerResumenCatalogo() {
+      return { total_comisiones: CATALOGO_TOTAL_COMISIONES }
+    },
+
     async listarDocentes() {
       return copiar(store.docentes)
     },
@@ -74,6 +84,11 @@ export function createMockDataSource() {
 
     async listarAlumnos() {
       return copiar(store.alumnos)
+    },
+
+    /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
+    async buscarAlumnos(texto) {
+      return buscarPorTexto(store.alumnos, texto, ['nombre', 'documento'])
     },
 
     async listarEmpresas() {

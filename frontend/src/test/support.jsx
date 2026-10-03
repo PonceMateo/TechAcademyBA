@@ -5,6 +5,19 @@ import { vi } from 'vitest'
 import { AppRoutes } from '../App'
 import { SessionProvider } from '../auth/SessionContext'
 import { TOKEN_STORAGE_KEY } from '../auth/tokenStorage'
+import { API_MODE, configurarFuenteDeDatos, createDataSource } from '../services/dataSourceFactory'
+
+/**
+ * Devuelve la frontera de datos a su estado de ejemplo.
+ *
+ * **Hace falta porque los datos de ejemplo son estado, no constantes.** Registrar una cobranza o
+ * forzar un bloqueo los escribe en la fuente en memoria, y sin este reset un test que modifica un
+ * alumno deja modificado el alumno del test siguiente. Es la misma razón por la que el store vive
+ * en la fuente y no en el módulo de datos: cada pantalla tiene su sesión de ejemplo.
+ */
+export function resetDataSource() {
+  configurarFuenteDeDatos(createDataSource({ modo: API_MODE.MOCK }))
+}
 
 /**
  * Arranque de la aplicación para los tests: el mismo árbol que monta `main.jsx`, pero con

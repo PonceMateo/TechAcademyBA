@@ -19,6 +19,14 @@ export function listarComisiones() {
   return getDataSource().listarComisiones()
 }
 
+/**
+ * Totales del catálogo que el chip y el tablero muestran. Van por el servicio y no como
+ * constantes de cada pantalla para que los dos números no puedan contradecirse.
+ */
+export function obtenerResumenCatalogo() {
+  return getDataSource().obtenerResumenCatalogo()
+}
+
 export function listarDocentes() {
   return getDataSource().listarDocentes()
 }
@@ -29,6 +37,10 @@ export function buscarDocentes(texto) {
 
 export function listarAlumnos() {
   return getDataSource().listarAlumnos()
+}
+
+export function buscarAlumnos(texto) {
+  return getDataSource().buscarAlumnos(texto)
 }
 
 export function listarEmpresas() {

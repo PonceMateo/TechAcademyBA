@@ -82,6 +82,10 @@ export function createApiDataSource() {
       return request(PATHS.comisiones)
     },
 
+    async obtenerResumenCatalogo() {
+      return request(PATHS.comisiones, { query: { resumen: true } })
+    },
+
     async listarDocentes() {
       return request(PATHS.docentes)
     },
@@ -92,6 +96,10 @@ export function createApiDataSource() {
 
     async listarAlumnos() {
       return request(PATHS.alumnos)
+    },
+
+    async buscarAlumnos(texto) {
+      return request(PATHS.alumnos, { query: { q: texto } })
     },
 
     async listarEmpresas() {

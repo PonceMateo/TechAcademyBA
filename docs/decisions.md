@@ -636,6 +636,81 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Shell de Administración (work unit 7, grupo 9)
+
+### M19 — Los rótulos del spec mandan sobre el encargo y sobre el prototipo
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la barra superior muestra el chip `Sede Constituciones` y el pie la etiqueta
+  `Terminal Interna 04`. El encargo del work unit pedía `Sede Central` en la barra superior.
+- **Por qué:** el spec de `admin-shell` fija los rótulos literales y es la fuente de verdad del
+  alcance. La línea temporal del período lectivo ya tiene su propia corrección anotada en el spec
+  (`Período Lectivo 2026` en vez del `Periodo Lectivo 2025` del prototipo), y el mismo criterio
+  aplica para la sede y la terminal: si el spec dice otra cosa que el prototipo, gana el spec.
+- **Pendiente:** si `Sede Constituciones` no es el nombre real de la sede del instituto, se cambia
+  en un solo lugar, `src/admin/navegacion.js`. Es un dato de ejemplo (D22).
+- **Dónde:** `frontend/src/admin/navegacion.js`.
+
+### M20 — El alta de docente se muestra sin formulario detrás
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la pantalla `Docentes` muestra la acción `+ Nuevo Docente` sin ningún formulario
+  detrás. La tarea 9.4 pedía "alta"; el escenario del spec dice lo contrario y exige que la acción
+  esté presente sin formulario, sin control de edición y con el control de clases dictadas
+  deshabilitado con `Próximamente`.
+- **Por qué:** el spec es la obligación literal. El maqueteo no implementa la historia #9 y mostrar
+  un formulario que no guarda nada sería peor que mostrar el hueco: el cliente tiene que ver el
+  alcance completo para decidir entre los dos caminos de MVP (D20).
+- **Dónde:** `frontend/src/admin/TeachersPage.jsx`.
+
+### M21 — `Modalidad` y `Sede` se completan con valor de ejemplo, y el docente va desnormalizado
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** las cinco comisiones de ejemplo llevan `modalidad` y `sede` con valores inventados
+  —presenciales en la sede del chip de la barra superior—, aunque la planilla del cliente no tiene
+  esas columnas. Y la comisión guarda `docente_nombre` desnormalizado, con `docente_id` nulo para
+  `CUR-104` y `CUR-110`, cuyos docentes el cliente nombra en la hoja de cursos pero no están en el
+  padrón de cinco filas que el spec obliga a mostrar.
+- **Por qué:** el modelo exige `modalidad` y la sede cuando corresponde (historia #8), así que el
+  ejemplo tiene que tenerlos o la fila no sería representativa. El nombre del docente va
+  desnormalizado porque es lo que la planilla muestra en esa columna, y `docente_id` puede ser nulo
+  porque el modelo lo admite: inventar una sexta fila en el padrón para que el nombre calce sería
+  agregar un dato que el cliente no registró.
+- **Consecuencia:** ninguna de las dos columnas se renderiza en la tabla, porque el spec fija las
+  columnas literales de esa pantalla y no incluye ninguna de las dos.
+- **Dónde:** `frontend/src/mocks/comisiones.js`, `frontend/src/admin/CoursesPage.jsx`.
+
+### M22 — La causa del comprobante aparece solo cuando el estado inicial no es acreditado
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el formulario de cobranza muestra los ocho campos que fija el spec, en ese orden, y
+  agrega un noveno campo, `Causa del comprobante no acreditado`, que aparece únicamente cuando el
+  `Estado Inicial` no es `ACREDITADO` y que es obligatorio en ese caso.
+- **Por qué:** D28 y la historia #45 hacen obligatoria la causa de una cobranza que no está
+  acreditada, con el CHECK `causa_obligatoria_si_no_acreditado` en el modelo. Un formulario que
+  deja registrar un cobro observado sin causa produciría una fila que la base real rechaza.
+  Condicional, el formulario por defecto tiene exactamente los campos del spec.
+- **Dónde:** `frontend/src/admin/PaymentsPage.jsx`.
+
+### M23 — Los elementos de sesión son componentes compartidos por los tres shells
+
+- **Fecha:** 2026-10-03
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `AvisoCambioContrasena` y `BotonCerrarSesion` salen de la pantalla de marcador de
+  posición y viven en `src/components/session/`. El shell de Administración y el de las otras dos
+  secciones los usan igual.
+- **Por qué:** el aviso de contraseña pendiente responde a un requisito de `auth-and-roles` y la
+  sesión es del contexto, no de una sección (M13). Con el aviso duplicado en tres pantallas, la
+  primera que se actualice deja a las otras dos diciendo que el flujo de cambio existe.
+- **Dónde:** `frontend/src/components/session/`, `frontend/src/pages/LandingPage.jsx`,
+  `frontend/src/admin/AdminLayout.jsx`.
+
+---
+
 ## Configuración del repositorio
 
 ### R1 — `opencode.json` declara Context7 sin API key

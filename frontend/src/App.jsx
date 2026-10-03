@@ -1,4 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { AccessPage } from './admin/AccessPage'
+import { AdminLayout } from './admin/AdminLayout'
+import { CoursesPage } from './admin/CoursesPage'
+import { DashboardPage } from './admin/DashboardPage'
+import { PaymentsPage } from './admin/PaymentsPage'
+import { StudentsPage } from './admin/StudentsPage'
+import { TeachersPage } from './admin/TeachersPage'
 import { RequireRole } from './auth/RequireRole'
 import { FORBIDDEN_PATH, LOGIN_PATH, homePathForRole } from './auth/roleRoutes'
 import { SESSION_STATUS, SessionProvider, useSession } from './auth/SessionContext'
@@ -25,8 +32,12 @@ function RootRedirect() {
 }
 
 /**
- * Tabla de ruteo. Cada sección declara su rol una vez, acá; las pantallas que llegan en los
- * grupos 9, 10 y 11 cuelgan debajo de estas tres rutas sin cambiar quién puede verlas.
+ * Tabla de ruteo. Cada sección declara su rol una vez, acá; las pantallas cuelgan debajo de estas
+ * tres rutas sin cambiar quién puede verlas (M10).
+ *
+ * El shell de Administración ya existe y sus seis pantallas cuelgan de `AdminLayout` con rutas
+ * hijas: el layout no sabe qué pantalla hay, la dibuja. Los shells de Docente y de Alumno siguen
+ * con la pantalla de marcador de posición hasta que lleguen los grupos 10 y 11.
  */
 export function AppRoutes() {
   return (
@@ -39,10 +50,18 @@ export function AppRoutes() {
         path="/admin"
         element={
           <RequireRole allowedRoles={['ADMIN']}>
-            <LandingPage />
+            <AdminLayout />
           </RequireRole>
         }
-      />
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="cursos" element={<CoursesPage />} />
+        <Route path="docentes" element={<TeachersPage />} />
+        <Route path="alumnos" element={<StudentsPage />} />
+        <Route path="cobranzas" element={<PaymentsPage />} />
+        <Route path="habilitacion" element={<AccessPage />} />
+      </Route>
+
       <Route
         path="/docente"
         element={
