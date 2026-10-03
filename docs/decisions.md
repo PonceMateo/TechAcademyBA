@@ -590,12 +590,18 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 - **Decisión:** la cobranza del 19/05/2026 se registra con `importe: null` y causa
   `comprobante ilegible`. El modelo exige `importe > 0` con el CHECK `cobranza_importe_positivo`,
   así que esa fila **no podría crearse** contra la base real.
+- **Cómo lo rechaza, exactamente:** el `null` lo rechaza el `NOT NULL` de la columna, no el CHECK.
+  El CHECK solo caza el cero y los negativos. Las dos cosas están probadas:
+  `test_importe_menor_o_igual_a_cero_es_rechazado` y `test_importe_nulo_es_rechazado` en
+  `backend/app/tests/test_cobranza.py`.
 - **Por qué:** es lo que el cliente tiene. La celda de la planilla está vacía porque el número
   nunca pudo leerse, y el caso vale justamente por eso: es la diferencia entre "no pagó" y "no se
-  pudo leer". Ocultar el hueco con un cero convertiría el ejemplo en un cobro de $0.
+  pudo leer". Ocultar el hueco con un cero convertiría el ejemplo en un cobro de $0. La interfaz
+  tampoco inventa nada: `formatMoneda(null)` devuelve cadena vacía y la celda queda en blanco.
 - **Pendiente:** qué hace la historia de alta de cobranza con un comprobante ilegible: si se
-  rechaza hasta poder leer el importe, si se registra con el importe en null y se relaxes el
-  CHECK, o si hay un estado más. Es una decisión de la historia #21 con la #45, no de este change.
+  rechaza hasta poder leer el importe, si se registra con el importe en `null` y se saca el
+  `NOT NULL` de la columna (relajar el CHECK no alcanza: no es lo que rechaza el `null`), o si
+  hay un estado más. Es una decisión de la historia #21 con la #45, no de este change.
 - **Dónde:** `frontend/src/mocks/cobranzas.js`, `backend/app/models/cobranza.py`.
 
 ### M17 — Las rutas de la implementación real son provisionales y viven en un solo mapa
@@ -963,8 +969,24 @@ con el cliente o entre los tres del equipo.
 | P6 | Datos que exige un alumno del exterior | Cliente | La historia #47 entra solo con pasaporte. |
 | P7 | Dígito verificador del CUIL | Cliente | El dato es obligatorio y único, pero el equipo no pidió validarlo. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
-| P9 | Remoto de Git del repositorio | Equipo | Sin remoto no hay `push`, no hay pull request y la integración continua nunca corrió: `.github/workflows/ci.yml` existe como archivo, no como historial de la pestaña Actions. |
 | P10 | Firma de la Definition of Done | Equipo | La tarea 12.4 pide una grabación de pantalla o una lista firmada **en el pull request**, y todavía no hay PR. La lista quedó escrita en `docs/verificacion-definition-of-done.md` y falta firmarla. |
+
+### P9 — Resuelto: el remoto sí existe y la integración continua ya corrió
+
+Este pendiente se abrió sobre una afirmación que era **falsa**. Se escribió que el repositorio no
+tenía remoto configurado, y de ahí salieron las tres cosas que se afirmaron después: que la
+integración continua nunca se ejecutó, que no hay dónde firmar la lista y que la 12.5 no se puede
+hacer.
+
+Lo verificado, con comando:
+
+- `git remote -v` devuelve `origin https://github.com/PonceMateo/TechAcademyBA.git`.
+- La rama `feat/bootstrap-initial-scaffold` está pusheada e idéntica a `origin`.
+- El `push` de `d86fa37` disparó el workflow y la corrida terminó en **`success`**, con los dos
+  jobs (`backend` y `frontend`) en verde.
+
+La única conclusión que sí era correcta: **la 12.5 sigue sin hacer**, porque depende de que el
+equipo abra el pull request.
 
 ### Detalle de P8 — `core.autocrlf` contra `.editorconfig`
 

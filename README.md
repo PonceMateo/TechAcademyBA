@@ -248,6 +248,10 @@ en el runner es un `services:` del propio job.
 
 Si cualquiera de los dos jobs falla, el workflow queda en rojo.
 
+> **Ya corrió de verdad.** El `push` de la rama `feat/bootstrap-initial-scaffold` disparó el
+> workflow el 2026-10-03 y la corrida terminó en `success`, con los dos jobs en verde. Es la
+> misma evidencia que dan los comandos de arriba, pero ejecutada por GitHub y no en la máquina.
+
 ## Herramientas opcionales
 
 **Ninguna hace falta para desarrollar.** Git, Docker y un editor alcanzan para trabajar en
@@ -360,6 +364,6 @@ está en [`docs/verificacion-definition-of-done.md`](docs/verificacion-definitio
 - **El proveedor de correo.** Solo existe la implementación que escribe en el log (P2).
 - **Los datos reales.** No se importa nada de la planilla del cliente: la carga de los datos
   históricos se hace a mano al final del MVP, por decisión del equipo.
-- **El remoto de Git.** El repositorio todavía no tiene remoto configurado, así que la
-  integración continua existe como archivo pero **nunca se ejecutó**. La primera corrida
-  real ocurre con el primer `git push` (P9).
+- **El pull request.** La rama `feat/bootstrap-initial-scaffold` está pusheada y la integración
+  continua ya corrió en verde sobre ella, pero el pull request todavía no está abierto: esa es
+  la tarea 12.5 del change, y la hace el equipo (P10).

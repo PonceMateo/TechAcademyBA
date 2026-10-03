@@ -12,10 +12,10 @@ secciones del menú de cada rol, comprobar que un rol no alcanza las rutas de ot
   `docker-compose.yml` levantados y con la base migrada y sembrada
 
 > **Por qué está en un archivo y no firmada en el pull request.** La tarea pide una grabación de
-> pantalla **o** una lista de verificación firmada en el PR. Este repositorio **no tiene remoto
-> configurado**, así que no hay pull request donde firmar ni donde adjuntar una grabación: la
-> tarea 12.5 es la que abre el PR y no forma parte de este work unit. Queda pendiente firmarla
-> cuando exista el PR (P10 en [`docs/decisions.md`](decisions.md)).
+> pantalla **o** una lista de verificación firmada en el PR. El repositorio tiene remoto y la
+> rama está pusheada, pero **el pull request todavía no existe**: la tarea 12.5 es la que lo abre y
+> no forma parte de este work unit. Queda pendiente firmarla cuando exista el PR (P10 en
+> [`docs/decisions.md`](decisions.md)).
 
 ## Cómo se verificó cada punto
 
@@ -114,10 +114,22 @@ que no tener lista.
 
 | No verificado | Por qué |
 |---|---|
-| El recorrido visual a ojo, con el navegador abierto | No hay grabador de pantalla ni navegador automatizable en el entorno donde se hizo este work unit. La evidencia es el render automatizado de arriba, que no es una mirada: es una aserción que falla. |
+| El recorrido visual a ojo, con el navegador abierto | En el entorno donde se hizo este work unit no había navegador automatizable. La evidencia automatizada es el render de arriba, que no es una mirada: es una aserción que falla. **Después, el equipo lo recorre a mano en el navegador y reporta que funciona** (ver más abajo). |
 | El ingreso tipeando el formulario del login en el navegador | El login se verificó contra el backend real con las tres cuentas, no desde el formulario. `LoginPage.test.jsx` cubre el render del formulario. |
-| El workflow apareciendo en la pestaña **Actions** | Requiere un `git push` y el repositorio **no tiene remoto configurado** (P9). El archivo `.github/workflows/ci.yml` está y se verificó que es YAML válido y que corre los mismos comandos que el equipo usa en local. |
-| El pull request de la tarea 12.5 | No hay remoto: no se puede abrir. No se intentó. |
+| El pull request de la tarea 12.5 | El remoto existe y la rama está pusheada, pero el PR no está abierto: lo abre el equipo. |
+
+## Verificación posterior, del equipo
+
+El 2026-10-03, con los tres servicios levantados, el equipo levantó la interfaz, entró con las
+tres cuentas de demostración y recorrió las secciones de cada rol. **Reportó que todo funciona.**
+
+Esto suma lo que ninguna aserción automatizada puede sumar: que las pantallas se ven bien y que
+el ingreso desde el formulario funciona de verdad. Queda como testimonio del equipo, no como
+verificación reproducible.
+
+La integración continua, en cambio, sí quedó verificada por máquina: el `push` de `d86fa37`
+disparó el workflow y la corrida terminó en `success`, con los jobs `backend` y `frontend` en
+verde.
 
 ## Firmas
 

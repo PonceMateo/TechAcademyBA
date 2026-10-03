@@ -42,6 +42,21 @@ def test_importe_menor_o_igual_a_cero_es_rechazado(db_session: Session, importe:
     assert "ck_cobranza_cobranza_importe_positivo" in motivo
 
 
+def test_importe_nulo_es_rechazado(db_session: Session) -> None:
+    """M16: el modelo no admite el importe en `null`, que es lo que lleva el ejemplo del
+    comprobante ilegible del 19/05. Por eso esa fila no podría crearse contra la base real.
+
+    Lo rechaza el `NOT NULL` de la columna, y no el CHECK `cobranza_importe_positivo`, que
+    solo caza el cero y los negativos. Qué hacer con un comprobante ilegible es una decisión
+    de las historias #21 y #45, no de este change.
+    """
+    cobranza = crear_cobranza(db_session)
+    cobranza.importe = None
+
+    motivo = assert_rechazado(lambda: db_session.flush())
+    assert 'column "importe"' in motivo
+
+
 def test_fecha_futura_es_rechazada(db_session: Session) -> None:
     """Historia #21: la fecha de una cobranza no puede ser futura."""
     cobranza = crear_cobranza(db_session)
