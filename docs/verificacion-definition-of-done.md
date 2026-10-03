@@ -135,7 +135,9 @@ verde.
 
 | Quién | Qué firma | Fecha |
 |---|---|---|
-| | Recorrido completo de la Definition of Done en el PR | |
-| | Revisión de la lista | |
+| PonceMateo | Recorrido completo de la Definition of Done, hecho en local | 2026-10-03 |
+| — | Revisión de la lista | — |
 
-Las firmas se completan cuando exista el pull request de 12.5.
+El pull request es el **#45** y salió mergeado el 2026-10-03, así que la firma del recorrido se
+registró acá y no en el PR. La fila de **revisión de la lista** queda sin firmar: la hace alguien
+distinto de quien recorrió la interfaz, y todavía no la hizo nadie.
