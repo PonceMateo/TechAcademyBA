@@ -119,23 +119,17 @@ def test_no_hay_archivos_de_test_de_unittest() -> None:
                 )
 
 
-def test_la_ruta_de_api_llega_al_backend_sin_el_prefijo(vercel: dict) -> None:
-    """Vercel entrega al servicio el path original: `/api/health` llega como `/api/health`.
+def test_el_rewrite_de_api_llega_al_servicio_backend(vercel: dict) -> None:
+    """Lo único que vercel.json tiene que resolver es el ruteo: un servicio es interno y
+    solo recibe tráfico público si un rewrite de primer nivel lo apunta.
 
-    El backend no publica prefijo (D14) y en desarrollo lo saca el proxy de Vite, así que
-    sin el transform de `request.path` toda ruta bajo /api responde 404 de FastAPI. El
-    transform no se puede ejercitar con pytest (es configuración de Vercel), así que lo que
-    se verifica acá es que la configuración lo siga declarando.
+    El prefijo `/api` no lo saca vercel.json: lo saca `root_path` de la aplicación, y eso
+    lo comprueba `test_health.py`. Un `transforms` de `request.path` en el servicio se
+    declaró antes y no tuvo efecto en el despliegue, así que no se vuelve a poner.
     """
-    del_backend = vercel["services"]["backend"].get("routes", [])
-    rutas = [r for r in del_backend if r["src"].startswith("/api")]
-    assert len(rutas) == 1, "el servicio backend tiene que tener una sola ruta para /api"
-    ruta = rutas[0]
+    rewrites = vercel["rewrites"]
+    de_api = [r for r in rewrites if r["source"].startswith("/api")]
 
-    transform = next(t for t in ruta["transforms"] if t["type"] == "request.path")
-    assert transform["op"] == "set"
-    assert transform["args"] == ruta["dest"], "el transform y el destino tienen que ir juntos"
-    assert "/api" not in transform["args"], "el prefijo /api tiene que quedar fuera del path"
-
-    rewrites_de_api = [r for r in vercel["rewrites"] if r["source"].startswith("/api")]
-    assert [r["destination"]["service"] for r in rewrites_de_api] == ["backend"]
+    assert [r["destination"]["service"] for r in de_api] == ["backend"]
+    assert rewrites.index(de_api[0]) < len(rewrites) - 1, "/api se evalúa antes del catch-all"
+    assert rewrites[-1]["destination"]["service"] == "frontend", "el resto es la SPA"
