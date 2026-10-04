@@ -64,6 +64,10 @@ services:
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-TechAcademy BA}
     volumes:
       - ./backend:/app
+      # La suite corre con `backend/` como raíz de trabajo, igual que en CI, así que para
+      # leer la configuración de despliegue tiene que ver el archivo de la raíz del repo.
+      # Es el mismo criterio que usa la prueba de tooling que lo verifica.
+      - ./vercel.json:/vercel.json:ro
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:

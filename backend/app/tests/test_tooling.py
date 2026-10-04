@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import subprocess
 import sys
 import tomllib
@@ -11,12 +12,19 @@ from pathlib import Path
 import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = BACKEND_ROOT.parent
 PYPROJECT = BACKEND_ROOT / "pyproject.toml"
+VERCEL_CONFIG = REPO_ROOT / "vercel.json"
 
 
 @pytest.fixture(scope="module")
 def pyproject() -> dict:
     return tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def vercel() -> dict:
+    return json.loads(VERCEL_CONFIG.read_text(encoding="utf-8"))
 
 
 def test_las_dependencias_de_aplicacion_estan_fijadas(pyproject: dict) -> None:
@@ -109,3 +117,25 @@ def test_no_hay_archivos_de_test_de_unittest() -> None:
                     f"{path.name} no sigue la convención de pytest: los archivos de prueba "
                     "se llaman test_<que_prueban>.py, no test<lo que sea>.py"
                 )
+
+
+def test_la_ruta_de_api_llega_al_backend_sin_el_prefijo(vercel: dict) -> None:
+    """Vercel entrega al servicio el path original: `/api/health` llega como `/api/health`.
+
+    El backend no publica prefijo (D14) y en desarrollo lo saca el proxy de Vite, así que
+    sin el transform de `request.path` toda ruta bajo /api responde 404 de FastAPI. El
+    transform no se puede ejercitar con pytest (es configuración de Vercel), así que lo que
+    se verifica acá es que la configuración lo siga declarando.
+    """
+    del_backend = vercel["services"]["backend"].get("routes", [])
+    rutas = [r for r in del_backend if r["src"].startswith("/api")]
+    assert len(rutas) == 1, "el servicio backend tiene que tener una sola ruta para /api"
+    ruta = rutas[0]
+
+    transform = next(t for t in ruta["transforms"] if t["type"] == "request.path")
+    assert transform["op"] == "set"
+    assert transform["args"] == ruta["dest"], "el transform y el destino tienen que ir juntos"
+    assert "/api" not in transform["args"], "el prefijo /api tiene que quedar fuera del path"
+
+    rewrites_de_api = [r for r in vercel["rewrites"] if r["source"].startswith("/api")]
+    assert [r["destination"]["service"] for r in rewrites_de_api] == ["backend"]
