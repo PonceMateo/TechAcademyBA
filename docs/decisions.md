@@ -952,6 +952,30 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
   que anotarla como si estuviera medida sería mentir por omisión.
 - **Dónde:** `README.md`, sección "Levantar el proyecto".
 
+### R5 — En el `opencode.json` del proyecto solo entran los MCP portables
+
+- **Fecha:** 2026-10-05
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `opencode.json` declara Context7 (remoto, sin API key, R1) y CodeGraph (local,
+  `codegraph serve --mcp`). Engram **no** se declara: cada miembro lo registra con
+  `engram setup opencode`, que lo escribe en la configuración global de su máquina. Ponytail
+  tampoco: es un plugin, no un MCP, y queda en el global de cada uno.
+- **Por qué:** el criterio no es qué herramienta usamos, sino si su registro sobrevive a un
+  `clone` en otra máquina. `engram setup` escribe la **ruta absoluta** del binario
+  (`C:\Users\<usuario>\...\engram.exe`), y una ruta absoluta en un archivo versionado no
+  funciona en la máquina de nadie más. CodeGraph en cambio se resuelve por `PATH`, que sí es
+  portable, así que va en el repo. Ponytail se deja fuera por otra razón: reescribe
+  `AGENTS.md` e inyecta en el prompt de cada agente, así que ponerlo en el repo le quitaría
+  el veto a los tres. Lo que sí se comparte es la convención, y ya está en "Cambio directo o
+  propuesta".
+- **Consecuencia:** `.gitignore` ignora `.codegraph/`. El índice es local y por máquina, así que
+  **cada clone necesita su propio `codegraph init`**: sin él el servidor levanta y devuelve
+  vacío, que es la forma más confusa de fallar. No se ignoró `.engram/` porque todavía no
+  existe: si el equipo llegara a querer memoria compartida por repo, ignorarla lo impediría
+  en silencio.
+- **Dónde:** `opencode.json`, `.gitignore`, `README.md` (sección "Herramientas para desarrollar
+  con IA"), `AGENTS.md` (sección "Herramientas").
+
 ---
 
 ## Pendientes

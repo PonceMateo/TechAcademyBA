@@ -112,6 +112,19 @@ Cuando la decisión es una decisión de OpenSpec (alcance, contrato, modelo), va
 también en el change. `docs/decisions.md` es el índice de por qué, no el lugar
 donde se discuten las alternativas.
 
+## Herramientas
+
+Los servidores MCP están declarados en `opencode.json`, así que llegan con el `pull`. Si uno
+aparece caído, la causa casi siempre es que el binario no está en el `PATH` de esa máquina, no
+la configuración.
+
+- **CodeGraph** indexa el repo en `.codegraph/`, que es local y no está versionado. Sin índice
+  devuelve vacío en lugar de error: usá Read, Grep y Glob hasta que exista. Indexar es
+  decisión del equipo, no del agente: si falta, avisá y seguí.
+- **Context7** es para documentación de librerías. La lógica del proyecto se lee en el repo.
+- **Engram** conserva decisiones entre sesiones. Se registra con `engram setup opencode`, que
+  escribe en la configuración global de cada máquina y por eso no está en el repo.
+
 ## Convenciones técnicas de este proyecto
 
 Estas no se negocian por historia. El detalle de cada una está en

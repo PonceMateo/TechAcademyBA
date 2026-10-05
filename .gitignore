@@ -76,3 +76,4 @@ desktop.ini
 # Cachés locales de herramientas del asistente
 # ==========================================
 .atl/
+.codegraph/

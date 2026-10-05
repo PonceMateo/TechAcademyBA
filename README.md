@@ -123,20 +123,32 @@ El proyecto se trabaja con [opencode](https://opencode.ai). Los comandos de slas
 habilidades de OpenSpec están versionados en [`.opencode/`](.opencode/), así que
 `/opsx-propose`, `/opsx-apply` y el resto funcionan apenas se clona el repo.
 
-**OpenSpec es obligatorio tenerlo instalado.** El proyecto sigue desarrollo guiado por specs
-(SDD) para los cambios grandes: propuesta, specs, tareas y aplicación, antes de escribir
-código. Los cambios chicos no pasan por OpenSpec. El criterio para distinguir unos de otros
-está en [`AGENTS.md`](AGENTS.md).
+**OpenSpec es obligatorio tenerlo instalado** (`npm i -g @fission-ai/openspec`). El proyecto
+sigue desarrollo guiado por specs (SDD) para los cambios grandes: propuesta, specs, tareas y
+aplicación, antes de escribir código. Los cambios chicos no pasan por OpenSpec. El criterio
+para distinguir unos de otros está en [`AGENTS.md`](AGENTS.md).
 
-Las siguientes son opcionales: no hacen falta para levantar el sistema ni correr las pruebas, y
-viven en la configuración de opencode de cada uno.
+Los servidores MCP del proyecto están declarados en [`opencode.json`](opencode.json), así que
+llegan con el `pull`. Lo que **no** se versiona son los binarios: eso se instala una vez por
+máquina.
 
-| Herramienta | Qué aporta |
-|---|---|
-| Engram | Memoria persistente entre sesiones. |
-| Context7 | Documentación actualizada de librerías. Es el único servidor MCP declarado en [`opencode.json`](opencode.json). |
-| CodeGraph | Índice de símbolos y llamadas del repo. |
-| Ponytail | Plugin que empuja a la solución más simple que funcione: no cambia el resultado, cambia el tamaño del diff. |
+| Servidor MCP | Qué aporta | Instalar |
+|---|---|---|
+| Context7 | Documentación actualizada de librerías. | Nada: es remoto. |
+| CodeGraph | Índice de símbolos y llamadas del repo. | `npm i -g @colbymchenry/codegraph` y después `codegraph init` |
+| Engram | Memoria persistente entre sesiones. | [Su guía de instalación](https://github.com/Gentleman-Programming/engram/blob/main/docs/INSTALLATION.md#windows) y después `engram setup opencode` |
+
+Dos cosas que no se ven en la tabla. **CodeGraph devuelve vacío en lugar de error hasta que
+corre `codegraph init`**, y como `.codegraph/` está en `.gitignore` el índice es por máquina:
+cada clone necesita el suyo. Y si un servidor MCP aparece caído, casi siempre es que falta el
+binario en el `PATH`, no la configuración: `opencode.json` es el mismo para todos.
+
+En Windows, el binario precompilado de Engram lo marca el antivirus como malware. Es un falso
+positivo que el propio proyecto documenta, y su recomendación es compilarlo con `go install`.
+
+Ponytail no es un MCP sino un plugin: empuja a la solución más simple que funcione sin cambiar
+el resultado, solo el tamaño del diff. Es opcional y vive en la configuración global de cada
+uno.
 
 ## Comandos
 
