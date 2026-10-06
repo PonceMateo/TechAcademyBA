@@ -85,7 +85,7 @@ describe('catálogo de comisiones', () => {
     expect(new Set(DOCENTES.map((d) => d.email)).size).toBe(DOCENTES.length)
   })
 
-  it('tiene a todos los docentes con CUIL, porque es obligatorio en el modelo', () => {
+  it('tiene a todos los docentes con CUIL, aunque el modelo ya no lo exige (D33)', () => {
     for (const docente of DOCENTES) {
       expect(docente.cuil).toBeTruthy()
       expect(docente.dni).toBeTruthy()

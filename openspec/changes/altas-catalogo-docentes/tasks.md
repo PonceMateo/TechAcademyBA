@@ -1,4 +1,4 @@
-﻿# Tasks
+# Tasks
 
 Cada work unit deja sus propios tests y su propia documentación. No hay un grupo final de
 testing ni de docs: un grupo que llega tarde y exercise trabajo de un grupo anterior hace
@@ -164,7 +164,7 @@ medías haría que el backlog mintiera sobre el estado real del producto (D21).
 Esta tarea es explícita y tiene su propia verificación porque el CSV de historias y los
 issues del backlog **ya citan D32, D33 y D34**: si no se hace, quedan referencias colgando.
 
-- [ ] 4.1 Registrar **D32** en `docs/decisions.md` con fecha y autor, y **textual y
+- [x] 4.1 Registrar **D32** en `docs/decisions.md` con fecha y autor, y **textual y
   explícito**: que el código del curso lo genera el sistema y no el operador; que los
   códigos del Excel (`CUR101`, `CUR-101`, `103`) **se descartan a propósito** y no se
   intentan preservar; que las variantes sucias del nombre (`"Curso Python"`,
@@ -174,31 +174,36 @@ issues del backlog **ya citan D32, D33 y D34**: si no se hace, quedan referencia
   por `nombre_norm` y su número sale del orden de aparición en la planilla.
   **Verificar** que la entrada existe, tiene fecha y autor, dice las cuatro cosas, y que la
   cita a D32 del CSV de historias deja de apuntar a la nada.
-- [ ] 4.2 Registrar **D33** con fecha y autor: el CUIL del docente pasa a ser opcional
+- [x] 4.2 Registrar **D33** con fecha y autor: el CUIL del docente pasa a ser opcional
   porque en esta fase los docentes no son personas reales y **un CUIL inventado es peor que
   ningún CUIL**. Decir que **revierte D27** y dejar el **alcance del revert explícito**: se
   revierte la obligatoriedad, **no se borra la columna ni el índice**, y la fila de Rita
   Molina conserva su CUIL. **Verificar** que la entrada dice las dos cosas del alcance.
-- [ ] 4.3 Registrar **D34** con fecha y autor: el código de la comisión es derivado, el
+- [x] 4.3 Registrar **D34** con fecha y autor: el código de la comisión es derivado, el
   número es incremental por curso, y la carrera entre dos altas simultáneas la corta el
   índice único que la API traduce a 409, con su techo anotado —a la escala declarada de 10
   comisiones no hace falta secuencia por curso ni lock—. **Verificar** que la entrada nombra
   el techo.
-- [ ] 4.4 Registrar **D35** con fecha y autor: **todos los montos quedan en pesos
+- [x] 4.4 Registrar **D35** con fecha y autor: **todos los montos quedan en pesos
   argentinos**, lo que **cierra el pendiente P4** (había al menos un cobro en dólares en el
   Excel). Anotar que **no hay cambio de código por moneda**: el modelo ya usa
   `Numeric(14, 2)` y la spec `domain-schema` ya lo dice. **Verificar** que P4 sale de la
   tabla de pendientes con su resolución escrita y que D35 dice que no hay cambio de código.
-- [ ] 4.5 Registrar **D36** con fecha y autor: `api` pasa a ser el modo por defecto, lo que
+- [x] 4.5 Registrar **D36** con fecha y autor: `api` pasa a ser el modo por defecto, lo que
   **modifica D14**. Lo que no tiene endpoint cae al ejemplo **solo** con 404 y **los POST
   nunca caen**, con la razón de por qué. Anotar su techo: **se borra cuando el shell tenga
   todos sus endpoints**; es un atajo deliberado, no una arquitectura. **Verificar** que la
   entrada nombra el techo y que dice que modifica D14.
-- [ ] 4.6 Corregir las referencias al modelo viejo que quedaron desactualizadas: el
+- [x] 4.6 Corregir las referencias al modelo viejo que quedaron desactualizadas: el
   docstring de `docs/decisions.md` sobre D27 y los de `app/models/padron.py` y
   `app/services/seed.py` que dicen que el CUIL es obligatorio. **Verificar** con un grep de
   "obligatorio" junto a `cuil` en el repo: no queda ninguno que afirme la obligatoriedad.
-- [ ] 4.7 Anotar en el README, en la sección del despliegue, que la migración se aplica
-  **antes** de desplegar el backend nuevo y que su `downgrade` no recupera los datos de las
-  columnas eliminadas. **Verificar** que la sección dice el orden de los tres pasos y el
-  alcance del rollback.
+- [x] 4.7 Anotar en el README, en la sección del despliegue, que la migración se aplica
+  **antes** de desplegar el backend nuevo y el **alcance real del `downgrade`**: sí
+  reconstruye los códigos que elimina, pero **falla si hay docentes cargados sin CUIL** y no
+  vuelve el texto libre que el operador haya cargado a mano en `comision.codigo`.
+  **Verificar** que la sección dice el orden de los tres pasos y el alcance del rollback.
+  - *Corregido al ejecutar:* esta tarea decía que el `downgrade` "no recupera los datos de
+    las columnas eliminadas". La migración terminada sí los recupera, porque copia el código
+    generado a una columna temporal antes de borrarlo. El README y `design.md` describen lo
+    que el código hace.

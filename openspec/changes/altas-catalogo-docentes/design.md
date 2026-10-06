@@ -372,9 +372,20 @@ La migración **elimina columnas** (`curso.codigo_norm`, `comision.codigo`) y re
 4. **Desplegar el frontend con el modo real.** Los tres formularios pasan a escribir
    contra la base.
 
-**Rollback:** `downgrade` de la migración y vuelta al backend anterior, con el respaldo
-como límite. El rollback de la migración **no recupera los datos de las columnas
-eliminadas**: volver atrás exige el respaldo.
+**Rollback:** `downgrade` de la migración y vuelta al backend anterior. El `downgrade`
+**sí reconstruye los códigos que la migración elimina**: copia `curso.codigo` a una
+columna temporal antes de soltar la generada, y recompone `comision.codigo` como
+`{curso.codigo}-{numero}` antes de soltar `numero`. El respaldo sigue siendo el límite
+real, pero por dos razones que no son "se perdieron los datos":
+
+- **`docente.cuil` vuelve a `NOT NULL` y la migración falla si hay docentes cargados sin
+  CUIL.** Es lo correcto: una restricción que los datos incumplen no se puede restaurar,
+  y quien intente volver atrás tiene que resolverlo antes.
+- **Lo único que no vuelve es el texto libre que el operador hubiera cargado a mano en
+  `comision.codigo`**: en el esquema viejo era un dato libre y queda reemplazado por el
+  derivado. Además `numero` **no se deduce del sufijo del código viejo** sino del orden de
+  inserción dentro de cada curso, así que el número asignado puede no ser el que tenía la
+  fila.
 
 ## Open Questions
 

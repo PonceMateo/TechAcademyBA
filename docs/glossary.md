@@ -35,7 +35,7 @@ columnas o valores de enum reales del modelo. Donde no hay equivalencia
 | **Vacantes** | Cuántos lugares quedan libres en una comisión. | **No se persiste** (D10): se deriva por consulta restando las inscripciones al cupo. El maquetado muestra el número como dato de ejemplo, no calculado. |
 | **Habilitación** | Si el alumno puede entrar a la clase: **habilitado** o **bloqueado**, siempre con la causa a la vista. | **No se persiste** (D9): se deriva de la situación arancelaria. Lo único que se guarda es `override_habilitacion`, el forzado manual con su motivo obligatorio. El maquetado muestra la causa siempre, incluso cuando el estado es bloqueado. |
 | **Factura A** | La factura que se le emite a una **empresa** por una compra, con sus datos fiscales. | Entidad `factura` con `tipo = 'A'`, y `empresa.requiere_factura_a` marca si la empresa la necesita. La factura **B**, del alumno particular, también se registra: es el caso más común del instituto. |
-| **CUIT** | Clave Única de Identificación Tributaria: el número con el que Hacienda identifica a una persona o empresa en Argentina. | Se guarda en `empresa.cuit_norm`, en `pagador.documento_norm` y, para el docente, en `docente.cuil` (obligatorio y único). Se almacena normalizado, solo con dígitos: el mismo CUIT escrito con y sin guiones es el mismo. |
+| **CUIT** | Clave Única de Identificación Tributaria: el número con el que Hacienda identifica a una persona o empresa en Argentina. | Se guarda en `empresa.cuit_norm`, en `pagador.documento_norm` y, para el docente, en `docente.cuil` (único pero **opcional**, D33). Se almacena normalizado, solo con dígitos: el mismo CUIT escrito con y sin guiones es el mismo. |
 
 ---
 

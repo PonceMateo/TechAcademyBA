@@ -5,9 +5,10 @@ seguidas sin duplicar registros ni fallar, y la segunda corrida deja lo mismo qu
 primera.
 
 **Upsert por clave natural.** Cada cuenta se busca por la clave que la identifica en el
-dominio —el email de `usuario`, el CUIL del `docente`, el documento del `alumno`— y se
-inserta o se actualiza. No se busca "la última cuenta creada" ni se usa un contador: la
-clave natural es la que evita que dos corridas se peleen por el mismo registro.
+dominio —el email de `usuario`, el DNI normalizado del `docente`, el documento del
+`alumno`— y se inserta o se actualiza. No se busca "la última cuenta creada" ni se usa
+un contador: la clave natural es la que evita que dos corridas se peleen por el mismo
+registro.
 
 Se optó por buscar y decidir en Python en lugar de `INSERT ... ON CONFLICT`: la operación
 corre dentro de una transacción que el entry point controla, el objeto del ORM queda vivo y

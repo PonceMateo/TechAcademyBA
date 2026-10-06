@@ -451,6 +451,54 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 - **Dónde:** `backend/app/core/database.py`, `backend/app/services/catalogo.py`,
   `backend/app/services/padron.py`.
 
+### D35 — Todos los montos quedan en pesos argentinos
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el arancel de la comisión y todos los montos de cobranza están en **pesos
+  argentinos**. No hay columna de moneda, no hay tipo que la admita y no hay conversión en el
+  código: un monto es un `Numeric(14, 2)` y se muestra con el formato de es-AR.
+- **Por qué:** cierra **P4**. El pendiente se abrió porque el Excel del cliente tenía al menos un
+  cobro en dólares y el modelo asumía pesos, así que había que saber cuál de las dos cosas
+  cambia. Cambia la suposición: los dólares del Excel son un dato de la planilla, no una
+ exigencia del sistema.
+- **No hay cambio de código por moneda.** `Comision.arancel` y `Cobranza.importe` ya usan
+  `Numeric(14, 2)` —el alias `MONEY` de `models/catalogo.py`—, y el saldo no imputado ni siquiera
+  es una columna porque se deriva (D10). La spec `domain-schema` ya decía que los montos son
+  pesos. D35 escribe la decisión que el modelo y la spec ya asumían; no los cambia.
+- **Consecuencia:** si algún día entra una cobranza en otra moneda, es **otro change**: o una
+  columna de moneda con su tipo de cambio y su fecha, o una conversión explícita antes de
+  escribir. Agregar la columna más adelante es barato; que dos montos de distinta moneda terminen
+  restados en el mismo saldo sin que nadie lo note, no.
+- **Dónde:** `docs/decisions.md` (P4), `backend/app/models/catalogo.py`,
+  `backend/app/models/cobranza.py`.
+
+### D36 — El modo por defecto de los datos pasa a ser la API, y lo que falta cae al ejemplo
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `resolveApiMode()` devuelve `api` salvo que la variable de entorno diga `mock`
+  explícitamente. Esto **modifica D14**, que dejaba la pantalla sin datos reales detrás.
+- **Por qué:** con el modo de ejemplo por omisión, el botón de "guardar curso" no guardaba nada y
+  la secretaría se enteraba de eso el día que le sobraba una tarea. El problema no es que el
+  ejemplo exista: es que fuera el camino por defecto de lo que sí se guarda.
+- **Cómo se reparte lo que todavía no existe.** Las **lecturas** caen al ejemplo **solo con un
+  404**. Un 404 es la ausencia de endpoint, que es el único caso en que el ejemplo es una
+  respuesta honesta: no hay dato que mostrar. Un 500 o un error de red **no** caen, porque un
+  ejemplo mostrado como si fuera un dato hace creer que la pantalla funciona.
+- **Los POST nunca caen.** Es lo más importante de la decisión. Un alta que no llega a la base
+  tiene que fallar y decir que no se guardó; si cayera, escribiría en un arreglo de memoria, la
+  pantalla confirmaría un curso que no existe y el equipo se iría creyendo que el sistema guarda.
+  La lista de métodos que escriben es explícita, y no un patrón de nombre, porque equivocarse
+  ahí no da un test rojo: da una demo que miente.
+- **Techo, y es el punto flojo de esta decisión.** La caída al ejemplo se borra cuando el shell
+  tenga todos sus endpoints. Es un atajo deliberado para no dejar media pantalla vacía mientras
+  faltan los endpoints de alumnos, empresas, cobranzas, habilitaciones y clases; no es una
+  arquitectura. Un día que haya que depurar por qué una pantalla muestra datos de ejemplo, la
+  primera pregunta es si ya llegó la hora de borrar `conEjemploEnAusencia`.
+- **Dónde:** `frontend/src/services/dataSourceFactory.js`,
+  `frontend/src/services/apiDataSource.js`, `docker-compose.yml`, `frontend/src/test/setup.js`.
+
 ---
 
 ## Correcciones al modelo de dominio
@@ -520,7 +568,8 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   `NOT NULL`, un CHECK `columna ~ '[^[:space:]]'`: `curso.codigo`, `curso.nombre`,
   `sede.nombre`, `comision.codigo`, `comision.dias_horarios`, `docente.cuil`,
   `docente.email`, `docente.nombre`, `docente.apellido`, `alumno.nombre`,
-  `alumno.email`, `usuario.email`, `usuario.nombre`.
+  `alumno.email`, `usuario.email`, `usuario.nombre`. De esa lista, `docente.cuil` ya no está:
+  D33 lo volvió opcional y le sacó el CHECK.
 - **Por qué:** `NOT NULL` solo rechaza la ausencia de valor. Una cadena vacía o de
   espacios es un campo obligatorio no informado, y la historia #1 pide que el sistema
   lo indique. La expresión es una clase de carácter y no `length(btrim(...))` porque
@@ -1169,12 +1218,26 @@ con el cliente o entre los tres del equipo.
 | P1 | Esquema de cuotas y de cobro | Cliente | La historia #27 habla de "cuota vigente" y "cuota vencida": la regla no se puede escribir sin esto (D11). |
 | P2 | Proveedor de correo | Equipo | Se elige en el sprint siguiente. La interfaz de D17 no cambia. |
 | P3 | Camino de alcance (Must+Should o solo Must) | Cliente | No cambia el scaffold. |
-| P4 | Moneda | Cliente | Hay al menos un cobro en dólares y el modelo asume pesos argentinos. |
 | P5 | Cronograma y temas de clase | Cliente | La historia #38 los muestra al alumno pero ninguna historia los carga. |
 | P6 | Datos que exige un alumno del exterior | Cliente | La historia #47 entra solo con pasaporte. |
-| P7 | Dígito verificador del CUIL | Cliente | El dato es obligatorio y único, pero el equipo no pidió validarlo. |
+| P7 | Dígito verificador del CUIL | Cliente | El CUIL es único pero **ya no es obligatorio** (D33): lo que sigue pendiente es validar su dígito verificador cuando venga cargado, y el equipo no lo pidió. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
 | P10 | Firma de la Definition of Done | Equipo | Se firmó el recorrido el 2026-10-03, en local y después de que el PR #45 saliera mergeado, así que la firma quedó en `docs/verificacion-definition-of-done.md` y no en el PR. La fila de **revisión de la lista** sigue sin firmar: la hace alguien distinto de quien recorrió la interfaz. |
+
+### P4 — Resuelto: todos los montos son pesos argentinos
+
+El pendiente pedía una decisión del cliente porque el Excel tenía al menos un cobro en dólares y
+el modelo asumía pesos. La respuesta no fue cambiar el modelo: fue decidir que **los dólares de la
+planilla son un dato de ese archivo, no una exigencia del sistema**, y que todos los montos son
+pesos argentinos (D35).
+
+Lo que queda escrito:
+
+- No hay columna de moneda ni tipo que la admita. Un monto es `Numeric(14, 2)` y se muestra con el
+  formato de es-AR.
+- No hubo migración: el modelo ya era así.
+- Si algún día hace falta otra moneda, es un change nuevo con columna de moneda y tipo de cambio
+  con fecha, no un ajuste de esta decisión.
 
 ### P9 — Resuelto: el remoto sí existe y la integración continua ya corrió
 
