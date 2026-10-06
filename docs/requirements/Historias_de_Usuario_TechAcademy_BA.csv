@@ -1,23 +1,23 @@
 HISTORIAS DE USUARIO: TechAcademyBA,,,,,,,
 ÉPICA,N° H/U,TÍTULO,DESCRIPCIÓN,CRITERIOS DE ACEPTACIÓN,PRIORIDAD,ESTIMACIÓN,OBSERVACIONES
-1- Catálogo de Cursos y Comisiones,1,Alta Curso,"Como administrador, quiero dar de alta un curso con nombre y código únicos, para eliminar la duplicidad de nombres (""Python Inicial"" / ""Py 101"" / ""Curso Python"").","Escenario: Alta exitosa
-Dado que soy administrador y no existe un curso con el mismo nombre ni código
-Cuando completo nombre y código y confirmo el alta
-Entonces el curso se crea y aparece en el catálogo único de cursos
+1- Catálogo de Cursos y Comisiones,1,Alta Curso,"Como administrador, quiero dar de alta un curso con nombre único, para eliminar la duplicidad de nombres (""Python Inicial"" / ""Py 101"" / ""Curso Python""). El código del curso lo genera el sistema y se muestra al confirmar el alta.","Escenario: Alta exitosa
+Dado que soy administrador y no existe un curso con el mismo nombre
+Cuando completo el nombre y confirmo el alta
+Entonces el curso se crea con un código generado automáticamente (por ejemplo, CUR001) que se me muestra, y aparece en el catálogo único de cursos
 
-Escenario: Código o nombre duplicado
-Dado que ya existe un curso con el mismo código o nombre (sin distinguir mayúsculas, espacios ni guiones, p. ej. CUR-101 y CUR101)
+Escenario: Nombre duplicado
+Dado que ya existe un curso con el mismo nombre (sin distinguir mayúsculas, acentos ni espacios, p. ej. ""Curso Python"" y ""curso  de  python"")
 Cuando intento guardar el nuevo curso
 Entonces el sistema rechaza el alta y muestra el curso existente
 
 Escenario: Datos obligatorios faltantes
-Dado que dejo vacío el nombre o el código
+Dado que dejo vacío el nombre
 Cuando intento guardar
-Entonces el sistema no crea el curso e indica los campos obligatorios",Must,2,
-,2,Alta Comision,"Como administrador, quiero abrir comisiones de un curso asignando docente, días, horarios y arancel, para organizar la oferta académica.","Escenario: Apertura exitosa
+Entonces el sistema no crea el curso e indica que el nombre es obligatorio",Must,2,"El código del curso pasó de cargado por el administrador a generado por el sistema (decisión D32). Los códigos que trae el Excel (CUR101, CUR-101, 103) se descartan a propósito y las variantes de nombre se resuelven con nombre_norm al migrar el Excel."
+,2,Alta Comision,"Como administrador, quiero abrir comisiones de un curso asignando docente, días, horarios y arancel, para organizar la oferta académica. El código de la comisión lo genera el sistema a partir del código del curso.","Escenario: Apertura exitosa
 Dado un curso existente y un docente registrado
 Cuando completo docente, días, horarios, arancel y cupo máximo y confirmo
-Entonces se crea la comisión asociada al curso, con código y denominación unificados
+Entonces se crea la comisión asociada al curso, con un código generado a partir del código del curso (por ejemplo, CUR001-1)
 
 Escenario: Datos obligatorios faltantes
 Dado que omito docente, días, horarios, arancel o cupo
@@ -27,7 +27,7 @@ Entonces el sistema no la crea y marca los campos faltantes
 Escenario: Arancel inválido
 Dado que ingreso un arancel negativo o no numérico
 Cuando intento guardar
-Entonces el sistema rechaza el valor e informa el error",Must,3,
+Entonces el sistema rechaza el valor e informa el error",Must,3,El código de la comisión pasó de cargado a derivado del código del curso más un número incremental por curso (decisión D34). Se implementa dentro de esta historia junto con el cupo (#5) y la modalidad (#8).
 ,3,Editar curso,"Como administrador, quiero editar el nombre, código o descripción de un curso ya existente, para corregir errores de carga sin tener que dar de baja el curso y perder su historial de comisiones asociadas.","Escenario: Edición exitosa
 Dado un curso con comisiones asociadas
 Cuando modifico nombre, código o descripción con valores no duplicados y guardo
@@ -54,7 +54,7 @@ Entonces el cupo se guarda como límite de inscripciones de la comisión
 Escenario: Cupo inválido
 Dado que ingreso cero, un número negativo o un valor no numérico
 Cuando intento guardar
-Entonces el sistema rechaza el valor e informa que el cupo debe ser un entero positivo",Must,2,
+Entonces el sistema rechaza el valor e informa que el cupo debe ser un entero positivo",Must,2,Se implementa dentro de la historia #2: el cupo máximo es un campo del alta de comisión.
 ,6,Visualizar cupos disponibles,"Como administrador, quiero ver en tiempo real las vacantes disponibles por comisión, para saber si puedo seguir inscribiendo alumnos.","Escenario: Vacantes calculadas
 Dado una comisión con cupo máximo 20 y 12 inscriptos confirmados
 Cuando consulto el listado de comisiones
@@ -86,7 +86,7 @@ Entonces el sistema rechaza el guardado y solicita seleccionar una sede
 Escenario: Presencial con sede
 Dado que selecciono modalidad presencial o híbrida e indico una sede
 Cuando guardo
-Entonces la comisión queda registrada con su modalidad y sede",Must,2,
+Entonces la comisión queda registrada con su modalidad y sede",Must,2,Se implementa dentro de la historia #2: la modalidad y la sede son campos del alta de comisión.
 2- Gestión de Docentes,9,Alta Docente,"Como administrador, quiero dar de alta a un profesor con sus datos de contacto y credenciales de acceso (mail), para que pueda ingresar a su panel y ser asignado a comisiones.","Escenario: Alta exitosa
 Dado que el mail y el DNI del docente no están registrados
 Cuando completo nombre, apellido, DNI, mail y teléfono y confirmo
@@ -100,7 +100,7 @@ Entonces el sistema rechaza el alta e informa el dato duplicado
 Escenario: Ingreso al panel
 Dado un docente dado de alta
 Cuando inicia sesión con sus credenciales
-Entonces accede a su panel de profesor",Must,3,
+Entonces accede a su panel de profesor",Must,3,"El CUIL es opcional: los docentes de esta fase no son personas reales, así que no se inventa un CUIL. La columna queda para completarla cuando haya docentes reales (decisión D33, que revierte D27)."
 ,10,Buscar docente,"Como administrador quiero buscar los docentes registrados, mostrando sus datos personales y las comisiones a los que están asignados.","Escenario: Búsqueda con resultados
 Dado docentes registrados en el sistema
 Cuando busco por nombre, apellido, DNI o mail
