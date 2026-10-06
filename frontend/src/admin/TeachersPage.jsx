@@ -1,23 +1,28 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Input, Table } from '../components/ui'
+import { Badge, Button, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { buscarDocentes } from '../services/dataService'
+import { buscarDocentes, crearDocente } from '../services/dataService'
 
 /**
  * Padrón de docentes (9.4).
  *
- * **Las columnas son las del dato, no las del modelo.** El modelo tiene `nombre` y `apellido` por
- * separado y un `activo` booleano; la pantalla muestra el nombre completo, el CUIL junto al DNI y
- * el estado `Activa`. La unión de las dos primeras columnas es el nombre que el cliente escribe,
- * y por eso se arma acá y no en el mock.
+ * **Las columnas son las del dato, no las del modelo.** La fuente de datos ya devuelve el nombre
+ * unido y el conte de comisiones, así que la pantalla no sabe de dónde viene la fila.
  *
- * **`+ Nuevo Docente` está sin formulario detrás, a propósito.** El prototipo no tiene esta
- * pantalla y el alta del docente es una historia del alcance mínimo, pero en este change es
- * maqueta: el botón existe y no abre nada. Lo mismo con el control de clases dictadas, que además
- * se muestra deshabilitado con `Próximamente` para que el cliente vea el hueco (D20).
+ * **El alta pide nombre, apellido, DNI, mail y teléfono. No pide CUIL** (D33): en esta fase los
+ * docentes no son personas reales, y un CUIL inventado es peor que ninguno. La columna CUIL sigue
+ * en la tabla porque la base la tiene, y muestra un guion cuando el docente todavía no la
+ * completó.
  *
- * **La búsqueda filtra por el servicio**, no sobre el arreglo que ya está en la pantalla: el mismo
- * criterio tiene que servir cuando los datos vengan de la API.
+ * **La columna CÁTEDRA no la puede llenar nadie.** El modelo no tiene ese campo, así que la fuente
+ * real devuelve `null` y la pantalla muestra un guion. Se mantiene porque es una columna del
+ * prototipo que el cliente pidió, y se deja a la vista que hoy no hay dato en vez de inventarlo.
+ *
+ * **Un alta fallida no cierra el formulario ni confirma nada.** Deja lo que la secretaría completó
+ * y muestra el motivo que devuelve la fuente, que dice si se repitió el DNI o el email (D36).
+ *
+ * El control de clases dictadas se muestra deshabilitado con `Próximamente` para que el cliente vea
+ * el hueco (D20).
  */
 const COLUMNAS = [
   {
@@ -26,10 +31,10 @@ const COLUMNAS = [
     render: (fila) => <span className="font-medium">{fila.nombre}</span>,
   },
   { clave: 'dni', titulo: 'DNI', render: (fila) => fila.dni },
-  { clave: 'cuil', titulo: 'CUIL', render: (fila) => fila.cuil },
+  { clave: 'cuil', titulo: 'CUIL', render: (fila) => fila.cuil ?? '—' },
   { clave: 'email', titulo: 'EMAIL', render: (fila) => fila.email },
-  { clave: 'telefono', titulo: 'TELÉFONO', render: (fila) => fila.telefono },
-  { clave: 'catedra', titulo: 'CÁTEDRA O ESPECIALIDAD', render: (fila) => fila.catedra },
+  { clave: 'telefono', titulo: 'TELÉFONO', render: (fila) => fila.telefono ?? '—' },
+  { clave: 'catedra', titulo: 'CÁTEDRA O ESPECIALIDAD', render: (fila) => fila.catedra ?? '—' },
   {
     clave: 'comisiones',
     titulo: 'COMISIONES ASIGNADAS',
@@ -44,22 +49,86 @@ const COLUMNAS = [
   },
 ]
 
+const CAMPOS_VACIOS = { nombre: '', apellido: '', dni: '', email: '', telefono: '' }
+
 export function TeachersPage() {
   const [docentes, setDocentes] = useState([])
   const [consulta, setConsulta] = useState('')
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [campos, setCampos] = useState(CAMPOS_VACIOS)
+  const [errores, setErrores] = useState({})
+  const [aviso, setAviso] = useState(null)
+  const [fallo, setFallo] = useState(null)
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
     buscarDocentes(consulta).then(setDocentes)
   }, [consulta])
 
+  function cambiar(campo) {
+    return (evento) => setCampos((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  function cerrarModal() {
+    setModalAbierto(false)
+    setCampos(CAMPOS_VACIOS)
+    setErrores({})
+    setFallo(null)
+  }
+
+  function validar() {
+    const encontrados = {}
+
+    if (campos.nombre.trim() === '') {
+      encontrados.nombre = 'El nombre es obligatorio.'
+    }
+    if (campos.apellido.trim() === '') {
+      encontrados.apellido = 'El apellido es obligatorio.'
+    }
+    if (campos.dni.trim() === '') {
+      encontrados.dni = 'El DNI es obligatorio.'
+    }
+    if (campos.email.trim() === '') {
+      encontrados.email = 'El mail es obligatorio.'
+    }
+
+    return encontrados
+  }
+
+  async function guardar() {
+    const encontrados = validar()
+    setErrores(encontrados)
+
+    if (Object.keys(encontrados).length > 0) {
+      return
+    }
+
+    setGuardando(true)
+    setFallo(null)
+    try {
+      // Sin `cuil`: el contrato no lo admite (D33).
+      const creado = await crearDocente({
+        nombre: campos.nombre,
+        apellido: campos.apellido,
+        dni: campos.dni,
+        email: campos.email,
+        telefono: campos.telefono === '' ? null : campos.telefono,
+      })
+      setDocentes((anteriores) => [...anteriores, creado])
+      cerrarModal()
+      setAviso(`Docente ${creado.nombre} dado de alta.`)
+    } catch (error) {
+      setFallo(error?.message ?? 'No se pudo guardar el docente.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card
         titulo="Padrón de Docentes"
-        acciones={
-          // Sin formulario detrás: el alta real llega con la historia #9.
-          <Button variante="secundario">+ Nuevo Docente</Button>
-        }
+        acciones={<Button variante="secundario" onClick={() => setModalAbierto(true)}>+ Nuevo Docente</Button>}
       >
         <div className="mb-4 max-w-sm">
           <Input
@@ -77,6 +146,86 @@ export function TeachersPage() {
           vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
         />
       </Card>
+
+      {aviso !== null && (
+        <p
+          role="status"
+          className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+        >
+          {aviso}
+        </p>
+      )}
+
+      <Modal
+        abierto={modalAbierto}
+        titulo="Nuevo Docente"
+        onClose={cerrarModal}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarModal}>
+              Cancelar
+            </Button>
+            <Button onClick={guardar} disabled={guardando}>
+              {guardando ? 'Guardando…' : 'Guardar Docente'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            id="docente-nombre"
+            etiqueta="Nombre"
+            valor={campos.nombre}
+            onChange={cambiar('nombre')}
+            obligatorio
+            error={errores.nombre ?? null}
+          />
+          <Input
+            id="docente-apellido"
+            etiqueta="Apellido"
+            valor={campos.apellido}
+            onChange={cambiar('apellido')}
+            obligatorio
+            error={errores.apellido ?? null}
+          />
+          <Input
+            id="docente-dni"
+            etiqueta="DNI"
+            valor={campos.dni}
+            onChange={cambiar('dni')}
+            obligatorio
+            error={errores.dni ?? null}
+          />
+          <Input
+            id="docente-email"
+            etiqueta="Mail"
+            type="email"
+            valor={campos.email}
+            onChange={cambiar('email')}
+            obligatorio
+            error={errores.email ?? null}
+          />
+          <Input
+            id="docente-telefono"
+            etiqueta="Teléfono"
+            valor={campos.telefono}
+            onChange={cambiar('telefono')}
+          />
+        </div>
+
+        {fallo !== null && (
+          <p
+            role="alert"
+            className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            {fallo}
+          </p>
+        )}
+
+        <p className="mt-4 text-xs text-slate-500">
+          El docente se crea con una cuenta de acceso para ese mail.
+        </p>
+      </Modal>
 
       <Card titulo="Control de Clases Dictadas">
         {/* Fuera del alcance mínimo: se muestra el hueco y no una pantalla vacía detrás (D20). */}

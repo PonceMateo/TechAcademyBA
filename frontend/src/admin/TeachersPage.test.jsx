@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Padrón de docentes (9.4).
@@ -10,6 +10,9 @@ import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
  * cliente pidió: el CUIL visible junto al DNI. El ítem deshabilitado de las clases dictadas se
  * comprueba con `disabled`, porque un ítem que "no navega" por no tener onclick y un ítem
  * deshabilitado son cosas distintas y el spec pide la segunda.
+ *
+ * El CUIL se muestra en la columna y **no se pide en el alta**: pasó a ser opcional en el modelo
+ * (D33), así que el formulario solo junta los datos que el alta necesita.
  */
 
 const COLUMNAS = [
@@ -119,12 +122,73 @@ describe('buscador', () => {
   })
 })
 
-describe('acciones sin contenido detrás', () => {
-  it('deja el alta de docente presente y sin formulario', () => {
-    expect(screen.getByRole('button', { name: '+ Nuevo Docente' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+describe('alta de docente', () => {
+  async function abrir(user) {
+    await user.click(screen.getByRole('button', { name: '+ Nuevo Docente' }))
+    await screen.findByRole('dialog', { name: 'Nuevo Docente' })
+  }
+
+  async function completar(user) {
+    await user.type(screen.getByLabelText(/^Nombre/), 'Ada')
+    await user.type(screen.getByLabelText(/^Apellido/), 'Lovelace')
+    await user.type(screen.getByLabelText(/^DNI/), '30.111.222')
+    await user.type(screen.getByLabelText(/^Mail/), 'ada.lovelace@techacademy.invalid')
+  }
+
+  it('pide nombre, apellido, DNI y mail, y no pide CUIL', async () => {
+    const user = userEvent.setup()
+    await abrir(user)
+
+    // El CUIL pasó a ser opcional en el modelo (D33) y el contrato del alta no lo admite: si el
+    // formulario lo pidiera, la pantalla estaría pidiendo un dato que la base no usa.
+    expect(screen.queryByLabelText(/CUIL/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    expect(await screen.findByText('El nombre es obligatorio.')).toBeInTheDocument()
+    expect(await screen.findByText('El apellido es obligatorio.')).toBeInTheDocument()
+    expect(await screen.findByText('El DNI es obligatorio.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nuevo Docente' })).toBeInTheDocument()
   })
 
+  it('da de alta el docente y lo agrega al padrón con el nombre junto', async () => {
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Nuevo Docente' })).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByText('Docente Ada Lovelace dado de alta.')).toBeInTheDocument()
+    expect(await screen.findByText('ada.lovelace@techacademy.invalid')).toBeInTheDocument()
+  })
+
+  it('deja el formulario abierto y muestra el motivo cuando la fuente rechaza el alta', async () => {
+    // El rechazo lo produce la fuente, no la pantalla: el ejemplo acepta cualquier mail, así que
+    // se reemplaza `crearDocente` por una que falla con el mensaje del backend (D36).
+    stubDataSource({
+      crearDocente: vi.fn(async () => {
+        throw new Error('Ya existe un docente con ese DNI: 28.114.402 — Rita Molina.')
+      }),
+    })
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: '+ Nuevo Docente' }))
+    await screen.findByRole('dialog', { name: 'Nuevo Docente' })
+    await completar(user)
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe un docente con ese DNI')
+    expect(screen.getByRole('dialog', { name: 'Nuevo Docente' })).toBeInTheDocument()
+    expect(screen.queryByText(/dado de alta\./)).not.toBeInTheDocument()
+    // Lo que el operador completó sigue ahí: reescribir el DNI a mano es el error más caro.
+    expect(screen.getByLabelText(/^DNI/)).toHaveValue('30.111.222')
+  })
+})
+
+describe('acciones sin contenido detrás', () => {
   it('muestra el control de clases dictadas deshabilitado y con Próximamente', async () => {
     const user = userEvent.setup()
 

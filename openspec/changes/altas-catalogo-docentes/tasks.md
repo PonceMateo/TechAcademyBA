@@ -1,4 +1,4 @@
-# Tasks
+﻿# Tasks
 
 Cada work unit deja sus propios tests y su propia documentación. No hay un grupo final de
 testing ni de docs: un grupo que llega tarde y exercise trabajo de un grupo anterior hace
@@ -114,48 +114,48 @@ medías haría que el backlog mintiera sobre el estado real del producto (D21).
 
 ## 3. `feat(frontend)` — Formularios de alta, `dataService` y el modo real
 
-- [ ] 3.1 Cambiar `resolveApiMode()` en `frontend/src/services/dataSourceFactory.js` para
+- [x] 3.1 Cambiar `resolveApiMode()` en `frontend/src/services/dataSourceFactory.js` para
   que `api` sea el valor por defecto, y publicar `VITE_API_MODE: ${VITE_API_MODE:-api}` en
   `docker-compose.yml`. **Verificar** con un test de la fábrica que, sin variable de
   entorno, el modo resuelto es el real.
-- [ ] 3.2 En `frontend/src/services/apiDataSource.js`, hacer que las **lecturas** caigan al
+- [x] 3.2 En `frontend/src/services/apiDataSource.js`, hacer que las **lecturas** caigan al
   datasource de ejemplo **solo** con respuesta 404, y que cualquier otro error se propague.
   **Verificar** con tests de la fuente: 404 devuelve el ejemplo, 500 propaga el fallo.
-- [ ] 3.3 Dejar explícito en `apiDataSource.js` que **los POST nunca caen**: un alta que no
+- [x] 3.3 Dejar explícito en `apiDataSource.js` que **los POST nunca caen**: un alta que no
   llega a la base falla y lo dice, y no escribe en un almacén de memoria. **Verificar** con
   un test que hace fallar el POST y afirma que la pantalla recibe un error y no una
   confirmación.
-- [ ] 3.4 Agregar a `frontend/src/services/dataService.js` las funciones de las tres altas
+- [x] 3.4 Agregar a `frontend/src/services/dataService.js` las funciones de las tres altas
   y de la consulta de sedes, con los nombres del dominio en español sin tildes (D19).
   **Verificar** con `npm run lint` y con el test de la frontera de datos.
-- [ ] 3.5 Agregar a `frontend/src/services/apiDataSource.js` los cuatro endpoints que ya
+- [x] 3.5 Agregar a `frontend/src/services/apiDataSource.js` los cuatro endpoints que ya
   existen, y sacar de `PATHS` los que este change define. **Verificar** con un test que
   afirma que la fuente real llama a las rutas del contrato.
-- [ ] 3.6 Convertir el modal de `frontend/src/admin/CoursesPage.jsx` en un alta real: quitar
+- [x] 3.6 Convertir el modal de `frontend/src/admin/CoursesPage.jsx` en un alta real: quitar
   el campo `codigo`, dejar nombre y descripción, y **mostrar el código generado** al
   confirmar. Sacar el aviso de "el maquetado no guarda nada todavía". **Verificar** con los
   tests de la pantalla: alta exitosa muestra el código, alta rechazada muestra el motivo y
   mantiene lo que el operador completó, alta que no llega a la base informa que no se guardó.
-- [ ] 3.7 Agregar el alta de comisión real al mismo lugar: `docente_id` obligatorio aunque la
+- [x] 3.7 Agregar el alta de comisión real al mismo lugar: `docente_id` obligatorio aunque la
   columna admita nulo, la regla de modalidad que exige sede en el formulario —un botón
   deshabilitado taparía el mensaje de error— y la numeración la muestra el código derivado
   que devuelve la API. **Verificar** con los tests de la pantalla.
-- [ ] 3.8 En `frontend/src/admin/TeachersPage.jsx`, reemplazar la acción sin formulario
+- [x] 3.8 En `frontend/src/admin/TeachersPage.jsx`, reemplazar la acción sin formulario
   detrás por el formulario real, con nombre, apellido, DNI, email y teléfono, **sin campo de
   CUIL**. **Verificar** con los tests de la pantalla.
-- [ ] 3.9 Corregir el resumen del catálogo: `obtenerResumenCatalogo()` pide
+- [x] 3.9 Corregir el resumen del catálogo: `obtenerResumenCatalogo()` pide
   `GET /comisiones?resumen=true`, que ningún endpoint define, así que el chip tiene que
   **derivar el total de la lista** en lugar de leer `total_comisiones`. **Verificar** con el
   test de la pantalla del catálogo: el chip muestra la cantidad de comisiones que devolvió la
   lista, y no `undefined`.
-- [ ] 3.10 Agregar `listarCursos()` a `dataService.js` y a **las dos** implementaciones de
+- [x] 3.10 Agregar `listarCursos()` a `dataService.js` y a **las dos** implementaciones de
   la frontera (`apiDataSource.js` y `mockDataSource.js`), y **arreglar el selector de curso
   de `CoursesPage.jsx`, que hoy se arma con `comisiones.map((c) => c.curso)`**: eso solo
   ofrece cursos que **ya tienen una comisión**, así que un curso recién creado no puede
   abrirle la primera, que es justamente el flujo que este change habilita. El selector tiene
   que consumir `listarCursos()`. **Verificar** con un test que el selector ofrece un curso
   sin comisiones, que es el caso que hoy no aparece.
-- [ ] 3.11 Corregir los tres tests de pantalla que hoy **afirman el aviso de que el maquetado
+- [x] 3.11 Corregir los tres tests de pantalla que hoy **afirman el aviso de que el maquetado
   no guarda nada**, y correr `npm run lint`, `npm run test` y `npm run build`. **Verificar**
   que los tres comandos terminan en cero.
 

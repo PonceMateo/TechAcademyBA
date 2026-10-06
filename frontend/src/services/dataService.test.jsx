@@ -45,15 +45,18 @@ function ComisionesProbe() {
 }
 
 describe('resolución de la implementación', () => {
-  it('usa mock salvo que la variable de entorno pida api', () => {
-    expect(resolveApiMode({ VITE_API_MODE: 'mock' })).toBe(API_MODE.MOCK)
+  it('usa api por defecto, y mock solo cuando se lo piden', () => {
     expect(resolveApiMode({ VITE_API_MODE: 'api' })).toBe(API_MODE.API)
+    expect(resolveApiMode({ VITE_API_MODE: 'mock' })).toBe(API_MODE.MOCK)
   })
 
-  it('cae en mock con un valor escrito mal, para no dejar el maquetado sin datos', () => {
-    expect(resolveApiMode({ VITE_API_MODE: 'API' })).toBe(API_MODE.MOCK)
-    expect(resolveApiMode({})).toBe(API_MODE.MOCK)
-    expect(resolveApiMode(undefined)).toBe(API_MODE.MOCK)
+  it('cae en api con un valor escrito mal o ausente, para que las altas se guarden', () => {
+    // D36: `api` es el valor por defecto porque el backend tiene los endpoints del catálogo. Un
+    // valor mal escrito tiene que dejar guardar, no dejar de guardar: el error de una demo que no
+    // guarda nada se descubre tarde.
+    expect(resolveApiMode({ VITE_API_MODE: 'API' })).toBe(API_MODE.API)
+    expect(resolveApiMode({})).toBe(API_MODE.API)
+    expect(resolveApiMode(undefined)).toBe(API_MODE.API)
   })
 
   it('rechaza un modo sin implementación con un mensaje que dice cuáles hay', () => {
