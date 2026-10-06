@@ -2,8 +2,9 @@
 
 ## Context
 
-Estado actual que condiciona el approach. La motivación está en `proposal.md`; el
-comportamiento exigido, en `specs/`.
+Estado **anterior** al change que condiciona el approach. La motivación está en `proposal.md`;
+el comportamiento exigido, en `specs/`. Lo que este change cambia de lo que está descrito acá está
+en las decisiones D36, D34 y D33.
 
 - **El frontend no habla con el backend más que para el login.** `resolveApiMode()` en
   `src/services/dataSourceFactory.js` devuelve `mock` salvo que la variable valga `api`,

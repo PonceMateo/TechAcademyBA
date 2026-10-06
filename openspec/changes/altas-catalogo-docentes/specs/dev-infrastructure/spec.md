@@ -53,4 +53,4 @@ las pantallas tengan su endpoint.
 
 #### Scenario: Un alta nunca cae al ejemplo
 - **WHEN** una pantalla envía un alta y el backend no la registra
-- **THEN** la pantalla informa que el alta no se guardó y no muestra una confirmación ficticia
+- **THEN** la pantalla falla y no muestra ninguna confirmación ficticia. El texto que ve la secretaría es el motivo de la falla —«No pudimos conectar con el servidor.»—, que no llega a decir literalmente que el alta no se guardó; lo que el sistema garantiza es que nunca se confirme un alta que no existe

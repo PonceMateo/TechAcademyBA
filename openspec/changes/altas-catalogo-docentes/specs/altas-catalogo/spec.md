@@ -83,7 +83,7 @@ el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Cupo inválido
 - **WHEN** se envía un cupo máximo cero, negativo o no numérico
-- **THEN** el sistema rechaza el alta e informa que el cupo debe ser un entero positivo
+- **THEN** el sistema rechaza el alta con `422`. El texto que llega de la API es el del validador y no está en es-AR; el mensaje «El cupo debe ser un entero positivo» lo pone el formulario de la pantalla, que valida antes de enviar
 
 #### Scenario: Arancel inválido
 - **WHEN** se envía un arancel negativo o no numérico
@@ -91,7 +91,7 @@ el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Modalidad que exige sede
 - **WHEN** se envía una comisión Presencial o Híbrida sin sede
-- **THEN** el sistema rechaza el alta y solicita seleccionar una sede
+- **THEN** el sistema rechaza el alta con `422`. **El texto que llega es el crudo de la restricción de la base y no un mensaje de interfaz**: el formulario de la pantalla valida la regla antes de enviar y muestra su mensaje en es-AR, y el mensaje de interfaz del backend para esta regla queda pendiente del change que escriba los mensajes de rechazo
 
 #### Scenario: Modalidad virtual sin sede
 - **WHEN** se envía una comisión Virtual sin sede
@@ -182,7 +182,7 @@ muestra la acción sin formulario detrás, y SHALL dejar de hacerlo.
 
 #### Scenario: Alta que no llega a la base
 - **WHEN** la fuente de datos no puede registrar el alta
-- **THEN** la pantalla informa que el alta no se guardó y no muestra una confirmación
+- **THEN** la pantalla **falla y no muestra ninguna confirmación**. Lo que muestra es el motivo de la falla —«No pudimos conectar con el servidor.» o «La API respondió 500 a POST /cursos.»—, que no llega a decir literalmente que el alta no se guardó. Lo que importa para la secretaría, que es que no aparezca una confirmación falsa, sí está garantizado: el alta nunca cae al ejemplo
 
 #### Scenario: El selector de curso ofrece cualquier curso del catálogo
 - **WHEN** se abre el formulario de alta de comisión

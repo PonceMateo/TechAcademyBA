@@ -65,6 +65,12 @@ ser obligatoria; WHEN sea Virtual, la sede SHALL ser opcional. Las vacantes SHAL
 derivarse de `cupo_maximo` menos la cantidad de inscripciones activas y SHALL NOT
 almacenarse como un valor editable (historias #2, #5, #6, #7 y #8).
 
+Las dos reglas que dependen de las inscripciones —no Inscribir en una comisión sin vacantes y no
+reducir el cupo por debajo de los inscriptos— **quedan diferidas al change de inscripciones**.
+Este change no incluye el alta de inscripciones, así que todavía no hay servicio ni endpoint que
+las pueda rechazar. Se mantienen escritas porque el modelo las tiene que sostener cuando existan,
+y la forma de derivar las vacantes por consulta —que es su base— ya está resuelta (D10).
+
 #### Scenario: Alta de comisión completa
 - **WHEN** se crea una comisión con curso, docente, días, horarios, cupo, arancel y modalidad
 - **THEN** la comisión queda asociada al curso con un número propio y su código derivado se compone con el código del curso
@@ -83,7 +89,7 @@ almacenarse como un valor editable (historias #2, #5, #6, #7 y #8).
 
 #### Scenario: Modalidad que exige sede
 - **WHEN** se selecciona modalidad Presencial o Híbrido y se intenta guardar sin indicar sede
-- **THEN** el sistema rechaza el guardado y solicita seleccionar una sede
+- **THEN** el sistema rechaza el guardado con `422`. **El texto que llega de la API es el crudo de la restricción de la base y no un mensaje de interfaz**: el formulario de la pantalla impide el envío y muestra su propio mensaje en es-AR, y el mensaje de interfaz del backend para esta regla queda pendiente del change que escriba los mensajes de rechazo
 
 #### Scenario: Modalidad virtual sin sede
 - **WHEN** se selecciona modalidad Virtual y se guarda sin indicar sede
@@ -91,7 +97,7 @@ almacenarse como un valor editable (historias #2, #5, #6, #7 y #8).
 
 #### Scenario: Cupo inválido
 - **WHEN** se intenta guardar un cupo cero, negativo o no numérico
-- **THEN** el sistema rechaza el valor e informa que el cupo debe ser un entero positivo
+- **THEN** el sistema rechaza el valor con `422`. El texto que llega de la API es el del validador y no está en es-AR; el mensaje «El cupo debe ser un entero positivo» lo muestra el formulario de la pantalla antes de enviar, y el del backend queda pendiente del change que escriba los mensajes de rechazo
 
 #### Scenario: Arancel inválido
 - **WHEN** se intenta guardar un arancel negativo o no numérico
@@ -103,11 +109,11 @@ almacenarse como un valor editable (historias #2, #5, #6, #7 y #8).
 
 #### Scenario: Comisión completa
 - **WHEN** una comisión no tiene vacantes y se intenta una nueva inscripción
-- **THEN** el sistema rechaza la inscripción e informa que la comisión está completa
+- **THEN** **Diferido a las inscripciones.** Hoy no hay servicio ni endpoint de inscripciones, así que la inscripción no se puede intentar y la regla no está verificada. La base de la regla ya está: las vacantes se derivan por consulta, así que una comisión sin vacantes es una comisión cuyo cupo iguala la cantidad de inscripciones activas
 
 #### Scenario: Reducción de cupo por debajo de los inscriptos
 - **WHEN** una comisión tiene 15 inscripciones activas y se intenta reducir su cupo máximo a un valor menor que 15
-- **THEN** el sistema rechaza el cambio e informa la cantidad actual de inscripciones activas
+- **THEN** **Diferido a las inscripciones.** No existe endpoint que modifique `cupo_maximo`, así que el cambio no se puede intentar y la regla no está verificada. Cuando exista, la regla se sostiene con la misma derivación de vacantes por consulta, sin columna nueva
 
 ### Requirement: Padrón de docentes y alumnos
 
@@ -129,7 +135,7 @@ con el cliente.
 
 #### Scenario: Alta de docente con CUIL
 - **WHEN** se da de alta un docente con nombre, apellido, DNI, CUIL, email y teléfono cuyos datos no están registrados
-- **THEN** el docente se crea con acceso por su email y queda disponible para ser asignado a comisiones
+- **THEN** el docente se crea con acceso por su email y queda disponible para ser asignado a comisiones. **Este caso es a nivel de modelo**: el contrato del alta no admite `cuil`, así que por la API un docente con CUIL no se puede dar de alta. Lo que se verifica es que el dato se sostenga en el esquema y que el índice único sobre él siga en pie
 
 #### Scenario: Docente sin CUIL
 - **WHEN** se intenta guardar un docente sin informar CUIL
@@ -141,7 +147,7 @@ con el cliente.
 
 #### Scenario: CUIL repetido
 - **WHEN** se intenta registrar un docente con un CUIL ya registrado
-- **THEN** el sistema rechaza el alta e informa que el CUIL está repetido
+- **THEN** el sistema rechaza el alta e informa que el CUIL está repetido. Lo sostiene el índice único sobre `cuil` en la base. **Por la API el caso no se alcanza**, porque el alta no pide CUIL, así que queda verificado a nivel de esquema
 
 #### Scenario: Alta de docente
 - **WHEN** se completa nombre, apellido, DNI, email y teléfono de un docente cuyos datos no están registrados
@@ -164,5 +170,5 @@ con el cliente.
 - **THEN** el sistema crea el alumno en el padrón y lo admite como identificador del legajo
 
 #### Scenario: Email con formato inválido
-- **WHEN** se intenta guardar un alumno o docente con un email de formato incorrecto
-- **THEN** el sistema rechaza el alta e indica el error de formato
+- **WHEN** se intenta guardar un docente con un email de formato incorrecto
+- **THEN** el sistema rechaza el alta e indica el error de formato. **La mitad del alumno no aplica**: el alta de alumno no forma parte de este change y `alumno.email` es una columna sin validador de formato, así que esa validación queda para el change del alta de alumno
