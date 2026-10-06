@@ -1,7 +1,8 @@
 """Autenticación: `POST /auth/login` y `GET /auth/me` (5.2, 5.3).
 
-Las dos rutas son las **únicas** llamadas de red que la interfaz va a hacer (D14). El
-resto del frontend consume datos de ejemplo hasta que lleguen las historias.
+D14 decía que estas dos rutas eran las **únicas** llamadas de red que la interfaz iba a hacer.
+Eso cambió con el change `altas-catalogo-docentes`, que subió `VITE_API_MODE` a `api` por
+omisión: el login ya no es la excepción, es la primera de muchas.
 
 `POST /auth/login` devuelve el mismo cuerpo y el mismo código para un correo inexistente y
 para una contraseña incorrecta. El mensaje no se escribe acá: viene de

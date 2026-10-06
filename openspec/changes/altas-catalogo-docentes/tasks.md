@@ -74,40 +74,40 @@ medías haría que el backlog mintiera sobre el estado real del producto (D21).
 
 ## 2. `feat(api)` — Servicios y endpoints del catálogo y del padrón de docentes
 
-- [ ] 2.1 Agregar los esquemas de entrada y salida de cursos en
+- [x] 2.1 Agregar los esquemas de entrada y salida de cursos en
   `backend/app/schemas/`: el alta admite **solo** `nombre` y `descripcion` opcional, y la
   salida devuelve el curso con su código generado. **Verificar** con `ruff check .` y con
   una prueba que falle si algún campo de código entra en el contrato.
-- [ ] 2.2 Agregar `GET /cursos` y `POST /cursos`. El nombre se normaliza con
+- [x] 2.2 Agregar `GET /cursos` y `POST /cursos`. El nombre se normaliza con
   `nombre_norm` antes de insertar, y un choque se traduce a un error que diga **que el
   nombre está repetido** e identifique el curso existente, no un error genérico de
   integridad. **Verificar** con pruebas del endpoint: alta correcta devuelve el código
   generado, nombre duplicado por normalización se rechaza, nombre vacío se rechaza.
-- [ ] 2.3 Agregar los esquemas de comisiones: el alta admite `curso_id`, `docente_id`,
+- [x] 2.3 Agregar los esquemas de comisiones: el alta admite `curso_id`, `docente_id`,
   `dias_horarios`, `arancel`, `cupo_maximo`, `modalidad` y `sede_id` opcional, y la salida
   devuelve el **código derivado** armado desde el código del curso y el número.
   **Verificar** con `ruff check .`.
-- [ ] 2.4 Agregar `GET /comisiones` y `POST /comisiones`. El `docente_id` es obligatorio
+- [x] 2.4 Agregar `GET /comisiones` y `POST /comisiones`. El `docente_id` es obligatorio
   **en el alta** aunque la columna admita nulo; el `numero` es el máximo de ese curso más
   uno; la modalidad que exige sede la cubre `CHECK modalidad_presencial_requiere_sede`; un
   choque de `uq_comision_curso_numero` se traduce a **409**. **Verificar** con pruebas del
   endpoint: alta completa, docente faltante, cupo inválido, arancel inválido, modalidad
   presencial sin sede, y numeración consecutiva dentro del mismo curso.
-- [ ] 2.5 Agregar los esquemas de docentes: el alta admite `nombre`, `apellido`, `dni`,
+- [x] 2.5 Agregar los esquemas de docentes: el alta admite `nombre`, `apellido`, `dni`,
   `email` y `telefono` opcional, y **ningún campo de CUIL**. **Verificar** con `ruff
   check .` y con una prueba que falle si el contrato incluye `cuil`.
-- [ ] 2.6 Agregar `GET /docentes` y `POST /docentes`. El alta crea el `Docente` y el
+- [x] 2.6 Agregar `GET /docentes` y `POST /docentes`. El alta crea el `Docente` y el
   `Usuario` con `rol = DOCENTE`, `password_hash = hashear_password('Demo2026!')` y
   `must_change_password = False`, **en una sola transacción**. La unicidad cruzada de mail
   la sigue sosteniendo `ensure_email_available`. **Verificar** con pruebas del endpoint:
   alta exitosa con las dos filas, DNI repetido identificado como DNI, email repetido
   identificado como email, email tomado en el padrón de alumnos rechazado, y que la cuenta
   creada entra a su panel.
-- [ ] 2.7 Agregar `GET /sedes`, de solo lectura. **Verificar** con una prueba que devuelva
+- [x] 2.7 Agregar `GET /sedes`, de solo lectura. **Verificar** con una prueba que devuelva
   identificador y nombre de cada sede.
-- [ ] 2.8 Registrar los routers nuevos en `backend/app/api/router.py`. **Verificar** con
+- [x] 2.8 Registrar los routers nuevos en `backend/app/api/router.py`. **Verificar** con
   `pytest app/tests/` completo en verde.
-- [ ] 2.9 Documentar las formas de entrada y salida reales y los códigos de error en las
+- [x] 2.9 Documentar las formas de entrada y salida reales y los códigos de error en las
   entradas de `docs/decisions.md`, reemplazando la provisoidad que M17 dejó anotada.
   **Verificar** que la entrada nueva existe con fecha y autor y que ya no dice que los
   caminos de `PATHS` son provisionales para estos cuatro recursos.

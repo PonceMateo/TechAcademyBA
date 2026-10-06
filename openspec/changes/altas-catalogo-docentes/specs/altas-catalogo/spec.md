@@ -32,8 +32,12 @@ quedar disponible en el catálogo (historia #1).
 - **THEN** admite nombre y descripción opcional, y ningún campo de código
 
 #### Scenario: Nombre de curso duplicado
-- **WHEN** se envía un nombre que solo difiere del existente en mayúsculas, acentos o espacios
+- **WHEN** se envía un nombre que solo difiere del existente en mayúsculas, acentos o espacios, por ejemplo "Curso Python" y "curso   python"
 - **THEN** el sistema rechaza el alta, informa que el nombre está repetido e identifica el curso existente
+
+#### Scenario: Palabras distintas no son el mismo curso
+- **WHEN** se envían "Curso Python" y "Curso de Python", que difieren en una palabra
+- **THEN** el sistema los acepta como dos cursos distintos, porque la normalización colapsa formato y no palabras
 
 #### Scenario: Curso sin nombre
 - **WHEN** se envía un alta de curso sin nombre o con el nombre vacío

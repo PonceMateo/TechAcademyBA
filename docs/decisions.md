@@ -396,6 +396,61 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 - **Dónde:** `app/models/catalogo.py` (`Comision.numero`, `Comision.codigo`),
   `alembic/versions/0002_altas_catalogo.py`.
 
+### M33 — Las formas reales del primer contrato de API, y el fin de la provisoidad de M17
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el change `altas-catalogo-docentes` escribió los primeros endpoints reales y
+  **confirma** los cuatro caminos de M17 sin cambios: `GET`/`POST /cursos`, `GET`/`POST
+  /comisiones`, `GET`/`POST /docentes` y `GET /sedes`. Las formas de entrada y de salida
+  quedan fijadas acá.
+- **Por qué:** M17 dejó los caminos como provisionales y puso la condición de que el primer
+  endpoint real los confirmara o los corrigiera. Confirmó: los nombres por recurso y por verbo
+  que ya estaban escritos en `PATHS` son los correctos, así que el mapa no se tocó.
+- **Formas de entrada.** El alta de curso admite **solo** `nombre` y `descripcion` opcional; el
+  alta de docente admite `nombre`, `apellido`, `dni`, `email` y `telefono` opcional; el alta de
+  comisión admite `curso_id`, `docente_id`, `dias_horarios`, `arancel`, `cupo_maximo`,
+  `modalidad` y `sede_id` opcional. Los tres esquemas son `extra="forbid"`, así que un campo
+  que no está en la lista —un `codigo` en el curso, un `cuil` en el docente— es un **422** y no
+  un campo que se ignora en silencio.
+- **Formas de salida.** El curso sale con `id`, `codigo`, `nombre`, `descripcion`. La comisión
+  sale con `id`, `codigo` (el **derivado**, D34), `curso` anidado, `docente_id`,
+  `docente_nombre`, `dias_horarios`, `cupo_maximo`, `arancel`, `modalidad`, `sede_id`,
+  `sede_nombre` y `vacantes`. El docente sale con `id`, `nombre`, `apellido`, `dni`, `cuil`
+  (puede venir `None`, D33), `email`, `telefono`, `activo` y `cantidad_comisiones`.
+- **Códigos de error.** 401 sin token o con token inválido; 403 con un rol que no sea `ADMIN`;
+  404 si el curso, el docente o la sede de un alta de comisión no existen; **409** si el nombre
+  del curso, el DNI o el email ya están registrados, y también 409 en la carrera entre dos
+  altas simultáneas, con un mensaje que en un caso pide corregir el formulario y en el otro
+  reintentar; 422 si falta un campo obligatorio, si el cupo o el arancel no son positivos, si
+  la modalidad exige sede y no vino, o si el email no tiene forma.
+- **`vacantes` en la respuesta de la comisión, y por qué no cierra la historia #6.** La tabla de
+  Administración ya tenía esa columna, y dejarla en blanco sería una regresión visible, así que
+  la respuesta la trae **derivada** por consulta, que es lo que D10 ya decidió. La #6 sigue
+  abierta porque además necesita el caso de extremo a punta con una inscripción real.
+- **Pendiente que queda:** los caminos de alumnos, empresas, cobranzas, habilitaciones, clases y
+  los shells de docente y de alumno siguen sin endpoint y siguen siendo provisionales.
+- **Dónde:** `backend/app/api/catalogo.py`, `backend/app/api/padron.py`,
+  `backend/app/schemas/catalogo.py`, `backend/app/schemas/padron.py`,
+  `backend/app/services/catalogo.py`, `backend/app/services/padron.py`.
+
+### M34 — `get_db` no confirma, así que el primer servicio que escribe confirma
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `get_db` cierra la sesión sin confirmar, y lo hizo así porque hasta ahora la
+  única ruta que escribía era el seed, que confirma por su cuenta. Los servicios de alta
+  confirman: `flush()` para obtener el identificador y el valor generado, `commit()`, y después
+  `refresh()`.
+- **Por qué:** poner el `commit` en la ruta se lee como un detalle de transporte en una capa que
+  no debería saber de transacciones (D1), y ponerlo en una dependencia obligaría a todos los
+  endpoints a escribir, aunque leer no necesita confirmar nada. En el servicio, un
+  `crear_curso` que se use desde un script o desde una tarea programada confirma igual.
+- **El `refresh` posterior al `commit` no es opcional:** un `INSERT` no devuelve el valor de una
+  columna generada, así que sin él la respuesta de `POST /cursos` devolvería `codigo = None`.
+- **Dónde:** `backend/app/core/database.py`, `backend/app/services/catalogo.py`,
+  `backend/app/services/padron.py`.
+
 ---
 
 ## Correcciones al modelo de dominio

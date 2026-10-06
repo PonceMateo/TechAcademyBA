@@ -6,7 +6,7 @@ Cuando completo el nombre y confirmo el alta
 Entonces el curso se crea con un código generado automáticamente (por ejemplo, CUR001) que se me muestra, y aparece en el catálogo único de cursos
 
 Escenario: Nombre duplicado
-Dado que ya existe un curso con el mismo nombre (sin distinguir mayúsculas, acentos ni espacios, p. ej. ""Curso Python"" y ""curso  de  python"")
+Dado que ya existe un curso con el mismo nombre (sin distinguir mayúsculas, acentos ni espacios, p. ej. ""Curso Python"" y ""curso   python"")
 Cuando intento guardar el nuevo curso
 Entonces el sistema rechaza el alta y muestra el curso existente
 

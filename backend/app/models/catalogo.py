@@ -172,3 +172,19 @@ class Comision(TimestampMixin, Base):
         número, y las dos cosas ya existen. Lo arma el serializador de la API.
         """
         return f"{self.curso.codigo}-{self.numero}"
+
+    @property
+    def docente_nombre(self) -> str | None:
+        """Nombre y apellido del docente, o `None` si la comisión todavía no tiene.
+
+        La columna admite docente nulo para poder abrir una comisión antes de que haya
+        quién la dicte, así que la tabla de Administración tiene que poder mostrar un guion.
+        """
+        if self.docente is None:
+            return None
+        return f"{self.docente.nombre} {self.docente.apellido}"
+
+    @property
+    def sede_nombre(self) -> str | None:
+        """Nombre de la sede, o `None` en una comisión virtual."""
+        return self.sede.nombre if self.sede is not None else None
