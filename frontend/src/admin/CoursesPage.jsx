@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { MODALIDAD } from '../domain/enums'
+import { normalizeCode } from '../domain/normalize'
 import {
   obtenerResumenCatalogo,
   crearComision,
@@ -14,12 +16,22 @@ import {
 import { formatMoneda } from '../utils/formato'
 
 /**
- * Cursos y comisiones (9.3).
+ * Cursos y comisiones (9.3), en dos vistas encadenadas.
+ *
+ * **La misma pantalla dibuja el catálogo o un curso, según la ruta.** `/admin/cursos` es el grid de
+ * cursos y `/admin/cursos/:codigo` es la tabla de comisiones de ese curso. Son dos vistas de una
+ * sola cosa —el catálogo— y comparten los mismos cinco listados y el mismo modal de alta, así que
+ * viven en el mismo archivo: partirlo repartiría el estado y duplicaría el modal.
  *
  * **Las dos altas escriben contra la base** desde el change `altas-catalogo-docentes`. El modal
  * de comisión ya no pide el código: lo genera el sistema a partir del curso (D34), así que el
  * formulario lo quita y muestra el que devuelve la API. El de curso es nuevo y pide solo el
  * nombre: el código lo genera la base (D32) y se muestra después de confirmar.
+ *
+ * **El selector de curso llega elegido cuando se abre desde un curso.** La comisión que se crea
+ * desde adentro de un curso es de ese curso, y pedir que la secretaría vuelva a elegirlo es pedir
+ * que confirme algo que ya está decidido. Desde el catálogo el selector viene vacío, porque ahí no
+ * hay ningún curso elegido todavía.
  *
  * **Sin edición.** El spec deja la edición de curso y de comisión para las historias #3 y #4.
  *
@@ -80,12 +92,28 @@ const CAMPOS_COMISION_VACIOS = {
 
 const CAMPOS_CURSO_VACIOS = { nombre: '', descripcion: '' }
 
+/**
+ * Lo que dice el buscador de que todavía no filtra.
+ *
+ * El campo se ve deshabilitado y no hay estado atrás: la búsqueda de cursos es la historia que
+ * todavía no se escribió, y un campo que se ve igual que los demás y no acepta el foco obliga a
+ * probarlo para enterarse (D20).
+ */
+const LEYENDA_BUSCADOR = 'la búsqueda todavía no está disponible'
+
 export function CoursesPage() {
+  // `undefined` es la vista del catálogo; con parámetro, la vista de ese curso.
+  const { codigo: codigoDeRuta } = useParams()
+  const navegar = useNavigate()
+
   const [comisiones, setComisiones] = useState([])
   const [cursos, setCursos] = useState([])
   const [docentes, setDocentes] = useState([])
   const [sedes, setSedes] = useState([])
   const [resumen, setResumen] = useState({ total_comisiones: 0 })
+  // Mientras el catálogo no llegó no se sabe si el curso de la ruta existe. Sin este flag, la
+  // pantalla dibujaría "curso no encontrado" en el primer render y después lo desmentiría.
+  const [catalogoListo, setCatalogoListo] = useState(false)
   const [modalComision, setModalComision] = useState(false)
   const [modalCurso, setModalCurso] = useState(false)
   const [campos, setCampos] = useState(CAMPOS_COMISION_VACIOS)
@@ -100,11 +128,46 @@ export function CoursesPage() {
     listarComisiones().then(setComisiones)
     // El selector de curso se arma con el catálogo, no con las comisiones: si se armara con las
     // comisiones, un curso recién creado no podría abrir su primera comisión.
-    listarCursos().then(setCursos)
+    listarCursos().then((catalogo) => {
+      setCursos(catalogo)
+      setCatalogoListo(true)
+    })
     listarDocentes().then(setDocentes)
     listarSedes().then(setSedes)
     obtenerResumenCatalogo().then(setResumen)
   }, [])
+
+  // Se comparan los códigos normalizados (D6): `cur-101` y `CUR-101` son el mismo curso, y el
+  // criterio es el mismo que usa el modelo para el índice único.
+  //
+  // `?? null` y no el `undefined` que devuelve `find`: con el catálogo todavía vacío —el primer
+  // render, antes de que llegue la respuesta— no hay curso abierto, y sin esto la pantalla
+  // intentaría leer el código de un curso que todavía no existe.
+  const cursoDeRuta =
+    codigoDeRuta === undefined
+      ? null
+      : (cursos.find((curso) => normalizeCode(curso.codigo) === normalizeCode(codigoDeRuta)) ??
+        null)
+
+  /**
+   * Conteo de comisiones por curso, armado una vez.
+   *
+   * La tarjeta y la tabla salen de este mismo estado, así que no pueden contradecirse. Y no se
+   * cuenta curso por curso en cada tarjeta: con el catálogo chico no se nota, y el día que
+   * tenga cientos de cursos cada tarjeta recorriendo la lista entera se va a notar.
+   */
+  const comisionesPorCurso = comisiones.reduce((conteos, comision) => {
+    const clave = normalizeCode(comision.curso.codigo)
+    conteos.set(clave, (conteos.get(clave) ?? 0) + 1)
+    return conteos
+  }, new Map())
+
+  const comisionesDelCurso =
+    cursoDeRuta === null
+      ? []
+      : comisiones.filter(
+          (comision) => normalizeCode(comision.curso.codigo) === normalizeCode(cursoDeRuta.codigo),
+        )
 
   const exigeSede =
     campos.modalidad === MODALIDAD.PRESENCIAL || campos.modalidad === MODALIDAD.HIBRIDO
@@ -116,6 +179,19 @@ export function CoursesPage() {
   function cambiarCurso(campo) {
     return (evento) =>
       setCamposCurso((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  function abrirModalComision() {
+    // Desde un curso, la comisión es de ese curso: el selector llega elegido y bloqueado. Desde el
+    // catálogo llega vacío, porque ahí todavía no se eligió ninguno.
+    setCampos(
+      cursoDeRuta === null
+        ? CAMPOS_COMISION_VACIOS
+        : { ...CAMPOS_COMISION_VACIOS, curso: String(cursoDeRuta.id) },
+    )
+    setErrores({})
+    setFallo(null)
+    setModalComision(true)
   }
 
   function cerrarModal() {
@@ -178,7 +254,8 @@ export function CoursesPage() {
     try {
       const creada = await crearComision({
         // `curso_id` es el identificador, no el código: el backend lo resuelve por primary key y
-        // espera un entero. El selector ofrece el código para que se lea, pero manda el id (D34).
+        // espera un entero. El selector ofrece el nombre del curso para que se lea, pero manda el
+        // id (D34).
         curso_id: Number(campos.curso),
         docente_id: Number(campos.docente),
         dias_horarios: campos.dias_horarios,
@@ -222,22 +299,44 @@ export function CoursesPage() {
     }
   }
 
+  function abrirCurso(curso) {
+    navegar(`/admin/cursos/${curso.codigo}`)
+  }
+
+  let contenido = null
+
+  if (catalogoListo) {
+    if (codigoDeRuta === undefined) {
+      contenido = (
+        <VistaCursos
+          cursos={cursos}
+          comisionesPorCurso={comisionesPorCurso}
+          resumen={resumen}
+          onNuevoCurso={() => setModalCurso(true)}
+          onNuevaComision={abrirModalComision}
+          onAbrir={abrirCurso}
+        />
+      )
+    } else if (cursoDeRuta === null) {
+      // Una tabla vacía acá se leería como "este curso no tiene comisiones", que es una afirmación
+      // falsa: el curso directamente no existe.
+      contenido = <CursoInexistente onVolver={() => navegar('/admin/cursos')} />
+    } else {
+      contenido = (
+        <VistaComisiones
+          curso={cursoDeRuta}
+          comisiones={comisionesDelCurso}
+          resumen={resumen}
+          onVolver={() => navegar('/admin/cursos')}
+          onNuevaComision={abrirModalComision}
+        />
+      )
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <Card
-        titulo="Comisiones Activas"
-        acciones={
-          <div className="flex items-center gap-2">
-            <Badge tono={TONO.CELESTE}>{`${resumen.total_comisiones} en el catálogo`}</Badge>
-            <Button variante="secundario" onClick={() => setModalCurso(true)}>
-              + Nuevo Curso
-            </Button>
-            <Button onClick={() => setModalComision(true)}>+ Nueva Comisión</Button>
-          </div>
-        }
-      >
-        <Table columnas={COLUMNAS} filas={comisiones} />
-      </Card>
+      {contenido}
 
       {aviso !== null && (
         <p
@@ -304,7 +403,14 @@ export function CoursesPage() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Campo id="curso" etiqueta="Curso / Programa" obligatorio error={errores.curso ?? null}>
-            <select id="curso" value={campos.curso} onChange={cambiar('curso')}>
+            {/* Bloqueado solo cuando el curso viene de la ruta: ahí la comisión no puede ser de
+                otro curso, y dejarlo editable sería ofrecer cambiar algo que ya está decidido. */}
+            <select
+              id="curso"
+              value={campos.curso}
+              onChange={cambiar('curso')}
+              disabled={cursoDeRuta !== null}
+            >
               <option value="">Seleccionar…</option>
               {cursos.map((curso) => (
                 <option key={curso.codigo} value={curso.id}>
@@ -314,7 +420,12 @@ export function CoursesPage() {
             </select>
           </Campo>
 
-          <Campo id="docente" etiqueta="Docente Asignado" obligatorio error={errores.docente ?? null}>
+          <Campo
+            id="docente"
+            etiqueta="Docente Asignado"
+            obligatorio
+            error={errores.docente ?? null}
+          >
             <select id="docente" value={campos.docente} onChange={cambiar('docente')}>
               <option value="">Seleccionar…</option>
               {docentes.map((docente) => (
@@ -385,6 +496,153 @@ export function CoursesPage() {
           lo genera el sistema a partir del curso.
         </p>
       </Modal>
+    </div>
+  )
+}
+
+/** El chip del catálogo, que las dos vistas muestran igual. */
+function ChipCatalogo({ total }) {
+  return <Badge tono={TONO.CELESTE}>{`${total} en el catálogo`}</Badge>
+}
+
+/** Vista de cursos: una tarjeta por curso del catálogo. */
+function VistaCursos({
+  cursos,
+  comisionesPorCurso,
+  resumen,
+  onNuevoCurso,
+  onNuevaComision,
+  onAbrir,
+}) {
+  return (
+    <Card
+      titulo="Cursos"
+      acciones={
+        <div className="flex items-center gap-2">
+          <ChipCatalogo total={resumen.total_comisiones} />
+          <Button variante="secundario" onClick={onNuevoCurso}>
+            + Nuevo Curso
+          </Button>
+          <Button onClick={onNuevaComision}>+ Nueva Comisión</Button>
+        </div>
+      }
+    >
+      <BuscadorPendiente
+        id="buscar-curso"
+        etiqueta="Buscar curso"
+        placeholder="Buscar por nombre, código o descripción…"
+      />
+
+      {cursos.length === 0 ? (
+        <p className="text-sm text-slate-500">Todavía no hay cursos en el catálogo.</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cursos.map((curso) => (
+            <TarjetaCurso
+              key={curso.id}
+              curso={curso}
+              total={comisionesPorCurso.get(normalizeCode(curso.codigo)) ?? 0}
+              onAbrir={() => onAbrir(curso)}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+/**
+ * La tarjeta de un curso.
+ *
+ * **Es un botón y no una `Card` con un botón adentro.** Un botón dentro de otro botón es HTML
+ * inválido y rompe la navegación por teclado, y el pedido era que se pueda abrir el curso con un
+ * click en cualquier punto de la tarjeta.
+ */
+function TarjetaCurso({ curso, total, onAbrir }) {
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-300 hover:shadow"
+    >
+      <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
+      <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
+      <span className="text-sm text-slate-500">{curso.descripcion ?? '—'}</span>
+      <span className="text-xs text-slate-600">
+        {total} {total === 1 ? 'comisión' : 'comisiones'}
+      </span>
+      <span className="text-sm font-medium text-blue-700">Abrir comisiones</span>
+    </button>
+  )
+}
+
+/** Vista de comisiones: la tabla del curso de la ruta, con el mismo formato de siempre. */
+function VistaComisiones({ curso, comisiones, resumen, onVolver, onNuevaComision }) {
+  return (
+    <Card
+      titulo="Comisiones Activas"
+      descripcion={`${curso.nombre} · ${curso.codigo}`}
+      acciones={
+        <div className="flex items-center gap-2">
+          <ChipCatalogo total={resumen.total_comisiones} />
+          <Button variante="secundario" onClick={onVolver}>
+            Volver a cursos
+          </Button>
+          <Button onClick={onNuevaComision}>+ Nueva Comisión</Button>
+        </div>
+      }
+    >
+      <BuscadorPendiente
+        id="buscar-comision"
+        etiqueta="Buscar comisión"
+        placeholder="Buscar por código, docente u horario…"
+      />
+
+      <Table
+        columnas={COLUMNAS}
+        filas={comisiones}
+        vacio={<p className="text-sm text-slate-500">Este curso todavía no tiene comisiones.</p>}
+      />
+    </Card>
+  )
+}
+
+/** La ruta apunta a un curso que no está en el catálogo. */
+function CursoInexistente({ onVolver }) {
+  return (
+    <Card
+      titulo="Curso no encontrado"
+      acciones={
+        <Button variante="secundario" onClick={onVolver}>
+          Volver a cursos
+        </Button>
+      }
+    >
+      <p className="text-sm text-slate-600">
+        Ese curso no está en el catálogo. Puede que el enlace sea de antes de que lo cambiaran.
+      </p>
+    </Card>
+  )
+}
+
+/**
+ * El buscador, visible y sin función.
+ *
+ * `readOnly` va con `disabled` porque un control con `value` y sin `onChange` es un campo que
+ * React avisa que no se puede editar; deshabilitado ya está.
+ */
+function BuscadorPendiente({ id, etiqueta, placeholder }) {
+  return (
+    <div className="mb-4 max-w-sm">
+      <Input
+        id={id}
+        etiqueta={etiqueta}
+        valor=""
+        placeholder={placeholder}
+        disabled
+        readOnly
+        leyenda={LEYENDA_BUSCADOR}
+      />
     </div>
   )
 }

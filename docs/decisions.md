@@ -1108,6 +1108,57 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+## Catálogo de cursos por curso (change `pulsar-catalogo-cursos`)
+
+### D37 — Una sola pantalla con dos vistas, y la ruta lleva el código del curso
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `CoursesPage` lee `cursos` de la ruta y dibuja el grid del catálogo
+  (`/admin/cursos`) o la tabla de comisiones de ese curso (`/admin/cursos/:codigo`). El
+  código se compara con `normalizeCode` de `src/domain/normalize`, el criterio de D6. No
+  se crea una segunda pantalla ni un componente presentacional en `frontend/src/admin/`.
+- **Por qué:** las dos vistas comparten los mismos cinco listados y el mismo modal de alta,
+  así que partir el archivo repartiría el estado y duplicaría el modal. Y
+  `shellConsistency.test.jsx` exige que todo `.jsx` de `admin/` lea sus datos por
+  `dataService` y dibuje con `components/ui`: un modal presentacional en ese directorio
+  rompería la prueba sin motivo. El código y no el identificador es lo que la secretaría
+  lee en pantalla, y ya es el parámetro de las rutas de docente y de alumno.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`, `frontend/src/App.jsx`.
+
+### D38 — El conteo de comisiones por curso se deriva en el cliente
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la tarjeta del curso cuenta las comisiones agrupando por
+  `normalizeCode(comision.curso.codigo)` sobre el estado que la pantalla ya descarga.
+  `GET /cursos` no gana ningún campo y el conteo no sale del backend.
+- **Por qué:** es el mismo criterio de `obtenerResumenCatalogo`, que también deriva en el
+  cliente (D15). Agregar `comisiones_asignadas` a la respuesta obligaría a tocar backend,
+  contrato y prueba para calcular una resta que el frontend ya puede hacer con las dos
+  listas que descarga. La tarjeta y la tabla salen del mismo grupo, así que no pueden
+  contradecirse.
+- **Techo, y es el punto flojo:** el conteo es O(n) sobre las comisiones y el filtro de la
+  tabla es O(n) por cada curso abierto. Con el tamaño del catálogo de la secretaría es
+  irrelevante; con cientos de cursos, la respuesta de `GET /cursos` es el lugar correcto y
+  el cambio queda dentro de la fuente de datos.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`.
+
+### D39 — El buscador de las dos vistas se ve deshabilitado y no filtra
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** las dos vistas muestran su campo de búsqueda con `disabled`, `readOnly` y
+  la leyenda `la búsqueda todavía no está disponible`. No hay estado, no hay servicio y no
+  hay contrato de búsqueda.
+- **Por qué:** D20 pide mostrar el hueco en vez de esconderlo. Un campo que se ve igual que
+  los demás y no acepta el foco obliga a probarlo para enterarse, y un campo habilitado que
+  no filtra hace creer a la secretaría que filtró. La búsqueda es una historia que todavía
+  no se escribió.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`.
+
+---
+
 ## Configuración del repositorio
 
 ### R1 — `opencode.json` declara Context7 sin API key
