@@ -10,7 +10,7 @@ medías haría que el backlog mintiera sobre el estado real del producto (D21).
 
 ## 1. `chore(catalogo)` — Migración 0002, modelo, factories y `test_migration.py`
 
-- [ ] 1.1 Escribir `backend/alembic/versions/0002_altas_catalogo.py` con
+- [x] 1.1 Escribir `backend/alembic/versions/0002_altas_catalogo.py` con
   `down_revision = "0001_initial"`: `curso.codigo` a
   `GENERATED ALWAYS AS ('CUR' || lpad(id::text, greatest(3, length(id::text)), '0')) STORED`,
   baja de `curso.codigo_norm` con su índice y creación de `uq_curso_codigo`; `comision.numero`
@@ -20,21 +20,21 @@ medías haría que el backlog mintiera sobre el estado real del producto (D21).
   `alembic upgrade head` y `alembic downgrade 0001_initial` terminan los dos en cero, porque
   `conftest.py` corre `downgrade base` y `upgrade head` al inicio de cada sesión y un
   `downgrade` a medias ensucia la base de pruebas entre corridas.
-- [ ] 1.2 Actualizar `backend/app/models/catalogo.py`: `Curso.codigo` como
+- [x] 1.2 Actualizar `backend/app/models/catalogo.py`: `Curso.codigo` como
   `Computed(..., persisted=True)`, borrar `codigo_norm`, mantener `no_vacio("codigo", ...)`;
   `Comision` sin `codigo`, con `numero`, `ck_comision_numero_positivo`,
   `uq_comision_curso_numero`, y el código derivado como **propiedad del ORM** que compone
   `{curso.codigo}-{numero}`. **Verificar** con `ruff check .` y con
   `test_la_migracion_escrita_a_mano_cuadra_con_los_modelos` en verde — sabiendo que esa
   prueba **no** alcanza para la expresión (ver 1.5).
-- [ ] 1.3 Actualizar `backend/app/models/padron.py`: `Docente.cuil` anulable y sin el CHECK
+- [x] 1.3 Actualizar `backend/app/models/padron.py`: `Docente.cuil` anulable y sin el CHECK
   de obligatorio; `uq_docente_cuil` intacto. **Verificar** que `alembic check` sigue
   **reportando** cero diferencias y que el índice del CUIL sigue existiendo en `pg_indexes`.
-- [ ] 1.4 Actualizar `backend/app/tests/factories.py`: `crear_curso` sin `codigo` ni
+- [x] 1.4 Actualizar `backend/app/tests/factories.py`: `crear_curso` sin `codigo` ni
   `codigo_norm`, `crear_comision` con `numero` en vez de `codigo`, `crear_docente` con
   `cuil` opcional. **Verificar** que las fábricas arman filas válidas: cualquier test que
   use `crear_curso` tiene que pasar sin tocar el esquema.
-- [ ] 1.5 Agregar a `backend/app/tests/` el test de la expresión generada. Sembrar con
+- [x] 1.5 Agregar a `backend/app/tests/` el test de la expresión generada. Sembrar con
   `setval('curso_id_seq', 999, false)`: el `false` es lo que hace que el **próximo**
   `nextval` devuelva 999, así que los tres inserts toman 999, 1000 y 1001. Comprobar que los
   códigos son `CUR999`, `CUR1000` y `CUR1001`, los tres distintos. Restaurar la secuencia con
@@ -51,24 +51,24 @@ medías haría que el backlog mintiera sobre el estado real del producto (D21).
   el id 1000 produce `duplicate key value violates unique constraint` con
   `Key (codigo)=(CUR100) already exists`, porque los dos truncan al mismo código. Si el test
   pasa por el motivo equivocado, esa es la forma de verlo.
-- [ ] 1.6 Actualizar `backend/app/tests/test_migration.py` **entero**, no con un caso
+- [x] 1.6 Actualizar `backend/app/tests/test_migration.py` **entero**, no con un caso
   suelto: `CHECKS_ESPERADOS` saca `ck_comision_comision_codigo_obligatorio` y
   `ck_docente_docente_cuil_obligatorio` y agrega `ck_comision_numero_positivo`, conservando
   `ck_curso_curso_codigo_obligatorio`; `INDICES_ESPERADOS` saca `uq_curso_codigo_norm` y
   `uq_comision_codigo` y agrega `uq_curso_codigo` y `uq_comision_curso_numero`;
   `test_la_version_de_alembic_queda_registrada` afirma `["0002_altas_catalogo"]`.
   **Verificar** con `pytest app/tests/test_migration.py`.
-- [ ] 1.7 Reescribir o borrar los tests del modelo que el cambio de contrato invalida
+- [x] 1.7 Reescribir o borrar los tests del modelo que el cambio de contrato invalida
   (`test_curso_sin_codigo_es_rechazado`, `test_codigo_duplicado_por_normalizacion`,
   `test_codigo_de_comision_unico`) y **mantener** `test_nombre_duplicado_por_normalizacion`,
   porque `nombre_norm` sigue siendo lo que mata el duplicado de nombres. Agregar el caso de
   que dos docentes sin CUIL conviven y el de que el CUIL repetido se sigue rechazando.
   **Verificar** con `pytest app/tests/test_catalogo.py app/tests/test_padron.py`.
-- [ ] 1.8 Arreglar `backend/app/services/seed.py`: buscar al docente por `dni_norm` en
+- [x] 1.8 Arreglar `backend/app/services/seed.py`: buscar al docente por `dni_norm` en
   lugar de por `cuil`, conservando el CUIL de Rita Molina en `CUENTAS_DEMO`. **Verificar**
   con `pytest app/tests/test_seed.py` y con una segunda corrida del seed, que tiene que ser
   idempotente.
-- [ ] 1.9 Documentar en `docs/decisions.md` el cambio de esquema con **fecha y autor**,
+- [x] 1.9 Documentar en `docs/decisions.md` el cambio de esquema con **fecha y autor**,
   siguiendo el formato de las entradas existentes. **Verificar** que la entrada existe con
   las dos cosas.
 

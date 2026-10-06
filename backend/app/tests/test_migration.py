@@ -46,6 +46,7 @@ TABLAS_ESPERADAS = {
 CHECKS_ESPERADOS = {
     # Catálogo
     "ck_comision_cupo_maximo_positivo",
+    "ck_comision_numero_positivo",
     "ck_comision_arancel_positivo",
     "ck_comision_modalidad_presencial_requiere_sede",
     "ck_comision_modalidad_valida",
@@ -79,12 +80,14 @@ CHECKS_ESPERADOS = {
     "ck_asistencia_asistencia_estado_valido",
     "ck_override_habilitacion_override_motivo_obligatorio",
     # Obligatorios: `NOT NULL` solo rechaza la ausencia de valor, no una cadena vacía.
+    # `ck_curso_curso_codigo_obligatorio` queda aunque la expresión generada no pueda
+    # producir una cadena vacía: forma parte del conjunto de M4 y `ck_comision_codigo_obligatorio`
+    # y `ck_docente_cuil_obligatorio` sí se van, porque esas columnas ya no existen o ya no
+    # son obligatorias (D32 y D33).
     "ck_curso_curso_codigo_obligatorio",
     "ck_curso_curso_nombre_obligatorio",
     "ck_sede_sede_nombre_obligatorio",
-    "ck_comision_comision_codigo_obligatorio",
     "ck_comision_comision_dias_horarios_obligatorio",
-    "ck_docente_docente_cuil_obligatorio",
     "ck_docente_docente_email_obligatorio",
     "ck_docente_docente_nombre_obligatorio",
     "ck_docente_docente_apellido_obligatorio",
@@ -96,7 +99,7 @@ CHECKS_ESPERADOS = {
 
 #: D6: la unicidad tolerante a formato vive en índices sobre columnas normalizadas.
 INDICES_ESPERADOS = {
-    "uq_curso_codigo_norm",
+    "uq_curso_codigo",
     "uq_curso_nombre_norm",
     "uq_docente_dni_norm",
     "uq_docente_cuil",
@@ -105,7 +108,7 @@ INDICES_ESPERADOS = {
     "uq_alumno_email",
     "uq_usuario_email",
     "uq_empresa_cuit_norm",
-    "uq_comision_codigo",
+    "uq_comision_curso_numero",
     "uq_inscripcion_alumno_comision",
     "uq_asistencia_clase_alumno",
 }
@@ -139,7 +142,7 @@ def test_la_migracion_inicial_deja_el_esquema_completo(db_session) -> None:
 
 def test_la_version_de_alembic_queda_registrada(db_session) -> None:
     versiones = db_session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    assert versiones == ["0001_initial"]
+    assert versiones == ["0002_altas_catalogo"]
 
 
 def test_la_migracion_escrita_a_mano_cuadra_con_los_modelos(

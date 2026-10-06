@@ -3,7 +3,7 @@
 D4: `Usuario` es la identidad única, con dos vínculos opcionales y un CHECK que valida
 la correspondencia entre rol y vínculo.
 D5: el email es único en cada padrón, y el documento es único **dentro** de su padrón.
-D27: el CUIL del docente es obligatorio y único.
+D33: el CUIL del docente es único pero **opcional** (revierte la obligatoriedad de D27).
 D30: el alumno puede no tener DNI, porque el instituto inscribe alumnos del exterior.
 """
 
@@ -26,9 +26,15 @@ from app.models.enums import Rol, TipoDocumento, enum_check
 class Docente(TimestampMixin, Base):
     """Docente del padrón (historias #9, #10 y #11).
 
-    D27: `cuil` es obligatorio. Es el identificador que el instituto usa para las
-    liquidaciones, así que un docente sin CUIL no existe en el sistema. No se valida
-    el dígito verificador: el equipo no lo pidió (decisión pendiente P7).
+    D33, que **revierte D27**: `cuil` dejó de ser obligatorio. En esta fase los docentes no
+    son personas reales, así que un CUIL inventado es peor que ningún CUIL: un `27-34567890-7`
+    fabricado no identifica a nadie para liquidar y después hay que ir a corregirlo. La
+    columna y el índice se quedan porque el instituto liquida con el CUIL y va a hacer falta
+    apenas haya docentes reales; lo que se revierte es la obligatoriedad, no el dato.
+
+    `uq_docente_cuil` **sobrevive a los nulos**: PostgreSQL admite varios nulos en un índice
+    único, así que el índice no estorba mientras los docentes no tengan CUIL y sigue
+    sosteniendo la unicidad en cuanto empiecen a tenerlo.
     """
 
     __tablename__ = "docente"
@@ -36,9 +42,6 @@ class Docente(TimestampMixin, Base):
         UniqueConstraint("dni_norm", name="uq_docente_dni_norm"),
         UniqueConstraint("cuil", name="uq_docente_cuil"),
         UniqueConstraint("email", name="uq_docente_email"),
-        # D27: obligatorio de verdad. `NOT NULL` no alcanza: un CUIL vacío no identifica a
-        # nadie para liquidar.
-        no_vacio("cuil", "docente_cuil_obligatorio"),
         no_vacio("email", "docente_email_obligatorio"),
         no_vacio("nombre", "docente_nombre_obligatorio"),
         no_vacio("apellido", "docente_apellido_obligatorio"),
@@ -49,7 +52,7 @@ class Docente(TimestampMixin, Base):
     apellido: Mapped[str] = mapped_column(String(80), nullable=False)
     dni: Mapped[str] = mapped_column(String(20), nullable=False)
     dni_norm: Mapped[str] = mapped_column(String(20), nullable=False)
-    cuil: Mapped[str] = mapped_column(String(20), nullable=False)
+    cuil: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     telefono: Mapped[str | None] = mapped_column(String(40))
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")

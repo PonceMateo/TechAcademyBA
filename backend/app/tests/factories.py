@@ -5,6 +5,12 @@ test que busca rechaza **una sola** cosa sepa exactamente cuál está probando. 
 `assert` sobre el motivo de PostgreSQL acompaña cada rechazo, así el test falla si
 PostgreSQL.ok.
 
+**Ningún constructor recibe el código de un curso ni el de una comisión.** Los dos los
+genera el sistema (D32 y D34): `curso.codigo` es una columna generada por la base y
+`comision.codigo` es una propiedad compuesta a partir del curso y del número. Una fábrica
+que los aceptara estaría escribiendo algo que el `INSERT` real no puede escribir, y los
+tests pasarían sobre un camino que la aplicación no tiene.
+
 Documentos y CUIT de ejemplo: los dígitos verificadores están calculados con la regla
 de AFIP (pesos 5, 4, 3, 2, 7, 6, 5, 4, 3, 2; `dv = 11 - (suma mod 11)`, con 11 → 0 y
 10 → 9). Por ejemplo `30-12345678-1` cierra con 1, y `20-12345678-6` con 6.
@@ -14,6 +20,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import crear_token_acceso, hashear_password
@@ -36,7 +43,7 @@ from app.models.enums import (
 )
 from app.models.inscripciones import ContratoCorporativo, Empresa, Inscripcion, NominaEmpleado
 from app.models.padron import Alumno, Docente, Usuario
-from app.services.normalization import normalize_code, normalize_document, normalize_name
+from app.services.normalization import normalize_document, normalize_name
 
 #: Contraseña de las cuentas que arman las fábricas. Las pruebas de autenticación la usan
 #: para comprobar que el login acepta lo que corresponde y rechaza lo demás.
@@ -74,14 +81,16 @@ def crear_sede(session: Session, nombre: str = "Sede Central") -> Sede:
 
 def crear_curso(
     session: Session,
-    codigo: str = "CUR-101",
     nombre: str = "Python Inicial",
 ) -> Curso:
+    """Curso válido. El código **no** es un parámetro: lo genera la base (D32).
+
+    Si un test necesita ver el código, lo lee del curso ya insertado, que es lo que hace
+    la aplicación.
+    """
     return _persistir(
         session,
         Curso(
-            codigo=codigo,
-            codigo_norm=normalize_code(codigo),
             nombre=nombre,
             nombre_norm=normalize_name(nombre),
             descripcion="Curso de introducción a Python.",
@@ -95,7 +104,7 @@ def crear_comision(
     curso: Curso | None = None,
     sede: Sede | None = None,
     con_sede: bool = True,
-    codigo: str = "COM-105",
+    numero: int | None = None,
     cupo_maximo: int = 20,
     arancel: Decimal | str = "52000.00",
     modalidad: str = Modalidad.PRESENCIAL.value,
@@ -104,15 +113,25 @@ def crear_comision(
 
     `con_sede=False` existe para probar el caso de la historia #8: modalidad presencial
     sin sede tiene que ser rechazado por la base.
+
+    `numero=None` toma el siguiente del curso, que es la regla de D34 y deja que un test
+    pueda crear varias comisiones del mismo curso sin pasar el número a mano. Para probar
+    la colisión de `uq_comision_curso_numero` hay que pasar el número explícito.
     """
     sede_efectiva = None
     if con_sede:
         sede_efectiva = sede or crear_sede(session)
+    curso_efectivo = curso or crear_curso(session)
+    if numero is None:
+        mayor = session.scalar(
+            select(func.max(Comision.numero)).where(Comision.curso_id == curso_efectivo.id)
+        )
+        numero = (mayor or 0) + 1
     return _persistir(
         session,
         Comision(
-            curso_id=(curso or crear_curso(session)).id,
-            codigo=codigo,
+            curso_id=curso_efectivo.id,
+            numero=numero,
             dias_horarios="Lunes y miércoles 18:00 a 20:00",
             cupo_maximo=cupo_maximo,
             arancel=Decimal(arancel),
@@ -128,9 +147,14 @@ def crear_docente(
     nombre: str = "Rita",
     apellido: str = "Molina",
     dni: str = "30111222",
-    cuil: str = "27345678907",
+    cuil: str | None = None,
     email: str = "rita.molina@techacademy.invalid",
 ) -> Docente:
+    """Docente válido. El CUIL es opcional (D33), así que el valor por defecto es `None`.
+
+    El caso de D33 en persona: en esta fase los docentes no son personas reales y no hay
+    CUIL que completar.
+    """
     return _persistir(
         session,
         Docente(

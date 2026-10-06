@@ -296,6 +296,108 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Altas de catálogo y docentes (change `altas-catalogo-docentes`)
+
+D32 a D36 son decisiones del change `altas-catalogo-docentes`, que rompe tres contratos
+de `domain-schema`: el código del curso pasa a generarlo la base, el de la comisión pasa a
+ser derivado y el CUIL del docente deja de ser obligatorio.
+
+**Los identificadores D22 a D31 están citados en el código y en el `design.md` del bootstrap,
+pero nunca llegaron a tener entrada acá.** El hueco queda a propósito: los números están
+reservados para que las decisiones que los citan no cambien de dirección. Cuando esas
+entradas se escriban, van en su lugar y no se renumeran las de acá.
+
+### D32 — El código del curso lo genera el sistema, y los del Excel se descartan
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `curso.codigo` pasa a ser una **columna generada y almacenada por la base**,
+  `GENERATED ALWAYS AS ('CUR' || lpad(id::text, greatest(3, length(id::text)), '0')) STORED`,
+  y el número sale del **identificador de la fila**, que ya es autoincremental y nunca se
+  reutiliza. El operador **no lo carga**: el alta de un curso admite solo el nombre y una
+  descripción opcional, y un `INSERT` que informe `codigo` es rechazado por PostgreSQL. Se
+  elimina `curso.codigo_norm` y el índice único pasa a `uq_curso_codigo`.
+- **Por qué:** había dos verdadades —el `DEFAULT` de la migración y la lógica del servicio—
+  que se desincronizaban sin que nada avisara. Con la columna generada, el valor es el de la
+  fila por definición.
+- **Los códigos que trae el Excel del cliente (`CUR101`, `CUR-101`, `103`, etc.) se
+  descartan a propósito** y no se intenta preservarlos. Las variantes sucias del nombre
+  (`"Curso Python"`, `"curso  de  python"`, `"Py 101"`) se resuelven con `nombre_norm`
+  durante la migración del Excel, que todavía no está escrita. **El Excel es el problema, no
+  la solución:** un código que el sistema genera no se preserva para acomodarse a una planilla
+  que el proyecto quiere reemplazar.
+- **Consecuencia anotada:** cuando se importe el Excel, **los códigos de las comisiones
+  también se regeneran**, porque sus `curso_id` se resuelven por `nombre_norm` y su número
+  sale del orden de aparición en la planilla. Si la planilla cruza comisiones con cursos por
+  código, ese casamiento lo resuelve el importador, no el esquema.
+- **`greatest` no es cosmético:** `lpad(texto, largo, relleno)` **trunca** cuando el texto ya
+  es más largo que el largo pedido, así que `lpad('1000', 3, '0')` devuelve `'100'`. Sin
+  `greatest`, el curso 1000 recibiría `CUR100`, que ya es del curso 100, y su alta fallaría
+  por una colisión de código con un error que no señala la causa.
+- **El CHECK `curso_codigo_obligatorio` se conserva** aunque la expresión no pueda producir
+  una cadena vacía: forma parte del conjunto de obligatorios de M4 y `test_migration.py` lo
+  verifica uno por uno. Sobrar no cuesta nada; faltaría, alguien lo sacaría de la lista sin
+  darse cuenta de que estaba dejando la regla coja.
+- **Dónde:** `app/models/catalogo.py` (`Curso.codigo`, `EXPRESION_CODIGO_CURSO`),
+  `alembic/versions/0002_altas_catalogo.py`, `app/tests/test_codigo_curso.py`.
+
+### D33 — El CUIL del docente pasa a ser opcional, y eso revierte D27
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `docente.cuil` deja de ser `NOT NULL` y se elimina el CHECK
+  `docente_cuil_obligatorio`. **Alcance del revert, explícito: se revierte la
+  obligatoriedad; no se borra la columna ni el índice**, y la fila de Rita Molina conserva su
+  CUIL en `CUENTAS_DEMO`.
+- **Por qué:** en esta fase los docentes **no son personas reales**, así que un CUIL
+  inventado es peor que ningún CUIL. Un `27-34567890-7` fabricado no identifica a nadie para
+  liquidar y después hay que ir a corregirlo. La columna queda porque el instituto liquida
+  con el CUIL y va a hacer falta apenas haya docentes reales.
+- **Alcance del revert respecto de D27:** D27 decía que el CUIL era obligatorio porque es el
+  identificador con el que el instituto liquida. Ese razonamiento sigue siendo cierto y la
+  columna no se borra; lo que cambia es que **esta fase no tiene docentes reales**, y el
+  requisito lo satisfacen el DNI y el correo, que sí obligatorios.
+- **`uq_docente_cuil` sobrevive a los nulos:** PostgreSQL admite varios nulos en un índice
+  único, así que el índice no estorba mientras los docentes no tengan CUIL y sigue sosteniendo
+  la unicidad en cuanto empiecen a tenerlo.
+- **Consecuencia en el seed:** `_upsert_docente` buscaba al docente por `cuil`, que era único
+  y obligatorio. Una columna que admite nulos no puede ser la clave natural del upsert, así que
+  pasa a buscar por `dni_norm`, que sigue siendo única, obligatoria y la tiene la fila de
+  ejemplo.
+- **Origen del requisito:** el CUIL lo pidió **el equipo** al derivar el modelo, no el cliente:
+  el CSV de historias nunca lo menciona. Por eso esto es una corrección de una decisión propia
+  y no una negociación de alcance.
+- **Dónde:** `app/models/padron.py` (`Docente.cuil`), `app/services/seed.py`
+  (`_upsert_docente`), `alembic/versions/0002_altas_catalogo.py`.
+
+### D34 — El código de la comisión es derivado, y lo único real es `(curso_id, numero)`
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** se elimina la columna `comision.codigo` con su índice único y su CHECK de
+  obligatorio. Entra `numero: Integer NOT NULL` con `ck_comision_numero_positivo` y
+  `uq_comision_curso_numero`, incremental **por curso**: el máximo de los números de ese curso
+  más uno. El código pasa a ser un **valor derivado**, `{curso.codigo}-{numero}`
+  (`CUR001-1`), armado en una propiedad del ORM y en el serializador de la API.
+- **Por qué:** no es una columna porque no hay nada que el operador escriba ni nada que pueda
+  quedar viejo —si el curso cambiara de código, el derivado cambiaría solo—. Y la numeración
+  es una derivación por consulta, que es el criterio de D10: un contador persistido se
+  desincroniza apenas alguien borre o migre una fila.
+- **La carrera entre dos altas simultáneas la corta el índice único**, y la API la traduce a
+  un 409. **Techo asumido:** a la escala declarada del proyecto (10 comisiones, D10) **no hace
+  falta una secuencia por curso ni un lock**. Si el volumen de altas simultáneas llegara a
+  importar, el arreglo es un `SELECT ... MAX(numero) ... FOR UPDATE` sobre el curso, y no toca
+  el contrato. Atajo deliberado, no arquitectura.
+- **Por qué `(curso_id, numero)` y no un único global:** el código derivado ya incluye el
+  curso, así que dos cursos distintos pueden tener ambos el número 1 sin colisionar.
+- **Por qué `numero` como columna y no una secuencia por curso:** una secuencia por curso es un
+  objeto del esquema que hay que mantener alineado y que además no sobrevive bien a un
+  borrado. El máximo por consulta es una consulta.
+- **Dónde:** `app/models/catalogo.py` (`Comision.numero`, `Comision.codigo`),
+  `alembic/versions/0002_altas_catalogo.py`.
+
+---
+
 ## Correcciones al modelo de dominio
 
 ### M1 — La unicidad global de email se sostiene en base y en servicio, no solo en base
@@ -875,6 +977,30 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
   a probarlo para enterarse de que no funciona. La leyenda va en la etiqueta, así que forma parte del
   nombre accesible del campo y un lector de pantalla la anuncia con el rótulo.
 - **Dónde:** `frontend/src/components/ui/Input.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`.
+
+### M32 — `alembic check` no verifica las columnas generadas, y hay que decirlo
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `curso.codigo` es la primera columna generada del esquema y, por lo tanto, la
+  primera que el control automático no cubre.
+  `test_la_migracion_escrita_a_mano_cuadra_con_los_modelos` corre `alembic check`, y esa
+  comparación **ignora las columnas generadas**: si el `Computed(...)` del modelo y el
+  `GENERATED ALWAYS AS ... STORED` de la migración se desincronizan —mismo nombre de columna,
+  distinta expresión—, `alembic check` sigue_reportando cero diferencias.
+- **Por qué:** D16 sigue siendo el control de que la migración escrita a mano cuadra con los
+  modelos, y es donde cualquiera iría a verificar un cambio de esquema. Para esta columna ese
+  control no alcanza, así que queda escrito para que nadie confíe en él.
+- **Mitigación:** la red real es `app/tests/test_codigo_curso.py`, que siembra la secuencia con
+  `setval` e inserta los identificadores 999, 1000 y 1001 —justo del lado de la frontera donde
+  `lpad` trunca—, más un control negativo que levanta la expresión **sin** `greatest` para
+  demostrar que el test no pasa por el motivo equivocado. Ese test restaura la secuencia con
+  `last_value` **e** `is_called` en un `finally`, porque en PostgreSQL las secuencias no son
+  transaccionales y un `setval` sobrevive al `rollback()` del fixture.
+- **Advertencia que lo confirma:** el propio `alembic check` avisa
+  `UserWarning: Computed default on curso.codigo cannot be modified`.
+- **Dónde:** `app/models/catalogo.py`, `alembic/versions/0002_altas_catalogo.py`,
+  `app/tests/test_codigo_curso.py`, `app/tests/conftest.py`.
 
 ---
 
