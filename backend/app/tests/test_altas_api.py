@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import Modalidad
 from app.models.padron import Usuario
+from app.services import catalogo, padron
 from app.services.auth import autenticar
 from app.tests.factories import (
     crear_alumno,
@@ -536,3 +537,81 @@ def test_las_lecturas_exigen_rol_de_administracion(
 
 def test_el_alta_de_curso_sin_token_es_401(api_client: TestClient) -> None:
     assert api_client.post("/cursos", json={"nombre": "Sin token"}).status_code == 401
+
+
+@pytest.mark.parametrize("ruta", ["/cursos", "/comisiones", "/docentes"])
+def test_las_altas_exigen_rol_de_administracion(
+    api_client: TestClient, db_session: Session, ruta: str
+) -> None:
+    """Un docente no escribe en el catálogo ni en el padrón: 403.
+
+    Los tres cuerpos son válidos a propósito. Con un cuerpo inválido el 403 seguiría siendo la
+    respuesta, pero el test pasaría por el motivo equivocado y dejaría de probar que lo que frena
+    es el rol.
+    """
+    curso = crear_curso(db_session, nombre="Curso para la carrera")
+    # Un solo docente: el factory de la cuenta crea el suyo si no le pasamos uno, y dos docentes
+    # con el DNI por defecto chocarían por `uq_docente_dni_norm`.
+    docente_del_padron = crear_docente(db_session)
+    cuenta_docente = crear_usuario_docente(db_session, docente=docente_del_padron)
+    cuerpos = {
+        "/cursos": {"nombre": "Curso sin permiso"},
+        "/comisiones": {
+            "curso_id": curso.id,
+            "docente_id": docente_del_padron.id,
+            "dias_horarios": "Lunes 18:00 a 20:00",
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "modalidad": Modalidad.VIRTUAL.value,
+        },
+        "/docentes": {
+            "nombre": "Sin",
+            "apellido": "Permiso",
+            "dni": "39.888.777",
+            "email": "sin.permiso@techacademy.invalid",
+            "telefono": None,
+        },
+    }
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(cuenta_docente)))
+
+    respuesta = api_client.post(ruta, json=cuerpos[ruta])
+
+    assert respuesta.status_code == 403
+    # El 403 tiene que venir del guard de rol: es el único que declara a quién admite la ruta.
+    assert respuesta.headers["X-Roles-Admitidos"] == "ADMIN"
+    # Y lo que de verdad importa: el 403 no puede haber escrito nada.
+    assert not any(c.nombre == "Curso sin permiso" for c in catalogo.listar_cursos(db_session))
+    assert not any(
+        d.email == "sin.permiso@techacademy.invalid" for d in padron.listar_docentes(db_session)
+    )
+    assert not catalogo.listar_comisiones(db_session)
+
+
+def test_la_carrera_de_dos_altas_del_mismo_curso_es_409(
+    cliente_admin: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D34: dos altas del mismo curso que calculan el mismo número se traducen a 409.
+
+    La carrera real pide dos transacciones concurrentes, que es caro de montar y flaky. Lo que
+    se prueba acá es la traducción, que es lo que importa: que el `IntegrityError` de
+    `uq_comision_curso_numero` salga como 409 con la invitación a reintentar, y no como un 500
+    que el operador no puede entender. Para eso se fuerza el número a uno que ya existe.
+    """
+    curso = crear_curso(db_session, nombre="Curso con carrera")
+    docente = crear_docente(db_session)
+    cuerpo = {
+        "curso_id": curso.id,
+        "docente_id": docente.id,
+        "dias_horarios": "Lunes 18:00 a 20:00",
+        "arancel": "52000.00",
+        "cupo_maximo": 20,
+        "modalidad": Modalidad.VIRTUAL.value,
+    }
+    primera = cliente_admin.post("/comisiones", json=cuerpo)
+    assert primera.status_code == 201, primera.text
+
+    monkeypatch.setattr(catalogo, "_siguiente_numero", lambda *_argumentos: 1)
+    segunda = cliente_admin.post("/comisiones", json=cuerpo)
+
+    assert segunda.status_code == 409, segunda.text
+    assert "Probá de nuevo" in segunda.text

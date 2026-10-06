@@ -330,6 +330,27 @@ def test_los_indices_unicos_sobre_columnas_normalizadas_existen(db_session) -> N
     assert not faltantes, f"faltan estos índices o restricciones únicas: {sorted(faltantes)}"
 
 
+def test_el_curso_no_tiene_una_forma_normalizada_del_codigo(db_session) -> None:
+    """D32: `curso.codigo_norm` y su índice único desaparecieron.
+
+    El otro test de esta migración afirma que `uq_curso_codigo` existe. Este afirma lo que lo
+    acompaña: un valor generado no tiene dos representaciones que puedan diferir, así que la
+    columna normalizada y su índice no tienen por qué estar, y si alguien los volviera a agregar
+    el catálogo tendría dos verdades para el mismo código.
+    """
+    from app.models.catalogo import Curso
+
+    assert "codigo_norm" not in Curso.__table__.columns
+
+    nombres = set(
+        db_session.execute(
+            text("SELECT indexname FROM pg_indexes WHERE schemaname = 'public'")
+        ).scalars()
+    )
+    assert "uq_curso_codigo_norm" not in nombres
+    assert "uq_curso_codigo" in nombres
+
+
 def test_el_trigger_de_auditoria_inmutable_existe(db_session) -> None:
     filas = db_session.execute(
         text(
