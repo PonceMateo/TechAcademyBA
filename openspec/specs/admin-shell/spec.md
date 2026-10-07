@@ -83,12 +83,14 @@ por cupo`.
 
 El sistema SHALL abrir el modal `Crear Nueva Comisión` con los campos, en este orden literal:
 `Curso / Programa`, `Docente Asignado`, `Días y Horarios` con placeholder `Ej: Mar y Jue 19 a 21
-hs`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)`, `Modalidad` y `Sede`, con los botones
-`Cancelar` y `Guardar Comisión`. El modal SHALL NOT pedir un código de comisión: el código lo deriva
-el sistema del curso y del número, y la pantalla lo muestra al confirmar. `Docente Asignado` SHALL
-ser una selección de los docentes del padrón y SHALL NOT ser un campo de búsqueda de texto libre.
-`Modalidad` SHALL ofrecer `Virtual`, `Presencial` y `Híbrido`, y `Sede` SHALL ser obligatoria solo
-cuando la modalidad seleccionada sea `Presencial` o `Híbrido`.
+hs`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, más `Sede` cuando el campo
+corresponda renderizarse, con los botones `Cancelar` y `Guardar Comisión`. El modal SHALL NOT pedir
+un código de comisión: el código lo deriva el sistema del curso y del número, y la pantalla lo
+muestra al confirmar. `Docente Asignado` SHALL ser una selección de los docentes del padrón y SHALL
+NOT ser un campo de búsqueda de texto libre. `Modalidad` SHALL ofrecer `Virtual`, `Presencial` y
+`Híbrido`. `Sede` SHALL ser opcional en toda modalidad: SHALL renderizarse solo cuando la modalidad
+elegida sea `Presencial` o `Híbrido`, y SHALL NOT renderizarse cuando la modalidad sea `Virtual`
+ni mientras el selector siga en `Seleccionar…`, que es como abre el modal.
 
 WHEN el modal de alta de comisión se abre desde la vista de comisiones del curso, el campo
 `Curso / Programa` SHALL venir elegido con el curso de la ruta y SHALL quedar bloqueado a ese curso,
@@ -155,15 +157,15 @@ ni de comisión.
 
 #### Scenario: El usuario abre el modal de alta
 - **WHEN** el usuario pulsa `+ Nueva Comisión`
-- **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)`, `Modalidad` y `Sede`, con los botones `Cancelar` y `Guardar Comisión`, y no muestra ningún campo para el código de la comisión porque el sistema lo genera
+- **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, con los botones `Cancelar` y `Guardar Comisión`, no muestra ningún campo para el código de la comisión porque el sistema lo genera, y tampoco muestra `Sede`: el modal abre con `Modalidad` en `Seleccionar…` y el campo aparece recién cuando la modalidad elegida sea `Presencial` o `Híbrido`
 
 #### Scenario: El usuario elige modalidad virtual
 - **WHEN** el usuario selecciona modalidad `Virtual` y confirma sin elegir sede
-- **THEN** el sistema acepta la carga y no exige sede, porque la sede solo es obligatoria para modalidad `Presencial` o `Híbrido`
+- **THEN** el sistema acepta la carga y el campo `Sede` no está renderizado en el modal, porque la sede es opcional en toda modalidad y no corresponde mostrarla para `Virtual`
 
 #### Scenario: El usuario elige modalidad presencial sin sede
-- **WHEN** el usuario selecciona modalidad `Presencial` o `Híbrido` y confirma sin elegir sede
-- **THEN** el sistema no confirma la carga e indica que el campo `Sede` es obligatorio
+- **WHEN** el usuario selecciona modalidad `Presencial` o `Híbrido`, deja `Sede` vacío y confirma
+- **THEN** el sistema guarda la comisión y la confirma, porque el campo `Sede` es opcional y su ausencia no impide el alta. El nombre del escenario conserva el de la regla anterior: ya no se rechaza el alta por falta de sede
 
 #### Scenario: El usuario busca en el catálogo
 - **WHEN** el usuario escribe en el buscador de cualquiera de las dos vistas

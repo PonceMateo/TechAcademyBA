@@ -66,10 +66,11 @@ ese curso más uno. El código de la comisión SHALL ser un valor **derivado** c
 `{código del curso}-{número}`, por ejemplo `CUR001-1`, y SHALL estar disponible sin
 persistirse como columna. `cupo_maximo` SHALL ser un entero mayor que cero, y el arancel
 SHALL ser un valor numérico mayor que cero. La modalidad SHALL tomar un valor entre
-Virtual, Presencial e Híbrido. WHEN la modalidad sea Presencial o Híbrido, `sede` SHALL
-ser obligatoria; WHEN sea Virtual, la sede SHALL ser opcional. Las vacantes SHALL
-derivarse de `cupo_maximo` menos la cantidad de inscripciones activas y SHALL NOT
-almacenarse como un valor editable (historias #2, #5, #6, #7 y #8).
+Virtual, Presencial e Híbrido. La sede SHALL ser **opcional en toda modalidad** y
+`sede_id` SHALL admitir ausencia en el esquema; WHEN la modalidad sea Virtual, la
+comisión SHALL NOT llevar `sede_id`. Las vacantes SHALL derivarse de `cupo_maximo` menos
+la cantidad de inscripciones activas y SHALL NOT almacenarse como un valor editable
+(historias #2, #5, #6, #7 y #8).
 
 Las dos reglas que dependen de las inscripciones —no Inscribir en una comisión sin vacantes y no
 reducir el cupo por debajo de los inscriptos— **quedan diferidas al change de inscripciones**.
@@ -95,7 +96,7 @@ y la forma de derivar las vacantes por consulta —que es su base— ya está re
 
 #### Scenario: Modalidad que exige sede
 - **WHEN** se selecciona modalidad Presencial o Híbrido y se intenta guardar sin indicar sede
-- **THEN** el sistema rechaza el guardado con `422`. **El texto que llega de la API es el crudo de la restricción de la base y no un mensaje de interfaz**: el formulario de la pantalla impide el envío y muestra su propio mensaje en es-AR, y el mensaje de interfaz del backend para esta regla queda pendiente del change que escriba los mensajes de rechazo
+- **THEN** la comisión se guarda y `sede_id` queda en `NULL`, porque la sede es opcional en toda modalidad. El nombre del escenario conserva el de la regla anterior: ya no hay modalidad que exija sede
 
 #### Scenario: Modalidad virtual sin sede
 - **WHEN** se selecciona modalidad Virtual y se guarda sin indicar sede

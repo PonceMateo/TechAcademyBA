@@ -45,13 +45,14 @@ quedar disponible en el catálogo (historia #1).
 #### Scenario: Listado del catálogo
 - **WHEN** se consulta el catálogo de cursos
 - **THEN** la respuesta trae cada curso con su código generado y su nombre
+
 ### Requirement: Consulta y alta de comisiones
 
 El sistema SHALL exponer la consulta de comisiones y su alta. La consulta
 `GET /comisiones` SHALL devolver las comisiones con su código derivado, su curso, su
 docente, sus días y horarios, su cupo máximo, su arancel y su modalidad. El alta
 `POST /comisiones` SHALL aceptar el curso, el docente, los días y horarios, el arancel,
-el cupo máximo, la modalidad y, cuando corresponda, la sede.
+el cupo máximo, la modalidad y la sede opcional.
 
 El `docente_id` SHALL ser obligatorio en el alta, aunque la columna de la comisión admita
 ausencia para poder asignar el docente más adelante. WHEN falte el docente, el sistema
@@ -59,16 +60,15 @@ SHALL rechazar el alta e indicar que el docente es obligatorio. WHEN falte el cu
 días y horarios o el arancel, el sistema SHALL rechazar el alta e indicar los campos
 faltantes. WHEN el cupo máximo sea cero, negativo o no numérico, el sistema SHALL rechazarlo
 e informar que el cupo debe ser un entero positivo. WHEN el arancel sea negativo o no
-numérico, el sistema SHALL rechazarlo e informar el error. WHEN la modalidad sea Presencial
-o Híbrido y no se informe sede, el sistema SHALL rechazar el alta y solicitar seleccionar
-una sede; WHEN la modalidad sea Virtual, la sede SHALL ser opcional. El número de la
-comisión SHALL ser el máximo de los números de ese curso más uno, y la respuesta SHALL
-devolver el código derivado con la forma del código del curso más el número. WHEN la
-numeración ya ocupada por otra comisión del mismo curso colisione, la API SHALL informar
-el conflicto (historias #2, #5 y #8).
+numérico, el sistema SHALL rechazarlo e informar el error. `sede_id` SHALL ser **opcional
+en toda modalidad**; WHEN la modalidad sea Virtual y la comisión informe una sede, el
+sistema SHALL rechazar el alta con `422`. El número de la comisión SHALL ser el máximo de
+los números de ese curso más uno, y la respuesta SHALL devolver el código derivado con la
+forma del código del curso más el número. WHEN la numeración ya ocupada por otra comisión
+del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Alta de comisión correcta
-- **WHEN** se envía una comisión con curso, docente, días y horarios, cupo máximo, arancel, modalidad y sede cuando corresponde
+- **WHEN** se envía una comisión con curso, docente, días y horarios, cupo máximo, arancel y modalidad
 - **THEN** el sistema responde con la comisión creada y su código derivado, y la comisión queda asociada al curso
 
 #### Scenario: Comisión sin docente
@@ -89,11 +89,15 @@ el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Modalidad que exige sede
 - **WHEN** se envía una comisión Presencial o Híbrida sin sede
-- **THEN** el sistema rechaza el alta con `422`. **El texto que llega es el crudo de la restricción de la base y no un mensaje de interfaz**: el formulario de la pantalla valida la regla antes de enviar y muestra su mensaje en es-AR, y el mensaje de interfaz del backend para esta regla queda pendiente del change que escriba los mensajes de rechazo
+- **THEN** el sistema la registra con `201` y `sede_id` en `NULL`, porque la sede es opcional en toda modalidad. El nombre del escenario conserva el de la regla anterior: ya no hay modalidad que exija sede
 
 #### Scenario: Modalidad virtual sin sede
 - **WHEN** se envía una comisión Virtual sin sede
 - **THEN** el sistema la registra y no exige sede
+
+#### Scenario: Modalidad virtual con sede
+- **WHEN** se envía una comisión Virtual informando una sede
+- **THEN** el sistema rechaza el alta con `422`. **El texto que llega es el crudo de la restricción de la base y no un mensaje de interfaz**: el formulario de la pantalla no renderiza el campo para modalidad `Virtual`, así que no hay mensaje de interfaz que mostrar, y el del backend para esta regla queda pendiente del change que escriba los mensajes de rechazo
 
 #### Scenario: Numeración por curso
 - **WHEN** se crean dos comisiones del mismo curso y después una tercera
@@ -102,6 +106,7 @@ el conflicto (historias #2, #5 y #8).
 #### Scenario: Listado de comisiones
 - **WHEN** se consulta el listado de comisiones
 - **THEN** cada fila trae el código derivado, el nombre del curso, el docente, los días y horarios, el cupo máximo y el arancel
+
 ### Requirement: Consulta y alta de docentes
 
 El sistema SHALL exponer la consulta del padrón de docentes y su alta. La consulta
@@ -144,6 +149,7 @@ de demostración, porque el flujo de cambio de contraseña todavía no existe (h
 #### Scenario: Listado del padrón de docentes
 - **WHEN** se consulta el padrón de docentes
 - **THEN** cada fila trae los datos personales del docente y la cantidad de comisiones que tiene asignadas
+
 ### Requirement: Consulta de sedes
 
 El sistema SHALL exponer la consulta de sedes con `GET /sedes`, de modo que el alta de
@@ -154,6 +160,7 @@ cada sede (historia #8).
 #### Scenario: Listado de sedes para el formulario
 - **WHEN** se consulta el listado de sedes
 - **THEN** la respuesta trae el identificador y el nombre de cada sede, y el formulario de alta de comisión puede ofrecerlas para elegir
+
 ### Requirement: Las pantallas de alta confirman contra la base
 
 Las tres pantallas de alta de Administración —curso, comisión y docente— SHALL enviar lo
