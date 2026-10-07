@@ -141,7 +141,10 @@ describe('catálogo de comisiones', () => {
     }
   })
 
-  it('deja toda comisión presencial con sede, como la exige el CHECK del modelo', () => {
+  // El CHECK `modalidad_virtual_sin_sede` ya no exige sede en ninguna modalidad: solo prohíbe la
+  // sede en `Virtual`. Lo que se comprueba acá es que las cinco comisiones del ejemplo sean
+  // `PRESENCIAL` con una sede que existe en el catálogo `SEDES`.
+  it('deja toda comisión del ejemplo presencial, con una sede del catálogo', () => {
     for (const comision of COMISIONES) {
       if (comision.modalidad !== 'VIRTUAL') {
         expect(comision.sede_id).not.toBeNull()

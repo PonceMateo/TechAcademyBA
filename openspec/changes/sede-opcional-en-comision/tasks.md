@@ -104,39 +104,39 @@ Depende del grupo 1: los asserts nombran el CHECK nuevo y la versión `0003`.
 
 ## 4. `feat(frontend)` — `mostrarSede` y el `sede_id` derivado
 
-- [ ] 4.1 En `frontend/src/admin/CoursesPage.jsx` (~172), renombrar `exigeSede` a `mostrarSede`,
+- [x] 4.1 En `frontend/src/admin/CoursesPage.jsx` (~172), renombrar `exigeSede` a `mostrarSede`,
   dejando la misma prueba de dos ramas. **Verificar** con `npm run lint` y con los tests de la
   pantalla: el nombre viejo no queda en el archivo.
-- [ ] 4.2 En el mismo archivo, borrar la rama `else if (campos.sede === '' && exigeSede)` de
+- [x] 4.2 En el mismo archivo, borrar la rama `else if (campos.sede === '' && exigeSede)` de
   `validar()` (~229-233). **Verificar** con el test de 5.2: guardar sin sede no muestra error de
   formulario.
-- [ ] 4.3 En el mismo archivo (~265), armar el payload como
+- [x] 4.3 En el mismo archivo (~265), armar el payload como
   `sede_id: mostrarSede && campos.sede !== '' ? Number(campos.sede) : null`. **Verificar** con un test
   que elige `Presencial`, elige una sede, cambia a `Virtual` y guarda: el `crearComision` recibe
   `sede_id: null`. Es el caso que la expresión derivada cubre y el `onChange` de modalidad no.
-- [ ] 4.4 En el mismo archivo (~480), envolver el `Campo` de `Sede` en `{mostrarSede && …}` y sacarle
+- [x] 4.4 En el mismo archivo (~480), envolver el `Campo` de `Sede` en `{mostrarSede && …}` y sacarle
   `obligatorio`. **Verificar** con el test de 5.1: el rótulo `Sede` no está entre las etiquetas del
   modal recién abierto, porque la modalidad arranca en `Seleccionar…`.
-- [ ] 4.5 En el docstring del componente (~38-41), corregir el párrafo que dice que `Sede` es
+- [x] 4.5 En el docstring del componente (~38-41), corregir el párrafo que dice que `Sede` es
   obligatoria para `Presencial` y `Híbrido` y que es el CHECK `modalidad_presencial_requiere_sede`.
   **Verificar** con `grep -rn modalidad_presencial_requiere_sede frontend/`: no queda ninguno.
 
 ## 5. `test(frontend)` — Tests de pantalla y título del test de mocks
 
-- [ ] 5.1 En `frontend/src/admin/CoursesPage.test.jsx` (~295-319), sacar `'Sede'` del `toEqual` del
+- [x] 5.1 En `frontend/src/admin/CoursesPage.test.jsx` (~295-319), sacar `'Sede'` del `toEqual` del
   test de orden de campos. **Verificar** con `npm run test`: si el campo siguiera renderizándose, el
   texto del spec no coincidiría con el orden real.
-- [ ] 5.2 En el mismo archivo (~355-378), invertir los dos tests de rechazo —presencial y
+- [x] 5.2 En el mismo archivo (~355-378), invertir los dos tests de rechazo —presencial y
   híbrida— a «guarda la comisión»: el modal se cierra y aparece el aviso con el código derivado.
   **Verificar** con `npm run test`: los dos en verde sin el mensaje «El campo Sede es obligatorio…».
-- [ ] 5.3 En el mismo archivo (~380), dejar el test de modalidad virtual como está y agregar el que
+- [x] 5.3 En el mismo archivo (~380), dejar el test de modalidad virtual como está y agregar el que
   afirma que con `Virtual` el campo `Sede` no está en el documento. **Verificar** con
   `queryByLabelText(/^Sede/)` en `null` después de elegir la modalidad.
-- [ ] 5.4 En `frontend/src/mocks/mocks.test.js` (~144), renombrar el test que dice «como la exige el
+- [x] 5.4 En `frontend/src/mocks/mocks.test.js` (~144), renombrar el test que dice «como la exige el
   CHECK del modelo» y corregir su comentario: lo que verifica es que las cinco comisiones del
   ejemplo son `PRESENCIAL` con una sede que existe en el catálogo `SEDES`. **Verificar** con
   `npm run test`: la aserción no cambia, solo el nombre que la nombraba.
-- [ ] 5.5 Correr `npm run lint`, `npm run test` y `npm run build`. **Verificar** que los tres
+- [x] 5.5 Correr `npm run lint`, `npm run test` y `npm run build`. **Verificar** que los tres
   terminan en cero.
 
 ## 6. `docs` — CSV, glosario y decisiones

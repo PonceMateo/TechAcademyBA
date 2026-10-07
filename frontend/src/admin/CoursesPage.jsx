@@ -35,10 +35,12 @@ import { formatMoneda } from '../utils/formato'
  *
  * **Sin edición.** El spec deja la edición de curso y de comisión para las historias #3 y #4.
  *
- * **`Modalidad` y `Sede` no están en el prototipo y sí van** (historia #8). La `Sede` es obligatoria
- * solo para `Presencial` y `Híbrido`, que es el CHECK `modalidad_presencial_requiere_sede` del
- * modelo. La regla vive en el formulario y no en el botón: un botón deshabilitado taparía el
- * mensaje de error, y lo que el operador necesita ver es qué campo le falta.
+ * **`Modalidad` y `Sede` no están en el prototipo y sí van** (historia #8). La `Sede` es
+ * **opcional en toda modalidad**: se renderiza solo cuando la modalidad elegida es `Presencial` o
+ * `Híbrido`, y no mientras el selector siga en `Seleccionar…`, que es como abre el modal. Para
+ * `Virtual` el campo ni existe, y su valor tampoco llega al payload. La única regla de la base es
+ * la inversa —el CHECK `modalidad_virtual_sin_sede` prohíbe la sede en `Virtual`—, así que acá no
+ * hay validación que la duplique.
  *
  * **Un alta fallida no cierra el formulario ni confirma nada.** Deja lo que el operador completó
  * y muestra el motivo que devuelve la fuente. Cerrar el modal como si se hubiera guardado sería
@@ -169,7 +171,10 @@ export function CoursesPage() {
           (comision) => normalizeCode(comision.curso.codigo) === normalizeCode(cursoDeRuta.codigo),
         )
 
-  const exigeSede =
+  // "Hace falta mostrarlo" y "es Presencial o Híbrido" son hoy la misma condición: la sede es
+  // opcional en toda modalidad, así que no hay nada que exigir. El campo aparece recién cuando la
+  // modalidad elegida sea una de esas dos, y no mientras el selector siga en `Seleccionar…`.
+  const mostrarSede =
     campos.modalidad === MODALIDAD.PRESENCIAL || campos.modalidad === MODALIDAD.HIBRIDO
 
   function cambiar(campo) {
@@ -228,9 +233,9 @@ export function CoursesPage() {
     }
     if (campos.modalidad === '') {
       encontrados.modalidad = 'Elegí la modalidad de la comisión.'
-    } else if (campos.sede === '' && exigeSede) {
-      encontrados.sede = 'El campo Sede es obligatorio para modalidad Presencial o Híbrido.'
     }
+    // La sede no se valida: es opcional en toda modalidad (historia #8). La regla que sí existe es
+    // la inversa y la sostiene el CHECK `modalidad_virtual_sin_sede` de la base.
 
     return encontrados
   }
@@ -262,7 +267,10 @@ export function CoursesPage() {
         arancel: Number(campos.arancel),
         cupo_maximo: Number(campos.cupo),
         modalidad: campos.modalidad,
-        sede_id: campos.sede === '' ? null : Number(campos.sede),
+        // Derivado de `mostrarSede`, no de `campos.sede`: el `select` se desmonta al cambiar a
+        // Virtual pero `campos.sede` conserva el valor viejo, así que leerlo solo mandaría la sede
+        // de una comisión virtual — que el CHECK de la base rechaza con 422.
+        sede_id: mostrarSede && campos.sede !== '' ? Number(campos.sede) : null,
       })
       setComisiones((anteriores) => [...anteriores, creada])
       setResumen((anterior) => ({ total_comisiones: anterior.total_comisiones + 1 }))
@@ -477,16 +485,18 @@ export function CoursesPage() {
             </select>
           </Campo>
 
-          <Campo id="sede" etiqueta="Sede" obligatorio={exigeSede} error={errores.sede ?? null}>
-            <select id="sede" value={campos.sede} onChange={cambiar('sede')}>
-              <option value="">Seleccionar…</option>
-              {sedes.map((sede) => (
-                <option key={sede.id} value={String(sede.id)}>
-                  {sede.nombre}
-                </option>
-              ))}
-            </select>
-          </Campo>
+          {mostrarSede && (
+            <Campo id="sede" etiqueta="Sede" error={errores.sede ?? null}>
+              <select id="sede" value={campos.sede} onChange={cambiar('sede')}>
+                <option value="">Seleccionar…</option>
+                {sedes.map((sede) => (
+                  <option key={sede.id} value={String(sede.id)}>
+                    {sede.nombre}
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          )}
         </div>
 
         {fallo !== null && <MensajeFallo>{fallo}</MensajeFallo>}

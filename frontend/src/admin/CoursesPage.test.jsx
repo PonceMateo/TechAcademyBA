@@ -13,9 +13,10 @@ import {
  * Cursos y comisiones (9.3), en las dos vistas de la sección.
  *
  * Las columnas se comparan contra la lista completa y en orden, porque el spec las fija literales
- * y en ese orden. Y la regla de la `Sede` se prueba en las dos direcciones: presencial sin sede no
- * guarda, virtual sin sede sí, que es lo que evita que la validación se convierta en un veto
- * generalizado que nadie entiende.
+ * y en ese orden. Y la `Sede`, que es **opcional en toda modalidad**, se prueba en las dos
+ * direcciones: presencial e híbrida sin sede guardan, y el campo no se renderiza para `Virtual`.
+ * Falta el caso inverso al 422 —`Virtual` con sede— porque el formulario no tiene forma de
+ * mandarlo: el `select` no está renderizado y el `sede_id` se deriva de `mostrarSede`.
  *
  * **Cada vista se abre en la ruta que le corresponde.** El catálogo es `/admin/cursos` y las
  * comisiones de un curso son `/admin/cursos/:codigo`: por eso los bloques que miran la tabla abren
@@ -296,9 +297,12 @@ describe('modal de alta', () => {
     const user = userEvent.setup()
     await abrirModal(user)
 
+    // `Sede` no está en el patrón: la sede es opcional en toda modalidad y el campo se renderiza
+    // solo cuando la modalidad elegida sea `Presencial` o `Híbrido`. El modal abre con `Modalidad`
+    // en `Seleccionar…`, así que todavía no corresponde mostrarla.
     const etiquetas = screen
       .getAllByText(
-        /^(Curso \/ Programa|Docente Asignado|Días y Horarios|Cupo Máximo|Valor de Arancel de Comisión \(AR\$\)|Modalidad|Sede)\*?$/,
+        /^(Curso \/ Programa|Docente Asignado|Días y Horarios|Cupo Máximo|Valor de Arancel de Comisión \(AR\$\)|Modalidad)\*?$/,
       )
       // El asterisco marca los campos obligatorios y va `aria-hidden`, así que el rótulo del
       // spec es el texto sin él.
@@ -311,7 +315,6 @@ describe('modal de alta', () => {
       'Cupo Máximo',
       'Valor de Arancel de Comisión (AR$)',
       'Modalidad',
-      'Sede',
     ])
 
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
@@ -352,29 +355,83 @@ describe('modal de alta', () => {
     expect(screen.getByLabelText(/^Curso \/ Programa/)).toBeEnabled()
   })
 
-  it('no deja guardar una modalidad presencial sin sede', async () => {
+  it('guarda una modalidad presencial sin sede, porque la sede es opcional', async () => {
     const user = userEvent.setup()
     await abrirModal(user)
 
     await completarComision(user, { modalidad: 'PRESENCIAL' })
     await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
 
-    expect(
-      await screen.findByText('El campo Sede es obligatorio para modalidad Presencial o Híbrido.'),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Crear Nueva Comisión' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Crear Nueva Comisión' }),
+      ).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByText('Comisión CUR-101-2 creada.')).toBeInTheDocument()
   })
 
-  it('tampoco deja guardar una modalidad híbrida sin sede', async () => {
+  it('guarda una modalidad híbrida sin sede, por la misma razón', async () => {
     const user = userEvent.setup()
     await abrirModal(user)
 
     await completarComision(user, { modalidad: 'HIBRIDO' })
     await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
 
-    expect(
-      await screen.findByText('El campo Sede es obligatorio para modalidad Presencial o Híbrido.'),
-    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Crear Nueva Comisión' }),
+      ).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByText('Comisión CUR-101-2 creada.')).toBeInTheDocument()
+  })
+
+  it('no manda la sede cuando la modalidad es Virtual, aunque se haya elegido antes', async () => {
+    // El bug que cubre: el `select` de sede se desmonta al cambiar a Virtual, pero el valor elegido
+    // queda en el estado del formulario. Si el payload lo leyera, mandaría una sede en una comisión
+    // virtual y el CHECK `modalidad_virtual_sin_sede` de la base la rechazaría con 422. Por eso el
+    // `sede_id` se deriva de `mostrarSede` y no de `campos.sede`.
+    const crear = vi.fn(async () => ({
+      id: 99,
+      codigo: 'CUR-101-2',
+      curso: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+      docente_id: 1,
+      docente_nombre: 'Profe Martín',
+      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      cupo_maximo: 20,
+      arancel: 52000,
+      vacantes: 20,
+      modalidad: 'VIRTUAL',
+      sede_id: null,
+      sede_nombre: null,
+    }))
+    stubDataSource({ crearComision: crear })
+
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await completarComision(user, { modalidad: 'PRESENCIAL', sede: '1' })
+    await user.selectOptions(screen.getByLabelText(/^Modalidad/), 'VIRTUAL')
+    await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+    await waitFor(() => expect(crear).toHaveBeenCalledTimes(1))
+    expect(crear.mock.calls[0][0]).toEqual({
+      curso_id: 1,
+      docente_id: 1,
+      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      arancel: 52000,
+      cupo_maximo: 20,
+      modalidad: 'VIRTUAL',
+      sede_id: null,
+    })
+  })
+
+  it('no renderiza el campo Sede cuando la modalidad es Virtual', async () => {
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await user.selectOptions(screen.getByLabelText(/^Modalidad/), 'VIRTUAL')
+
+    expect(screen.queryByLabelText(/^Sede/)).not.toBeInTheDocument()
   })
 
   it('guarda una modalidad virtual sin sede y muestra el código derivado', async () => {
