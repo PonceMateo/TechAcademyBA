@@ -143,13 +143,13 @@ Depende del grupo 1: los asserts nombran el CHECK nuevo y la versión `0003`.
 
 Al último, para que la decisión cite lo que se construyó.
 
-- [ ] 6.1 En `docs/requirements/Historias_de_Usuario_TechAcademy_BA.csv` (historia #8, ~84), reescribir
+- [x] 6.1 En `docs/requirements/Historias_de_Usuario_TechAcademy_BA.csv` (historia #8, ~84), reescribir
   el criterio de aceptación del escenario «Modalidad presencial o híbrida»: ya no rechaza el guardado
   ni pide seleccionar una sede. **Verificar** con `grep -n "solicita seleccionar una sede"` sobre el
   CSV: no queda ninguna ocurrencia.
-- [ ] 6.2 En `docs/glossary.md` (~26), corregir la fila de **Sede**, que dice «Es obligatoria para toda
+- [x] 6.2 En `docs/glossary.md` (~26), corregir la fila de **Sede**, que dice «Es obligatoria para toda
   comisión que no sea virtual». **Verificar** que la fila dice que es opcional en toda modalidad.
-- [ ] 6.3 Agregar **M35** en `docs/decisions.md` con **fecha y autor**, siguiendo el formato de las
+- [x] 6.3 Agregar **M35** en `docs/decisions.md` con **fecha y autor**, siguiendo el formato de las
   entradas existentes: que la sede es opcional en toda modalidad y que la regla se invirtió en el
   CHECK (`modalidad_virtual_sin_sede`) en lugar de desaparecer, que la migración `0003` pone en
   `NULL` la sede de las comisiones virtuales porque es el dato que el CHECK nuevo prohíbe, y que el
@@ -157,6 +157,6 @@ Al último, para que la decisión cite lo que se construyó.
   encabezado es `### M35 —` y que tiene fecha y autor; el número se ubica **después de M34** (~437),
   no al final del archivo: `M32` figura en la sección anterior y el archivo no está ordenado por
   número.
-- [ ] 6.4 Corregir en el sitio la frase de **M33** (~426) que dice que hay `422` «si la modalidad exige
+- [x] 6.4 Corregir en el sitio la frase de **M33** (~426) que dice que hay `422` «si la modalidad exige
   sede y no vino». **Verificar** con `grep -n "modalidad exige sede" docs/decisions.md`: no queda
   ninguna, y M33 sigue diciendo que el `sede_id` del alta de comisión es opcional.

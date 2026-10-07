@@ -423,7 +423,8 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   del curso, el DNI o el email ya están registrados, y también 409 en la carrera entre dos
   altas simultáneas, con un mensaje que en un caso pide corregir el formulario y en el otro
   reintentar; 422 si falta un campo obligatorio, si el cupo o el arancel no son positivos, si
-  la modalidad exige sede y no vino, o si el email no tiene forma.
+  la comisión es virtual y trae sede, o si el email no tiene forma. El `sede_id` del alta de
+  comisión es opcional en toda modalidad (M35).
 - **`vacantes` en la respuesta de la comisión, y por qué no cierra la historia #6.** La tabla de
   Administración ya tenía esa columna, y dejarla en blanco sería una regresión visible, así que
   la respuesta la trae **derivada** por consulta, que es lo que D10 ya decidió. La #6 sigue
@@ -450,6 +451,36 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   columna generada, así que sin él la respuesta de `POST /cursos` devolvería `codigo = None`.
 - **Dónde:** `backend/app/core/database.py`, `backend/app/services/catalogo.py`,
   `backend/app/services/padron.py`.
+
+### M35 — La sede es opcional en toda modalidad, y el CHECK invierte su dirección
+
+- **Fecha:** 2026-10-07
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `comision.sede_id` es **opcional en toda modalidad**. El CHECK
+  `modalidad_presencial_requiere_sede` (`modalidad = 'VIRTUAL' OR sede_id IS NOT NULL`) se
+  reemplaza por `modalidad_virtual_sin_sede` (`modalidad <> 'VIRTUAL' OR sede_id IS NULL`): deja de
+  exigir sede y pasa a **prohibirla** en Virtual.
+- **Por qué invierte y no desaparece.** "Dejar de exigir" y "no exigir nunca" no son lo mismo. De
+  las cuatro combinaciones de modalidad por `sede_id`, el viejo rechazaba `(PRESENCIAL, NULL)` y el
+  nuevo rechaza `(VIRTUAL, con sede)`: no son la negación el uno del otro, y por eso la migración no
+  puede ser un `drop` y nada más. Se prohíbe en lugar de permitirla porque una comisión virtual con
+  `sede_id` es el dato incoherente que el formulario no renderiza.
+- **La regla vive en un solo lugar.** No hay `model_validator` en `ComisionCreate` ni validación en
+  el frontend: son CHECK de la base, y una regla que se sostiene en dos lugares es una regla que se
+  desincroniza (el docstring de `crear_comision` ya lo decía). El 422 de virtual con sede sale del
+  `IntegrityError` que traduce `_regla_de_alta_rota`, igual que el del cupo y el del arancel, y su
+  texto sigue siendo el crudo de PostgreSQL.
+- **La migración `0003_sede_opcional_comision` pone en `NULL` la sede de las virtuales.** El CHECK
+  anterior **permitía** virtual con sede, así que sobre cualquier base poblada el
+  `create_check_constraint` a secas falla. Lo que se pierde con ese `UPDATE` es exactamente el dato
+  que el CHECK nuevo prohíbe: no se destruye nada con significado. Es una migración que **reescribe
+  filas**, así que se aplica antes de desplegar el backend nuevo.
+- **El `downgrade` no repara los datos, falla.** Restaura el CHECK viejo y deja que la base lo
+  rechace si quedan comisiones presenciales sin sede, con el mismo criterio que el `downgrade` del
+  CUIL en `0002_altas_catalogo`: rellenar sedes inventadas mentiría sobre el estado del esquema.
+- **Dónde:** `backend/app/models/catalogo.py`, `backend/alembic/versions/0003_sede_opcional_comision.py`,
+  `backend/app/api/catalogo.py`, `backend/app/services/catalogo.py`, `backend/app/schemas/catalogo.py`,
+  `frontend/src/admin/CoursesPage.jsx`.
 
 ### D35 — Todos los montos quedan en pesos argentinos
 

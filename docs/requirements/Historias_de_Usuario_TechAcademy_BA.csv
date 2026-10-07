@@ -81,7 +81,7 @@ Entonces la modalidad se guarda y se muestra en el listado de comisiones sin exi
 Escenario: Modalidad presencial o híbrida
 Dado que selecciono modalidad presencial o híbrida
 Cuando intento guardar sin indicar sede
-Entonces el sistema rechaza el guardado y solicita seleccionar una sede
+Entonces el sistema registra la comisión sin sede
 
 Escenario: Presencial con sede
 Dado que selecciono modalidad presencial o híbrida e indico una sede
