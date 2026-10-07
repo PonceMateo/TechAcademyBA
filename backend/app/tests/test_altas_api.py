@@ -9,8 +9,9 @@ Lo que estos tests afirma por debajo de la respuesta:
 - el alta de un curso **no admite un campo de código** (`extra="forbid"`), y uno que lo mande
   recibe 422;
 - el alta de un docente **no admite un campo de CUIL** (D33), y uno que lo mande recibe 422;
-- la comisión sin docente, con cupo inválido, con arancel inválido o presencial sin sede se
-  rechazan;
+- la comisión sin docente, con cupo inválido o con arancel inválido se rechazan; la de modalidad
+  presencial o híbrida **sin sede se registra**, porque la sede es opcional en toda modalidad
+  (historia #8), y la que la lleva en `Virtual` se rechaza con 422;
 - el rechazo del DNI repetido dice **DNI** y el del email repetido dice **email**;
 - la cuenta creada por el alta entra al sistema con la contraseña de demostración.
 """

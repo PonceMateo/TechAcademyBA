@@ -29,13 +29,15 @@ dependencia; el frontend no depende del backend y puede ir en paralelo.
   base que tenga una comisión `VIRTUAL` con `sede_id` asignado: el `upgrade` tiene que terminar en
   cero y la fila quedar con `sede_id` en `NULL`. Si el `UPDATE` no estuviera, ese mismo comando
   revienta con el `create_check_constraint`.
-- [x] 1.3 En la misma migración, escribir el `downgrade()` al revés (baja el CHECK nuevo, corre el
-  `UPDATE` contrario y restaura `ck_comision_modalidad_presencial_requiere_sede`) y un docstring
-  largo al estilo de `0002_altas_catalogo.py` que diga **por qué** el `UPDATE` va entre el `drop` y el
-  `create`, y que el `downgrade` **falla** si quedan comisiones presenciales sin sede en vez de
-  rellenar sedes inventadas. **Verificar** con `alembic upgrade head` y `alembic downgrade
-  0002_altas_catalogo` los dos en cero, porque `conftest.py` corre `downgrade base` y `upgrade head`
-  al inicio de cada sesión y un `downgrade` a medias ensucia la base de pruebas entre corridas.
+- [x] 1.3 En la misma migración, escribir el `downgrade()` al revés —baja el CHECK nuevo y restaura
+  `ck_comision_modalidad_presencial_requiere_sede`— y un docstring largo al estilo de
+  `0002_altas_catalogo.py` que diga **por qué** el `UPDATE` va entre el `drop` y el `create`, que
+  **no** hay ningún `UPDATE` que deshaga ese, y que el `downgrade` **falla** si quedan comisiones
+  presenciales sin sede en vez de rellenar sedes inventadas. **Verificar** con `alembic upgrade head`
+  y `alembic downgrade 0002_altas_catalogo` los dos en cero, porque `conftest.py` corre `downgrade
+  base` y `upgrade head` al inicio de cada sesión y un `downgrade` a medias ensucia la base de
+  pruebas entre corridas. La ausencia del `UPDATE` contrario es deliberada y está anotada en el
+  **Migration Plan** del `design.md`; ver 7.5.
 - [x] 1.4 Con el modelo de 1.1 y la migración de 1.2 y 1.3 ya en el mismo commit, **verificar** con
   `alembic check` reportando **cero** diferencias entre la migración y los modelos, o sea que no
   queda nada que sincronizar. Este es el primer momento en que esa verificación es posible: antes
@@ -123,9 +125,12 @@ Depende del grupo 1: los asserts nombran el CHECK nuevo y la versión `0003`.
 
 ## 5. `test(frontend)` — Tests de pantalla y título del test de mocks
 
-- [x] 5.1 En `frontend/src/admin/CoursesPage.test.jsx` (~295-319), sacar `'Sede'` del `toEqual` del
-  test de orden de campos. **Verificar** con `npm run test`: si el campo siguiera renderizándose, el
-  texto del spec no coincidiría con el orden real.
+- [x] 5.1 En `frontend/src/admin/CoursesPage.test.jsx` (~295-322), sacar `'Sede'` del `toEqual` del
+  test de orden de campos y agregar en ese mismo test
+  `expect(screen.queryByLabelText(/^Sede/)).not.toBeInTheDocument()`. **Verificar** con `npm run
+  test`: es la aserción negativa la que puede fallar, no el `toEqual` —como `Sede` no está en el
+  patrón de `getAllByText`, el rótulo se filtra y el orden daría igual con el campo renderizado—. Ver
+  7.1.
 - [x] 5.2 En el mismo archivo (~355-378), invertir los dos tests de rechazo —presencial y
   híbrida— a «guarda la comisión»: el modal se cierra y aparece el aviso con el código derivado.
   **Verificar** con `npm run test`: los dos en verde sin el mensaje «El campo Sede es obligatorio…».
@@ -160,3 +165,30 @@ Al último, para que la decisión cite lo que se construyó.
 - [x] 6.4 Corregir en el sitio la frase de **M33** (~426) que dice que hay `422` «si la modalidad exige
   sede y no vino». **Verificar** con `grep -n "modalidad exige sede" docs/decisions.md`: no queda
   ninguna, y M33 sigue diciendo que el `sede_id` del alta de comisión es opcional.
+
+## 7. Correcciones de verify
+
+Lo que encontró la pasada de verificación después de los grupos anteriores. Ninguna cambia
+comportamiento: un test que no podía fallar, dos textos que afirmaban la regla vieja y el registro de
+una desviación deliberada.
+
+- [x] 7.1 (W2) El test de orden de campos **no podía fallar**: con `Sede` fuera del patrón de
+  `getAllByText` el rótulo se filtraba y el `toEqual` daba verde aunque el campo se renderizara. Se
+  agregó `expect(screen.queryByLabelText(/^Sede/)).not.toBeInTheDocument()` en el mismo test, que sí
+  falla si aparece. **Verificar** con `npm run test`: el escenario «abre con los campos en el orden
+  del spec» tiene una aserción que se puede romper.
+- [x] 7.2 (W3) El docstring de `test_altas_api.py` decía que «presencial sin sede se rechaza», falso
+  desde `f7c245e`: el mismo archivo afirma `201`. Reescrito para decir que la presencial y la
+  híbrida sin sede **se registran** y que la que se rechaza es la virtual **con** sede. **Verificar**
+  con `pytest app/tests/test_altas_api.py`: el docstring nombra las dos mitades.
+- [x] 7.3 (S1) `errores.sede` ya no lo setea nadie —la rama de validación de 4.2 se borró—, así que el
+  `error` del `Campo` de `Sede` era `undefined ?? null`, siempre `null`. Se sacó el prop. **Verificar**
+  con `grep -rn "errores.sede" frontend/src`: no queda ninguna ocurrencia.
+- [x] 7.4 (S2) El docstring de `Comision.sede_nombre` decía que el `None` es el de una comisión
+  virtual; bajo la regla nueva también —y sobre todo— es el de una presencial o híbrida sin sede.
+  Reescrito para decir qué produce el `None`. **Verificar** leyendo el docstring contra el CHECK
+  `modalidad_virtual_sin_sede`.
+- [x] 7.5 (S3) La tarea 1.3 pedía un `UPDATE` contrario en el `downgrade` que nunca se escribió, y
+  archivarla habría dejado el registro diciendo que sí. La omisión era correcta —decisión 4— y ahora
+  está anotada en la tarea y en el **Migration Plan** del `design.md`. **Verificar** con
+  `openspec validate sede-opcional-en-comision --strict`.

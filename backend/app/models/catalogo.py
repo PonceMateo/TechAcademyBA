@@ -188,5 +188,11 @@ class Comision(TimestampMixin, Base):
 
     @property
     def sede_nombre(self) -> str | None:
-        """Nombre de la sede, o `None` en una comisión virtual."""
+        """Nombre de la sede de la comisión, o `None` si no tiene ninguna asignada.
+
+        Desde la historia #8 la sede es opcional en toda modalidad, así que el `None` ya no dice
+        que la comisión sea virtual: una `Presencial` o una `Híbrido` sin sede también lo devuelven,
+        y es el caso común. En `Virtual` el CHECK `modalidad_virtual_sin_sede` garantiza que siempre
+        sea `None`, porque es la única combinación que la base prohíbe.
+        """
         return self.sede.nombre if self.sede is not None else None

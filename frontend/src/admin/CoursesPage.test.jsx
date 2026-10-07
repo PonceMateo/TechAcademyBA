@@ -317,6 +317,11 @@ describe('modal de alta', () => {
       'Modalidad',
     ])
 
+    // El `toEqual` de arriba **no** puede probar que la sede no esté: como `Sede` quedó fuera del
+    // patrón, `getAllByText` filtra el rótulo y el orden daría igual con el campo renderizado. La
+    // aserción que sí falla si el campo aparece va por `queryByLabelText`, que no filtra nada.
+    expect(screen.queryByLabelText(/^Sede/)).not.toBeInTheDocument()
+
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guardar Comisión' })).toBeInTheDocument()
   })

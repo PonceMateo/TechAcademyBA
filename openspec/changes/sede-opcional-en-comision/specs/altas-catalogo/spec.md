@@ -31,9 +31,6 @@ los números de ese curso más uno, y la respuesta SHALL devolver el código der
 forma del código del curso más el número. WHEN la numeración ya ocupada por otra comisión
 del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 y #8).
 
-`GET /sedes` no cambia: sigue siendo la fuente de las opciones del selector, y ahora se
-consulta solo cuando la modalidad elegida es `Presencial` o `Híbrido`.
-
 #### Scenario: Alta de comisión correcta
 - **WHEN** se envía una comisión con curso, docente, días y horarios, cupo máximo, arancel y modalidad
 - **THEN** el sistema responde con la comisión creada y su código derivado, y la comisión queda asociada al curso

@@ -486,7 +486,7 @@ export function CoursesPage() {
           </Campo>
 
           {mostrarSede && (
-            <Campo id="sede" etiqueta="Sede" error={errores.sede ?? null}>
+            <Campo id="sede" etiqueta="Sede">
               <select id="sede" value={campos.sede} onChange={cambiar('sede')}>
                 <option value="">Seleccionar…</option>
                 {sedes.map((sede) => (

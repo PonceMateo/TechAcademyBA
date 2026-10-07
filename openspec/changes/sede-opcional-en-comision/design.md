@@ -116,6 +116,11 @@ CHECK viejo, pone en `NULL` la sede de las comisiones virtuales y agrega `modali
 **Reescribe filas** (decisión 3), así que se aplica antes de desplegar el backend nuevo; hoy no hay
 datos reales y el `UPDATE` no toca nada.
 
+**Desviación de la tarea 1.3: el `downgrade` no lleva el `UPDATE` contrario, y es deliberado.** El
+`upgrade` pone la sede de las comisiones `VIRTUAL` en `NULL` sin guardar el valor anterior, así que
+la única «reversión» posible sería inventarles una sede, que es justo lo que la decisión 4 prohíbe.
+El `downgrade` restaura el CHECK viejo y deja que la base falle si quedan presenciales sin sede.
+
 Un work unit y un commit, con el modelo y la migración adentro. Trailer `Refs #8`, y **no**
 `Closes #8`: la historia sigue abierta porque este change no le cierra los criterios de edición.
 
