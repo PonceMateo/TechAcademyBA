@@ -142,14 +142,26 @@ def test_arancel_menor_o_igual_a_cero_es_rechazado(db_session: Session, arancel:
 
 
 @pytest.mark.parametrize("modalidad", [Modalidad.PRESENCIAL.value, Modalidad.HIBRIDO.value])
-def test_modalidad_presencial_u_hibrida_sin_sede_es_rechazada(
+def test_modalidad_presencial_u_hibrida_sin_sede_se_registra(
     db_session: Session, modalidad: str
 ) -> None:
-    """Historia #8: Presencial e Híbrido exigen sede."""
+    """Historia #8: la sede es opcional en toda modalidad, así que la comisión se persiste.
+
+    El nombre conserva el de la regla anterior: ya no hay modalidad que exija sede.
+    """
+    comision = crear_comision(db_session, modalidad=modalidad, con_sede=False)
+    assert comision.sede_id is None
+
+
+def test_modalidad_virtual_con_sede_es_rechazada(db_session: Session) -> None:
+    """Historia #8: la sede es opcional, pero en Virtual la base la prohíbe.
+
+    Es el test que cubre la regla en la capa que la escribe, sin pasar por la ruta.
+    """
     motivo = assert_rechazado(
-        crear_comision, db_session, modalidad=modalidad, con_sede=False
+        crear_comision, db_session, modalidad=Modalidad.VIRTUAL.value, con_sede=True
     )
-    assert "ck_comision_modalidad_presencial_requiere_sede" in motivo
+    assert "ck_comision_modalidad_virtual_sin_sede" in motivo
 
 
 def test_modalidad_virtual_no_exige_sede(db_session: Session) -> None:

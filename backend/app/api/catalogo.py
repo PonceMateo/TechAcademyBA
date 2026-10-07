@@ -95,7 +95,7 @@ def crear_comision(
 
     201 con la comisión y su código derivado, 404 si el curso, el docente o la sede no existen,
     409 si la numeración chocó con otra alta simultánea, 422 si falta un campo obligatorio, si
-    el cupo o el arancel no son positivos o si la modalidad exige sede y no vino.
+    el cupo o el arancel no son positivos, o si la comisión es Virtual y trae sede.
     """
     try:
         comision = catalogo.crear_comision(session, cuerpo)
@@ -138,7 +138,8 @@ def _conflicto_de_restriccion(error: IntegrityError) -> HTTPException:
 def _regla_de_alta_rota(error: IntegrityError) -> HTTPException:
     """Un CHECK de la base que el esquema de Pydantic no cubrió.
 
-    Los CHECK de `comision` —cupo positivo, arancel positivo, sede obligatoria para Presencial e
-    Híbrido— se traducen a 422 con el texto de PostgreSQL, que dice qué regla se incumplió.
+    Los CHECK de `comision` —cupo positivo, arancel positivo y `modalidad_virtual_sin_sede`, que
+    prohíbe la sede en Virtual porque es opcional en toda modalidad— se traducen a 422 con el texto
+    de PostgreSQL, que dice qué regla se incumplió.
     """
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error.orig))

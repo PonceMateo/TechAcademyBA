@@ -48,7 +48,7 @@ CHECKS_ESPERADOS = {
     "ck_comision_cupo_maximo_positivo",
     "ck_comision_numero_positivo",
     "ck_comision_arancel_positivo",
-    "ck_comision_modalidad_presencial_requiere_sede",
+    "ck_comision_modalidad_virtual_sin_sede",
     "ck_comision_modalidad_valida",
     # Padrón
     "ck_usuario_rol_vinculo_coherente",
@@ -142,7 +142,7 @@ def test_la_migracion_inicial_deja_el_esquema_completo(db_session) -> None:
 
 def test_la_version_de_alembic_queda_registrada(db_session) -> None:
     versiones = db_session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    assert versiones == ["0002_altas_catalogo"]
+    assert versiones == ["0003_sede_opcional_comision"]
 
 
 def test_la_migracion_escrita_a_mano_cuadra_con_los_modelos(

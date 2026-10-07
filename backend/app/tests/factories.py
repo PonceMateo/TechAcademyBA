@@ -111,8 +111,8 @@ def crear_comision(
 ) -> Comision:
     """Comisión válida por defecto.
 
-    `con_sede=False` existe para probar el caso de la historia #8: modalidad presencial
-    sin sede tiene que ser rechazado por la base.
+    `con_sede=False` existe para el caso de la historia #8 de la sede **opcional**: una
+    comisión presencial o híbrida sin sede tiene que persistir con `sede_id` en `None`.
 
     `numero=None` toma el siguiente del curso, que es la regla de D34 y deja que un test
     pueda crear varias comisiones del mismo curso sin pasar el número a mano. Para probar

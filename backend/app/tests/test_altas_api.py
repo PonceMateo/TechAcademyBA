@@ -242,10 +242,11 @@ def test_arancel_invalido_es_rechazado(
 
 
 @pytest.mark.parametrize("modalidad", [Modalidad.PRESENCIAL.value, Modalidad.HIBRIDO.value])
-def test_modalidad_que_exige_sede_sin_sede_es_rechazada(
+def test_modalidad_que_exige_sede_sin_sede_se_registra(
     cliente_admin: TestClient, db_session: Session, modalidad: str
 ) -> None:
-    """Historia #8: Presencial e Híbrido exigen sede. Lo rechaza el CHECK de la base."""
+    """Historia #8: la sede es opcional en toda modalidad, así que Presencial e Híbrido sin sede
+    se registran. El nombre conserva el de la regla anterior: ya no hay modalidad que la exija."""
     curso = crear_curso(db_session)
     docente = crear_docente(db_session)
 
@@ -261,8 +262,38 @@ def test_modalidad_que_exige_sede_sin_sede_es_rechazada(
         },
     )
 
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["sede_id"] is None
+
+
+def test_modalidad_virtual_con_sede_es_rechazada(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """Historia #8: la sede es opcional, pero en Virtual es dato incoherente.
+
+    No hay validador en el esquema de Pydantic que lo rechace: el texto trae el nombre del CHECK,
+    y eso prueba que el 422 sale del `IntegrityError` que traduce `_regla_de_alta_rota`, igual que
+    el del cupo y el del arancel.
+    """
+    curso = crear_curso(db_session)
+    docente = crear_docente(db_session)
+    sede = crear_sede(db_session)
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json={
+            "curso_id": curso.id,
+            "docente_id": docente.id,
+            "dias_horarios": "Lunes 18:00 a 20:00",
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "modalidad": Modalidad.VIRTUAL.value,
+            "sede_id": sede.id,
+        },
+    )
+
     assert respuesta.status_code == 422, respuesta.text
-    assert "sede" in respuesta.text.lower(), respuesta.text
+    assert "ck_comision_modalidad_virtual_sin_sede" in respuesta.text
 
 
 def test_modalidad_virtual_no_exige_sede(cliente_admin: TestClient, db_session: Session) -> None:

@@ -12,7 +12,7 @@ dependencia; el frontend no depende del backend y puede ir en paralelo.
 
 ## 1. `fix(catalogo)` — CHECK invertido y migración `0003_sede_opcional_comision`
 
-- [ ] 1.1 En `backend/app/models/catalogo.py` (~137-141), sacar
+- [x] 1.1 En `backend/app/models/catalogo.py` (~137-141), sacar
   `CheckConstraint("modalidad = 'VIRTUAL' OR sede_id IS NOT NULL", name="modalidad_presencial_requiere_sede")`
   y poner `CheckConstraint("modalidad <> 'VIRTUAL' OR sede_id IS NULL", name="modalidad_virtual_sin_sede")`;
   reescribir el comentario `# Historia #8:` que dice que Presencial e Híbrido exigen sede.
@@ -20,7 +20,7 @@ dependencia; el frontend no depende del backend y puede ir en paralelo.
   no existe, así que `alembic check` **tiene** que reportar una diferencia —el CHECK nuevo del
   modelo contra el `modalidad_presencial_requiere_sede` de la base—, y reportarla es lo correcto.
   La verificación de sincronía va en **1.4**, con modelo y migración ya en el mismo commit.
-- [ ] 1.2 Crear `backend/alembic/versions/0003_sede_opcional_comision.py` con
+- [x] 1.2 Crear `backend/alembic/versions/0003_sede_opcional_comision.py` con
   `revision = "0003_sede_opcional_comision"`, `down_revision = "0002_altas_catalogo"`, y el `upgrade()`
   en tres pasos en este orden: `op.drop_constraint("ck_comision_modalidad_presencial_requiere_sede",
   "comision", type_="check")`, `op.execute("UPDATE comision SET sede_id = NULL WHERE modalidad =
@@ -29,14 +29,14 @@ dependencia; el frontend no depende del backend y puede ir en paralelo.
   base que tenga una comisión `VIRTUAL` con `sede_id` asignado: el `upgrade` tiene que terminar en
   cero y la fila quedar con `sede_id` en `NULL`. Si el `UPDATE` no estuviera, ese mismo comando
   revienta con el `create_check_constraint`.
-- [ ] 1.3 En la misma migración, escribir el `downgrade()` al revés (baja el CHECK nuevo, corre el
+- [x] 1.3 En la misma migración, escribir el `downgrade()` al revés (baja el CHECK nuevo, corre el
   `UPDATE` contrario y restaura `ck_comision_modalidad_presencial_requiere_sede`) y un docstring
   largo al estilo de `0002_altas_catalogo.py` que diga **por qué** el `UPDATE` va entre el `drop` y el
   `create`, y que el `downgrade` **falla** si quedan comisiones presenciales sin sede en vez de
   rellenar sedes inventadas. **Verificar** con `alembic upgrade head` y `alembic downgrade
   0002_altas_catalogo` los dos en cero, porque `conftest.py` corre `downgrade base` y `upgrade head`
   al inicio de cada sesión y un `downgrade` a medias ensucia la base de pruebas entre corridas.
-- [ ] 1.4 Con el modelo de 1.1 y la migración de 1.2 y 1.3 ya en el mismo commit, **verificar** con
+- [x] 1.4 Con el modelo de 1.1 y la migración de 1.2 y 1.3 ya en el mismo commit, **verificar** con
   `alembic check` reportando **cero** diferencias entre la migración y los modelos, o sea que no
   queda nada que sincronizar. Este es el primer momento en que esa verificación es posible: antes
   de que exista `0003`, modelo y base discrepan a propósito.
@@ -45,13 +45,13 @@ dependencia; el frontend no depende del backend y puede ir en paralelo.
 
 Sin cambio de comportamiento: la regla vive en un solo lugar y estos textos la describen.
 
-- [ ] 2.1 En `backend/app/api/catalogo.py` (~96-98), el docstring de `crear_comision`: sacar del
+- [x] 2.1 En `backend/app/api/catalogo.py` (~96-98), el docstring de `crear_comision`: sacar del
   422 la frase «si la modalidad exige sede y no vino» y dejar el 422 de virtual con sede. **Verificar**
   con un grep de `exige sede` en `backend/app/`: no queda ninguno que afirme la obligatoriedad.
-- [ ] 2.2 En `backend/app/api/catalogo.py` (~138-144), el docstring de `_regla_de_alta_rota`:
+- [x] 2.2 En `backend/app/api/catalogo.py` (~138-144), el docstring de `_regla_de_alta_rota`:
   cambiar la lista de CHECK de `comision` para que nombre la regla nueva. **Verificar** leyendo el
   docstring contra `Comision.__table_args__`: los tres CHECK que nombra existen con esos nombres.
-- [ ] 2.3 En `backend/app/services/catalogo.py` (~145-149 y ~178-181), el docstring de
+- [x] 2.3 En `backend/app/services/catalogo.py` (~145-149 y ~178-181), el docstring de
   `crear_comision` y el comentario que sigue al `except IntegrityError`: sacar «sede obligatoria para
   Presencial e Híbrido» y el nombre `modalidad_presencial_requiere_sede`. **Verificar** con `grep -rn
   modalidad_presencial_requiere_sede backend/` acotado a lo que no sea historial: quedan exactamente
@@ -60,7 +60,7 @@ Sin cambio de comportamiento: la regla vive en un solo lugar y estos textos la d
   donde el nombre viejo tiene que sobrevivir porque es el que se restaura—. Ninguna en `app/`. Del
   nombre nuevo quedan el `CheckConstraint` del modelo y el `create_check_constraint` del `upgrade()`,
   y no el viejo.
-- [ ] 2.4 En `backend/app/schemas/catalogo.py` (~73-75), el docstring de `ComisionCreate`: decir que
+- [x] 2.4 En `backend/app/schemas/catalogo.py` (~73-75), el docstring de `ComisionCreate`: decir que
   `sede_id` es opcional en **toda** modalidad y que solo se acepta cuando la modalidad no es Virtual.
   **Verificar** que el campo sigue siendo `int | None` y sin validador de modalidad: la regla no se
   duplica en Pydantic.
@@ -69,36 +69,36 @@ Sin cambio de comportamiento: la regla vive en un solo lugar y estos textos la d
 
 Depende del grupo 1: los asserts nombran el CHECK nuevo y la versión `0003`.
 
-- [ ] 3.1 En `backend/app/tests/test_migration.py`, sacar
+- [x] 3.1 En `backend/app/tests/test_migration.py`, sacar
   `ck_comision_modalidad_presencial_requiere_sede` de `CHECKS_ESPERADOS` (~51) y agregar
   `ck_comision_modalidad_virtual_sin_sede`. **Verificar** con
   `pytest app/tests/test_migration.py`: si la migración no hubiera creado el CHECK, el conjunto
   comparado no coincide y el assert del nombre dice cuál falta.
-- [ ] 3.2 En el mismo archivo (~145), cambiar `versiones == ["0002_altas_catalogo"]` por
+- [x] 3.2 En el mismo archivo (~145), cambiar `versiones == ["0002_altas_catalogo"]` por
   `["0003_sede_opcional_comision"]`. **Verificar** con
   `pytest app/tests/test_migration.py::test_la_version_de_alembic_queda_registrada`.
-- [ ] 3.3 En `backend/app/tests/test_altas_api.py` (~244-265), invertir
+- [x] 3.3 En `backend/app/tests/test_altas_api.py` (~244-265), invertir
   `test_modalidad_que_exige_sede_sin_sede_es_rechazada`: sobre el parametrize de `PRESENCIAL` y
   `HIBRIDO`, ahora espera `201` y `sede_id is None` en la respuesta. **Verificar** con
   `pytest app/tests/test_altas_api.py -k sede` sobre PostgreSQL real: los dos casos del parametrize
   en verde.
-- [ ] 3.4 En el mismo archivo, agregar el caso nuevo: `POST /comisiones` con `modalidad: VIRTUAL` y
+- [x] 3.4 En el mismo archivo, agregar el caso nuevo: `POST /comisiones` con `modalidad: VIRTUAL` y
   un `sede_id` válido. **Verificar** con el test afirmando `422` **y** que el texto de la respuesta
   trae `ck_comision_modalidad_virtual_sin_sede`, que es lo que lo prueba como origen: sale del
   `IntegrityError` que traduce `_regla_de_alta_rota`, no de un validador.
-- [ ] 3.5 En `backend/app/tests/test_catalogo.py` (~144-152), invertir
+- [x] 3.5 En `backend/app/tests/test_catalogo.py` (~144-152), invertir
   `test_modalidad_presencial_u_hibrida_sin_sede_es_rechazada`: crear la comisión con
   `con_sede=False` y afirmar que persiste con `sede_id is None`. **Verificar** con
   `pytest app/tests/test_catalogo.py -k sede`.
-- [ ] 3.6 En el mismo archivo, agregar la contraparte del servicio: `crear_comision` con
+- [x] 3.6 En el mismo archivo, agregar la contraparte del servicio: `crear_comision` con
   `modalidad=Modalidad.VIRTUAL.value` y `con_sede=True` levanta `IntegrityError` cuyo motivo trae
   `ck_comision_modalidad_virtual_sin_sede`, con `assert_rechazado`. **Verificar** con
   `pytest app/tests/test_catalogo.py -k sede`: es el test que cubre la regla en la capa que la
   escribe, sin pasar por la ruta.
-- [ ] 3.7 En `backend/app/tests/factories.py` (~113-115), corregir el docstring de `con_sede=False`,
+- [x] 3.7 En `backend/app/tests/factories.py` (~113-115), corregir el docstring de `con_sede=False`,
   que hoy dice que la modalidad presencial sin sede tiene que ser rechazada por la base.
   **Verificar** que el docstring dice para qué existe el parámetro ahora.
-- [ ] 3.8 Correr `pytest app/tests/` completo. **Verificar** que termina en cero: el CHECK nuevo no
+- [x] 3.8 Correr `pytest app/tests/` completo. **Verificar** que termina en cero: el CHECK nuevo no
   puede romper ningún otro test, y si aparece uno que armaba una comisión virtual con sede, el
   nombre del CHECK aparece en el motivo del fallo.
 

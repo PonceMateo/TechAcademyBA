@@ -71,8 +71,9 @@ class ComisionCreate(BaseModel):
     de una comisión nueva sí lo exige, porque es lo que pide el criterio de la historia #2.
 
     `numero` **no** está en el contrato: sale del máximo de los números de ese curso más uno
-    (D34). `sede_id` es opcional y solo se acepta cuando la modalidad la exige; el CHECK
-    `modalidad_presencial_requiere_sede` es el que sostiene esa regla en la base.
+    (D34). `sede_id` es **opcional en toda modalidad**, y solo se acepta cuando la modalidad no
+    es Virtual: el CHECK `modalidad_virtual_sin_sede` es el que sostiene esa regla en la base, y
+    no hay un validador acá que la duplique.
     """
 
     model_config = ConfigDict(extra="forbid")

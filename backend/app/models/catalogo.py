@@ -134,10 +134,12 @@ class Comision(TimestampMixin, Base):
         CheckConstraint("cupo_maximo > 0", name="cupo_maximo_positivo"),
         CheckConstraint("arancel > 0", name="arancel_positivo"),
         enum_check("modalidad", Modalidad, "modalidad_valida"),
-        # Historia #8: Presencial e Híbrido exigen sede; Virtual no la exige.
+        # Historia #8: la sede es **opcional en toda modalidad**. Este CHECK no la pide en ningún
+        # caso: lo que hace es prohibirla en Virtual, donde una `sede_id` es el dato incoherente
+        # que el formulario ni siquiera renderiza.
         CheckConstraint(
-            "modalidad = 'VIRTUAL' OR sede_id IS NOT NULL",
-            name="modalidad_presencial_requiere_sede",
+            "modalidad <> 'VIRTUAL' OR sede_id IS NULL",
+            name="modalidad_virtual_sin_sede",
         ),
         Index("ix_comision_curso_id", "curso_id"),
     )

@@ -144,9 +144,10 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
 
     El curso, el docente y la sede se validan antes de insertar para que un identificador que
     no existe responda 404 en vez de un 500 de clave foránea. Las reglas de la comisión —cupo
-    positivo, arancel positivo, sede obligatoria para Presencial e Híbrido— no se validan acá:
-    son CHECK de la base, y una regla que se sostiene en dos lugares es una regla que se
-    desincroniza.
+    positivo, arancel positivo y `modalidad_virtual_sin_sede`, que prohíbe la sede en Virtual—
+    no se validan acá: son CHECK de la base, y una regla que se sostiene en dos lugares es una
+    regla que se desincroniza. La sede es **opcional en toda modalidad**, así que su ausencia no
+    es un rechazo.
     """
     curso = session.get(Curso, datos.curso_id)
     if curso is None:
@@ -175,7 +176,7 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
         session.rollback()
         if INDICE_COMISION_NUMERO in _motivo(error):
             raise NumeracionDeComisionEnConflicto from error
-        # `modalidad_presencial_requiere_sede`, `cupo_maximo_positivo` y `arancel_positivo`
+        # `modalidad_virtual_sin_sede`, `cupo_maximo_positivo` y `arancel_positivo`
         # también llegan como IntegrityError. Siguen subiendo: la ruta los traduce a 422 y el
         # mensaje de PostgreSQL ya dice qué regla se incumplió.
         raise
