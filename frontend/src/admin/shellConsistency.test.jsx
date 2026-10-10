@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { accountForRole, renderAppAs, resetDataSource, stubBackend } from '../test/support'
@@ -261,8 +261,15 @@ describe('navegación por teclado en los tres armazones (6.2)', () => {
     await screen.findByRole('navigation', { name: marca })
 
     const user = userEvent.setup()
-    // La primera parada es el bloque de perfil: la búsqueda `⌘ K` y la campana son composición
-    // inerte y no reciben foco, así que lo que sigue en el recorrido es el lateral.
+    // El lateral va primero en el DOM (ocupa toda la altura a la izquierda): las primeras paradas
+    // son sus enlaces y el perfil llega después. La búsqueda `⌘ K` y la campana son composición
+    // inerte y no reciben foco.
+    const enlaces = within(screen.getByRole('navigation', { name: marca })).getAllByRole('link')
+    await user.tab()
+    expect(document.activeElement).toBe(enlaces[0])
+    for (let i = 1; i < enlaces.length; i += 1) {
+      await user.tab()
+    }
     await user.tab()
     const perfil = screen.getByRole('button', { name: new RegExp(accountForRole(rol).nombre) })
     expect(document.activeElement).toBe(perfil)
@@ -278,7 +285,13 @@ describe('navegación por teclado en los tres armazones (6.2)', () => {
     await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
 
     const user = userEvent.setup()
-    await user.tab()
+    // El perfil llega después del lateral: se atraviesan sus enlaces antes de abrir el menú.
+    const enlaces = within(
+      screen.getByRole('navigation', { name: 'MENÚ OPERATIVO' }),
+    ).getAllByRole('link')
+    for (let i = 0; i < enlaces.length + 1; i += 1) {
+      await user.tab()
+    }
     await user.keyboard('{Enter}')
     await user.tab()
 

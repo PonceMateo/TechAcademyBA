@@ -110,9 +110,58 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
     <div
       {...{ [MARCA_UI]: 'shell-frame' }}
       data-acento={acento}
-      className="flex min-h-screen flex-col"
+      className="flex min-h-screen flex-col lg:flex-row"
     >
-      <header className="superficie-cristal sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-white/60 px-4 py-3 sm:px-6">
+      <nav
+        aria-label={tituloMenu}
+        className="superficie-cristal w-full shrink-0 overflow-x-hidden border-b border-white/60 px-4 py-4 lg:w-60 lg:border-r lg:border-b-0 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:overflow-y-auto"
+      >
+        <div className="flex items-center gap-3 px-2 pb-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--acento-fuerte)] text-white">
+            <GraduationCap className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="text-base font-bold text-slate-800">TechAcademyBA</span>
+        </div>
+
+        <ul className="min-w-0 space-y-1">
+          {secciones.map((seccion) => (
+            <li key={seccion.clave} className="min-w-0">
+              {seccion.deshabilitado === true ? (
+                <span
+                  aria-disabled="true"
+                  className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-400"
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-2.5 leading-snug break-words">
+                    <seccion.icono className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {seccion.etiqueta}
+                  </span>
+                  <span className="shrink-0">
+                    <Badge tono={TONO.GRIS}>Próximamente</Badge>
+                  </span>
+                </span>
+              ) : (
+                <NavLink
+                  to={seccion.ruta}
+                  end={seccion.exacta === true}
+                  className={({ isActive }) =>
+                    `foco-acento flex min-w-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
+                      isActive
+                        ? 'bg-[var(--acento-suave)] font-semibold text-[var(--acento-texto)]'
+                        : 'text-slate-600 hover:bg-white/70'
+                    }`
+                  }
+                >
+                  <seccion.icono className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {seccion.etiqueta}
+                </NavLink>
+              )}
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="superficie-cristal sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-white/60 px-4 py-3 sm:px-6">
         <nav aria-label="Ubicación" className="flex items-center gap-2 text-sm">
           <span className="text-slate-500">Mi espacio</span>
           <ChevronRight className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
@@ -176,66 +225,19 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col lg:flex-row">
-        <nav
-          aria-label={tituloMenu}
-          className="superficie-cristal w-full shrink-0 border-b border-white/60 px-4 py-4 lg:w-60 lg:border-r lg:border-b-0"
-        >
-          <div className="flex items-center gap-3 px-2 pb-4">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--acento-fuerte)] text-white">
-              <GraduationCap className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <span className="text-base font-bold text-slate-800">TechAcademyBA</span>
-          </div>
-
-          <ul className="space-y-1">
-            {secciones.map((seccion) => (
-              <li key={seccion.clave}>
-                {seccion.deshabilitado === true ? (
-                  <span
-                    aria-disabled="true"
-                    className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-slate-400"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <seccion.icono className="h-4 w-4" aria-hidden="true" />
-                      {seccion.etiqueta}
-                    </span>
-                    <Badge tono={TONO.GRIS}>Próximamente</Badge>
-                  </span>
-                ) : (
-                  <NavLink
-                    to={seccion.ruta}
-                    end={seccion.exacta === true}
-                    className={({ isActive }) =>
-                      `foco-acento flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${
-                        isActive
-                          ? 'bg-[var(--acento-suave)] font-semibold text-[var(--acento-texto)]'
-                          : 'text-slate-600 hover:bg-white/70'
-                      }`
-                    }
-                  >
-                    <seccion.icono className="h-4 w-4" aria-hidden="true" />
-                    {seccion.etiqueta}
-                  </NavLink>
-                )}
-              </li>
-            ))}
-          </ul>
-        </nav>
-
         <main className="flex-1 space-y-6 p-4 sm:p-6">
           <AvisoCambioContrasena pendiente={session.must_change_password} />
           <Outlet />
         </main>
-      </div>
 
-      <footer className="superficie-cristal flex flex-wrap items-center justify-between gap-3 border-t border-white/60 px-4 py-3 text-xs text-slate-500 sm:px-6">
-        <span>{TAGLINE}</span>
-        <span className="flex flex-wrap items-center gap-3">
-          <span>{periodoLectivo}</span>
-          <span>{ULTIMA_ACTUALIZACION}</span>
-        </span>
-      </footer>
+        <footer className="superficie-cristal flex flex-wrap items-center justify-between gap-3 border-t border-white/60 px-4 py-3 text-xs text-slate-500 sm:px-6">
+          <span>{TAGLINE}</span>
+          <span className="flex flex-wrap items-center gap-3">
+            <span>{periodoLectivo}</span>
+            <span>{ULTIMA_ACTUALIZACION}</span>
+          </span>
+        </footer>
+      </div>
     </div>
   )
 }

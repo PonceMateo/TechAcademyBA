@@ -36,7 +36,7 @@ const NOMBRE_CUENTA = accountForRole('ADMIN').nombre
  * tablero también es un `<header>` y también se anuncia como banner.
  */
 function barraSuperior() {
-  return within(document.querySelector('[data-ui="shell-frame"] > header'))
+  return within(document.querySelector('[data-ui="shell-frame"] header'))
 }
 
 /** El bloque de perfil es el único botón con menú de la barra superior. */

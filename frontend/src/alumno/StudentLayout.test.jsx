@@ -34,7 +34,7 @@ function armazon() {
  * tablero también es un `<header>` y también se anuncia como banner.
  */
 function barraSuperior() {
-  return within(document.querySelector('[data-ui="shell-frame"] > header'))
+  return within(document.querySelector('[data-ui="shell-frame"] header'))
 }
 
 async function entrar(ruta = '/alumno') {
