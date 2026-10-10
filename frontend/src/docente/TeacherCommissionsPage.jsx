@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useSession } from '../auth/SessionContext'
 import { Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { obtenerComisionesAsignadas } from '../services/dataService'
 
 /**
- * Comisiones asignadas del docente (10.2).
+ * Tablero del docente (10.2): comisiones asignadas, con la composición del diseño
+ * (`docs/design/figma-dashboards-overhaul/`).
  *
  * **Los tres indicadores salen de la misma lista que la tabla.** `COMISIONES ACTIVAS`,
  * `ALUMNOS HABILITADOS` y `BLOQUEADOS` se cuentan sobre las comisiones que la fila muestra, así que
@@ -20,10 +22,21 @@ import { obtenerComisionesAsignadas } from '../services/dataService'
  *
  * **Los contadores hablan en singular y en plural.** `1 bloqueado` y `4 bloqueados` son el mismo
  * dato con la palabra correcta, y un `1 bloqueados` en pantalla hace dudar de la cuenta.
+ *
+ * **La columna derecha es la agenda de la única comisión, y los bloques del prototipo que no
+ * tienen datos no están.** `Correcciones pendientes`, `Novedades` y `Mensajes` del Figma no se
+ * construyen: el maquetado no registra entregas por corregir ni mensajes (D40). La agenda se arma
+ * con el horario y la próxima clase de la comisión, que son los mismos datos del bloque de arriba.
+ *
+ * **La línea de fecha del encabezado es un literal del maquetado**, no una fecha calculada, y no
+ * anuncia cantidades de clases ni de entregas porque esos valores no están en el maquetado (D40).
  */
 
 /** Los contadores de acceso, con el tono que los distingue. */
 const TONOS_ACCESO = { habilitado: TONO.VERDE, bloqueado: TONO.ROJO }
+
+/** Línea de fecha del encabezado: literal del maquetado (D40). */
+const RESUMEN = 'Viernes 9 de octubre · Tu agenda y tus comisiones en un solo lugar.'
 
 const COLUMNAS = [
   {
@@ -53,6 +66,7 @@ function pluralizar(cantidad, palabra) {
 }
 
 export function TeacherCommissionsPage() {
+  const { session } = useSession()
   const [comisiones, setComisiones] = useState([])
 
   useEffect(() => {
@@ -71,32 +85,62 @@ export function TeacherCommissionsPage() {
   ]
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-slate-900">Mis Comisiones</h2>
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+          {`Buen día, ${session.nombre}`}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">{RESUMEN}</p>
+      </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {indicadores.map((indicador) => (
           <Card key={indicador.rotulo}>
-            <p className="text-xs font-semibold tracking-wider text-slate-500">
+            <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
               {indicador.rotulo}
             </p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{indicador.valor}</p>
+            <p className="mt-2 text-3xl font-extrabold text-slate-900">{indicador.valor}</p>
           </Card>
         ))}
       </div>
 
-      <Card titulo="Comisiones asignadas">
-        <Table
-          columnas={COLUMNAS}
-          filas={comisiones}
-          claveDeFila={(fila) => fila.codigo}
-          vacio={
-            <p className="text-sm text-slate-500">
-              No tenés comisiones asignadas en este período lectivo.
-            </p>
-          }
-        />
-      </Card>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Card titulo="Comisiones asignadas">
+          <Table
+            columnas={COLUMNAS}
+            filas={comisiones}
+            claveDeFila={(fila) => fila.codigo}
+            vacio={
+              <p className="text-sm text-slate-500">
+                No tenés comisiones asignadas en este período lectivo.
+              </p>
+            }
+          />
+        </Card>
+
+        <Card titulo="Tu agenda">
+          {comisiones.length === 0 ? (
+            <p className="text-sm text-slate-500">No tenés clases programadas en este período.</p>
+          ) : (
+            <ul className="space-y-3">
+              {comisiones.map((comision) => (
+                <li
+                  key={comision.codigo}
+                  className="rounded-xl bg-slate-50 px-4 py-3 last:mb-0"
+                >
+                  <p className="text-sm font-semibold text-slate-800">
+                    {comision.proxima_clase ?? 'Sin próxima clase'}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {`${comision.nombre_curso} · ${comision.codigo}`}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">{comision.horario}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </div>
   )
 }

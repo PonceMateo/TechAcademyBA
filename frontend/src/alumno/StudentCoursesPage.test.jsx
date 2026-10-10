@@ -1,7 +1,7 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { forzarBloqueoManual } from '../services/dataService'
-import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
+import { accountForRole, renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Cursos del alumno (11.2).
@@ -10,13 +10,20 @@ import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../te
  * exactamente lo que hace la secretaría desde `Habilitación de Accesos`: si el shell del alumno se
  * dibujara con una segunda tarjeta de ejemplo, el caso del bloqueo estaría ilustrado con una
  * inscripción que el cliente no tiene.
+ *
+ * **El tablero abre con el saludo y con los indicadores, no con el título `Mis Cursos`.** Desde el
+ * change `ui-figma-dashboards` el índice del alumno tiene la composición del tablero del diseño; el
+ * nombre de la sección vive en el ítem del menú y en el breadcrumb del armazón.
  */
+
+/** El tablero abre con el saludo de la cuenta de la sesión. */
+const SALUDO = `Buen día, ${accountForRole('ALUMNO').nombre}`
 
 beforeEach(async () => {
   resetDataSource()
   stubBackend()
   renderAppAs('ALUMNO', '/alumno')
-  await screen.findByRole('heading', { name: 'Mis Cursos' })
+  await screen.findByRole('heading', { name: SALUDO })
   await screen.findByText('CUR-102')
 })
 
@@ -66,7 +73,10 @@ describe('la tarjeta bloqueada', () => {
     const banner = screen.getByText('Bloqueado', { selector: 'p' })
 
     expect(banner.className).toContain('text-red-800')
-    expect(screen.getByText(/Causa: comprobante ilegible/)).toBeInTheDocument()
+    // La causa aparece dos veces y no es una repetición de más: el indicador `ACCESO A LA CLASE` la
+    // lleva como texto de apoyo y el banner de la tarjeta la muestra para que el bloqueo se
+    // entienda sin salir de la pantalla.
+    expect(screen.getAllByText(/Causa: comprobante ilegible/)).toHaveLength(2)
   })
 
   it('ofrece una forma de ir a Mis Pagos', () => {

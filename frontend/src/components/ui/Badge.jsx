@@ -16,7 +16,7 @@ export function Badge({ children, tono = TONO.GRIS, title }) {
     <span
       {...{ [MARCA_UI]: 'badge' }}
       title={title}
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${CLASES_BADGE[tono] ?? CLASES_BADGE[TONO.GRIS]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${CLASES_BADGE[tono] ?? CLASES_BADGE[TONO.GRIS]}`}
     >
       {children}
     </span>

@@ -1,14 +1,15 @@
+import { useSession } from '../auth/SessionContext'
 import { Badge, Button, Card } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 
 /**
- * Tablero operativo (9.2).
+ * Tablero operativo (9.2), con la composición del diseño (`docs/design/figma-dashboards-overhaul/`).
  *
- * **Todo lo de esta pantalla es texto fijo.** No consulta datos, no calcula agregados y no navega:
- * no hay historia de usuario que la cubra (la tabla de cobertura de `design.md` lo dice en la
- * fila 6). Los valores son los del prototipo y los del cliente, y están escritos acá a propósito,
- * no derivados: un tablero que calcula sobre datos de ejemplo daría la impresión de estar
- * midiendo algo real.
+ * **Todo lo de esta pantalla es texto fijo.** No consulta datos —solo el nombre de la cuenta para
+ * el saludo—, no calcula agregados y no navega: no hay historia de usuario que la cubra (la tabla
+ * de cobertura de `design.md` lo dice en la fila 6). Los valores son los del prototipo y los del
+ * cliente, y están escritos acá a propósito, no derivados: un tablero que calcula sobre datos de
+ * ejemplo daría la impresión de estar midiendo algo real.
  *
  * **El `27%` del cupo promedio es el caso que más tentador es "arreglar".** El cálculo real sobre
  * las cinco comisiones del maquetado da 43 ocupados sobre 160 lugares, que redondea a 27%. Coincide
@@ -16,10 +17,17 @@ import { TONO } from '../components/ui/paleta'
  * en tiempo de ejecución, y `src/mocks/mocks.test.js` verifica la coherencia de los números desde
  * el otro lado.
  *
+ * **Los gráficos del prototipo no están.** El Figma muestra una sección `La academia en números`
+ * con `1.248` alumnos activos, `32` comisiones y `$ 8,4 M` cobrados: son números del prototipo que
+ * contradicen el maquetado, y Figma aporta cero datos (D40).
+ *
  * **Ninguna alerta es un enlace.** La cuarta línea es la lista de espera, que es una función real
  * que el cliente confirmó y que queda fuera de este change: se muestra el caso y no se ofrece un
  * camino a una pantalla que no existe (D20).
  */
+
+/** La línea de fecha del encabezado es un literal del maquetado, no una fecha calculada (D40). */
+const RESUMEN = 'Viernes 9 de octubre · Todo lo que necesitás para gestionar tu academia.'
 
 /** Los cuatro indicadores, con rótulo, valor y texto de apoyo literales. */
 const INDICADORES = Object.freeze([
@@ -62,29 +70,36 @@ const ACCESOS_RAPIDOS = Object.freeze([
 ])
 
 export function DashboardPage() {
+  const { session } = useSession()
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-slate-900">Dashboard</h2>
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+          {`Buen día, ${session.nombre}`}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">{RESUMEN}</p>
+      </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {INDICADORES.map((indicador) => (
           <Card key={indicador.rotulo}>
-            <p className="text-xs font-semibold tracking-wider text-slate-500">
+            <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
               {indicador.rotulo}
             </p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">{indicador.valor}</p>
+            <p className="mt-2 text-3xl font-extrabold text-slate-900">{indicador.valor}</p>
             <p className="mt-1 text-xs text-slate-500">{indicador.apoyo}</p>
           </Card>
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         <Card titulo="Alertas de Gestión Pendiente">
           <ul className="space-y-3">
             {ALERTAS.map((alerta) => (
               <li
                 key={alerta.texto}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 last:border-b-0"
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
               >
                 <span className="text-sm text-slate-700">{alerta.texto}</span>
                 <Badge tono={alerta.tono}>{alerta.chip}</Badge>

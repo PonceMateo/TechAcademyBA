@@ -19,13 +19,13 @@ export function Table({ columnas, filas, claveDeFila = (fila) => fila.id, vacio 
   return (
     <div className="overflow-x-auto">
       <table {...{ [MARCA_UI]: 'table' }} className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+        <thead>
           <tr>
             {columnas.map((columna) => (
               <th
                 key={columna.clave}
                 scope="col"
-                className={`px-3 py-2 text-left text-xs font-semibold tracking-wide text-slate-600 ${columna.ancho ?? ''}`}
+                className={`px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase ${columna.ancho ?? ''}`}
               >
                 {columna.titulo}
               </th>
@@ -34,9 +34,9 @@ export function Table({ columnas, filas, claveDeFila = (fila) => fila.id, vacio 
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
           {filas.map((fila) => (
-            <tr key={claveDeFila(fila)} className="align-top">
+            <tr key={claveDeFila(fila)} className="align-top transition hover:bg-slate-50/70">
               {columnas.map((columna) => (
-                <td key={columna.clave} className="px-3 py-2 text-slate-700">
+                <td key={columna.clave} className="px-4 py-3 text-slate-700 tabular-nums">
                   {columna.render(fila)}
                 </td>
               ))}

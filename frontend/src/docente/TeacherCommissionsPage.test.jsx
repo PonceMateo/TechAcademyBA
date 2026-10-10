@@ -1,6 +1,6 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
+import { accountForRole, renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 import { obtenerComisionesAsignadas } from '../services/dataService'
 
 /**
@@ -11,15 +11,22 @@ import { obtenerComisionesAsignadas } from '../services/dataService'
  * plural según la cantidad. El caso de los cuatro bloqueados no existe en los datos del cliente —la
  * comisión del maqueteado tiene uno— así que se renderiza con la fuente de datos sustituida, que es
  * para lo que existe: ver un estado que el ejemplo no tiene sin inventar filas de ejemplo.
+ *
+ * **El encabezado es el saludo del tablero, no el título `Mis Comisiones`.** Desde el change
+ * `ui-figma-dashboards` el índice del docente abre con `Buen día, {cuenta}` y su línea de fecha
+ * placeholder; el nombre de la sección vive en el ítem del menú y en el breadcrumb del armazón.
  */
 
 const COLUMNAS = ['CÓDIGO', 'CURSO', 'DOCENTE', 'HORARIO', 'PRÓXIMA CLASE', 'ACCESO']
+
+/** El tablero abre con el saludo de la cuenta de la sesión. */
+const SALUDO = `Buen día, ${accountForRole('DOCENTE').nombre}`
 
 beforeEach(async () => {
   resetDataSource()
   stubBackend()
   renderAppAs('DOCENTE', '/docente')
-  await screen.findByRole('heading', { name: 'Mis Comisiones' })
+  await screen.findByRole('heading', { name: SALUDO })
   await screen.findByText('CUR-101')
 })
 
@@ -91,7 +98,7 @@ describe('singular y plural de los contadores', () => {
     })
     renderAppAs('DOCENTE', '/docente')
 
-    await screen.findByRole('heading', { name: 'Mis Comisiones' })
+    await screen.findByRole('heading', { name: SALUDO })
   }
 
   it('usa el plural cuando la cantidad no es uno', async () => {

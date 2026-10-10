@@ -29,11 +29,11 @@ describe('contexto de sesión', () => {
     await waitFor(() => {
       expect(window.sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('token-ADMIN')
     })
-    // El nombre de la cuenta se muestra en el pie del shell de Secretaría, así que se afirma
-    // sobre el pie y no sobre el texto suelto: el mismo nombre aparece también en la barra
-    // superior.
-    const pie = await screen.findByRole('contentinfo')
-    expect(pie).toHaveTextContent('Secretaria BA')
+    // El nombre de la cuenta se muestra en el bloque de perfil de la barra superior del shell de
+    // Secretaría, que desde el change `ui-figma-dashboards` es el único lugar del armazón donde
+    // vive la identidad.
+    const perfil = await screen.findByRole('button', { name: /Secretaria BA/ })
+    expect(perfil).toHaveTextContent('Secretaria BA')
   })
 
   it('no guarda la sesión cuando las credenciales no sirven', async () => {
@@ -51,7 +51,9 @@ describe('contexto de sesión', () => {
 
     renderApp('/')
 
-    expect(await screen.findByText(/Rita Molina/)).toBeInTheDocument()
+    // El nombre aparece en el saludo del tablero y en el perfil de la barra superior: se busca el
+    // botón de perfil, que es el dato del armazón.
+    expect(await screen.findByRole('button', { name: /Rita Molina/ })).toBeInTheDocument()
     expect(currentPath()).toBe('/docente')
     // La sesión se restauró con `GET /auth/me`: no aparece el formulario de login.
     expect(screen.queryByLabelText('Correo electrónico')).not.toBeInTheDocument()
@@ -97,7 +99,7 @@ describe('contexto de sesión', () => {
 
     await fillLoginForm(accountForRole('ALUMNO'))
 
-    expect(await screen.findByText(/Agustina Benítez/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Agustina Benítez/ })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 

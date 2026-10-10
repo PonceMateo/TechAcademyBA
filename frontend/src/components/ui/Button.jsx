@@ -11,14 +11,17 @@ import { MARCA_UI } from './paleta'
  * que existen y todavía no (D20). Por eso el texto de esos casos es siempre `Próximamente`.
  */
 const VARIANTES = {
-  primario: 'bg-slate-900 text-white hover:bg-slate-800',
-  secundario: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-  peligro: 'bg-red-700 text-white hover:bg-red-800',
-  fantasma: 'text-slate-600 hover:bg-slate-100',
+  // El primario toma el acento del shell donde esté: lo pinta `.boton-primario` desde
+  // `index.css`, con el `data-acento` que publica el armazón. Fuera de un shell es el azul de
+  // la marca.
+  primario: 'boton-primario text-white foco-acento',
+  secundario: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 foco-acento',
+  peligro: 'bg-red-700 text-white hover:bg-red-800 foco-acento',
+  fantasma: 'text-slate-600 hover:bg-slate-100 foco-acento',
 }
 
 const TAMANOS = {
-  chico: 'px-2 py-1 text-xs',
+  chico: 'px-2.5 py-1 text-xs',
   medio: 'px-4 py-2 text-sm',
 }
 
@@ -36,7 +39,7 @@ export function Button({
       {...{ [MARCA_UI]: 'button' }}
       type={type}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-1 rounded-md font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTES[variante]} ${TAMANOS[tamano]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTES[variante]} ${TAMANOS[tamano]} ${className}`}
       {...resto}
     >
       {children}

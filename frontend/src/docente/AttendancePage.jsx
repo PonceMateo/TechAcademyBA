@@ -119,7 +119,7 @@ export function AttendancePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold text-slate-900">Asistencia</h2>
-          <Badge tono={TONO.VERDE_AZULADO}>
+          <Badge tono={TONO.ESMERALDA}>
             {`${asistencia.codigo} · ${asistencia.nombre_curso}`}
           </Badge>
         </div>

@@ -2,5 +2,119 @@
  * Tailwind CSS v4 se conecta por plugin de Vite, no por PostCSS: la configuración vive
  * acá y en el plugin `@tailwindcss/vite` de `vite.config.js`. No hay
  * `tailwind.config.js`, y es lo esperado en esta versión.
+ *
+ * Identidad visual (change `ui-figma-dashboards`, D40): una sola familia sans, un fondo de
+ * shell con el degradado del rol y tres acentos sobre la misma geometría —Alumno dorado,
+ * Docente verde, Secretaría azul—. Figma es autoridad de estilo
+ * (`docs/design/figma-dashboards-overhaul/`); lo que Figma no define, no se inventa.
  */
 @import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/*
+ * El acento del shell es un dato, no una variante de componente: `ShellFrame` publica
+ * `data-acento` y estos bloques traducen ese nombre al color. Fuera de un shell —acceso,
+ * landing, estados— el acento es el azul de la marca.
+ *
+ * Los tres acentos son los del diseño: dorado `#d0a52c`, verde `#26836b` y azul `#3975d5`,
+ * mapeados a la paleta stock de Tailwind más cercana (`yellow`, `emerald`, `blue`).
+ */
+:root,
+[data-acento='secretaria'] {
+  --acento: var(--color-blue-600);
+  --acento-fuerte: var(--color-blue-700);
+  --acento-fuerte-hover: var(--color-blue-800);
+  --acento-suave: var(--color-blue-50);
+  --acento-borde: var(--color-blue-200);
+  --acento-texto: var(--color-blue-700);
+  --anillo-acento: var(--color-blue-500);
+}
+
+[data-acento='docente'] {
+  --acento: var(--color-emerald-600);
+  --acento-fuerte: var(--color-emerald-700);
+  --acento-fuerte-hover: var(--color-emerald-800);
+  --acento-suave: var(--color-emerald-50);
+  --acento-borde: var(--color-emerald-200);
+  --acento-texto: var(--color-emerald-700);
+  --anillo-acento: var(--color-emerald-500);
+}
+
+[data-acento='alumno'] {
+  --acento: var(--color-yellow-600);
+  --acento-fuerte: var(--color-yellow-700);
+  --acento-fuerte-hover: var(--color-yellow-800);
+  --acento-suave: var(--color-yellow-50);
+  --acento-borde: var(--color-yellow-200);
+  --acento-texto: var(--color-yellow-700);
+  --anillo-acento: var(--color-yellow-600);
+}
+
+/*
+ * Fondo del shell: el degradado del rol con una retícula del mismo tono al 8 %. Es una sola
+ * declaración sobre el elemento que lleva `data-acento`, y no una clase que cada pantalla
+ * repita. La retícula se dibuja con gradientes repetidos para que no dependa de imágenes.
+ */
+[data-acento] {
+  background-color: var(--fondo-shell, var(--color-slate-50));
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      var(--reticula) 0 1px,
+      transparent 1px 88px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--reticula) 0 1px,
+      transparent 1px 88px
+    ),
+    var(--degradado);
+}
+
+[data-acento='secretaria'] {
+  --degradado: linear-gradient(155deg, #f0f7ff 0%, #d4e2f6 52%, #c7daf7 100%);
+  --reticula: rgb(57 117 213 / 0.08);
+  --fondo-shell: #eaf1fb;
+}
+
+[data-acento='docente'] {
+  --degradado: linear-gradient(155deg, #e9fff3 0%, #d1e7db 52%, #c7e5d4 100%);
+  --reticula: rgb(38 131 107 / 0.08);
+  --fondo-shell: #eaf4ee;
+}
+
+[data-acento='alumno'] {
+  --degradado: linear-gradient(155deg, #fffbed 0%, #efe2b3 52%, #f2e5ad 100%);
+  --reticula: rgb(208 165 44 / 0.12);
+  --fondo-shell: #f8f4e6;
+}
+
+/* Primario contextual: dentro de un shell es el acento del rol; fuera, el azul de la marca. */
+.boton-primario {
+  background-color: var(--acento-fuerte);
+}
+
+.boton-primario:hover {
+  background-color: var(--acento-fuerte-hover);
+}
+
+/* Anillo de foco visible en el acento, sin depender solo del color del borde. */
+.foco-acento:focus-visible {
+  outline: 2px solid var(--anillo-acento);
+  outline-offset: 2px;
+}
+
+/* Superficie clara del shell: el lateral y la barra superior son blancos translúcidos. */
+.superficie-cristal {
+  background-color: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(12px);
+}
+
+/* Avatar en el tono suave del acento; fuera de un shell, el azul de la marca. */
+[data-ui='avatar'] {
+  background-color: var(--acento-suave);
+  color: var(--acento-texto);
+}
