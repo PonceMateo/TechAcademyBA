@@ -92,6 +92,7 @@ Cada rol entra a su sección y solo a la suya.
 | Un servicio no levanta | `docker compose logs -f backend` (o `frontend`, o `db`) |
 | No se puede entrar | Falta la carga inicial: corré el tercer comando otra vez |
 | Cambiaste el código y no se ve | `docker compose restart backend frontend` |
+| Agregaste una dependencia y el frontend dice que no la encuentra | El volumen con nombre tapa `/app/node_modules`, así que la imagen la tiene y el contenedor no: `docker compose exec frontend npm ci` y `docker compose restart frontend` |
 
 Para volver a cero (base y volumen incluidos): `docker compose down -v`.
 
