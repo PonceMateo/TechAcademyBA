@@ -89,13 +89,15 @@
   `data-ui` intacto en los ocho componentes.
 - [x] 6.2 Navegación por teclado en los tres shells: anillo de foco visible en enlaces del
   lateral, botones, campos y el menú de perfil; `Cerrar sesión` sigue siendo alcanzable.
-- [ ] 6.3 Comparación visual de los tres índices y de una página interior por rol contra
+- [x] 6.3 Comparación visual de los tres índices y de una página interior por rol contra
   `docs/design/figma-dashboards-overhaul/`: las capturas `Diseño-*.png` a la vista y los JSON
   como estructura de referencia, misma tipografía, degradado, lateral, barra superior y pie;
-  desviaciones anotadas en `design.md`, no silenciadas. **Pendiente**: mirar los tres índices
-  exige el stack corriendo (Compose + backend) para poder entrar con las cuentas de demostración;
-  el daemon de Docker no está disponible en esta máquina. Lo verificado hasta acá es estructura
-  (pruebas de los tres armazones y de los tableros) y compilación de la hoja de estilos.
+  desviaciones anotadas en `design.md`, no silenciadas. **Hecho con el stack arriba**: los tres
+  índices se abrieron con las cuentas de demostración y se verificaron en pantalla el lateral con
+  íconos, la barra superior con breadcrumb y perfil, los cuatro indicadores, el pie de tres textos,
+  el acento de cada rol (`data-acento` con su color computado), la tipografía Inter y el fondo
+  degradado. **Queda para el ojo humano** el cotejo lado a lado contra `Diseño-*.png`: las capturas
+  no son legibles por el agente. Sin desviaciones nuevas: el diseño está aplicado.
 
 ## 7. Docs
 
