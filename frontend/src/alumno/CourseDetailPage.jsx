@@ -126,7 +126,7 @@ export function CourseDetailPage() {
             ) : (
               <a
                 href={link}
-                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white"
+                className="boton-primario foco-acento inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-white transition"
               >
                 Ingresar a la clase por Zoom
               </a>

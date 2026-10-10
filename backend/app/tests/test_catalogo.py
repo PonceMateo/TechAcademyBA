@@ -19,37 +19,32 @@ from app.tests.factories import crear_comision, crear_curso, crear_docente, crea
 
 
 def test_alta_de_curso_sin_duplicados(db_session: Session) -> None:
-    curso = crear_curso(db_session, codigo="CUR-101", nombre="Python Inicial")
+    """Historia #1: el curso se crea con el nombre que escribió el operador.
+
+    El código **no** se informa: lo genera la base a partir del identificador (D32). Está
+    verificado en `test_codigo_curso.py`, que es donde vive la frontera del `lpad`.
+    """
+    curso = crear_curso(db_session, nombre="Python Inicial")
+
     assert curso.id is not None
-    assert curso.codigo == "CUR-101", "el valor tal como lo escribió el operador se conserva"
-
-
-def test_codigo_duplicado_por_normalizacion(db_session: Session) -> None:
-    """Historia #1: `CUR-101` y `CUR101` son el mismo curso. Un índice único sobre la
-    columna cruda no lo detectaría; por eso existe `codigo_norm` (D6)."""
-    crear_curso(db_session, codigo="CUR-101", nombre="Python Inicial")
-
-    motivo = assert_rechazado(crear_curso, db_session, codigo="cur101", nombre="otro nombre")
-
-    assert "uq_curso_codigo_norm" in motivo
+    assert curso.nombre == "Python Inicial", "el valor tal como lo escribió el operador se conserva"
 
 
 def test_nombre_duplicado_por_normalizacion(db_session: Session) -> None:
-    """Historia #1: el nombre también es único, tolerando acentos y espacios."""
-    crear_curso(db_session, codigo="CUR-101", nombre="Categoría Ónica")
-    motivo = assert_rechazado(crear_curso, db_session, codigo="OTRO-1", nombre="categoria onica")
+    """Historia #1: el nombre es único, tolerando acentos y espacios.
+
+    Este sigue siendo el rechazo que mata el duplicado de nombres de la planilla del
+    cliente: `"Curso Python"` y `"curso  de  python"` tienen que ser el mismo curso. Lo que
+    dejó de existir es el equivalente del código, porque el código ya no se carga (D32).
+    """
+    crear_curso(db_session, nombre="Categoría Ónica")
+    motivo = assert_rechazado(crear_curso, db_session, nombre="categoria onica")
     assert "uq_curso_nombre_norm" in motivo
-
-
-def test_curso_sin_codigo_es_rechazado(db_session: Session) -> None:
-    """Historia #1: el código es obligatorio."""
-    motivo = assert_rechazado(crear_curso, db_session, codigo="", nombre="Sin código")
-    assert "codigo" in motivo
 
 
 def test_curso_sin_nombre_es_rechazado(db_session: Session) -> None:
     """Historia #1: el nombre es obligatorio."""
-    motivo = assert_rechazado(crear_curso, db_session, codigo="SIN-NOMBRE", nombre="")
+    motivo = assert_rechazado(crear_curso, db_session, nombre="")
     assert "nombre" in motivo
 
 
@@ -68,19 +63,62 @@ def test_editar_curso_conserva_el_historial_de_sus_comisiones(db_session: Sessio
     assert comision_reevaluada.curso_id == curso.id
 
 
-def test_codigo_de_comision_unico(db_session: Session) -> None:
+def test_numero_de_comision_unico_por_curso(db_session: Session) -> None:
+    """D34: lo único real es `(curso_id, numero)`. Dos comisiones del mismo curso no pueden
+    tener el mismo número, porque el código derivado se armaría dos veces igual."""
     sede = crear_sede(db_session)
-    crear_comision(
-        db_session, codigo="COM-105", sede=sede, curso=crear_curso(db_session, codigo="CUR-200")
-    )
+    curso = crear_curso(db_session)
+    crear_comision(db_session, numero=1, sede=sede, curso=curso)
+
     motivo = assert_rechazado(
-        crear_comision,
-        db_session,
-        codigo="COM-105",
-        sede=sede,
-        curso=crear_curso(db_session, codigo="CUR-300", nombre="Otro curso"),
+        crear_comision, db_session, numero=1, sede=sede, curso=curso
     )
-    assert "uq_comision_codigo" in motivo
+
+    assert "uq_comision_curso_numero" in motivo
+
+
+def test_numero_de_comision_se_reinicia_por_curso(db_session: Session) -> None:
+    """D34: el número es incremental **por curso**. Dos cursos distintos pueden tener ambos
+    el número 1 sin colisionar, porque el código derivado ya incluye el código del curso."""
+    sede = crear_sede(db_session)
+    primero = crear_comision(
+        db_session, numero=1, sede=sede, curso=crear_curso(db_session, nombre="Python Inicial")
+    )
+    segundo = crear_comision(
+        db_session, numero=1, sede=sede, curso=crear_curso(db_session, nombre="Excel Intermedio")
+    )
+
+    assert primero.codigo.endswith("-1")
+    assert segundo.codigo.endswith("-1")
+    assert primero.codigo != segundo.codigo, (
+        "el código derivado lleva el código del curso, así que las dos comisiones se distinguen"
+    )
+
+
+@pytest.mark.parametrize("numero", [0, -1])
+def test_numero_de_comision_no_puede_ser_cero_ni_negativo(
+    db_session: Session, numero: int
+) -> None:
+    """Va parametrizado y no en un `for`: `assert_rechazado` deja la transacción
+    abortada después del primer rechazo, y el segundo intento del loop chocaría con un
+    `PendingRollbackError` en vez de con la restricción que se quiere probar."""
+    motivo = assert_rechazado(
+        crear_comision, db_session, numero=numero, curso=crear_curso(db_session)
+    )
+    assert "numero_positivo" in motivo
+
+
+def test_el_codigo_de_la_comision_se_deriva_del_curso(db_session: Session) -> None:
+    """D34: `codigo` no es una columna, es `{curso.codigo}-{numero}`."""
+    curso = crear_curso(db_session)
+    db_session.refresh(curso)
+    comision = crear_comision(db_session, numero=7, curso=curso)
+
+    assert not hasattr(Comision.__table__.columns, "codigo"), (
+        "el código de la comisión es un valor derivado, no una columna: si vuelve a existir, "
+        "puede quedar viejo si el curso cambia de código"
+    )
+    assert comision.codigo == f"{curso.codigo}-7"
 
 
 def test_sede_unica_por_nombre(db_session: Session) -> None:
@@ -104,14 +142,26 @@ def test_arancel_menor_o_igual_a_cero_es_rechazado(db_session: Session, arancel:
 
 
 @pytest.mark.parametrize("modalidad", [Modalidad.PRESENCIAL.value, Modalidad.HIBRIDO.value])
-def test_modalidad_presencial_u_hibrida_sin_sede_es_rechazada(
+def test_modalidad_presencial_u_hibrida_sin_sede_se_registra(
     db_session: Session, modalidad: str
 ) -> None:
-    """Historia #8: Presencial e Híbrido exigen sede."""
+    """Historia #8: la sede es opcional en toda modalidad, así que la comisión se persiste.
+
+    El nombre conserva el de la regla anterior: ya no hay modalidad que exija sede.
+    """
+    comision = crear_comision(db_session, modalidad=modalidad, con_sede=False)
+    assert comision.sede_id is None
+
+
+def test_modalidad_virtual_con_sede_es_rechazada(db_session: Session) -> None:
+    """Historia #8: la sede es opcional, pero en Virtual la base la prohíbe.
+
+    Es el test que cubre la regla en la capa que la escribe, sin pasar por la ruta.
+    """
     motivo = assert_rechazado(
-        crear_comision, db_session, modalidad=modalidad, con_sede=False
+        crear_comision, db_session, modalidad=Modalidad.VIRTUAL.value, con_sede=True
     )
-    assert "ck_comision_modalidad_presencial_requiere_sede" in motivo
+    assert "ck_comision_modalidad_virtual_sin_sede" in motivo
 
 
 def test_modalidad_virtual_no_exige_sede(db_session: Session) -> None:

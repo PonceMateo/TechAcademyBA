@@ -25,7 +25,7 @@ export function ForbiddenPage() {
       <p className="max-w-md text-sm text-slate-600">
         Tu rol no tiene acceso a esta sección. Si creés que debería, hablá con la secretaría.
       </p>
-      <Link to={destination} className="text-sm font-medium text-slate-900 underline">
+      <Link to={destination} className="foco-acento rounded text-sm font-medium text-slate-900 underline">
         {status === SESSION_STATUS.AUTHENTICATED ? 'Ir a mi inicio' : 'Iniciar sesión'}
       </Link>
     </main>

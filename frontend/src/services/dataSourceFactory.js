@@ -6,13 +6,18 @@ import { createMockDataSource } from './mockDataSource'
  *
  * **Este archivo es el punto de cambio de la aplicación.** Las pantallas piden datos al servicio y
  * no saben de dónde salen; acá se decide si salen de `src/mocks/` o del backend, según
- * `VITE_API_MODE`. Cuando aparezca la API real, se cambia la fábrica —o la variable de entorno— y
- * no se toca ni un componente. Ese es el punto entero de que los datos vivan detrás de una
- * frontera asíncrona.
+ * `VITE_API_MODE`. El modo se cambia acá —o con la variable de entorno— y no se toca ni un
+ * componente. Ese es el punto entero de que los datos vivan detrás de una frontera asíncrona.
  *
- * **El valor por defecto es `mock`.** D14 deja una sola llamada de red, el login, así que con la
- * variable en `api` las pantallas no tienen nada contra qué pega. `docker-compose.yml` publica
- * `VITE_API_MODE=mock` y `.env.example` la documenta.
+ * **El valor por defecto es `api`.** D14 dejó el maquetado como valor por defecto porque el
+ * frontend hacía una sola llamada de red, el login. El change `altas-catalogo-docentes` escribió
+ * los primeros endpoints reales y subió el modo real a omisión, así que la aplicación ahora
+ * guarda de verdad.
+ *
+ * **Lo que todavía no tiene endpoint cae al ejemplo, no al revés.** Lo resuelve
+ * `apiDataSource.js`, y solo para las lecturas y solo con un 404: los shells de alumno y docente
+ * y las pantallas de alumnos, cobranzas y habilitación siguen mostrando el ejemplo hasta que
+ * existan sus endpoints.
  */
 export const API_MODE = Object.freeze({
   MOCK: 'mock',
@@ -25,11 +30,15 @@ const IMPLEMENTACIONES = Object.freeze({
 })
 
 /**
- * Resuelve el modo desde el entorno. Cualquier valor que no sea `api` es `mock`: es la respuesta
- * segura, porque un valor mal escrito tiene que dejar funcionando el maquetado, no romperlo.
+ * Resuelve el modo desde el entorno. **`api` es el valor por omisión y `mock` hay que pedirlo.**
+ *
+ * La asimetría es deliberada: el default real hace que las altas se guarden, que es lo que la
+ * secretaría necesita para trabajar (D36). Un valor mal escrito cae en `api` y no en `mock`
+ * porque el error de un default que no guarda es invisible hasta que alguien pierde un día de
+ * carga, mientras que el de una pantalla vacía se ve enseguida.
  */
 export function resolveApiMode(env = import.meta.env) {
-  return env?.VITE_API_MODE === API_MODE.API ? API_MODE.API : API_MODE.MOCK
+  return env?.VITE_API_MODE === API_MODE.MOCK ? API_MODE.MOCK : API_MODE.API
 }
 
 export function createDataSource({

@@ -21,7 +21,7 @@ export function NotFoundPage() {
       <p className="max-w-md text-sm text-slate-600">
         La dirección no existe o todavía no tiene una pantalla.
       </p>
-      <Link to={destination} className="text-sm font-medium text-slate-900 underline">
+      <Link to={destination} className="foco-acento rounded text-sm font-medium text-slate-900 underline">
         {status === SESSION_STATUS.AUTHENTICATED ? 'Ir a mi inicio' : 'Iniciar sesión'}
       </Link>
     </main>

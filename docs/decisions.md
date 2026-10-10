@@ -296,6 +296,242 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Altas de catálogo y docentes (change `altas-catalogo-docentes`)
+
+D32 a D36 son decisiones del change `altas-catalogo-docentes`, que rompe tres contratos
+de `domain-schema`: el código del curso pasa a generarlo la base, el de la comisión pasa a
+ser derivado y el CUIL del docente deja de ser obligatorio.
+
+**Los identificadores D22 a D31 están citados en el código y en el `design.md` del bootstrap,
+pero nunca llegaron a tener entrada acá.** El hueco queda a propósito: los números están
+reservados para que las decisiones que los citan no cambien de dirección. Cuando esas
+entradas se escriban, van en su lugar y no se renumeran las de acá.
+
+### D32 — El código del curso lo genera el sistema, y los del Excel se descartan
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `curso.codigo` pasa a ser una **columna generada y almacenada por la base**,
+  `GENERATED ALWAYS AS ('CUR' || lpad(id::text, greatest(3, length(id::text)), '0')) STORED`,
+  y el número sale del **identificador de la fila**, que ya es autoincremental y nunca se
+  reutiliza. El operador **no lo carga**: el alta de un curso admite solo el nombre y una
+  descripción opcional, y un `INSERT` que informe `codigo` es rechazado por PostgreSQL. Se
+  elimina `curso.codigo_norm` y el índice único pasa a `uq_curso_codigo`.
+- **Por qué:** había dos verdadades —el `DEFAULT` de la migración y la lógica del servicio—
+  que se desincronizaban sin que nada avisara. Con la columna generada, el valor es el de la
+  fila por definición.
+- **Los códigos que trae el Excel del cliente (`CUR101`, `CUR-101`, `103`, etc.) se
+  descartan a propósito** y no se intenta preservarlos. Las variantes sucias del nombre
+  (`"Curso Python"`, `"curso  de  python"`, `"Py 101"`) se resuelven con `nombre_norm`
+  durante la migración del Excel, que todavía no está escrita. **El Excel es el problema, no
+  la solución:** un código que el sistema genera no se preserva para acomodarse a una planilla
+  que el proyecto quiere reemplazar.
+- **Consecuencia anotada:** cuando se importe el Excel, **los códigos de las comisiones
+  también se regeneran**, porque sus `curso_id` se resuelven por `nombre_norm` y su número
+  sale del orden de aparición en la planilla. Si la planilla cruza comisiones con cursos por
+  código, ese casamiento lo resuelve el importador, no el esquema.
+- **`greatest` no es cosmético:** `lpad(texto, largo, relleno)` **trunca** cuando el texto ya
+  es más largo que el largo pedido, así que `lpad('1000', 3, '0')` devuelve `'100'`. Sin
+  `greatest`, el curso 1000 recibiría `CUR100`, que ya es del curso 100, y su alta fallaría
+  por una colisión de código con un error que no señala la causa.
+- **El CHECK `curso_codigo_obligatorio` se conserva** aunque la expresión no pueda producir
+  una cadena vacía: forma parte del conjunto de obligatorios de M4 y `test_migration.py` lo
+  verifica uno por uno. Sobrar no cuesta nada; faltaría, alguien lo sacaría de la lista sin
+  darse cuenta de que estaba dejando la regla coja.
+- **Dónde:** `app/models/catalogo.py` (`Curso.codigo`, `EXPRESION_CODIGO_CURSO`),
+  `alembic/versions/0002_altas_catalogo.py`, `app/tests/test_codigo_curso.py`.
+
+### D33 — El CUIL del docente pasa a ser opcional, y eso revierte D27
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `docente.cuil` deja de ser `NOT NULL` y se elimina el CHECK
+  `docente_cuil_obligatorio`. **Alcance del revert, explícito: se revierte la
+  obligatoriedad; no se borra la columna ni el índice**, y la fila de Rita Molina conserva su
+  CUIL en `CUENTAS_DEMO`.
+- **Por qué:** en esta fase los docentes **no son personas reales**, así que un CUIL
+  inventado es peor que ningún CUIL. Un `27-34567890-7` fabricado no identifica a nadie para
+  liquidar y después hay que ir a corregirlo. La columna queda porque el instituto liquida
+  con el CUIL y va a hacer falta apenas haya docentes reales.
+- **Alcance del revert respecto de D27:** D27 decía que el CUIL era obligatorio porque es el
+  identificador con el que el instituto liquida. Ese razonamiento sigue siendo cierto y la
+  columna no se borra; lo que cambia es que **esta fase no tiene docentes reales**, y el
+  requisito lo satisfacen el DNI y el correo, que sí obligatorios.
+- **`uq_docente_cuil` sobrevive a los nulos:** PostgreSQL admite varios nulos en un índice
+  único, así que el índice no estorba mientras los docentes no tengan CUIL y sigue sosteniendo
+  la unicidad en cuanto empiecen a tenerlo.
+- **Consecuencia en el seed:** `_upsert_docente` buscaba al docente por `cuil`, que era único
+  y obligatorio. Una columna que admite nulos no puede ser la clave natural del upsert, así que
+  pasa a buscar por `dni_norm`, que sigue siendo única, obligatoria y la tiene la fila de
+  ejemplo.
+- **Origen del requisito:** el CUIL lo pidió **el equipo** al derivar el modelo, no el cliente:
+  el CSV de historias nunca lo menciona. Por eso esto es una corrección de una decisión propia
+  y no una negociación de alcance.
+- **Dónde:** `app/models/padron.py` (`Docente.cuil`), `app/services/seed.py`
+  (`_upsert_docente`), `alembic/versions/0002_altas_catalogo.py`.
+
+### D34 — El código de la comisión es derivado, y lo único real es `(curso_id, numero)`
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** se elimina la columna `comision.codigo` con su índice único y su CHECK de
+  obligatorio. Entra `numero: Integer NOT NULL` con `ck_comision_numero_positivo` y
+  `uq_comision_curso_numero`, incremental **por curso**: el máximo de los números de ese curso
+  más uno. El código pasa a ser un **valor derivado**, `{curso.codigo}-{numero}`
+  (`CUR001-1`), armado en una propiedad del ORM y en el serializador de la API.
+- **Por qué:** no es una columna porque no hay nada que el operador escriba ni nada que pueda
+  quedar viejo —si el curso cambiara de código, el derivado cambiaría solo—. Y la numeración
+  es una derivación por consulta, que es el criterio de D10: un contador persistido se
+  desincroniza apenas alguien borre o migre una fila.
+- **La carrera entre dos altas simultáneas la corta el índice único**, y la API la traduce a
+  un 409. **Techo asumido:** a la escala declarada del proyecto (10 comisiones, D10) **no hace
+  falta una secuencia por curso ni un lock**. Si el volumen de altas simultáneas llegara a
+  importar, el arreglo es un `SELECT ... MAX(numero) ... FOR UPDATE` sobre el curso, y no toca
+  el contrato. Atajo deliberado, no arquitectura.
+- **Por qué `(curso_id, numero)` y no un único global:** el código derivado ya incluye el
+  curso, así que dos cursos distintos pueden tener ambos el número 1 sin colisionar.
+- **Por qué `numero` como columna y no una secuencia por curso:** una secuencia por curso es un
+  objeto del esquema que hay que mantener alineado y que además no sobrevive bien a un
+  borrado. El máximo por consulta es una consulta.
+- **Dónde:** `app/models/catalogo.py` (`Comision.numero`, `Comision.codigo`),
+  `alembic/versions/0002_altas_catalogo.py`.
+
+### M33 — Las formas reales del primer contrato de API, y el fin de la provisoidad de M17
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el change `altas-catalogo-docentes` escribió los primeros endpoints reales y
+  **confirma** los cuatro caminos de M17 sin cambios: `GET`/`POST /cursos`, `GET`/`POST
+  /comisiones`, `GET`/`POST /docentes` y `GET /sedes`. Las formas de entrada y de salida
+  quedan fijadas acá.
+- **Por qué:** M17 dejó los caminos como provisionales y puso la condición de que el primer
+  endpoint real los confirmara o los corrigiera. Confirmó: los nombres por recurso y por verbo
+  que ya estaban escritos en `PATHS` son los correctos, así que el mapa no se tocó.
+- **Formas de entrada.** El alta de curso admite **solo** `nombre` y `descripcion` opcional; el
+  alta de docente admite `nombre`, `apellido`, `dni`, `email` y `telefono` opcional; el alta de
+  comisión admite `curso_id`, `docente_id`, `dias_horarios`, `arancel`, `cupo_maximo`,
+  `modalidad` y `sede_id` opcional. Los tres esquemas son `extra="forbid"`, así que un campo
+  que no está en la lista —un `codigo` en el curso, un `cuil` en el docente— es un **422** y no
+  un campo que se ignora en silencio.
+- **Formas de salida.** El curso sale con `id`, `codigo`, `nombre`, `descripcion`. La comisión
+  sale con `id`, `codigo` (el **derivado**, D34), `curso` anidado, `docente_id`,
+  `docente_nombre`, `dias_horarios`, `cupo_maximo`, `arancel`, `modalidad`, `sede_id`,
+  `sede_nombre` y `vacantes`. El docente sale con `id`, `nombre`, `apellido`, `dni`, `cuil`
+  (puede venir `None`, D33), `email`, `telefono`, `activo` y `cantidad_comisiones`.
+- **Códigos de error.** 401 sin token o con token inválido; 403 con un rol que no sea `ADMIN`;
+  404 si el curso, el docente o la sede de un alta de comisión no existen; **409** si el nombre
+  del curso, el DNI o el email ya están registrados, y también 409 en la carrera entre dos
+  altas simultáneas, con un mensaje que en un caso pide corregir el formulario y en el otro
+  reintentar; 422 si falta un campo obligatorio, si el cupo o el arancel no son positivos, si
+  la comisión es virtual y trae sede, o si el email no tiene forma. El `sede_id` del alta de
+  comisión es opcional en toda modalidad (M35).
+- **`vacantes` en la respuesta de la comisión, y por qué no cierra la historia #6.** La tabla de
+  Administración ya tenía esa columna, y dejarla en blanco sería una regresión visible, así que
+  la respuesta la trae **derivada** por consulta, que es lo que D10 ya decidió. La #6 sigue
+  abierta porque además necesita el caso de extremo a punta con una inscripción real.
+- **Pendiente que queda:** los caminos de alumnos, empresas, cobranzas, habilitaciones, clases y
+  los shells de docente y de alumno siguen sin endpoint y siguen siendo provisionales.
+- **Dónde:** `backend/app/api/catalogo.py`, `backend/app/api/padron.py`,
+  `backend/app/schemas/catalogo.py`, `backend/app/schemas/padron.py`,
+  `backend/app/services/catalogo.py`, `backend/app/services/padron.py`.
+
+### M34 — `get_db` no confirma, así que el primer servicio que escribe confirma
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `get_db` cierra la sesión sin confirmar, y lo hizo así porque hasta ahora la
+  única ruta que escribía era el seed, que confirma por su cuenta. Los servicios de alta
+  confirman: `flush()` para obtener el identificador y el valor generado, `commit()`, y después
+  `refresh()`.
+- **Por qué:** poner el `commit` en la ruta se lee como un detalle de transporte en una capa que
+  no debería saber de transacciones (D1), y ponerlo en una dependencia obligaría a todos los
+  endpoints a escribir, aunque leer no necesita confirmar nada. En el servicio, un
+  `crear_curso` que se use desde un script o desde una tarea programada confirma igual.
+- **El `refresh` posterior al `commit` no es opcional:** un `INSERT` no devuelve el valor de una
+  columna generada, así que sin él la respuesta de `POST /cursos` devolvería `codigo = None`.
+- **Dónde:** `backend/app/core/database.py`, `backend/app/services/catalogo.py`,
+  `backend/app/services/padron.py`.
+
+### M35 — La sede es opcional en toda modalidad, y el CHECK invierte su dirección
+
+- **Fecha:** 2026-10-07
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `comision.sede_id` es **opcional en toda modalidad**. El CHECK
+  `modalidad_presencial_requiere_sede` (`modalidad = 'VIRTUAL' OR sede_id IS NOT NULL`) se
+  reemplaza por `modalidad_virtual_sin_sede` (`modalidad <> 'VIRTUAL' OR sede_id IS NULL`): deja de
+  exigir sede y pasa a **prohibirla** en Virtual.
+- **Por qué invierte y no desaparece.** "Dejar de exigir" y "no exigir nunca" no son lo mismo. De
+  las cuatro combinaciones de modalidad por `sede_id`, el viejo rechazaba `(PRESENCIAL, NULL)` y el
+  nuevo rechaza `(VIRTUAL, con sede)`: no son la negación el uno del otro, y por eso la migración no
+  puede ser un `drop` y nada más. Se prohíbe en lugar de permitirla porque una comisión virtual con
+  `sede_id` es el dato incoherente que el formulario no renderiza.
+- **La regla vive en un solo lugar.** No hay `model_validator` en `ComisionCreate` ni validación en
+  el frontend: son CHECK de la base, y una regla que se sostiene en dos lugares es una regla que se
+  desincroniza (el docstring de `crear_comision` ya lo decía). El 422 de virtual con sede sale del
+  `IntegrityError` que traduce `_regla_de_alta_rota`, igual que el del cupo y el del arancel, y su
+  texto sigue siendo el crudo de PostgreSQL.
+- **La migración `0003_sede_opcional_comision` pone en `NULL` la sede de las virtuales.** El CHECK
+  anterior **permitía** virtual con sede, así que sobre cualquier base poblada el
+  `create_check_constraint` a secas falla. Lo que se pierde con ese `UPDATE` es exactamente el dato
+  que el CHECK nuevo prohíbe: no se destruye nada con significado. Es una migración que **reescribe
+  filas**, así que se aplica antes de desplegar el backend nuevo.
+- **El `downgrade` no repara los datos, falla.** Restaura el CHECK viejo y deja que la base lo
+  rechace si quedan comisiones presenciales sin sede, con el mismo criterio que el `downgrade` del
+  CUIL en `0002_altas_catalogo`: rellenar sedes inventadas mentiría sobre el estado del esquema.
+- **Dónde:** `backend/app/models/catalogo.py`, `backend/alembic/versions/0003_sede_opcional_comision.py`,
+  `backend/app/api/catalogo.py`, `backend/app/services/catalogo.py`, `backend/app/schemas/catalogo.py`,
+  `frontend/src/admin/CoursesPage.jsx`.
+
+### D35 — Todos los montos quedan en pesos argentinos
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el arancel de la comisión y todos los montos de cobranza están en **pesos
+  argentinos**. No hay columna de moneda, no hay tipo que la admita y no hay conversión en el
+  código: un monto es un `Numeric(14, 2)` y se muestra con el formato de es-AR.
+- **Por qué:** cierra **P4**. El pendiente se abrió porque el Excel del cliente tenía al menos un
+  cobro en dólares y el modelo asumía pesos, así que había que saber cuál de las dos cosas
+  cambia. Cambia la suposición: los dólares del Excel son un dato de la planilla, no una
+ exigencia del sistema.
+- **No hay cambio de código por moneda.** `Comision.arancel` y `Cobranza.importe` ya usan
+  `Numeric(14, 2)` —el alias `MONEY` de `models/catalogo.py`—, y el saldo no imputado ni siquiera
+  es una columna porque se deriva (D10). La spec `domain-schema` ya decía que los montos son
+  pesos. D35 escribe la decisión que el modelo y la spec ya asumían; no los cambia.
+- **Consecuencia:** si algún día entra una cobranza en otra moneda, es **otro change**: o una
+  columna de moneda con su tipo de cambio y su fecha, o una conversión explícita antes de
+  escribir. Agregar la columna más adelante es barato; que dos montos de distinta moneda terminen
+  restados en el mismo saldo sin que nadie lo note, no.
+- **Dónde:** `docs/decisions.md` (P4), `backend/app/models/catalogo.py`,
+  `backend/app/models/cobranza.py`.
+
+### D36 — El modo por defecto de los datos pasa a ser la API, y lo que falta cae al ejemplo
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `resolveApiMode()` devuelve `api` salvo que la variable de entorno diga `mock`
+  explícitamente. Esto **modifica D14**, que dejaba la pantalla sin datos reales detrás.
+- **Por qué:** con el modo de ejemplo por omisión, el botón de "guardar curso" no guardaba nada y
+  la secretaría se enteraba de eso el día que le sobraba una tarea. El problema no es que el
+  ejemplo exista: es que fuera el camino por defecto de lo que sí se guarda.
+- **Cómo se reparte lo que todavía no existe.** Las **lecturas** caen al ejemplo **solo con un
+  404**. Un 404 es la ausencia de endpoint, que es el único caso en que el ejemplo es una
+  respuesta honesta: no hay dato que mostrar. Un 500 o un error de red **no** caen, porque un
+  ejemplo mostrado como si fuera un dato hace creer que la pantalla funciona.
+- **Los POST nunca caen.** Es lo más importante de la decisión. Un alta que no llega a la base
+  tiene que fallar y decir que no se guardó; si cayera, escribiría en un arreglo de memoria, la
+  pantalla confirmaría un curso que no existe y el equipo se iría creyendo que el sistema guarda.
+  La lista de métodos que escriben es explícita, y no un patrón de nombre, porque equivocarse
+  ahí no da un test rojo: da una demo que miente.
+- **Techo, y es el punto flojo de esta decisión.** La caída al ejemplo se borra cuando el shell
+  tenga todos sus endpoints. Es un atajo deliberado para no dejar media pantalla vacía mientras
+  faltan los endpoints de alumnos, empresas, cobranzas, habilitaciones y clases; no es una
+  arquitectura. Un día que haya que depurar por qué una pantalla muestra datos de ejemplo, la
+  primera pregunta es si ya llegó la hora de borrar `conEjemploEnAusencia`.
+- **Dónde:** `frontend/src/services/dataSourceFactory.js`,
+  `frontend/src/services/apiDataSource.js`, `docker-compose.yml`, `frontend/src/test/setup.js`.
+
+---
+
 ## Correcciones al modelo de dominio
 
 ### M1 — La unicidad global de email se sostiene en base y en servicio, no solo en base
@@ -363,7 +599,8 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
   `NOT NULL`, un CHECK `columna ~ '[^[:space:]]'`: `curso.codigo`, `curso.nombre`,
   `sede.nombre`, `comision.codigo`, `comision.dias_horarios`, `docente.cuil`,
   `docente.email`, `docente.nombre`, `docente.apellido`, `alumno.nombre`,
-  `alumno.email`, `usuario.email`, `usuario.nombre`.
+  `alumno.email`, `usuario.email`, `usuario.nombre`. De esa lista, `docente.cuil` ya no está:
+  D33 lo volvió opcional y le sacó el CHECK.
 - **Por qué:** `NOT NULL` solo rechaza la ausencia de valor. Una cadena vacía o de
   espacios es un campo obligatorio no informado, y la historia #1 pide que el sistema
   lo indique. La expresión es una clase de carácter y no `length(btrim(...))` porque
@@ -876,6 +1113,81 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
   nombre accesible del campo y un lector de pantalla la anuncia con el rótulo.
 - **Dónde:** `frontend/src/components/ui/Input.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`.
 
+### M32 — `alembic check` no verifica las columnas generadas, y hay que decirlo
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `curso.codigo` es la primera columna generada del esquema y, por lo tanto, la
+  primera que el control automático no cubre.
+  `test_la_migracion_escrita_a_mano_cuadra_con_los_modelos` corre `alembic check`, y esa
+  comparación **ignora las columnas generadas**: si el `Computed(...)` del modelo y el
+  `GENERATED ALWAYS AS ... STORED` de la migración se desincronizan —mismo nombre de columna,
+  distinta expresión—, `alembic check` sigue_reportando cero diferencias.
+- **Por qué:** D16 sigue siendo el control de que la migración escrita a mano cuadra con los
+  modelos, y es donde cualquiera iría a verificar un cambio de esquema. Para esta columna ese
+  control no alcanza, así que queda escrito para que nadie confíe en él.
+- **Mitigación:** la red real es `app/tests/test_codigo_curso.py`, que siembra la secuencia con
+  `setval` e inserta los identificadores 999, 1000 y 1001 —justo del lado de la frontera donde
+  `lpad` trunca—, más un control negativo que levanta la expresión **sin** `greatest` para
+  demostrar que el test no pasa por el motivo equivocado. Ese test restaura la secuencia con
+  `last_value` **e** `is_called` en un `finally`, porque en PostgreSQL las secuencias no son
+  transaccionales y un `setval` sobrevive al `rollback()` del fixture.
+- **Advertencia que lo confirma:** el propio `alembic check` avisa
+  `UserWarning: Computed default on curso.codigo cannot be modified`.
+- **Dónde:** `app/models/catalogo.py`, `alembic/versions/0002_altas_catalogo.py`,
+  `app/tests/test_codigo_curso.py`, `app/tests/conftest.py`.
+
+---
+
+## Catálogo de cursos por curso (change `pulsar-catalogo-cursos`)
+
+### D37 — Una sola pantalla con dos vistas, y la ruta lleva el código del curso
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `CoursesPage` lee `cursos` de la ruta y dibuja el grid del catálogo
+  (`/admin/cursos`) o la tabla de comisiones de ese curso (`/admin/cursos/:codigo`). El
+  código se compara con `normalizeCode` de `src/domain/normalize`, el criterio de D6. No
+  se crea una segunda pantalla ni un componente presentacional en `frontend/src/admin/`.
+- **Por qué:** las dos vistas comparten los mismos cinco listados y el mismo modal de alta,
+  así que partir el archivo repartiría el estado y duplicaría el modal. Y
+  `shellConsistency.test.jsx` exige que todo `.jsx` de `admin/` lea sus datos por
+  `dataService` y dibuje con `components/ui`: un modal presentacional en ese directorio
+  rompería la prueba sin motivo. El código y no el identificador es lo que la secretaría
+  lee en pantalla, y ya es el parámetro de las rutas de docente y de alumno.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`, `frontend/src/App.jsx`.
+
+### D38 — El conteo de comisiones por curso se deriva en el cliente
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la tarjeta del curso cuenta las comisiones agrupando por
+  `normalizeCode(comision.curso.codigo)` sobre el estado que la pantalla ya descarga.
+  `GET /cursos` no gana ningún campo y el conteo no sale del backend.
+- **Por qué:** es el mismo criterio de `obtenerResumenCatalogo`, que también deriva en el
+  cliente (D15). Agregar `comisiones_asignadas` a la respuesta obligaría a tocar backend,
+  contrato y prueba para calcular una resta que el frontend ya puede hacer con las dos
+  listas que descarga. La tarjeta y la tabla salen del mismo grupo, así que no pueden
+  contradecirse.
+- **Techo, y es el punto flojo:** el conteo es O(n) sobre las comisiones y el filtro de la
+  tabla es O(n) por cada curso abierto. Con el tamaño del catálogo de la secretaría es
+  irrelevante; con cientos de cursos, la respuesta de `GET /cursos` es el lugar correcto y
+  el cambio queda dentro de la fuente de datos.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`.
+
+### D39 — El buscador de las dos vistas se ve deshabilitado y no filtra
+
+- **Fecha:** 2026-10-06
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** las dos vistas muestran su campo de búsqueda con `disabled`, `readOnly` y
+  la leyenda `la búsqueda todavía no está disponible`. No hay estado, no hay servicio y no
+  hay contrato de búsqueda.
+- **Por qué:** D20 pide mostrar el hueco en vez de esconderlo. Un campo que se ve igual que
+  los demás y no acepta el foco obliga a probarlo para enterarse, y un campo habilitado que
+  no filtra hace creer a la secretaría que filtró. La búsqueda es una historia que todavía
+  no se escribió.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`.
+
 ---
 
 ## Configuración del repositorio
@@ -978,6 +1290,46 @@ que usa `design.md`, para poder citarlos desde cualquier lado sin ambigüedad.
 
 ---
 
+## Aparencia Figma de los shells y los tableros (change `ui-figma-dashboards`)
+
+### D40 — La apariencia nueva sale de los JSON de Figma, con paleta por rol y sin datos del prototipo
+
+- **Fecha:** 2026-10-09
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** los tres shells se redibujan con el lenguaje de los JSON exportados de Figma
+  —fondo degradado por rol con retícula, lateral blanco translúcido sin rótulo de título y con
+  íconos, barra superior con breadcrumb, búsqueda inerte, campana inerte y perfil con
+  `Cerrar sesión`, pie de tres textos— y con tres acentos en paleta stock: dorado (Alumno),
+  verde (Docente) y azul (Secretaría). Los tableros son las pantallas índice existentes,
+  recompuestas con datos del maquetado; lo que el prototipo muestra sin datos detrás
+  —gráficos, tareas, calificaciones, correcciones, novedades— no se construye. La sede sale
+  del armazón y se conserva en las pantallas de dominio. Las fechas y la `Última actualización`
+  quedan literales placeholders.
+- **Por qué:** Figma es la autoridad de estructura y estilo (`AGENTS.md`) y aporta cero datos;
+  los números del PDF (`1.248 alumnos`, `68% de progreso`) contradicen el maquetado. Los chips,
+  títulos de panel y textos de pie que se eliminan estaban fijados en los specs de shell, por
+  eso entran como deltas del change y no como cambios de código silenciosos.
+- **Dónde:** `openspec/changes/ui-figma-dashboards/`,
+  `docs/design/figma-dashboards-overhaul/`,
+  `frontend/src/components/shell/ShellFrame.jsx`, `frontend/src/index.css`,
+  `frontend/src/*/navegacion.js`.
+
+---
+
+### D41 — El experimento `ui-appearance-improvement` se descarta y no se fusiona
+
+- **Fecha:** 2026-10-09
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la rama `feat/ui-appearance-improvement` (commit `e6cb747`) queda sin fusionar y
+  sin borrar; el trabajo nuevo arranca de `feat/altas-catalogo-docentes` con la rama
+  `feat/ui-figma-dashboards` y el change `ui-figma-dashboards`.
+- **Por qué:** el equipo probó ese acabado y no le gustó cómo quedó, así que se trata como
+  rollback. Borrar la rama destruiría el registro de lo que se probó, y fusionarla impondría
+  una paleta —terracota, teal, índigo— que la decisión D40 reemplaza.
+- **Dónde:** rama `feat/ui-appearance-improvement`.
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven
@@ -988,12 +1340,26 @@ con el cliente o entre los tres del equipo.
 | P1 | Esquema de cuotas y de cobro | Cliente | La historia #27 habla de "cuota vigente" y "cuota vencida": la regla no se puede escribir sin esto (D11). |
 | P2 | Proveedor de correo | Equipo | Se elige en el sprint siguiente. La interfaz de D17 no cambia. |
 | P3 | Camino de alcance (Must+Should o solo Must) | Cliente | No cambia el scaffold. |
-| P4 | Moneda | Cliente | Hay al menos un cobro en dólares y el modelo asume pesos argentinos. |
 | P5 | Cronograma y temas de clase | Cliente | La historia #38 los muestra al alumno pero ninguna historia los carga. |
 | P6 | Datos que exige un alumno del exterior | Cliente | La historia #47 entra solo con pasaporte. |
-| P7 | Dígito verificador del CUIL | Cliente | El dato es obligatorio y único, pero el equipo no pidió validarlo. |
+| P7 | Dígito verificador del CUIL | Cliente | El CUIL es único pero **ya no es obligatorio** (D33): lo que sigue pendiente es validar su dígito verificador cuando venga cargado, y el equipo no lo pidió. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
 | P10 | Firma de la Definition of Done | Equipo | Se firmó el recorrido el 2026-10-03, en local y después de que el PR #45 saliera mergeado, así que la firma quedó en `docs/verificacion-definition-of-done.md` y no en el PR. La fila de **revisión de la lista** sigue sin firmar: la hace alguien distinto de quien recorrió la interfaz. |
+
+### P4 — Resuelto: todos los montos son pesos argentinos
+
+El pendiente pedía una decisión del cliente porque el Excel tenía al menos un cobro en dólares y
+el modelo asumía pesos. La respuesta no fue cambiar el modelo: fue decidir que **los dólares de la
+planilla son un dato de ese archivo, no una exigencia del sistema**, y que todos los montos son
+pesos argentinos (D35).
+
+Lo que queda escrito:
+
+- No hay columna de moneda ni tipo que la admita. Un monto es `Numeric(14, 2)` y se muestra con el
+  formato de es-AR.
+- No hubo migración: el modelo ya era así.
+- Si algún día hace falta otra moneda, es un change nuevo con columna de moneda y tipo de cambio
+  con fecha, no un ajuste de esta decisión.
 
 ### P9 — Resuelto: el remoto sí existe y la integración continua ya corrió
 

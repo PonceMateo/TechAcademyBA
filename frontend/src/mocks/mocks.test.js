@@ -85,7 +85,7 @@ describe('catálogo de comisiones', () => {
     expect(new Set(DOCENTES.map((d) => d.email)).size).toBe(DOCENTES.length)
   })
 
-  it('tiene a todos los docentes con CUIL, porque es obligatorio en el modelo', () => {
+  it('tiene a todos los docentes con CUIL, aunque el modelo ya no lo exige (D33)', () => {
     for (const docente of DOCENTES) {
       expect(docente.cuil).toBeTruthy()
       expect(docente.dni).toBeTruthy()
@@ -141,7 +141,10 @@ describe('catálogo de comisiones', () => {
     }
   })
 
-  it('deja toda comisión presencial con sede, como la exige el CHECK del modelo', () => {
+  // El CHECK `modalidad_virtual_sin_sede` ya no exige sede en ninguna modalidad: solo prohíbe la
+  // sede en `Virtual`. Lo que se comprueba acá es que las cinco comisiones del ejemplo sean
+  // `PRESENCIAL` con una sede que existe en el catálogo `SEDES`.
+  it('deja toda comisión del ejemplo presencial, con una sede del catálogo', () => {
     for (const comision of COMISIONES) {
       if (comision.modalidad !== 'VIRTUAL') {
         expect(comision.sede_id).not.toBeNull()

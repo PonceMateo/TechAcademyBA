@@ -3,10 +3,11 @@ import { markAsExample } from './placeholderNotice'
 /**
  * Padrón de docentes (datos de ejemplo, D22).
  *
- * **El CUIL va porque el modelo lo exige** (D27): sin CUIL un docente no se puede liquidar, así
- * que la columna existe aunque la planilla del cliente no la tenga. El dígito verificador no se
- * valida en el modelo todavía (decisión pendiente P7), así que estos valores son de ejemplo y no
- * tienen por qué pasar esa validación.
+ * **El CUIL va porque la columna existe** (D27 la agregó, D33 la volvió opcional): sin CUIL un
+ * docente no se puede liquidar, así que el modelo la conserva aunque la planilla del cliente no
+ * la tenga. El ejemplo la carga en las cinco filas para que la columna no se vea siempre vacía; el
+ * alta real no lo pide. El dígito verificador no se valida en el modelo todavía (decisión
+ * pendiente P7), así que estos valores son de ejemplo y no tienen por qué pasar esa validación.
  *
  * `comisiones_asignadas` es el conteo que el cliente registra, no un cálculo sobre las comisiones
  * del maquetado: el padrón del cliente cubre diez comisiones y `comisiones.js` muestra cinco, así

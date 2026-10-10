@@ -5,9 +5,10 @@ seguidas sin duplicar registros ni fallar, y la segunda corrida deja lo mismo qu
 primera.
 
 **Upsert por clave natural.** Cada cuenta se busca por la clave que la identifica en el
-dominio —el email de `usuario`, el CUIL del `docente`, el documento del `alumno`— y se
-inserta o se actualiza. No se busca "la última cuenta creada" ni se usa un contador: la
-clave natural es la que evita que dos corridas se peleen por el mismo registro.
+dominio —el email de `usuario`, el DNI normalizado del `docente`, el documento del
+`alumno`— y se inserta o se actualiza. No se busca "la última cuenta creada" ni se usa
+un contador: la clave natural es la que evita que dos corridas se peleen por el mismo
+registro.
 
 Se optó por buscar y decidir en Python en lugar de `INSERT ... ON CONFLICT`: la operación
 corre dentro de una transacción que el entry point controla, el objeto del ORM queda vivo y
@@ -15,10 +16,14 @@ la regla se lee en un solo lugar. `ON CONFLICT` daría menos idas y vueltas y at
 extra ante dos seeds concurrentes, a cambio de SQL específico del dialecto y de perder el
 objeto de ORM. Para una carga inicial disparada por una persona, el canje no vale.
 
-La carga **converge** la fila al dato declarado: si el CUIL del docente de ejemplo ya
+La carga **converge** la fila al dato declarado: si el DNI del docente de ejemplo ya
 estuviera en uso, la carga le cambia el correo y el nombre a esa fila. Los datos del ejemplo
 son ficticios (D22), así que el riesgo es teórico, y `ensure_email_available` impide que ese
 cambio le pise el correo a un tercero.
+
+**El docente se busca por su DNI normalizado, no por su CUIL.** El CUIL dejó de ser
+obligatorio en D33, y una columna que admite nulos no puede ser la clave natural del upsert.
+El `dni_norm` sigue siendo único y obligatorio, así que cumple el mismo papel.
 
 **D18: las tres cuentas quedan con `must_change_password = false`.** El modelo dice que las
 cuentas de docente y alumno nacen con el indicador en `true` (historias #9 y #13), pero este
@@ -229,17 +234,26 @@ def _upsert_cuenta(session: Session, cuenta: CuentaDemo) -> tuple[Usuario, bool]
 
 
 def _upsert_docente(session: Session, cuenta: CuentaDemo) -> Docente:
-    """El docente de la cuenta, buscándolo por su CUIL, que es único y obligatorio (D27)."""
+    """El docente de la cuenta, buscándolo por su DNI normalizado.
+
+    **Por qué el DNI y no el CUIL:** hasta D33 el CUIL era obligatorio y único, así que era
+    la clave natural. D33 lo volvió opcional —en esta fase los docentes no son personas
+    reales y un CUIL inventado es peor que ninguno— y una columna que admite nulos no puede
+    ser la clave de búsqueda. `dni_norm` sigue siendo única, obligatoria y la tiene la fila de
+    ejemplo, así que cumple el mismo papel.
+    """
     datos = dict(cuenta.docente or {})
-    cuil = datos["cuil"]
-    docente = session.scalar(select(Docente).where(Docente.cuil == cuil))
+    dni_norm = normalize_document(datos["dni"])
+    docente = session.scalar(select(Docente).where(Docente.dni_norm == dni_norm))
     if docente is None:
         docente = Docente(
             nombre=datos["nombre"],
             apellido=datos["apellido"],
             dni=datos["dni"],
-            dni_norm=normalize_document(datos["dni"]),
-            cuil=cuil,
+            dni_norm=dni_norm,
+            # D33: el CUIL es opcional. La fila de ejemplo lo trae, porque el CUIL de
+            # Rita es de uso interno del seed y no un dato inventado por la aplicación.
+            cuil=datos.get("cuil"),
             # El correo del padrón es el mismo que el de acceso: es la misma persona y la
             # tabla de identidad manda. `ensure_email_available` excluye esta fila.
             email=cuenta.email,

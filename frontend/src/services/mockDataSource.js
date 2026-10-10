@@ -53,6 +53,27 @@ function copiar(registros) {
   return registros.map((registro) => ({ ...registro }))
 }
 
+/** El identificador siguiente de una colección: el máximo + 1, o 1 si está vacía. */
+function siguienteId(registros) {
+  return registros.reduce((mayor, registro) => Math.max(mayor, registro.id ?? 0), 0) + 1
+}
+
+/**
+ * La fila de docente con la forma que consume la pantalla, que es la de la fuente real.
+ *
+ * El ejemplo guarda el nombre ya junto y el conte en `comisiones_asignadas`, porque así venía de
+ * la planilla del cliente; la fuente real devuelve `nombre` y `apellido` por separado y
+ * `cantidad_comisiones`. La unión vive acá, en la frontera, para que la pantalla no tenga que
+ * saber de dónde viene la fila (D33, M33).
+ */
+function filaDeDocente(docente) {
+  return {
+    ...docente,
+    nombre: `${docente.nombre} ${docente.apellido ?? ''}`.trim(),
+    comisiones_asignadas: docente.cantidad_comisiones ?? docente.comisiones_asignadas ?? 0,
+  }
+}
+
 function buscarPorTexto(registros, texto, campos) {
   const aguja = texto.trim().toLowerCase()
 
@@ -162,12 +183,99 @@ export function createMockDataSource() {
     },
 
     async listarDocentes() {
-      return copiar(store.docentes)
+      return store.docentes.map(filaDeDocente)
     },
 
     /** Búsqueda por nombre, apellido, DNI o email: lo que el buscador de la pantalla promete. */
     async buscarDocentes(texto) {
-      return buscarPorTexto(store.docentes, texto, ['nombre', 'dni', 'email'])
+      return buscarPorTexto(store.docentes, texto, ['nombre', 'dni', 'email']).map(filaDeDocente)
+    },
+
+    /**
+     * Alta de docente de ejemplo: agrega la fila al store y la devuelve con la misma forma que la
+     * fuente real.
+     *
+     * El CUIL queda en `null` a propósito (D33): en esta fase los docentes no son personas reales
+     * y un CUIL inventado es peor que ninguno.
+     */
+    async crearDocente({ nombre, apellido, dni, email, telefono }) {
+      return filaDeDocente({
+        id: siguienteId(store.docentes),
+        nombre,
+        apellido,
+        dni,
+        cuil: null,
+        email,
+        telefono,
+        activo: true,
+        catedra: null,
+      })
+    },
+
+    /**
+     * Cursos del ejemplo, derivados de las comisiones: es lo único que el catálogo tiene.
+     *
+     * El identificador se asigna por orden de aparición porque el ejemplo no guarda cursos sueltos.
+     * La fuente real lo trae de la tabla, y la pantalla lo necesita para armar el alta de comisión:
+     * el contrato manda `curso_id` numérico, no el código (D34).
+     */
+    async listarCursos() {
+      const vistos = new Map()
+      for (const comision of store.comisiones) {
+        const curso = comision.curso
+        if (curso && !vistos.has(curso.codigo)) {
+          vistos.set(curso.codigo, { ...curso, id: vistos.size + 1, activo: true, descripcion: null })
+        }
+      }
+      return [...vistos.values()]
+    },
+
+    /** Alta de curso de ejemplo. El código se arma acá porque no hay base que lo genere. */
+    async crearCurso({ nombre, descripcion }) {
+      const existentes = await this.listarCursos()
+      const siguiente = existentes.reduce(
+        (mayor, curso) => Math.max(mayor, Number.parseInt(curso.codigo.replace(/\D/g, ''), 10) || 0),
+        0,
+      ) + 1
+      return {
+        id: siguienteId(existentes),
+        codigo: `CUR${String(siguiente).padStart(3, '0')}`,
+        nombre,
+        descripcion: descripcion ?? null,
+      }
+    },
+
+    /**
+     * Alta de comisión de ejemplo: el número es el siguiente del curso, como en la fuente real.
+     *
+     * `curso_id` llega numérico, igual que a la fuente real, así que el curso se busca por `id` y
+     * no por código. Buscarlo por código fue lo que escondió el contrato roto del lado de la
+     * pantalla: el ejemplo aceptaba un string donde la base exige un entero.
+     */
+    async crearComision({ curso_id, docente_id, dias_horarios, arancel, cupo_maximo, modalidad, sede_id }) {
+      const cursos = await this.listarCursos()
+      const curso = cursos.find((candidato) => String(candidato.id) === String(curso_id))
+      const delCurso = store.comisiones.filter(
+        (comision) => normalizeCode(comision.curso.codigo) === normalizeCode(curso?.codigo),
+      )
+      const docente = store.docentes.find((candidato) => String(candidato.id) === String(docente_id))
+      const sede = store.sedes.find((candidato) => String(candidato.id) === String(sede_id))
+      const comision = {
+        id: siguienteId(store.comisiones),
+        codigo: `${curso?.codigo ?? curso_id}-${delCurso.length + 1}`,
+        curso: { codigo: curso?.codigo ?? curso_id, nombre: curso?.nombre ?? 'Curso' },
+        docente_id: docente?.id ?? null,
+        docente_nombre: docente?.nombre ?? null,
+        dias_horarios,
+        cupo_maximo: Number(cupo_maximo),
+        arancel,
+        vacantes: Number(cupo_maximo),
+        modalidad,
+        sede_id: sede?.id ?? null,
+        sede_nombre: sede?.nombre ?? null,
+      }
+      store.comisiones.push(comision)
+      return comision
     },
 
     async listarAlumnos() {

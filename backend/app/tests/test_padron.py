@@ -17,26 +17,37 @@ from app.tests.factories import (
 )
 
 
-def test_alta_de_docente_con_cuil(db_session: Session) -> None:
-    """Historia #9: el docente se crea con acceso por su email."""
+def test_alta_de_docente_sin_cuil(db_session: Session) -> None:
+    """Historia #9 y D33: el docente se crea con acceso por su email, y el CUIL no se pide.
+
+    El valor por defecto de la fábrica es `None`: en esta fase los docentes no son personas
+    reales y un CUIL inventado sería peor que ninguno.
+    """
     docente = crear_docente(db_session)
-    assert docente.cuil == "27345678907"
+    assert docente.cuil is None
     assert docente.email.endswith("@techacademy.invalid")
 
 
-def test_docente_sin_cuil_es_rechazado(db_session: Session) -> None:
-    """D27: el CUIL es obligatorio. Es el identificador con el que el instituto liquida,
-    así que un docente sin CUIL no existe en el sistema."""
-    motivo = assert_rechazado(crear_docente, db_session, cuil="")
-    assert "cuil" in motivo
+def test_alta_de_docente_con_cuil(db_session: Session) -> None:
+    """D33: la columna no se borró, sigue aceptando el dato cuando hay docente real."""
+    docente = crear_docente(db_session, cuil="27345678907")
+    assert docente.cuil == "27345678907"
 
 
-def test_docente_con_cuil_nulo_es_rechazado(db_session: Session) -> None:
-    motivo = assert_rechazado(crear_docente, db_session, cuil=None)  # type: ignore[arg-type]
-    assert "cuil" in motivo
+def test_varios_docentes_sin_cuil_conviven(db_session: Session) -> None:
+    """D33: el índice único sobre `cuil` sobrevive a los nulos.
+
+    PostgreSQL admite varios nulos en un índice único, así que la obligatoriedad que se
+    revirtió no dejó el índice pidiendo un valor inventado.
+    """
+    primero = crear_docente(db_session, dni="30111222", email="uno@techacademy.invalid")
+    segundo = crear_docente(db_session, dni="30111999", email="dos@techacademy.invalid")
+
+    assert primero.cuil is None and segundo.cuil is None
 
 
 def test_cuil_duplicado_es_rechazado(db_session: Session) -> None:
+    """D33: el CUIL sigue siendo único cuando está cargado."""
     crear_docente(db_session, cuil="27345678907")
     motivo = assert_rechazado(
         crear_docente,

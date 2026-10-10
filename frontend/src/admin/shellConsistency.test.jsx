@@ -1,9 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { accountForRole, renderAppAs, resetDataSource, stubBackend } from '../test/support'
 import { SECCIONES_ALUMNO } from '../alumno/navegacion'
 import { SECCIONES_DOCENTE } from '../docente/navegacion'
 import { SECCIONES_ADMIN } from './navegacion'
@@ -26,6 +27,12 @@ import { SECCIONES_ADMIN } from './navegacion'
  * no por los mocks, y que los tres armazones salen del mismo `ShellFrame`. Lo segundo es lo que
  * hace que "los tres shells comparten los mismos componentes" sea una afirmación sobre el código y
  * no una impresión mirando la pantalla.
+ *
+ * **El botón compartido ya no está siempre a la vista.** Antes el pie del armazón mostraba el botón
+ * de cerrar sesión en todas las pantallas, así que afirmar "toda pantalla tiene un `Button`" salía
+ * gratis. Desde el change `ui-figma-dashboards` el cierre de sesión vive en el menú de perfil, que
+ * se dibuja al abrirlo, así que la afirmación se parte en dos: cada pantalla dibuja tarjetas del
+ * componente compartido, y el armazón de las tres secciones sigue cerrando sesión con ese botón.
  */
 
 const RAIZ_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -215,15 +222,102 @@ describe('las pantallas de cada shell dibujan con los componentes compartidos', 
             `${ruta} sin tarjetas`,
           ).toBeGreaterThan(0),
         )
-        expect(
-          document.querySelectorAll('[data-ui="button"]').length,
-          `${ruta} sin botones`,
-        ).toBeGreaterThan(0)
 
         unmount()
       }
     },
   )
+
+  it.each([
+    ['ADMIN', 'MENÚ OPERATIVO'],
+    ['DOCENTE', 'ESPACIO DOCENTE'],
+    ['ALUMNO', 'ESPACIO ALUMNO'],
+  ])(
+    'la sección de %s cierra la sesión con el botón compartido del menú de perfil',
+    async (rol, tituloMenu) => {
+      resetDataSource()
+      stubBackend()
+      renderAppAs(rol, rol === 'ADMIN' ? '/admin' : `/${rol.toLowerCase()}`)
+      await screen.findByRole('navigation', { name: tituloMenu })
+
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: new RegExp(accountForRole(rol).nombre) }))
+
+      expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
+      expect(document.querySelectorAll('[data-ui="button"]').length).toBeGreaterThan(0)
+    },
+  )
+})
+
+describe('navegación por teclado en los tres armazones (6.2)', () => {
+  it.each([
+    ['ADMIN', '/admin', 'MENÚ OPERATIVO'],
+    ['DOCENTE', '/docente', 'ESPACIO DOCENTE'],
+    ['ALUMNO', '/alumno', 'ESPACIO ALUMNO'],
+  ])('deja llegar al perfil con Tab y abrir su menú con Enter en %s', async (rol, ruta, marca) => {
+    resetDataSource()
+    stubBackend()
+    renderAppAs(rol, ruta)
+    await screen.findByRole('navigation', { name: marca })
+
+    const user = userEvent.setup()
+    // El lateral va primero en el DOM (ocupa toda la altura a la izquierda): las primeras paradas
+    // son sus enlaces y el perfil llega después. La búsqueda `⌘ K` y la campana son composición
+    // inerte y no reciben foco.
+    const enlaces = within(screen.getByRole('navigation', { name: marca })).getAllByRole('link')
+    await user.tab()
+    expect(document.activeElement).toBe(enlaces[0])
+    for (let i = 1; i < enlaces.length; i += 1) {
+      await user.tab()
+    }
+    await user.tab()
+    const perfil = screen.getByRole('button', { name: new RegExp(accountForRole(rol).nombre) })
+    expect(document.activeElement).toBe(perfil)
+
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
+  })
+
+  it('deja cerrar la sesión solo con el teclado', async () => {
+    resetDataSource()
+    stubBackend()
+    renderAppAs('ADMIN', '/admin')
+    await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
+
+    const user = userEvent.setup()
+    // El perfil llega después del lateral: se atraviesan sus enlaces antes de abrir el menú.
+    const enlaces = within(
+      screen.getByRole('navigation', { name: 'MENÚ OPERATIVO' }),
+    ).getAllByRole('link')
+    for (let i = 0; i < enlaces.length + 1; i += 1) {
+      await user.tab()
+    }
+    await user.keyboard('{Enter}')
+    await user.tab()
+
+    const salir = screen.getByRole('menuitem', { name: 'Cerrar sesión' })
+    expect(document.activeElement).toBe(salir)
+
+    await user.keyboard('{Enter}')
+    // La sesión se cierra y vuelve el acceso, sin haber usado el mouse.
+    expect(await screen.findByLabelText('Correo electrónico')).toBeInTheDocument()
+  })
+})
+
+describe('los tres acentos de la identidad', () => {
+  it('declara un bloque de acento por rol, y los tres son distintos', () => {
+    const css = readFileSync(join(RAIZ_SRC, 'index.css'), 'utf8')
+
+    const acentos = ['secretaria', 'docente', 'alumno'].map((rol) => {
+      const bloque = new RegExp(`\\[data-acento='${rol}'\\]\\s*\\{[^}]*\\}`).exec(css)
+      expect(bloque, `sin bloque de acento para ${rol}`).not.toBeNull()
+      return bloque[0]
+    })
+
+    // El color es del rol y no de la pantalla: si dos bloques fueran iguales, dos shells se verían
+    // iguales y el menú no distinguiría la sección en la que se está.
+    expect(new Set(acentos).size).toBe(3)
+  })
 })
 
 describe('las tres raíces de rol', () => {
@@ -237,9 +331,13 @@ describe('las tres raíces de rol', () => {
 
     renderAppAs(rol, ruta)
 
-    await screen.findByText(marca)
-    // El botón de cerrar sesión es el mismo componente en las tres secciones.
-    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
+    // La marca de la sección es el nombre accesible de su panel: el título dejó de dibujarse
+    // cuando el diseño sacó los rótulos de sección.
+    await screen.findByRole('navigation', { name: marca })
+    // Con esa marca montada, el armazón ya dibujó la barra superior y su bloque de perfil.
+    expect(
+      screen.getByRole('button', { name: new RegExp(accountForRole(rol).nombre) }),
+    ).toBeInTheDocument()
   })
 
   it.each([

@@ -1,23 +1,15 @@
 import { screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
-import {
-  CHIP_ROL,
-  PERIODO_LECTIVO,
-  PIE_AVATAR,
-  PIE_NOMBRE,
-  PIE_ROL,
-  SECCIONES_DOCENTE,
-  TITULO_MENU,
-} from './navegacion'
+import { accountForRole, renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { PERIODO_LECTIVO, SECCIONES_DOCENTE, TITULO_MENU } from './navegacion'
 
 /**
  * Armazón del shell de Docente (10.1).
  *
- * Se verifica el orden del menú, las etiquetas literales y —lo que el encargo pide— que el armazón
- * se distinga del de Administración. La comparación de acento es entre las dos clases del panel
- * lateral, porque es donde el acento se ve: si dos secciones compartieran color, el menú no las
- * distinguiría y el guard de rol seguiría siendo la única señal de en qué sección se está.
+ * Se verifica el orden del menú y que el shell use el acento de su rol. Desde el change
+ * `ui-figma-dashboards` el acento no se pinta con clases de color en el armazón: `ShellFrame`
+ * publica `data-acento` y `index.css` traduce ese nombre al color, así que la prueba compara los
+ * dos armazones por el acento que declaran y no por la clase con la que se ven.
  */
 
 const ETIQUETAS_ESPERADAS = [
@@ -28,6 +20,22 @@ const ETIQUETAS_ESPERADAS = [
   'Mi Perfil',
 ]
 
+const TAGLINE = 'TechAcademy BA · Aprendemos, crecemos, conectamos.'
+const ULTIMA_ACTUALIZACION = 'Última actualización: 09:41'
+const NOMBRE_CUENTA = accountForRole('DOCENTE').nombre
+
+function armazon() {
+  return document.querySelector('[data-ui="shell-frame"]')
+}
+
+/**
+ * La barra superior del armazón, ubicada por el armazón y no por el rol `banner`: la cabecera del
+ * tablero también es un `<header>` y también se anuncia como banner.
+ */
+function barraSuperior() {
+  return within(document.querySelector('[data-ui="shell-frame"] header'))
+}
+
 async function entrar(ruta = '/docente') {
   resetDataSource()
   stubBackend()
@@ -36,47 +44,65 @@ async function entrar(ruta = '/docente') {
 }
 
 describe('armazón del shell de Docente', () => {
+  // La flecha es necesaria: `beforeEach(entrar)` le pasaría a `entrar` el contexto del test como ruta.
   beforeEach(async () => {
     await entrar()
   })
 
-  it('muestra el panel lateral con el título ESPACIO DOCENTE', () => {
+  it('muestra el panel lateral con el nombre accesible ESPACIO DOCENTE', () => {
     expect(TITULO_MENU).toBe('ESPACIO DOCENTE')
     expect(screen.getByRole('navigation', { name: 'ESPACIO DOCENTE' })).toBeInTheDocument()
   })
 
+  it('no dibuja el título del panel como texto visible', () => {
+    expect(screen.queryByText('ESPACIO DOCENTE')).not.toBeInTheDocument()
+  })
+
   it('muestra los ítems del menú en el orden que fija el spec', () => {
-    // Se comparan los `<li>` del panel y no los enlaces: el cuarto ítem está deshabilitado y no es
-    // un enlace, igual que en el menú tiene que estar en su lugar.
     const menu = within(screen.getByRole('navigation', { name: TITULO_MENU }))
     const items = menu.getAllByRole('listitem').map((item) => item.textContent)
 
     expect(items.map((texto) => texto.replace('Próximamente', '').trim())).toEqual(
       ETIQUETAS_ESPERADAS,
     )
-  })
-
-  it('deja el orden del menú en un solo lugar, el de navegación', () => {
     expect(SECCIONES_DOCENTE.map((seccion) => seccion.etiqueta)).toEqual(ETIQUETAS_ESPERADAS)
   })
 
-  it('muestra el chip de rol y el período lectivo en la barra superior', () => {
-    expect(screen.getByText(CHIP_ROL)).toHaveTextContent('Rol Docente · Solo mis comisiones')
-    expect(screen.getByText(PERIODO_LECTIVO)).toHaveTextContent('Período Lectivo 2026')
+  it('muestra el rol y el nombre de la cuenta en el bloque de perfil', () => {
+    const perfil = screen.getByRole('button', { name: new RegExp(NOMBRE_CUENTA) })
+
+    expect(perfil).toHaveTextContent(NOMBRE_CUENTA)
+    expect(perfil).toHaveTextContent('Docente')
   })
 
-  it('muestra el pie con el avatar, el nombre y el rol', () => {
+  it('no muestra el chip de rol ni el período lectivo en la barra superior', () => {
+    const barra = barraSuperior()
+
+    expect(barra.queryByText('Rol Docente · Solo mis comisiones')).not.toBeInTheDocument()
+    expect(barra.queryByText(PERIODO_LECTIVO)).not.toBeInTheDocument()
+  })
+
+  it('muestra el pie con el tagline, el período lectivo y la última actualización', () => {
     const pie = screen.getByRole('contentinfo')
 
-    expect(pie).toHaveTextContent(PIE_AVATAR)
-    expect(pie).toHaveTextContent(PIE_NOMBRE)
-    expect(pie).toHaveTextContent(PIE_ROL)
+    expect(pie).toHaveTextContent(TAGLINE)
+    expect(pie).toHaveTextContent(PERIODO_LECTIVO)
+    expect(pie).toHaveTextContent(ULTIMA_ACTUALIZACION)
+  })
+
+  it('no deja la persona del maquetado en el pie', () => {
+    // El avatar `PM`, el nombre `Profe Martín` y el rol `DOCENTE` salieron del pie: la identidad del
+    // armazón es la cuenta de la sesión y vive en la barra superior.
+    const pie = screen.getByRole('contentinfo')
+
+    expect(pie).not.toHaveTextContent('PM')
+    expect(pie).not.toHaveTextContent('Profe Martín')
+    expect(pie).not.toHaveTextContent('DOCENTE')
   })
 
   it('muestra con qué cuenta se entró en la barra superior', () => {
-    // El pie muestra la persona del maqueteado y la barra la cuenta que está abierta. Son dos
-    // personas distintas solo porque las cuentas de demostración no son las del prototype (M25).
-    expect(screen.getByText('Rita Molina')).toBeInTheDocument()
+    // La cuenta que está abierta es la de la sesión, que no es la del prototype (M25).
+    expect(screen.getByRole('button', { name: new RegExp(NOMBRE_CUENTA) })).toBeInTheDocument()
   })
 
   it('dibuja el armazón con el mismo componente compartido que el resto de los shells', () => {
@@ -92,28 +118,32 @@ describe('armazón del shell de Docente', () => {
 })
 
 describe('el acento del shell de Docente', () => {
-  it('usa verde azulado, y no el celeste del shell de Administración', async () => {
-    const { unmount } = renderAppAs('DOCENTE', '/docente')
-    await screen.findByRole('navigation', { name: TITULO_MENU })
+  beforeEach(async () => {
+    await entrar()
+  })
 
-    const panel = screen.getByRole('navigation', { name: TITULO_MENU }).className
-    expect(panel).toContain('bg-teal-900')
-    expect(panel).not.toContain('bg-slate-900')
-    unmount()
+  it('declara el acento verde del rol y no el azul de Administración', () => {
+    expect(armazon()).toHaveAttribute('data-acento', 'docente')
+    expect(armazon()).not.toHaveAttribute('data-acento', 'secretaria')
+  })
 
+  it('cambia de acento al cambiar de sección', async () => {
     resetDataSource()
     stubBackend()
     renderAppAs('ADMIN', '/admin')
-    const panelAdmin = await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
+    await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
 
-    expect(panelAdmin.className).toContain('bg-slate-900')
-    expect(panelAdmin.className).not.toContain('bg-teal-900')
+    // El esquema de acento es del shell, no de la pantalla: al entrar a Secretaría, el armazón
+    // declara su propio acento.
+    const armazones = document.querySelectorAll('[data-ui="shell-frame"]')
+    expect(armazones[armazones.length - 1]).toHaveAttribute('data-acento', 'secretaria')
   })
 
-  it('pinta el chip de rol con el mismo acento que el panel', async () => {
-    renderAppAs('DOCENTE', '/docente')
-    const chip = await screen.findByText(CHIP_ROL)
+  it('no pinta el color a mano en el lateral', () => {
+    const panel = screen.getByRole('navigation', { name: TITULO_MENU }).className
 
-    expect(chip.className).toContain('teal')
+    expect(panel).not.toContain('bg-teal-900')
+    expect(panel).not.toContain('bg-emerald-')
+    expect(panel).not.toContain('bg-slate-900')
   })
 })

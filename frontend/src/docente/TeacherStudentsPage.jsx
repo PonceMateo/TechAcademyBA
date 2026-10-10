@@ -30,7 +30,7 @@ const COLUMNAS = [
     render: (fila) => (
       <Link
         to={`/docente/alumnos/${fila.codigo}`}
-        className="text-sm font-medium text-teal-800 underline"
+        className="foco-acento texto-acento rounded text-sm font-medium underline"
       >
         Ver alumnos
       </Link>

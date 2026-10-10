@@ -104,9 +104,9 @@ def upgrade() -> None:
         sa.Column("apellido", sa.String(length=80), nullable=False),
         sa.Column("dni", sa.String(length=20), nullable=False),
         sa.Column("dni_norm", sa.String(length=20), nullable=False),
-        # D27: el CUIL es obligatorio. Es el identificador con el que el instituto
-        # liquida, así que un docente sin CUIL no existe en el sistema. El dígito
-        # verificador no se valida: decisión pendiente P7.
+        # D27: acá el CUIL es obligatorio. Es el identificador con el que el instituto
+        # liquida, así que en este esquema un docente sin CUIL no existe. D33 revierte la
+        # obligatoriedad y `0002` la afloja; el dígito verificador no se valida: pendiente P7.
         sa.Column("cuil", sa.String(length=20), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("telefono", sa.String(length=40), nullable=True),
@@ -127,8 +127,8 @@ def upgrade() -> None:
         sa.UniqueConstraint("cuil", name="uq_docente_cuil"),
         sa.UniqueConstraint("dni_norm", name="uq_docente_dni_norm"),
         sa.UniqueConstraint("email", name="uq_docente_email"),
-        # D27: obligatorio de verdad. `NOT NULL` no alcanza: un CUIL vacío no identifica a
-        # nadie para liquidar.
+        # D27: obligatorio de verdad en este esquema. `NOT NULL` no alcanza: un CUIL vacío
+        # no identifica a nadie para liquidar. `0002` lo elimina (D33).
         sa.CheckConstraint(
             "cuil ~ '[^[:space:]]'", name=op.f("ck_docente_docente_cuil_obligatorio")
         ),

@@ -52,7 +52,7 @@ export function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-semibold text-slate-900">TechAcademy BA</h1>
         <p className="mt-1 text-sm text-slate-600">Ingresá con tu correo y tu contraseña.</p>
 
@@ -68,7 +68,7 @@ export function LoginPage() {
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="foco-acento mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
             />
           </div>
 
@@ -83,7 +83,7 @@ export function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="foco-acento mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
             />
           </div>
 
@@ -96,13 +96,13 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="boton-primario foco-acento w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-60"
           >
             {submitting ? 'Ingresando…' : 'Ingresar'}
           </button>
         </form>
 
-        <p className="mt-6 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <p className="mt-6 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
           {DEMO_NOTICE}
         </p>
       </div>

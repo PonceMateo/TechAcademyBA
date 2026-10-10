@@ -17,14 +17,14 @@ export const TONO = Object.freeze({
   VIOLETA: 'violeta',
   MAGENTA: 'magenta',
   CELESTE: 'celeste',
-  // El acento del shell de Docente. El spec lo llama `verde azulado`, que es el nombre de
-  // Tailwind para ese color: el nombre del tono y el de la clase coinciden a propósito, para
-  // que quien busque el color en el proyecto encuentre las dos cosas juntas.
-  VERDE_AZULADO: 'verde azulado',
-  // El acento del shell de Alumno. El spec lo llama `terracota` y Tailwind no tiene ese color:
-  // el naranja quemado es el tono más cercano de la paleta, y el nombre del tono sigue siendo el
-  // que dice el spec para que el código no invente un cuarto nombre para el mismo color.
-  TERRACOTA: 'terracota',
+  // El acento del shell de Docente. Los specs lo llaman `verde` (change
+  // `ui-figma-dashboards`, D40): es el verde de Figma `#26836b`, que en la paleta de Tailwind
+  // cae en `emerald`. El nombre del tono es el del spec, no el de la clase.
+  ESMERALDA: 'esmeralda',
+  // El acento del shell de Alumno. El spec lo llama `dorado` y es el dorado de Figma
+  // `#d0a52c`, que en Tailwind cae en `yellow`. Reemplaza al terracota de la versión anterior
+  // del diseño.
+  DORADO: 'dorado',
 })
 
 export const CLASES_BADGE = Object.freeze({
@@ -35,8 +35,10 @@ export const CLASES_BADGE = Object.freeze({
   [TONO.VIOLETA]: 'bg-violet-100 text-violet-800 ring-violet-600/20',
   [TONO.MAGENTA]: 'bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-600/20',
   [TONO.CELESTE]: 'bg-sky-100 text-sky-800 ring-sky-600/20',
-  [TONO.VERDE_AZULADO]: 'bg-teal-100 text-teal-800 ring-teal-600/20',
-  [TONO.TERRACOTA]: 'bg-orange-100 text-orange-900 ring-orange-700/25',
+  [TONO.ESMERALDA]: 'bg-emerald-100 text-emerald-800 ring-emerald-600/20',
+  // El dorado sobre blanco necesita la variante oscura del texto para pasar el contraste
+  // (D6): `yellow-900` sobre `yellow-100` está por encima de 4.5:1.
+  [TONO.DORADO]: 'bg-yellow-100 text-yellow-900 ring-yellow-600/25',
 })
 
 /**
@@ -44,7 +46,7 @@ export const CLASES_BADGE = Object.freeze({
  * que la prueba de los tres shells (9.8) pueda afirmar que las tres secciones dibujan con los
  * mismos componentes y no con tablas o insignias escritas a mano en cada pantalla.
  *
- * Es un atributo de un carácter de costo y es lo único en estos siete archivos que existe por una
+ * Es un atributo de un carácter de costo y es lo único en estos archivos que existe por una
  * prueba. La alternativa —inferirlo del DOM— es imposible: un `<table>` escrito a mano es
  * indistinguible de uno que viene de `Table`.
  */

@@ -8,11 +8,36 @@ Definir el shell de Administración y Secretaría de TechAcademy BA como maqueta
 
 ### Requirement: Estructura y navegación del shell de Administración
 
-The system SHALL renderizar el shell de Administración con un panel lateral titulado `MENÚ OPERATIVO`, una barra superior con el chip `Sede Constituciones` y el texto `Período Lectivo 2026`, y un pie con el nombre `Secretaria BA` y la etiqueta `Terminal Interna 04`. Administración y Secretaría son el mismo rol: la interfaz lo identifica siempre como `Secretaría`. La interfaz SHALL estar escrita en español rioplatense y SHALL ofrecer los ítems de navegación, en este orden exacto: `Dashboard`, `Cursos y Comisiones`, `Docentes`, `Alumnos e Inscripciones`, `Cobranzas e Ingresos`, `Habilitación de Accesos`. El período lectivo SHALL renderizarse como `Período Lectivo 2026` en las tres pantallas de shell, aunque el prototipo muestre `Periodo Lectivo 2025`: es una corrección intencional de la línea temporal del proyecto.
+The system SHALL renderizar el shell de Administración sobre un fondo con degradado sutil en el
+tono del rol, con un panel lateral blanco translúcido **sin rótulo de título**: el panel no lleva
+el texto `MENÚ OPERATIVO` ni ninguna categoría de sección. El panel SHALL mostrar la marca del
+producto arriba y SHALL ofrecer los ítems de navegación, en este orden exacto: `Dashboard`,
+`Cursos y Comisiones`, `Docentes`, `Alumnos e Inscripciones`, `Cobranzas e Ingresos`,
+`Habilitación de Accesos`, cada uno con un ícono y el ítem activo destacado en el acento azul
+del rol. La interfaz SHALL estar escrita en español rioplatense, y Administración y Secretaría
+siguen siendo el mismo rol: la interfaz lo identifica siempre como `Secretaría`.
+
+The system SHALL renderizar una barra superior con, de izquierda a derecha: un breadcrumb
+`Mi espacio > [etiqueta del ítem activo]` que refleja la pantalla abierta; un campo de búsqueda
+`Buscar en la plataforma` con la tecla de atajo `⌘ K`, **inerte**, que SHALL mostrarse pero
+SHALL NOT filtrar ni navegar; una campana de notificaciones con punto de no leído, **inerte**;
+y un bloque de perfil con el avatar, el nombre de la cuenta de la sesión, el rol `Secretaría` y
+un menú desplegable con una única entrada, `Cerrar sesión`, que sí funciona. La barra superior
+SHALL NOT renderizar el chip `Sede Constituciones`, ningún chip de rol ni el texto
+`Período Lectivo 2026`: la sede desaparece del armazón y la información de contexto vive en el
+pie.
+
+The system SHALL renderizar un pie con, en este orden, `TechAcademy BA · Aprendemos, crecemos,
+conectamos.`, el texto `Período Lectivo 2026` y `Última actualización: 09:41`. El período
+lectivo SHALL renderizarse como `Período Lectivo 2026`, aunque el prototipo muestre
+`Periodo Lectivo 2025` o `Ciclo lectivo 2026`: es una corrección intencional de la línea
+temporal del proyecto. El pie SHALL NOT renderizar el nombre `Secretaria BA` ni la etiqueta
+`Terminal Interna 04`, y el texto de `Última actualización` SHALL ser un literal del maquetado,
+no una hora calculada.
 
 #### Scenario: El usuario abre el shell de Administración
 - **WHEN** un usuario con rol Secretaría se autentica y abre una pantalla del shell
-- **THEN** ve el panel `MENÚ OPERATIVO`, la barra superior con `Sede Constituciones` y `Período Lectivo 2026`, y el pie con `Secretaria BA` y `Terminal Interna 04`
+- **THEN** ve el lateral sin rótulo de título con la marca y los seis ítems con ícono, la barra superior con el breadcrumb, la búsqueda inerte con `⌘ K`, la campana y el perfil con `Cerrar sesión`, y el pie con el tagline, `Período Lectivo 2026` y `Última actualización: 09:41`
 
 #### Scenario: El usuario recorre la navegación
 - **WHEN** el usuario abre el panel lateral
@@ -20,19 +45,60 @@ The system SHALL renderizar el shell de Administración con un panel lateral tit
 
 #### Scenario: El usuario cambia de pantalla
 - **WHEN** el usuario elige un ítem de navegación
-- **THEN** el ítem queda destacado como activo y la dirección de la pantalla refleja la sección elegida
+- **THEN** el ítem queda destacado como activo y el breadcrumb de la barra superior refleja la sección elegida
+
+#### Scenario: El usuario pulsa la búsqueda o la campana
+- **WHEN** el usuario escribe en el campo de búsqueda o pulsa la campana
+- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque ambos elementos son composición inerte
+
+#### Scenario: El usuario cierra la sesión desde su perfil
+- **WHEN** el usuario abre su perfil en la barra superior y elige `Cerrar sesión`
+- **THEN** la sesión se cierra y el usuario vuelve al acceso
+
+#### Scenario: El usuario busca la sede en el armazón
+- **WHEN** el usuario recorre la barra superior y el lateral buscando `Sede Constituciones`
+- **THEN** no la encuentra en ninguna parte del armazón, porque la sede es dato de las pantallas de dominio y no del marco
 
 ### Requirement: Dashboard operativo con indicadores y alertas estáticas
 
-The system SHALL mostrar cuatro tarjetas de indicador con estos rótulos, valores y textos de apoyo literales: `ALUMNOS INSCRIPTOS` con valor `8` y el texto `en comisiones abiertas y en curso`; `COMISIONES` con valor `10` y el texto `en el catálogo`; `COBROS PENDIENTES DE COBRO` con valor `3` y el texto `3 comprobantes observados`; y `CUPO PROMEDIO OCUPADO` con valor `27%` y el texto `sobre las comisiones del catálogo`. El valor `27%` es un texto fijo del maquetado, consistente con los cupos y las vacantes de las comisiones del catálogo: sobre un cupo total de 160 lugares hay 43 ocupados y 117 vacantes. El sistema SHALL NOT calcular ese porcentaje ni ningún otro agregado en tiempo de ejecución.
+The system SHALL mostrar, como encabezado del tablero, el saludo `Buen día, {nombre de la
+cuenta}` seguido de la línea de fecha placeholder `Viernes 9 de octubre · Todo lo que necesitás
+para gestionar tu academia.`, donde el nombre es el de la cuenta de la sesión y la fecha es un
+literal del maquetado, no un valor calculado.
 
-The system SHALL mostrar el bloque `Alertas de Gestión Pendiente` con tres ítems tomados de casos reales del cliente: `Comprobante ilegible de Agustina Benítez` con chip `Urgente`, `Cheque de Banco Federal pendiente de acreditación` con chip `Observado` y `Valeria Rossi debe la mitad del arancel` con chip `Aviso`. Como cuarta línea SHALL mostrarse un texto de lista de espera, `La comisión CUR-104 alcanzó su cupo de 20 inscriptos y figura cerrada por cupo. Hay lista de espera activa.`, con chip `Aviso`, que es contenido de ejemplo y no un dato de negocio: la lista de espera es una función real que el cliente confirmó y que queda fuera del alcance de este change, por lo que esa línea SHALL NOT ser navegable ni abrir ninguna pantalla.
+The system SHALL mostrar cuatro tarjetas de indicador con estos rótulos, valores y textos de
+apoyo literales: `ALUMNOS INSCRIPTOS` con valor `8` y el texto `en comisiones abiertas y en
+curso`; `COMISIONES` con valor `10` y el texto `en el catálogo`; `COBROS PENDIENTES DE COBRO`
+con valor `3` y el texto `3 comprobantes observados`; y `CUPO PROMEDIO OCUPADO` con valor `27%`
+y el texto `sobre las comisiones del catálogo`. El valor `27%` es un texto fijo del maquetado,
+consistente con los cupos y las vacantes de las comisiones del catálogo: sobre un cupo total de
+160 lugares hay 43 ocupados y 117 vacantes. El sistema SHALL NOT calcular ese porcentaje ni
+ningún otro agregado en tiempo de ejecución.
 
-The system SHALL mostrar el bloque `Accesos Rápidos del Personal` con las acciones `Registrar Cobranza`, `Verificar Habilitaciones` y `Descargar Reporte del Día`, que usan la misma denominación que los datos del cliente. Todo el contenido del dashboard es texto fijo: el sistema no calcula agregados, no consulta datos y las tres acciones rápidas no navegan a ninguna pantalla.
+El tablero SHALL organizarse en dos columnas: a la izquierda, el bloque `Alertas de Gestión
+Pendiente` con sus cuatro líneas; a la derecha, el bloque `Accesos Rápidos del Personal` con sus
+tres acciones.
+
+The system SHALL mostrar el bloque `Alertas de Gestión Pendiente` con tres ítems tomados de casos
+reales del cliente: `Comprobante ilegible de Agustina Benítez` con chip `Urgente`, `Cheque de
+Banco Federal pendiente de acreditación` con chip `Observado` y `Valeria Rossi debe la mitad del
+arancel` con chip `Aviso`. Como cuarta línea SHALL mostrarse un texto de lista de espera, `La
+comisión CUR-104 alcanzó su cupo de 20 inscriptos y figura cerrada por cupo. Hay lista de espera
+activa.`, con chip `Aviso`, que es contenido de ejemplo y no un dato de negocio: la lista de
+espera es una función real que el cliente confirmó y que queda fuera del alcance de este change,
+por lo que esa línea SHALL NOT ser navegable ni abrir ninguna pantalla.
+
+The system SHALL mostrar el bloque `Accesos Rápidos del Personal` con las acciones `Registrar
+Cobranza`, `Verificar Habilitaciones` y `Descargar Reporte del Día`, que usan la misma
+denominación que los datos del cliente. Todo el contenido del dashboard es texto fijo: el sistema
+no calcula agregados, no consulta datos y las tres acciones rápidas no navegan a ninguna
+pantalla. El tablero SHALL NOT mostrar gráficos ni indicadores cuyos valores no estén fijados
+por este requisito: los números del prototipo (`1.248 alumnos activos`, `32 comisiones en curso`,
+`$ 8,4 M cobrados`) no son datos del maquetado y no se reproducen.
 
 #### Scenario: El usuario abre el Dashboard
 - **WHEN** un usuario de Secretaría abre `Dashboard`
-- **THEN** ve las cuatro tarjetas con los rótulos, valores y textos de apoyo indicados, y el bloque de alertas con sus tres casos reales y la cuarta línea de lista de espera
+- **THEN** ve el saludo con su nombre y la línea de fecha placeholder, las cuatro tarjetas con los rótulos, valores y textos de apoyo indicados, las alertas en la columna izquierda y los accesos rápidos en la derecha
 
 #### Scenario: El usuario compara los indicadores con el catálogo
 - **WHEN** el usuario lee `COMISIONES` con valor `10` y lo contrasta con el listado de `Cursos y Comisiones`
@@ -46,39 +112,138 @@ The system SHALL mostrar el bloque `Accesos Rápidos del Personal` con las accio
 - **WHEN** el usuario lee la cuarta línea del bloque de alertas
 - **THEN** ve el texto sobre el cupo alcanzado de `CUR-104` y no encuentra ninguna pantalla de lista de espera en el producto, porque la función existe pero queda fuera de este change
 
+#### Scenario: El usuario busca un gráfico del prototipo
+- **WHEN** el usuario recorre el tablero buscando la sección `La academia en números` con sus gráficos
+- **THEN** no la encuentra, porque los números del prototipo no corresponden a los datos del maquetado
+
 ### Requirement: Comisiones activas y alta de comisión
 
-The system SHALL mostrar el bloque `Comisiones Activas` con el chip `10 en el catálogo` y el botón `+ Nueva Comisión`, seguido de una tabla cuyas columnas, con estos rótulos literales y en este orden, son `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES` y `ARANCEL`. Las filas del maquetado son, en este orden: `CUR-101` Python Inicial con Profe Martín, `Mar y Jue 19 a 21 hs`, cupo 30, 7 vacantes y arancel `$45.000`; `CUR-104` Diseño UX/UI Avanzado con Caro UX, `Miércoles 19 a 22`, cupo 20, 0 vacantes y `$52.000`; `CUR-108` Java Backend Spring con Ing. González, `Sábados intensivo`, cupo 30, 30 vacantes y `$58.000`; `CUR-110` Power BI & Dashboards con Mariana Data, `Mar y Jue 18:30`, cupo 40, 40 vacantes y `$39.000`; y `CUR-103` Marketing Digital & Ads con Santi Ads, `Sábados 10 a 13 hs`, cupo 40, 40 vacantes y `$38.000`.
+The system SHALL mostrar la sección `Cursos y Comisiones` como dos vistas encadenadas en lugar de
+un listado único. La **vista de cursos**, en la ruta `/admin/cursos`, SHALL mostrar un grid con una
+tarjeta por cada curso del catálogo y las acciones `+ Nuevo Curso` y `+ Nueva Comisión`, más el chip
+del total de comisiones del catálogo —`10 en el catálogo` con los datos de ejemplo—. Cada tarjeta
+SHALL mostrar el nombre del curso, su código, su descripción y la cantidad de comisiones que tiene, y
+SHALL ser activable con un click sobre la tarjeta o sobre el botón `Abrir comisiones` de esa tarjeta.
 
-La columna `VACANTES` SHALL mostrar el conteo de vacantes que el cliente registra para cada comisión, y cuando valga 0 la fila SHALL llevar el chip `LLENO` en rojo junto al valor. La fila de `CUR-104` es la única del maquetado con 0 vacantes, porque el cliente la registra con estado `Cerrada por cupo`. El maquetado SHALL NOT inventar comisiones adicionales para completar el catálogo: las cinco filas son un subconjunto de las diez comisiones del cliente.
+La **vista de comisiones del curso**, en la ruta `/admin/cursos/:codigo`, SHALL mostrar la tabla de
+comisiones del curso de la ruta con el chip del total del catálogo, el nombre y el código del curso a
+la vista, la acción `Volver a cursos` y la acción `+ Nueva Comisión`. La tabla SHALL conservar las
+columnas, con estos rótulos literales y en este orden: `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`,
+`HORARIO`, `CUPO MÁX.`, `VACANTES` y `ARANCEL`, y SHALL contener solamente las comisiones del curso
+de la ruta. La vista de comisiones del curso SHALL NOT ofrecer la acción `+ Nuevo Curso`: dentro de
+un curso no tiene sentido dar de alta otro curso.
 
-The system SHALL abrir el modal `Crear Nueva Comisión` con los campos, en este orden literal: `Curso / Programa` como selección, `Código Comisión` con placeholder `Ej: CUR-111`, `Docente Asignado` como campo de búsqueda con placeholder `Buscar docente…`, `Días y Horarios` con placeholder `Ej: Mar y Jue 19 a 21 hs`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)`, `Modalidad` y `Sede`, con los botones `Cancelar` y `Guardar Comisión`. Esta adición es intencional: el prototipo no incluye `Modalidad` ni `Sede` y la historia de usuario que exige definirlas está dentro del alcance mínimo. `Modalidad` SHALL ofrecer `Virtual`, `Presencial` y `Híbrido`, y `Sede` SHALL ser obligatoria solo cuando la modalidad seleccionada sea `Presencial` o `Híbrido`.
+La tabla de la vista de comisiones del curso SHALL mostrar las comisiones que devuelve el catálogo,
+con los datos que la fuente informa de cada una. La pantalla SHALL NOT inventar cursos ni comisiones
+para completar el catálogo.
 
-Este cambio no incluye edición: el sistema SHALL NOT renderizar ningún control de edición de curso ni de comisión.
+Cuando los datos de la pantalla salen del ejemplo —el modo `mock`, que solo entra cuando un endpoint
+no existe— las filas son un subconjunto de las diez comisiones del cliente: `CUR-101` Python Inicial
+con Profe Martín, `Mar y Jue 19 a 21 hs`, cupo 30, 7 vacantes y arancel `$45.000`; `CUR-104` Diseño
+UX/UI Avanzado con Caro UX, `Miércoles 19 a 22`, cupo 20, 0 vacantes y `$52.000`; `CUR-108` Java
+Backend Spring con Ing. González, `Sábados intensivo`, cupo 30, 30 vacantes y `$58.000`; `CUR-110`
+Power BI & Dashboards con Mariana Data, `Mar y Jue 18:30`, cupo 40, 40 vacantes y `$39.000`; y
+`CUR-103` Marketing Digital & Ads con Santi Ads, `Sábados 10 a 13 hs`, cupo 40, 40 vacantes y
+`$38.000`. En el modo por omisión las filas son las que hay en la base, no las del ejemplo.
+
+La columna `VACANTES` SHALL mostrar el conteo de vacantes que la fuente informa para cada comisión, y
+cuando valga 0 la fila SHALL llevar el chip `LLENO` en rojo junto al valor. En los datos de ejemplo
+la fila de `CUR-104` es la única con 0 vacantes, porque el cliente la registra con estado `Cerrada
+por cupo`.
+
+El sistema SHALL abrir el modal `Crear Nueva Comisión` con los campos, en este orden literal:
+`Curso / Programa`, `Docente Asignado`, `Días y Horarios` con placeholder `Ej: Mar y Jue 19 a 21
+hs`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, más `Sede` cuando el campo
+corresponda renderizarse, con los botones `Cancelar` y `Guardar Comisión`. El modal SHALL NOT pedir
+un código de comisión: el código lo deriva el sistema del curso y del número, y la pantalla lo
+muestra al confirmar. `Docente Asignado` SHALL ser una selección de los docentes del padrón y SHALL
+NOT ser un campo de búsqueda de texto libre. `Modalidad` SHALL ofrecer `Virtual`, `Presencial` y
+`Híbrido`. `Sede` SHALL ser opcional en toda modalidad: SHALL renderizarse solo cuando la modalidad
+elegida sea `Presencial` o `Híbrido`, y SHALL NOT renderizarse cuando la modalidad sea `Virtual`
+ni mientras el selector siga en `Seleccionar…`, que es como abre el modal.
+
+WHEN el modal de alta de comisión se abre desde la vista de comisiones del curso, el campo
+`Curso / Programa` SHALL venir elegido con el curso de la ruta y SHALL quedar bloqueado a ese curso,
+porque la comisión que se está creando pertenece a ese curso. WHEN el modal se abre desde la vista
+de cursos, `Curso / Programa` SHALL venir vacío y editable, y el selector SHALL ofrecer cualquier
+curso del catálogo.
+
+La pantalla SHALL abrir además el modal `Crear Nuevo Curso`, con los campos `Nombre del Curso` y
+`Descripción` y sin ningún campo de código. La adición de la modal de curso es intencional: sin ella
+el catálogo no tiene forma de crecer, y el selector de curso de la comisión se armaba con las
+comisiones existentes, así que un curso nuevo no podía abrir su primera comisión.
+
+Ambas vistas SHALL mostrar su campo de búsqueda con el control deshabilitado y una leyenda que
+explique que todavía no filtra. Los buscadores SHALL NOT filtrar el contenido de la vista: la
+funcionalidad de búsqueda queda para otro change y el campo deshabilitado existe para dejar el hueco
+a la vista, igual que los controles marcados `Próximamente`.
+
+WHEN el código de la ruta no corresponde a ningún curso del catálogo, el sistema SHALL informar que
+el curso no existe y ofrecer el regreso a la vista de cursos. El sistema SHALL NOT mostrar una tabla
+de comisiones vacía en ese caso, porque se leería como que el curso no tiene comisiones.
+
+Esta pantalla SHALL confirmar sus altas contra la base: un alta aceptada SHALL mostrar el código que
+devuelve el sistema, un alta rechazada SHALL dejar el formulario abierto con el motivo tal como lo
+informa la fuente, y un alta que no llega a la base SHALL fallar sin mostrar ninguna confirmación.
+
+Este cambio no incluye edición: el sistema SHALL NOT renderizar ningún control de edición de curso
+ni de comisión.
 
 #### Scenario: El usuario revisa el listado de comisiones
+- **WHEN** el usuario abre un curso del catálogo desde la vista de cursos
+- **THEN** ve el bloque `Comisiones Activas` de ese curso con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES` y `ARANCEL` en ese orden, y las comisiones de ese curso con su arancel formateado
+
+#### Scenario: El usuario abre la vista de cursos
 - **WHEN** un usuario de Secretaría abre `Cursos y Comisiones`
-- **THEN** ve el chip `10 en el catálogo`, el botón `+ Nueva Comisión` y la tabla con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES` y `ARANCEL` en ese orden, con las cinco comisiones del maquetado
+- **THEN** ve el chip `10 en el catálogo`, las acciones `+ Nuevo Curso` y `+ Nueva Comisión`, el buscador deshabilitado y el grid con una tarjeta por curso del catálogo, cada una con nombre, código, descripción y cantidad de comisiones
+
+#### Scenario: El usuario compara el conteo de un curso con su tabla
+- **WHEN** el usuario mira la cantidad de comisiones de una tarjeta y abre ese curso
+- **THEN** la tabla de ese curso tiene exactamente las mismas filas que la cantidad anunciada en la tarjeta
+
+#### Scenario: El usuario abre un curso
+- **WHEN** el usuario pulsa una tarjeta del curso o su botón `Abrir comisiones`
+- **THEN** ve la tabla de comisiones de ese curso, con el nombre y el código del curso a la vista, y la dirección de la pantalla es la de ese curso
+
+#### Scenario: El usuario vuelve al catálogo
+- **WHEN** el usuario pulsa `Volver a cursos` desde la vista de un curso
+- **THEN** ve de nuevo el grid de cursos del catálogo
+
+#### Scenario: El usuario crea una comisión dentro de un curso
+- **WHEN** el usuario abre un curso y pulsa `+ Nueva Comisión`
+- **THEN** el modal abre con `Curso / Programa` ya elegido con ese curso y bloqueado, y la pantalla **no** ofrece `+ Nuevo Curso`
+
+#### Scenario: El usuario crea una comisión desde la vista de cursos
+- **WHEN** el usuario pulsa `+ Nueva Comisión` en la vista de cursos
+- **THEN** el modal abre con `Curso / Programa` vacío y editable, ofreciendo cualquier curso del catálogo
 
 #### Scenario: El usuario busca la comisión cerrada por cupo
-- **WHEN** el usuario mira la fila de `CUR-104` Diseño UX/UI Avanzado
+- **WHEN** el usuario abre el curso de `CUR-104` Diseño UX/UI Avanzado
 - **THEN** ve `VACANTES` con valor 0 y el chip `LLENO` en rojo junto a la fila
 
 #### Scenario: El usuario compara las vacantes con el cupo
-- **WHEN** el usuario recorre la columna `VACANTES` del maquetado
+- **WHEN** el usuario recorre la columna `VACANTES` de los datos de ejemplo
 - **THEN** ve que `CUR-103` y `CUR-110` conservan su cupo completo como vacantes y que solo `CUR-104` aparece cerrada por cupo
 
 #### Scenario: El usuario abre el modal de alta
 - **WHEN** el usuario pulsa `+ Nueva Comisión`
-- **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Código Comisión`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)`, `Modalidad` y `Sede`, con los botones `Cancelar` y `Guardar Comisión`
+- **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, con los botones `Cancelar` y `Guardar Comisión`, no muestra ningún campo para el código de la comisión porque el sistema lo genera, y tampoco muestra `Sede`: el modal abre con `Modalidad` en `Seleccionar…` y el campo aparece recién cuando la modalidad elegida sea `Presencial` o `Híbrido`
 
 #### Scenario: El usuario elige modalidad virtual
 - **WHEN** el usuario selecciona modalidad `Virtual` y confirma sin elegir sede
-- **THEN** el maquetado acepta la carga y no exige sede, porque la sede solo es obligatoria para modalidad `Presencial` o `Híbrido`
+- **THEN** el sistema acepta la carga y el campo `Sede` no está renderizado en el modal, porque la sede es opcional en toda modalidad y no corresponde mostrarla para `Virtual`
 
 #### Scenario: El usuario elige modalidad presencial sin sede
-- **WHEN** el usuario selecciona modalidad `Presencial` o `Híbrido` y confirma sin elegir sede
-- **THEN** el maquetado no confirma la carga e indica que el campo `Sede` es obligatorio
+- **WHEN** el usuario selecciona modalidad `Presencial` o `Híbrido`, deja `Sede` vacío y confirma
+- **THEN** el sistema guarda la comisión y la confirma, porque el campo `Sede` es opcional y su ausencia no impide el alta. El nombre del escenario conserva el de la regla anterior: ya no se rechaza el alta por falta de sede
+
+#### Scenario: El usuario busca en el catálogo
+- **WHEN** el usuario escribe en el buscador de cualquiera de las dos vistas
+- **THEN** el campo no acepta la escritura y su leyenda explica que la búsqueda todavía no está disponible, y el contenido de la vista no cambia
+
+#### Scenario: La ruta apunta a un curso que no existe
+- **WHEN** el usuario abre la dirección de un curso que no está en el catálogo
+- **THEN** ve que el curso no existe y puede volver al catálogo, en lugar de una tabla de comisiones vacía
 
 #### Scenario: El usuario busca una acción de edición
 - **WHEN** el usuario recorre el listado y el modal
@@ -86,9 +251,9 @@ Este cambio no incluye edición: el sistema SHALL NOT renderizar ningún control
 
 ### Requirement: Padrón de docentes
 
-The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS` y `ESTADO`, con un campo de búsqueda por nombre, apellido, DNI o email, y la acción `+ Nuevo Docente`. El CUIL SHALL estar presente en la fila porque es obligatorio en el modelo de docente. Las filas del maquetado son, en este orden: Profe Martín con `Programación`, 1 comisión asignada y estado `Activa`; Lic. Laura Benítez con `Desarrollo Web`, 1 comisión asignada y `Activa`; Santi Ads con `Marketing`, 2 comisiones asignadas y `Activa`; Dr. Marcelo Ríos con `Datos`, 1 comisión asignada y `Activa`; e Ing. González con `Programación`, 1 comisión asignada y `Activa`. La columna `ESTADO` SHALL renderizar `Activa` en verde. El maquetado SHALL NOT mostrar columnas de documento, correo ni teléfono de los docentes, porque los datos del cliente no registran esos datos y no deben inventarse.
+The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS` y `ESTADO`, con un campo de búsqueda por nombre, apellido, DNI o email, y la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila válida. Las filas del maquetado son, en este orden: Profe Martín con `Programación`, 1 comisión asignada y estado `Activa`; Lic. Laura Benítez con `Desarrollo Web`, 1 comisión asignada y `Activa`; Santi Ads con `Marketing`, 2 comisiones asignadas y `Activa`; Dr. Marcelo Ríos con `Datos`, 1 comisión asignada y `Activa`; e Ing. González con `Programación`, 1 comisión asignada y `Activa`. La columna `ESTADO` SHALL renderizar `Activa` en verde. El maquetado SHALL NOT mostrar columnas de documento, correo ni teléfono de los docentes, porque los datos del cliente no registran esos datos y no deben inventarse.
 
-Esta pantalla es una adición intencional: el prototipo no la incluye y el alta de docente está dentro del alcance mínimo. El sistema SHALL NOT renderizar un formulario de edición de docente. El control de clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás.
+Esta pantalla es una adición intencional: el prototipo no la incluye y el alta de docente está dentro del alcance mínimo. La acción `+ Nuevo Docente` SHALL abrir el modal `Nuevo Docente`, con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y `Teléfono`, y sin ningún campo de CUIL porque el contrato del alta no lo admite. El sistema SHALL NOT renderizar un formulario de edición de docente. El control de clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás.
 
 #### Scenario: El usuario abre el padrón de docentes
 - **WHEN** un usuario de Secretaría abre `Docentes`
@@ -96,7 +261,7 @@ Esta pantalla es una adición intencional: el prototipo no la incluye y el alta 
 
 #### Scenario: El usuario localiza a un docente por CUIL
 - **WHEN** el usuario recorre la fila de un docente
-- **THEN** ve su CUIL visible junto al DNI, porque el CUIL es obligatorio para dar de alta a un docente y se necesita para cualquier gestión administrativa posterior
+- **THEN** ve su CUIL visible junto al DNI cuando el docente lo tiene, y la fila no lo exige porque el CUIL es único pero opcional en el modelo, así que un docente cargado sin ese dato sigue siendo una fila válida del padrón
 
 #### Scenario: El usuario compara las cargas de los docentes
 - **WHEN** el usuario recorre la columna `COMISIONES ASIGNADAS`
@@ -112,7 +277,7 @@ Esta pantalla es una adición intencional: el prototipo no la incluye y el alta 
 
 #### Scenario: El usuario busca edición o control de clases
 - **WHEN** el usuario revisa la pantalla buscando editar a un docente o controlar las clases que dicta
-- **THEN** la acción `+ Nuevo Docente` está presente sin formulario detrás, no hay control de edición, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, no hay control de edición, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
 
 ### Requirement: Alumnos, categorías arancelarias y cuentas corporativas
 

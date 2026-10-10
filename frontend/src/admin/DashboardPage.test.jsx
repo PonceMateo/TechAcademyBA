@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { accountForRole, renderAppAs, resetDataSource, stubBackend } from '../test/support'
 
 /**
  * Tablero operativo (9.2).
@@ -13,6 +13,10 @@ import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
  * El caso interesante es el de las tres acciones rápidas: el spec dice que se pueden pulsar y que
  * no pasa nada. Un botón deshabilitado cumpliría el "no pasa nada" y rompería el "se puede pulsar",
  * así que la prueba las aprieta y verifica que la ruta no cambie.
+ *
+ * **El encabezado del tablero es el saludo, no el título `Dashboard`.** Desde el change
+ * `ui-figma-dashboards` el tablero abre con `Buen día, {cuenta}` y su línea de fecha placeholder; el
+ * nombre de la sección queda en el ítem del menú y en el breadcrumb del armazón.
  */
 
 /** Los cuatro indicadores con rótulo, valor y texto de apoyo literales. */
@@ -39,11 +43,14 @@ const ACCESOS_RAPIDOS = [
   'Descargar Reporte del Día',
 ]
 
+/** El tablero abre con el saludo de la cuenta de la sesión y no con el nombre de la sección. */
+const SALUDO = `Buen día, ${accountForRole('ADMIN').nombre}`
+
 beforeEach(async () => {
   resetDataSource()
   stubBackend()
   renderAppAs('ADMIN', '/admin')
-  await screen.findByRole('heading', { name: 'Dashboard' })
+  await screen.findByRole('heading', { name: SALUDO })
 })
 
 describe('indicadores', () => {
@@ -104,10 +111,8 @@ describe('accesos rápidos del personal', () => {
     }
 
     expect(navegar).not.toHaveBeenCalled()
-    // La sección sigue siendo el tablero: ninguna acción Sacó a la secretaría de la pantalla.
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument(),
-    )
+    // La sección sigue siendo el tablero: ninguna acción sacó a la secretaría de la pantalla.
+    await waitFor(() => expect(screen.getByRole('heading', { name: SALUDO })).toBeInTheDocument())
     expect(screen.getByText(ALERTAS[0][0])).toBeInTheDocument()
 
     window.removeEventListener('popstate', navegar)

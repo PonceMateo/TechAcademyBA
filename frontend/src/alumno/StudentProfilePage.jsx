@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Avatar, Badge, Button, Card, Input } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { obtenerPerfilAlumno } from '../services/dataService'
-import { PIE_AVATAR, PIE_NOMBRE } from './navegacion'
 
 /**
  * Perfil del alumno (11.5).
@@ -19,7 +18,15 @@ import { PIE_AVATAR, PIE_NOMBRE } from './navegacion'
  *
  * **La edición es local y lo dice.** No hay endpoint para actualizar el contacto (M17) y la pantalla
  * muestra la confirmación y el valor nuevo en el campo, que es lo que el maqueteado promete.
+ *
+ * **El avatar y el nombre de la tarjeta son del maquetado, no de la sesión.** Son los mismos
+ * placeholders del cliente que ya mostraba el pie del armazón; desde el change
+ * `ui-figma-dashboards` el pie muestra el tagline y el período lectivo, así que estos dos literales
+ * son contenido de esta tarjeta y viven acá.
  */
+const PIE_AVATAR = 'CR'
+const PIE_NOMBRE = 'Camila Rodríguez'
+
 const CHIP_PERMISOS = 'ALUMNO · PERMISOS MÍNIMOS'
 const NOTA_PERMISOS = 'Solo podés editar tus datos de contacto.'
 const LEYENDO_SOLO_LECTURA = 'solo lectura'
@@ -60,7 +67,7 @@ export function StudentProfilePage() {
           <div>
             <p className="text-lg font-semibold text-slate-900">{PIE_NOMBRE}</p>
             <div className="mt-2">
-              <Badge tono={TONO.TERRACOTA}>{CHIP_PERMISOS}</Badge>
+              <Badge tono={TONO.DORADO}>{CHIP_PERMISOS}</Badge>
             </div>
           </div>
         </div>

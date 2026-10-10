@@ -20,6 +20,31 @@ export function listarComisiones() {
 }
 
 /**
+ * Alta de curso. **El contrato no lleva código**: lo genera el sistema (D32) y la respuesta lo
+ * trae para que la pantalla muestre lo que el operador va a ver después.
+ */
+export function crearCurso(datos) {
+  return getDataSource().crearCurso(datos)
+}
+
+/** Alta de comisión. La respuesta trae el código derivado `{codigo del curso}-{numero}` (D34). */
+export function crearComision(datos) {
+  return getDataSource().crearComision(datos)
+}
+
+/**
+ * Catálogo de cursos, para el selector del alta de comisión.
+ *
+ * **No se puede armar con `listarComisiones()`:** el selector se llenaba con
+ * `comisiones.map((c) => c.curso)`, que solo ofrece cursos que **ya tienen** una comisión. Un
+ * curso recién creado no podría abrir su primera comisión, que es justo el flujo que este change
+ * habilita (D36).
+ */
+export function listarCursos() {
+  return getDataSource().listarCursos()
+}
+
+/**
  * Totales del catálogo que el chip y el tablero muestran. Van por el servicio y no como
  * constantes de cada pantalla para que los dos números no puedan contradecirse.
  */
@@ -33,6 +58,14 @@ export function listarDocentes() {
 
 export function buscarDocentes(texto) {
   return getDataSource().buscarDocentes(texto)
+}
+
+/**
+ * Alta de docente. **El contrato no lleva CUIL** (D33) y la promesa **nunca cae al ejemplo**: un
+ * alta que no llega a la base tiene que fallar y decirlo (D36).
+ */
+export function crearDocente(datos) {
+  return getDataSource().crearDocente(datos)
 }
 
 export function listarAlumnos() {

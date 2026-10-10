@@ -67,6 +67,9 @@ export function AppRoutes() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="cursos" element={<CoursesPage />} />
+        {/* El catálogo de cursos abre sus comisiones: la misma pantalla lee el código de la ruta y
+            dibuja la tabla de ese curso. */}
+        <Route path="cursos/:codigo" element={<CoursesPage />} />
         <Route path="docentes" element={<TeachersPage />} />
         <Route path="alumnos" element={<StudentsPage />} />
         <Route path="cobranzas" element={<PaymentsPage />} />

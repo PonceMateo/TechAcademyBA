@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Avatar, Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { obtenerPerfilDocente } from '../services/dataService'
-import { PIE_AVATAR, PIE_NOMBRE } from './navegacion'
 
 /**
  * Perfil del docente (10.5).
@@ -17,7 +16,15 @@ import { PIE_AVATAR, PIE_NOMBRE } from './navegacion'
  *
  * **El chip `DOCENTE · PERMISOS REDUCIDOS` va con la nota de a quién pedir los cambios.** Un chip
  * que dice "pocos permisos" sin decir a quién recurres deja la misma duda en las tres secciones.
+ *
+ * **El avatar y el nombre de la tarjeta son del maquetado, no de la sesión.** Son los mismos
+ * placeholders del cliente que ya mostraba el pie del armazón; desde el change
+ * `ui-figma-dashboards` el pie muestra el tagline y el período lectivo, así que estos dos literales
+ * son contenido de esta tarjeta y viven acá.
  */
+const PIE_AVATAR = 'PM'
+const PIE_NOMBRE = 'Profe Martín'
+
 const COLUMNAS = [
   {
     clave: 'codigo',

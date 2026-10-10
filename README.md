@@ -27,6 +27,7 @@ El README tiene dos partes. **Si querés usar el sistema, andá directo a
   [Comandos](#comandos) ·
   [Estructura](#estructura) ·
   [Base de datos](#base-de-datos) ·
+  [Despliegue](#despliegue) ·
   [API](#api) ·
   [Pruebas](#pruebas) ·
   [Integración continua](#integración-continua) ·
@@ -91,6 +92,7 @@ Cada rol entra a su sección y solo a la suya.
 | Un servicio no levanta | `docker compose logs -f backend` (o `frontend`, o `db`) |
 | No se puede entrar | Falta la carga inicial: corré el tercer comando otra vez |
 | Cambiaste el código y no se ve | `docker compose restart backend frontend` |
+| Agregaste una dependencia y el frontend dice que no la encuentra | El volumen con nombre tapa `/app/node_modules`, así que la imagen la tiene y el contenedor no: `docker compose exec frontend npm ci` y `docker compose restart frontend` |
 
 Para volver a cero (base y volumen incluidos): `docker compose down -v`.
 
@@ -214,6 +216,44 @@ el backend de verdad (D14), y hay una prueba que verifica esa frontera leyendo e
 `alembic upgrade head` aplica la migración inicial, que crea las 18 tablas. Está **revisada a
 mano** (D16): Alembic no emite CHECK constraints ni índices sobre columnas normalizadas, así que
 esos dos tipos de restricción están escritos a mano en el archivo de migración.
+
+## Despliegue
+
+La migración `0002_altas_catalogo` cambia el esquema y **elimina columnas**
+(`curso.codigo_norm`, `comision.codigo`), así que el orden de los pasos importa. Antes de tocar
+un entorno con datos, hacé un respaldo de la base: **el respaldo es el límite real del
+rollback.**
+
+En este orden, y en este orden:
+
+1. **Aplicar la migración**: `alembic upgrade head`.
+2. **Desplegar o reiniciar el backend nuevo.**
+3. **Desplegar el frontend nuevo.**
+
+El orden importa porque el backend anterior todavía escribe `curso.codigo_norm` y
+`comision.codigo`, que `0002` elimina, y porque el modelo anterior exige `docente.cuil` con
+`NOT NULL`. Backend nuevo contra esquema viejo, el código nuevo falla por columnas que no
+encuentra; backend anterior contra esquema nuevo, falla por columnas que ya no están.
+Migrar primero es seguro: `comision.numero` se completa dentro de la propia migración.
+
+### Qué hace y qué no hace el rollback
+
+`alembic downgrade 0001_initial` **recrea las columnas y recupera los datos**:
+
+- `curso.codigo` y `curso.codigo_norm` se copian desde el código generado. Copiar es
+  normalizar: `CUR001` no tiene separadores ni acentos, así que queda igual.
+- `comision.codigo` se recompone como `{curso.codigo}-{numero}`.
+- `docente.cuil` no se toca: solo deja de ser `NOT NULL` en el `upgrade` y vuelve a serlo en el
+  `downgrade`. Si hay docentes cargados sin CUIL, **el `downgrade` falla**, y es lo correcto:
+  una restricción que los datos incumplen no se puede restaurar.
+
+Lo que **no** vuelve es el texto que el operador había cargado a mano en `comision.codigo`: en
+el esquema viejo era un dato libre y queda reemplazado por el código derivado. Y `0002` **no
+deduce `numero` del sufijo del código viejo**: numera las comisiones por orden de inserción
+dentro de cada curso, así que el número asignado puede no ser el que tenía la fila.
+
+El `downgrade()` de `0001_initial` tira las tablas enteras (`DROP TABLE`), así que no sirve
+para deshacer esta migración: el paso atrás es el de arriba.
 
 ## API
 

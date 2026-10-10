@@ -19,8 +19,20 @@ import {
  * bien y estos tests lo dicen.
  *
  * **Cada sección se reconoce por su propia marca.** Las tres tienen su shell montado —los grupos 9,
- * 10 y 11— así que la marca de cada una es el título de su panel lateral.
+ * 10 y 11— así que la marca de cada una es el nombre accesible de su panel lateral.
+ *
+ * **El cierre de sesión está en el menú de perfil.** Desde el change `ui-figma-dashboards` la barra
+ * superior tiene un bloque de perfil desplegable con una única entrada, así que quien quiera salir
+ * abre primero ese menú: es la misma interacción en las tres secciones.
  */
+
+/** Abre el menú de perfil de la cuenta y elige `Cerrar sesión` (7.3). */
+async function cerrarSesion(nombreCuenta) {
+  const user = userEvent.setup()
+
+  await user.click(screen.getByRole('button', { name: new RegExp(nombreCuenta) }))
+  await user.click(await screen.findByRole('menuitem', { name: 'Cerrar sesión' }))
+}
 describe('redirección por rol', () => {
   beforeEach(() => {
     stubBackend()
@@ -72,8 +84,8 @@ describe('redirección por rol', () => {
     seedStoredToken('ADMIN')
     renderApp('/admin')
 
-    await screen.findByRole('button', { name: 'Cerrar sesión' })
-    await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
+    await screen.findByRole('button', { name: /Secretaria BA/ })
+    await cerrarSesion('Secretaria BA')
 
     await waitFor(() => {
       expect(window.sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull()
@@ -85,8 +97,8 @@ describe('redirección por rol', () => {
   it('deja volver a entrar después de cerrar sesión', async () => {
     seedStoredToken('DOCENTE')
     renderApp('/docente')
-    await screen.findByRole('button', { name: 'Cerrar sesión' })
-    await userEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
+    await screen.findByRole('button', { name: /Rita Molina/ })
+    await cerrarSesion('Rita Molina')
     await screen.findByLabelText('Correo electrónico')
 
     await fillLoginForm(accountForRole('DOCENTE'))

@@ -7,7 +7,10 @@
  * verifica sobre el código, no sobre la confianza.
  *
  * Para qué están los datos si nadie los importa directo: la fábrica de `src/services/` los carga
- * cuando `VITE_API_MODE` es `mock`, que es el valor por defecto del entorno de desarrollo.
+ * cuando `VITE_API_MODE` es `mock`. Ese modo **no es el valor por omisión** desde el change
+ * `altas-catalogo-docentes`: el entorno de desarrollo publica `api` (D36), así que estos datos
+ * aparecen solo donde todavía no hay endpoint —una lectura que responde 404— o cuando se pide
+ * `mock` explícitamente.
  *
  * Todos los datos son de ejemplo. Ninguno es dato de negocio y ninguno implica que la
  * información del cliente ya se haya migrado.

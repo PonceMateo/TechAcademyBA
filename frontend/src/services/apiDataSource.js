@@ -1,17 +1,24 @@
 import { API_BASE_URL } from '../config/api'
 import { readStoredToken } from '../auth/tokenStorage'
+import { createMockDataSource } from './mockDataSource'
 
 /**
- * Implementación real de la frontera de datos: habla con el backend.
+ * Implementación real de la frontera de datos: habla con el backend (D36).
  *
- * **Todavía no hay endpoint para nada de esto.** D14 deja una sola llamada de red, el login; los
- * grupos del backend que expongan cat padrón, cobranza y habilitación todavía no están escritos.
+ * **Las lecturas que no tienen endpoint caen al ejemplo, solo con un 404.** Los endpoints que
+ * existen son los del catálogo y del padrón de docentes. Los de alumnos, empresas, cobranzas,
+ * habilitación y clases todavía no están escritos, y las pantallas que los usan tienen que seguir
+ * mostrando algo: si el modo real es el default (D36) y no hubiera caída, el tablero, la pantalla
+ * de alumnos y la de cobranzas quedarían vacías.
  *
- * Los caminos de `PATHS` son **provisionales**: son los que corresponde por recurso y verbo, y
- * están en un solo lugar para que el primer endpoint real los confirme o los corrija de una vez.
- * Esa es la forma en que `design.md` avisa que va a aparecer el error: no después de un mes de
- * pantallas rotas, sino en el primer endpoint que se define. Si un campo del ejemplo no exista
- * en la API, se ve acá.
+ * **Por qué solo 404 y no "cualquier error":** un error de red o un 500 disfrazado de dato
+ * válido hace creer que la pantalla funciona. La ausencia de endpoint es el único caso en el que
+ * el ejemplo es una respuesta honesta: lo que falta es el endpoint, y no hay dato que mostrar.
+ *
+ * **Los POST NUNCA caen. Es lo más importante de este archivo.** Un alta que no llega a la base
+ * tiene que fallar y decir que no se guardó. Si cayera al ejemplo, escribiría en un arreglo de
+ * memoria, la pantalla confirmaría un curso que no existe, y la secretaría se iría creyendo que
+ * el sistema guarda. Es la diferencia entre una demo que miente y una demo honesta.
  *
  * **El token va en cada petición** porque el backend resuelve la sesión en cada request (M7): la
  * frontera de datos no tiene sesión propia. Se lee del mismo lugar que el login, para que haya un
@@ -25,8 +32,13 @@ export class DataSourceError extends Error {
   }
 }
 
-/** Rutas provisionales, por recurso. Un solo lugar para corregirlas cuando exista el endpoint. */
+/**
+ * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes` y `sedes` quedaron **confirmadas**
+ * por los endpoints reales del change `altas-catalogo-docentes`; las demás siguen provisionales
+ * (M33) hasta que exista su endpoint.
+ */
 const PATHS = Object.freeze({
+  cursos: '/cursos',
   comisiones: '/comisiones',
   docentes: '/docentes',
   alumnos: '/alumnos',
@@ -36,14 +48,29 @@ const PATHS = Object.freeze({
   habilitacion: '/habilitaciones/consulta',
   override: '/habilitaciones/override',
   comisionesAsignadas: '/docentes/mis-comisiones',
+  perfilDocente: '/docentes/mi-perfil',
   padronComision: '/comisiones/:codigo/alumnos',
   asistencia: '/comisiones/:codigo/asistencia',
-  perfilDocente: '/docentes/mi-perfil',
   linkClase: '/clases/link',
   inscripcionesAlumno: '/alumno/inscripciones',
   pagosAlumno: '/alumno/pagos',
   perfilAlumno: '/alumno/mi-perfil',
 })
+
+/**
+ * Los métodos que **escriben**, y que por lo tanto nunca caen al ejemplo.
+ *
+ * Es una lista explícita y no un patrón de nombre, porque la consecuencia de equivocarse no es un
+ * test rojo: es una secretaría que cree que guardó un curso que no está en la base.
+ */
+const ESCRIBEN = new Set([
+  'crearCurso',
+  'crearComision',
+  'crearDocente',
+  'registrarCobranza',
+  'forzarBloqueoManual',
+  'guardarLinkClase',
+])
 
 async function request(path, { method = 'GET', body, query, params } = {}) {
   // Los `:nombre` del camino se reemplazan con `params`. Es lo que permite que `PATHS` declare
@@ -80,7 +107,11 @@ async function request(path, { method = 'GET', body, query, params } = {}) {
 
   if (!response.ok) {
     throw new DataSourceError(
-      `La API respondió ${response.status} a ${method} ${ruta}.`,
+      // El `detail` del backend es texto de interfaz en es-AR y dice qué dato se repitió, así que
+      // se sube tal cual: la pantalla lo muestra y no necesita saber de dónde viene.
+      response.status >= 400 && response.status < 500 && response.status !== 404
+        ? (await leerDetalle(response)) ?? `La API respondió ${response.status} a ${method} ${ruta}.`
+        : `La API respondió ${response.status} a ${method} ${ruta}.`,
       response.status,
     )
   }
@@ -88,25 +119,85 @@ async function request(path, { method = 'GET', body, query, params } = {}) {
   return response.json()
 }
 
+/** El `detail` de un error del backend, si lo tiene. Un 4xx sin cuerpo no rompe nada. */
+async function leerDetalle(response) {
+  try {
+    const cuerpo = await response.json()
+    return typeof cuerpo?.detail === 'string' ? cuerpo.detail : null
+  } catch {
+    return null
+  }
+}
+
 export function createApiDataSource() {
-  return {
+  const api = {
     modo: 'api',
+
+    // ------------------------------------------------------------- catálogo
+
+    async listarCursos() {
+      return request(PATHS.cursos)
+    },
+
+    async crearCurso(datos) {
+      return request(PATHS.cursos, { method: 'POST', body: datos })
+    },
 
     async listarComisiones() {
       return request(PATHS.comisiones)
     },
 
-    async obtenerResumenCatalogo() {
-      return request(PATHS.comisiones, { query: { resumen: true } })
+    async crearComision(datos) {
+      return request(PATHS.comisiones, { method: 'POST', body: datos })
     },
+
+    /**
+     * El resumen sale de la lista, no de un campo de la API.
+     *
+     * Antes pedía `GET /comisiones?resumen=true`, que ningún endpoint definía: con el modo real la
+     * respuesta era la lista entera y el chip de la pantalla mostraba `undefined` (D15).
+     */
+    async obtenerResumenCatalogo() {
+      const comisiones = await request(PATHS.comisiones)
+      return { total_comisiones: comisiones.length }
+    },
+
+    async listarSedes() {
+      return request(PATHS.sedes)
+    },
+
+    // ---------------------------------------------------------- padrón
 
     async listarDocentes() {
-      return request(PATHS.docentes)
+      return (await request(PATHS.docentes)).map(filaDeDocente)
     },
 
+    /**
+     * Búsqueda de docentes: filtra la lista ya traída, en el cliente.
+     *
+     * `GET /docentes` no acepta un parámetro de búsqueda porque la historia #10, que es la que
+     * lo pide, está fuera de este change. Filtrar acá mantiene el buscador de la pantalla
+     * andando con datos reales; cuando llegue #10, la búsqueda pasa al servidor y esto se
+     * convierte en el `?q=` que el endpoint va a definir.
+     */
     async buscarDocentes(texto) {
-      return request(PATHS.docentes, { query: { q: texto } })
+      const aguja = texto.trim().toLowerCase()
+      const todos = (await request(PATHS.docentes)).map(filaDeDocente)
+      if (aguja === '') {
+        return todos
+      }
+      return todos.filter((fila) =>
+        [fila.nombre, fila.dni, fila.email].some((campo) =>
+          String(campo ?? '').toLowerCase().includes(aguja),
+        ),
+      )
     },
+
+    async crearDocente(datos) {
+      return filaDeDocente(await request(PATHS.docentes, { method: 'POST', body: datos }))
+    },
+
+    // ------------------------------------ endpoints que todavía no existen
 
     async listarAlumnos() {
       return request(PATHS.alumnos)
@@ -118,10 +209,6 @@ export function createApiDataSource() {
 
     async listarEmpresas() {
       return request(PATHS.empresas)
-    },
-
-    async listarSedes() {
-      return request(PATHS.sedes)
     },
 
     async listarCobranzas() {
@@ -152,16 +239,21 @@ export function createApiDataSource() {
       return request(PATHS.comisionesAsignadas)
     },
 
+    /**
+     * Ficha del docente que entra. La ruta es **provisional**: no hay endpoint escrito, así que
+     * esto da 404 y la lectura cae al ejemplo, que es lo que la pantalla del docente muestra
+     * mientras tanto (M33).
+     */
+    async obtenerPerfilDocente() {
+      return request(PATHS.perfilDocente)
+    },
+
     async obtenerPadronComision(comisionCodigo) {
       return request(PATHS.padronComision, { params: { codigo: comisionCodigo } })
     },
 
     async obtenerAsistenciaComision(comisionCodigo) {
       return request(PATHS.asistencia, { params: { codigo: comisionCodigo } })
-    },
-
-    async obtenerPerfilDocente() {
-      return request(PATHS.perfilDocente)
     },
 
     async obtenerLinkClase(comisionCodigo) {
@@ -192,5 +284,60 @@ export function createApiDataSource() {
     async obtenerPerfilAlumno() {
       return request(PATHS.perfilAlumno)
     },
+  }
+
+  return conEjemploEnAusencia(api)
+}
+
+/**
+ * Envuelve las lecturas para que caigan al ejemplo cuando el endpoint no existe.
+ *
+ * `ponytail: la caída al ejemplo se borra cuando el shell tenga todos sus endpoints. Es un atajo
+ * deliberado, no una arquitectura: mientras falten, es lo que evita que el modo real por omisión
+ * deje media pantalla vacía.` (D36)
+ */
+function conEjemploEnAusencia(api) {
+  const ejemplo = createMockDataSource()
+  const envuelto = { modo: api.modo }
+
+  for (const [nombre, metodo] of Object.entries(api)) {
+    if (nombre === 'modo' || ESCRIBEN.has(nombre) || typeof metodo !== 'function') {
+      envuelto[nombre] = metodo
+      continue
+    }
+
+    envuelto[nombre] = async (...argumentos) => {
+      try {
+        return await metodo(...argumentos)
+      } catch (error) {
+        const sinEndpoint = error instanceof DataSourceError && error.status === 404
+        const tieneEjemplo = typeof ejemplo[nombre] === 'function'
+        if (!sinEndpoint || !tieneEjemplo) {
+          throw error
+        }
+        return ejemplo[nombre](...argumentos)
+      }
+    }
+  }
+
+  return envuelto
+}
+
+/**
+ * La fila de docente como la consume la pantalla: nombre completo y conte de comisiones.
+ *
+ * El modelo tiene `nombre` y `apellido` por separado y una cuenta derivada de comisiones; el
+ * ejemplo traía el nombre ya junto y el campo `comisiones_asignadas`. La unión vive acá, en la
+ * frontera, para que `TeachersPage` no tenga que saber de dónde viene la fila.
+ *
+ * `catedra` no existe en el modelo: se manda `null` para que la columna muestre un guion en vez de
+ * inventar un dato.
+ */
+function filaDeDocente(docente) {
+  return {
+    ...docente,
+    nombre: `${docente.nombre} ${docente.apellido}`,
+    catedra: null,
+    comisiones_asignadas: docente.cantidad_comisiones ?? 0,
   }
 }
