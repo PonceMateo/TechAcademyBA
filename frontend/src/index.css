@@ -107,6 +107,31 @@
   outline-offset: 2px;
 }
 
+/*
+ * Texto en el acento del rol. Las pantallas no eligen color: dentro de un shell esto es verde,
+ * azul o dorado según dónde esté la pantalla, y fuera de un shell es el azul de la marca.
+ */
+.texto-acento {
+  color: var(--acento-texto);
+}
+
+@layer components {
+  /*
+   * Los `select` del maquetado no pasan por `Input` —el navegador dibuja su propia flecha— así que
+   * toman acá la forma del campo del sistema. Es una regla de elemento y no una clase repetida en
+   * cada formulario: las utilidades de cada `select` siguen ganando sobre este bloque, así que las
+   * pantallas que ya fijan tamaño o radio no cambian.
+   */
+  select {
+    @apply rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900;
+  }
+
+  select:focus-visible {
+    outline: 2px solid var(--anillo-acento);
+    outline-offset: 2px;
+  }
+}
+
 /* Superficie clara del shell: el lateral y la barra superior son blancos translúcidos. */
 .superficie-cristal {
   background-color: rgb(255 255 255 / 0.72);

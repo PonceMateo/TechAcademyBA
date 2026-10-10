@@ -573,7 +573,7 @@ function TarjetaCurso({ curso, total, onAbrir }) {
     <button
       type="button"
       onClick={onAbrir}
-      className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-300 hover:shadow"
+      className="foco-acento flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-300 hover:shadow"
     >
       <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
       <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
@@ -581,7 +581,7 @@ function TarjetaCurso({ curso, total, onAbrir }) {
       <span className="text-xs text-slate-600">
         {total} {total === 1 ? 'comisión' : 'comisiones'}
       </span>
-      <span className="text-sm font-medium text-blue-700">Abrir comisiones</span>
+      <span className="texto-acento text-sm font-medium">Abrir comisiones</span>
     </button>
   )
 }

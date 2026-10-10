@@ -63,7 +63,10 @@ quiso fuera de alcance, y el Figma ya dibuja el tablero sobre la página que exi
 
 **2. El menú es la lista de cada spec, sin rótulos de sección y con ícono.**
 
-Se eliminan las constantes `TITULO_MENU` de los tres `navegacion.js` y el `<h1>` del panel:
+Se elimina el `<h1>` del panel y el rótulo visible de sección. **`TITULO_MENU` se conserva** en
+cada `navegacion.js` —contra lo que decía la task 3.4— porque es el nombre accesible del `<nav>`:
+sin él, el panel de navegación se anuncia como "navegación" a secas. Deja de dibujarse como texto
+y queda solo como `aria-label`; ver *Desviaciones del tasks*. La línea original decía:
 las categorías `ESPACIO DE TRABAJO` / `COMUNIDAD` del Figma son invenciones suyas y no aportan
 nada. Cada ítem lleva un ícono lucide: el que el Figma asigna cuando el ítem existe en su menú
 (`Mis Cursos` → `book-open`, `Mis Pagos` → `wallet`, `Certificados` → `award`, `Cobranzas` →
@@ -163,6 +166,32 @@ openspec/changes/ui-figma-dashboards/
     ├── teacher-shell/spec.md    (MODIFIED: estructura de navegación + listado de comisiones)
     └── student-shell/spec.md    (MODIFIED: estructura de navegación; ADDED: tablero del alumno)
 ```
+
+## Desviaciones del tasks
+
+Anotadas acá y no silenciadas (tasks 6.1 y 7.1):
+
+- **`TITULO_MENU` no se elimina** (task 3.4). Se conserva como nombre accesible del `<nav>` de los
+tres shells y deja de dibujarse; las pruebas de armazón afirman las dos cosas: que el nombre
+existe y que no hay texto visible.
+- **El `Button` compartido dejó de estar en toda pantalla.** Antes el pie mostraba el botón de
+  cerrar sesión en todas las pantallas; ahora vive en el menú de perfil. La entrada del menú usa el
+  mismo componente `Button` (con `role="menuitem"`), y la prueba de consistencia se parte en dos:
+  tarjetas compartidas por pantalla y cierre de sesión compartido por armazón (6.1).
+- **Los `select` nativos del maquetado** no pasan por `Input` —el navegador dibuja su flecha—, así
+  que toman la forma del campo desde una regla de elemento en `@layer components` de `index.css`,
+  con las utilidades de cada pantalla ganando por encima. Se agrega además la utilidad
+  `.texto-acento` para los textos que van en el acento del rol: reemplaza a `text-teal-800` y
+  `text-blue-700` sueltos en las páginas (5.1 y 5.3).
+- **La barra superior se ubica en las pruebas por `[data-ui="shell-frame"] > header`** y no por el
+  rol `banner`: la cabecera de cada tablero —el saludo— también es un `<header>` y jsdom la anuncia
+  igual. Es una limitación del entorno de prueba, no del armazón.
+- **Los perfiles de alumno y docente conservan sus literales de identidad** (`CR`/`Camila
+  Rodríguez`, `PM`/`Profe Martín`) como constantes locales de la pantalla: el armazón ya no exporta
+  las suyas porque la identidad que muestra es la cuenta de la sesión (5.1).
+- **La comparación visual (6.3) queda pendiente**: mirar los tres índices contra
+  `Diseño-*.png` exige el stack corriendo (Compose + backend), que no está disponible en esta
+  máquina. Está verificado por estructura y por pruebas, no por ojo.
 
 ## Riesgos
 

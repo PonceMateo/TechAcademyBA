@@ -249,6 +249,48 @@ describe('las pantallas de cada shell dibujan con los componentes compartidos', 
   )
 })
 
+describe('navegación por teclado en los tres armazones (6.2)', () => {
+  it.each([
+    ['ADMIN', '/admin', 'MENÚ OPERATIVO'],
+    ['DOCENTE', '/docente', 'ESPACIO DOCENTE'],
+    ['ALUMNO', '/alumno', 'ESPACIO ALUMNO'],
+  ])('deja llegar al perfil con Tab y abrir su menú con Enter en %s', async (rol, ruta, marca) => {
+    resetDataSource()
+    stubBackend()
+    renderAppAs(rol, ruta)
+    await screen.findByRole('navigation', { name: marca })
+
+    const user = userEvent.setup()
+    // La primera parada es el bloque de perfil: la búsqueda `⌘ K` y la campana son composición
+    // inerte y no reciben foco, así que lo que sigue en el recorrido es el lateral.
+    await user.tab()
+    const perfil = screen.getByRole('button', { name: new RegExp(accountForRole(rol).nombre) })
+    expect(document.activeElement).toBe(perfil)
+
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
+  })
+
+  it('deja cerrar la sesión solo con el teclado', async () => {
+    resetDataSource()
+    stubBackend()
+    renderAppAs('ADMIN', '/admin')
+    await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
+
+    const user = userEvent.setup()
+    await user.tab()
+    await user.keyboard('{Enter}')
+    await user.tab()
+
+    const salir = screen.getByRole('menuitem', { name: 'Cerrar sesión' })
+    expect(document.activeElement).toBe(salir)
+
+    await user.keyboard('{Enter}')
+    // La sesión se cierra y vuelve el acceso, sin haber usado el mouse.
+    expect(await screen.findByLabelText('Correo electrónico')).toBeInTheDocument()
+  })
+})
+
 describe('los tres acentos de la identidad', () => {
   it('declara un bloque de acento por rol, y los tres son distintos', () => {
     const css = readFileSync(join(RAIZ_SRC, 'index.css'), 'utf8')

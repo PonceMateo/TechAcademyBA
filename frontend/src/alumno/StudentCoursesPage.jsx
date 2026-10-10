@@ -182,7 +182,7 @@ export function StudentCoursesPage() {
                       {estaBloqueada && (
                         <p className="mt-1 text-sm">
                           {`Causa: ${inscripcion.acceso.causa}`}
-                          <Link to="/alumno/pagos" className="ml-2 font-medium underline">
+                          <Link to="/alumno/pagos" className="foco-acento ml-2 rounded font-medium underline">
                             Ir a Mis Pagos
                           </Link>
                         </p>
