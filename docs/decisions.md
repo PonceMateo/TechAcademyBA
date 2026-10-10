@@ -1290,6 +1290,46 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+## Aparencia Figma de los shells y los tableros (change `ui-figma-dashboards`)
+
+### D40 — La apariencia nueva sale de los JSON de Figma, con paleta por rol y sin datos del prototipo
+
+- **Fecha:** 2026-10-09
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** los tres shells se redibujan con el lenguaje de los JSON exportados de Figma
+  —fondo degradado por rol con retícula, lateral blanco translúcido sin rótulo de título y con
+  íconos, barra superior con breadcrumb, búsqueda inerte, campana inerte y perfil con
+  `Cerrar sesión`, pie de tres textos— y con tres acentos en paleta stock: dorado (Alumno),
+  verde (Docente) y azul (Secretaría). Los tableros son las pantallas índice existentes,
+  recompuestas con datos del maquetado; lo que el prototipo muestra sin datos detrás
+  —gráficos, tareas, calificaciones, correcciones, novedades— no se construye. La sede sale
+  del armazón y se conserva en las pantallas de dominio. Las fechas y la `Última actualización`
+  quedan literales placeholders.
+- **Por qué:** Figma es la autoridad de estructura y estilo (`AGENTS.md`) y aporta cero datos;
+  los números del PDF (`1.248 alumnos`, `68% de progreso`) contradicen el maquetado. Los chips,
+  títulos de panel y textos de pie que se eliminan estaban fijados en los specs de shell, por
+  eso entran como deltas del change y no como cambios de código silenciosos.
+- **Dónde:** `openspec/changes/ui-figma-dashboards/`,
+  `docs/design/figma-dashboards-overhaul/`,
+  `frontend/src/components/shell/ShellFrame.jsx`, `frontend/src/index.css`,
+  `frontend/src/*/navegacion.js`.
+
+---
+
+### D41 — El experimento `ui-appearance-improvement` se descarta y no se fusiona
+
+- **Fecha:** 2026-10-09
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la rama `feat/ui-appearance-improvement` (commit `e6cb747`) queda sin fusionar y
+  sin borrar; el trabajo nuevo arranca de `feat/altas-catalogo-docentes` con la rama
+  `feat/ui-figma-dashboards` y el change `ui-figma-dashboards`.
+- **Por qué:** el equipo probó ese acabado y no le gustó cómo quedó, así que se trata como
+  rollback. Borrar la rama destruiría el registro de lo que se probó, y fusionarla impondría
+  una paleta —terracota, teal, índigo— que la decisión D40 reemplaza.
+- **Dónde:** rama `feat/ui-appearance-improvement`.
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven
