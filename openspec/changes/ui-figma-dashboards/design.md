@@ -189,6 +189,14 @@ existe y que no hay texto visible.
 - **Los perfiles de alumno y docente conservan sus literales de identidad** (`CR`/`Camila
   Rodríguez`, `PM`/`Profe Martín`) como constantes locales de la pantalla: el armazón ya no exporta
   las suyas porque la identidad que muestra es la cuenta de la sesión (5.1).
+- **Revisión con `ui-ux-pro-max` (5.3 y checklist previo a la entrega).** Dos hallazgos
+  aplicados: el foco no puede quedar tapado por la barra superior `sticky` —se declara
+  `scroll-padding-top` en `index.css` (WCAG 2.2, foco no oculto)— y el sistema declara
+  `prefers-reduced-motion: reduce` para las transiciones. Lo demás del checklist que aplica a
+  web ya se cumplía: íconos vectoriales de una sola familia (`lucide`), decorativos con
+  `aria-hidden`, controles con nombre accesible, estado anunciado por `aria-current`/`aria-expanded`
+  y texto en el acento con variante oscura. Los apartados de la skill para app nativa (safe areas,
+  touch targets, Dynamic Type) no aplican a este frontend web.
 - **La comparación visual (6.3) queda pendiente**: mirar los tres índices contra
   `Diseño-*.png` exige el stack corriendo (Compose + backend), que no está disponible en esta
   máquina. Está verificado por estructura y por pruebas, no por ojo.

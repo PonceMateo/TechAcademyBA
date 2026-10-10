@@ -108,6 +108,34 @@
 }
 
 /*
+ * El foco no queda tapado por la barra superior. La barra es `sticky`, así que sin este margen un
+ * enlace del panel o un campo al que llega el teclado quedaría por debajo de ella cuando el
+ * navegador lo trae a la vista (WCAG 2.2, foco no oculto en su mínimo). El valor es una sola vez
+ * acá y corresponde a la altura de la barra del armazón en una línea.
+ */
+:root {
+  --alto-barra-superior: 4.5rem;
+}
+
+html {
+  scroll-padding-top: var(--alto-barra-superior);
+}
+
+/*
+ * Movimiento reducido: las transiciones del sistema son de color y de sombra, no de movimiento,
+ * pero quien pide menos movimiento no tiene por qué bancárselas igual.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
  * Texto en el acento del rol. Las pantallas no eligen color: dentro de un shell esto es verde,
  * azul o dorado según dónde esté la pantalla, y fuera de un shell es el azul de la marca.
  */
