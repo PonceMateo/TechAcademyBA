@@ -47,8 +47,8 @@
   `Última actualización: 09:41`; quitar el bloque de persona/terminal del pie.
 - [x] 3.3 Acentos: alumno dorado, docente verde, Secretaría azul en `ACENTOS`/`data-acento`;
   mantener la validación de acento desconocido.
-- [x] 3.4 `navegacion.js` de `admin/`, `docente/` y `alumno/`: quitar `TITULO_MENU`,
-  `CHIP_ROL`, `CHIP_SEDE` y las constantes de pie que dejan de existir; agregar el ícono de cada
+- [x] 3.4 `navegacion.js` de `admin/`, `docente/` y `alumno/`: quitar `TITULO_MENU`
+  (ver Desviaciones: se conserva solo como `aria-label`), `CHIP_ROL`, `CHIP_SEDE` y las constantes de pie que dejan de existir; agregar el ícono de cada
   ítem (los del Figma cuando el ítem existe en su menú, un equivalente lucide cuando no).
 - [x] 3.5 Quitar del `ShellFrame` el uso de esas constantes y verificar que ninguna pantalla
   las importa más.

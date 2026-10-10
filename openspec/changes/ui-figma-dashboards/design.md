@@ -183,9 +183,14 @@ existe y que no hay texto visible.
   con las utilidades de cada pantalla ganando por encima. Se agrega además la utilidad
   `.texto-acento` para los textos que van en el acento del rol: reemplaza a `text-teal-800` y
   `text-blue-700` sueltos en las páginas (5.1 y 5.3).
-- **La barra superior se ubica en las pruebas por `[data-ui="shell-frame"] > header`** y no por el
+- **La barra superior se ubica en las pruebas por `[data-ui="shell-frame"] header`** y no por el
   rol `banner`: la cabecera de cada tablero —el saludo— también es un `<header>` y jsdom la anuncia
   igual. Es una limitación del entorno de prueba, no del armazón.
+- **Reorden sidebar-first neutro al spec**: el `<nav>` pasa a primer hijo del shell y
+  barra/contenido/pie van en un contenedor de columna derecha; en móvil el lateral apila
+  arriba de la barra. Endurecimiento anti-desborde (`overflow-x-hidden`, `flex-wrap`,
+  `min-w-0`, insignias con envoltorio `shrink-0`) + selector descendente en las 3 pruebas
+  de layout + orden de Tab con nav primero.
 - **Los perfiles de alumno y docente conservan sus literales de identidad** (`CR`/`Camila
   Rodríguez`, `PM`/`Profe Martín`) como constantes locales de la pantalla: el armazón ya no exporta
   las suyas porque la identidad que muestra es la cuenta de la sesión (5.1).
@@ -197,9 +202,12 @@ existe y que no hay texto visible.
   `aria-hidden`, controles con nombre accesible, estado anunciado por `aria-current`/`aria-expanded`
   y texto en el acento con variante oscura. Los apartados de la skill para app nativa (safe areas,
   touch targets, Dynamic Type) no aplican a este frontend web.
-- **La comparación visual (6.3) queda pendiente**: mirar los tres índices contra
-  `Diseño-*.png` exige el stack corriendo (Compose + backend), que no está disponible en esta
-  máquina. Está verificado por estructura y por pruebas, no por ojo.
+- **Comparación visual (6.3): verificada en pantalla con el stack arriba** — los tres
+  índices se abrieron con las cuentas de demostración y se vieron el lateral con íconos, la
+  barra superior con breadcrumb y perfil, los cuatro indicadores, el pie de tres textos, el
+  acento de cada rol, la tipografía Inter y el fondo degradado. **Queda para el ojo humano**
+  el cotejo lado a lado contra `Diseño-*.png`: las capturas no son legibles por el agente.
+  Sin desviaciones nuevas.
 
 ## Riesgos
 
