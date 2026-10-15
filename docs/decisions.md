@@ -1320,6 +1320,10 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   `docs/design/figma-dashboards-overhaul/`,
   `frontend/src/components/shell/ShellFrame.jsx`, `frontend/src/index.css`,
   `frontend/src/*/navegacion.js`.
+- **Modificación (2026-10-15): la frase de cierre deja de ser cierta.** "Las fechas y la
+  `Última actualización` quedan literales placeholders" ya no es contrato vigente: las fechas de los
+  encabezados son la fecha real del día y el pie pierde `Última actualización`, porque un
+  placeholder que parece un dato es justo lo que se confundió con un dato real (D43).
 
 ---
 
@@ -1350,6 +1354,37 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   elimina es la posibilidad de que la app corra sobre ellos.
 - **Dónde:** `frontend/src/services/dataSourceFactory.js`, `frontend/src/mocks/index.js`,
   `frontend/src/test/setup.js`, `frontend/src/test/support.jsx`.
+
+---
+
+## Quitar los datos inventados del frontend (change `quitar-datos-inventados-frontend`)
+
+### D43 — El frontend conserva la forma de las pantallas y marca con `—` lo que ninguna fuente respalda
+
+- **Fecha:** 2026-10-15
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** se eliminan los literales de negocio escritos a mano de los tres tableros, los dos
+  perfiles, el pie del armazón y la acción de copia de `AccessPage`. Ninguna pantalla elimina un
+  elemento porque su dato no exista todavía: la pantalla conserva su forma y, donde la fuente no
+  puede responder, el valor es `—`. Donde la fuente responde se muestra el valor real, incluido un
+  `0` real. El valor `—` significa "todavía no lo sé" y SHALL NOT significar "cero"; un valor que
+  ninguna fuente respalde no se muestra nunca. Mientras una lectura no haya resuelto, el valor
+  afectado es `—`, nunca un `0` ni un literal. La fecha de los encabezados pasa a ser la fecha real
+  del día y el pie pierde `Última actualización`.
+- **Por qué:** el bootstrap fue una maqueta para una presentación; un alumno vio un tablero con
+  números falsos antes de que la consulta fallara. El equipo priorizó que ninguna pantalla muestre
+  un dato que no venga de la fuente, conservando la forma de la interfaz: la pantalla se desarma
+  menos y se ve exactamente qué falta, sin que un `0` o un literal afirmen algo que no se sabe.
+- **Corrige a D40:** su frase de cierre, "Las fechas y la `Última actualización` quedan literales
+  placeholders", deja de ser cierta. Las fechas son la fecha real del día y la `Última
+  actualización` se quita, porque un placeholder que parece un dato es justo lo que se confundió
+  con un dato real.
+- **Dónde:** `frontend/src/admin/DashboardPage.jsx`,
+  `frontend/src/admin/AccessPage.jsx`, `frontend/src/alumno/StudentCoursesPage.jsx`,
+  `frontend/src/alumno/StudentPaymentsPage.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`,
+  `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/docente/TeacherProfilePage.jsx`, `frontend/src/components/shell/ShellFrame.jsx`,
+  `frontend/src/utils/formato.js`.
 
 ---
 

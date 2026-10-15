@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Definir el shell del alumno de TechAcademy BA como maqueta navegable: su curso inscripto, el detalle de esa cursada con su estado de acceso, su historial de pagos y su perfil, apoyados en datos de ejemplo del alumno y de su inscripción y dejando la historia de pago en línea y los certificados fuera de alcance.
+Definir el shell del alumno de TechAcademy BA como maqueta navegable: su curso inscripto, el detalle de esa cursada con su estado de acceso, su historial de pagos y su perfil, apoyados en la capa de datos real y degradando a su estado vacío lo que no tiene endpoint detrás, y dejando la historia de pago en línea y los certificados fuera de alcance.
 
 ## Requirements
 

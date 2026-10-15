@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Definir el shell de Administración y Secretaría de TechAcademy BA como maqueta navegable: su navegación, sus seis pantallas y la forma visible de representar el estado de acceso de cada alumno, apoyadas en datos de ejemplo de comisiones, docentes, alumnos, cuentas corporativas y cobranzas, y sin implementar lógica de negocio ni historias de usuario.
+Definir el shell de Administración y Secretaría de TechAcademy BA como maqueta navegable: su navegación, sus seis pantallas y la forma visible de representar el estado de acceso de cada alumno, apoyadas en la capa de datos real y degradando a su estado vacío lo que no tiene endpoint detrás, y sin implementar lógica de negocio ni historias de usuario.
 
 ## Requirements
 

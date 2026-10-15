@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Definir el shell del docente de TechAcademy BA como maqueta navegable: su navegación, el detalle de la única comisión que el cliente tiene asignada con su padrón de alumnos, la carga del link de la clase, la asistencia y su perfil, apoyadas en datos de ejemplo de docentes y alumnos y dejando fuera de alcance las notas y la certificación.
+Definir el shell del docente de TechAcademy BA como maqueta navegable: su navegación, el detalle de la única comisión que el cliente tiene asignada con su padrón de alumnos, la carga del link de la clase, la asistencia y su perfil, apoyadas en la capa de datos real y degradando a su estado vacío lo que no tiene endpoint detrás, y dejando fuera de alcance las notas y la certificación.
 
 ## Requirements
 
