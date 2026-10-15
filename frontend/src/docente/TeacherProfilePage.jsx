@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useSession } from '../auth/SessionContext'
 import { Avatar, Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { obtenerPerfilDocente } from '../services/dataService'
+import { inicialesDe } from '../utils/formato'
 
 /**
  * Perfil del docente (10.5).
@@ -17,14 +19,10 @@ import { obtenerPerfilDocente } from '../services/dataService'
  * **El chip `DOCENTE · PERMISOS REDUCIDOS` va con la nota de a quién pedir los cambios.** Un chip
  * que dice "pocos permisos" sin decir a quién recurres deja la misma duda en las tres secciones.
  *
- * **El avatar y el nombre de la tarjeta son del maquetado, no de la sesión.** Son los mismos
- * placeholders del cliente que ya mostraba el pie del armazón; desde el change
- * `ui-figma-dashboards` el pie muestra el tagline y el período lectivo, así que estos dos literales
- * son contenido de esta tarjeta y viven acá.
+ * **El avatar y el nombre de la tarjeta son de la cuenta de la sesión, no del maquetado.** Las
+ * iniciales salen de `inicialesDe`, el mismo helper de la barra superior, y el nombre es el de
+ * quien entró (M25).
  */
-const PIE_AVATAR = 'PM'
-const PIE_NOMBRE = 'Profe Martín'
-
 const COLUMNAS = [
   {
     clave: 'codigo',
@@ -46,6 +44,7 @@ const CHIP_PERMISOS = 'DOCENTE · PERMISOS REDUCIDOS'
 const NOTA_PERMISOS = 'Los cambios administrativos deben solicitarse a Secretaría BA.'
 
 export function TeacherProfilePage() {
+  const { session } = useSession()
   const [perfil, setPerfil] = useState(null)
 
   useEffect(() => {
@@ -69,10 +68,10 @@ export function TeacherProfilePage() {
 
       <Card titulo="Identidad">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar iniciales={PIE_AVATAR} tamano="grande" />
+          <Avatar iniciales={inicialesDe(session.nombre)} tamano="grande" />
 
           <div>
-            <p className="text-lg font-semibold text-slate-900">{PIE_NOMBRE}</p>
+            <p className="text-lg font-semibold text-slate-900">{session.nombre}</p>
             <div className="mt-2">
               <Badge tono={TONO.AMBAR}>{CHIP_PERMISOS}</Badge>
             </div>

@@ -3,6 +3,7 @@ import { useSession } from '../auth/SessionContext'
 import { Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { obtenerComisionesAsignadas } from '../services/dataService'
+import { formatFechaLarga } from '../utils/formato'
 
 /**
  * Tablero del docente (10.2): comisiones asignadas, con la composición del diseño
@@ -28,15 +29,17 @@ import { obtenerComisionesAsignadas } from '../services/dataService'
  * construyen: el maquetado no registra entregas por corregir ni mensajes (D40). La agenda se arma
  * con el horario y la próxima clase de la comisión, que son los mismos datos del bloque de arriba.
  *
- * **La línea de fecha del encabezado es un literal del maquetado**, no una fecha calculada, y no
- * anuncia cantidades de clases ni de entregas porque esos valores no están en el maquetado (D40).
+ * **La línea de fecha del encabezado es la fecha real del día**, no un literal del maquetado (D43), y
+ * no anuncia cantidades de clases ni de entregas porque esos valores no están en el maquetado (D40).
+ *
+ * **El pendiente se distingue del vacío real.** `comisiones` arranca en `null` y queda en `null` en el
+ * rechazo: mientras la lectura no resuelve o falla, los cuatro indicadores muestran `—`; con la
+ * lectura resuelta vuelven los valores derivados, incluido un `0` real, y la tabla y la agenda caen a
+ * sus mensajes de vacío (D43).
  */
 
 /** Los contadores de acceso, con el tono que los distingue. */
 const TONOS_ACCESO = { habilitado: TONO.VERDE, bloqueado: TONO.ROJO }
-
-/** Línea de fecha del encabezado: literal del maquetado (D40). */
-const RESUMEN = 'Viernes 9 de octubre · Tu agenda y tus comisiones en un solo lugar.'
 
 const COLUMNAS = [
   {
@@ -67,23 +70,25 @@ function pluralizar(cantidad, palabra) {
 
 export function TeacherCommissionsPage() {
   const { session } = useSession()
-  const [comisiones, setComisiones] = useState([])
+  const [comisiones, setComisiones] = useState(null)
 
   useEffect(() => {
     obtenerComisionesAsignadas()
       .then(setComisiones)
-      .catch(() => setComisiones([]))
+      .catch(() => setComisiones(null))
   }, [])
 
-  const habilitados = comisiones.reduce((total, fila) => total + fila.habilitados, 0)
-  const bloqueados = comisiones.reduce((total, fila) => total + fila.bloqueados, 0)
-  const proxima = comisiones.find((fila) => fila.proxima_clase !== null)?.proxima_clase ?? '—'
+  const pendiente = comisiones === null
+  const lista = comisiones ?? []
+  const habilitados = lista.reduce((total, fila) => total + fila.habilitados, 0)
+  const bloqueados = lista.reduce((total, fila) => total + fila.bloqueados, 0)
+  const proxima = lista.find((fila) => fila.proxima_clase !== null)?.proxima_clase ?? '—'
 
   const indicadores = [
-    { rotulo: 'COMISIONES ACTIVAS', valor: String(comisiones.length) },
-    { rotulo: 'ALUMNOS HABILITADOS', valor: String(habilitados) },
-    { rotulo: 'BLOQUEADOS', valor: String(bloqueados) },
-    { rotulo: 'PRÓXIMA CLASE', valor: proxima },
+    { rotulo: 'COMISIONES ACTIVAS', valor: pendiente ? '—' : String(lista.length) },
+    { rotulo: 'ALUMNOS HABILITADOS', valor: pendiente ? '—' : String(habilitados) },
+    { rotulo: 'BLOQUEADOS', valor: pendiente ? '—' : String(bloqueados) },
+    { rotulo: 'PRÓXIMA CLASE', valor: pendiente ? '—' : proxima },
   ]
 
   return (
@@ -92,7 +97,9 @@ export function TeacherCommissionsPage() {
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
           {`Buen día, ${session.nombre}`}
         </h1>
-        <p className="mt-1 text-sm text-slate-600">{RESUMEN}</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {`${formatFechaLarga()} · Tu agenda y tus comisiones en un solo lugar.`}
+        </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -110,7 +117,7 @@ export function TeacherCommissionsPage() {
         <Card titulo="Comisiones asignadas">
           <Table
             columnas={COLUMNAS}
-            filas={comisiones}
+            filas={lista}
             claveDeFila={(fila) => fila.codigo}
             vacio={
               <p className="text-sm text-slate-500">
@@ -121,11 +128,11 @@ export function TeacherCommissionsPage() {
         </Card>
 
         <Card titulo="Tu agenda">
-          {comisiones.length === 0 ? (
+          {lista.length === 0 ? (
             <p className="text-sm text-slate-500">No tenés clases programadas en este período.</p>
           ) : (
             <ul className="space-y-3">
-              {comisiones.map((comision) => (
+              {lista.map((comision) => (
                 <li
                   key={comision.codigo}
                   className="rounded-xl bg-slate-50 px-4 py-3 last:mb-0"

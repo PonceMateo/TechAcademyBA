@@ -22,7 +22,6 @@ const ETIQUETAS_ESPERADAS = [
 ]
 
 const TAGLINE = 'TechAcademy BA · Aprendemos, crecemos, conectamos.'
-const ULTIMA_ACTUALIZACION = 'Última actualización: 09:41'
 const NOMBRE_CUENTA = accountForRole('ALUMNO').nombre
 
 function armazon() {
@@ -89,12 +88,12 @@ describe('armazón del shell de Alumno', () => {
     expect(barra.queryByText(PERIODO_LECTIVO)).not.toBeInTheDocument()
   })
 
-  it('muestra el pie con el tagline, el período lectivo y la última actualización', () => {
+  it('muestra el pie con el tagline y el período lectivo, sin la última actualización', () => {
     const pie = screen.getByRole('contentinfo')
 
     expect(pie).toHaveTextContent(TAGLINE)
     expect(pie).toHaveTextContent(PERIODO_LECTIVO)
-    expect(pie).toHaveTextContent(ULTIMA_ACTUALIZACION)
+    expect(pie).not.toHaveTextContent('Última actualización')
   })
 
   it('no deja la persona del maquetado en el pie', () => {

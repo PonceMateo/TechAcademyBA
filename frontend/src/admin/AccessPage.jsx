@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from '../auth/SessionContext'
-import { Badge, Button, Card, Input, StatusIndicator } from '../components/ui'
+import { Badge, Button, Campo, Card, Input, StatusIndicator } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import {
   buscarHabilitacion,
   forzarBloqueoManual,
   listarCobranzas,
+  listarComisiones,
   listarEmailsHabilitados,
 } from '../services/dataService'
 import { formatFechaCorta, formatMoneda } from '../utils/formato'
@@ -21,17 +22,15 @@ import { formatFechaCorta, formatMoneda } from '../utils/formato'
  * registro; un cartel de "listo" que desaparece al segundo no dice quién lo forzó ni cuándo.
  *
  * **La copia de correos filtra por acceso, no por categoría.** Copia los correos de los alumnos
- * habilitados de la comisión indicada y, cuando no hay ninguno, informa que no hay nada para
- * copiar en lugar de copiar una lista vacía. Agustina Benítez es becada parcial y está
- * bloqueada: su correo no va en la lista de CUR-101.
+ * habilitados de la comisión elegida del catálogo real y, cuando no hay ninguno, informa que no hay
+ * nada para copiar en lugar de copiar una lista vacía. La comisión no se escribe a mano: se elige
+ * del catálogo.
  */
 
 const AYUDA_BUSQUEDA =
   'Buscá por DNI de alumno, Email institucional, CUIT de empresa o Razón Social.'
 
 const TEXTO_HABILITADO = 'El alumno cumple con la condición arancelaria.'
-
-const COMISION_DE_LA_COPIA = 'CUR-101'
 
 /** Campos de la ficha resumen, en el orden del spec. */
 const CAMPOS_FICHA = [
@@ -73,6 +72,14 @@ export function AccessPage() {
   const [errorMotivo, setErrorMotivo] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [copiados, setCopiados] = useState(null)
+  const [comisiones, setComisiones] = useState(null)
+  const [elegida, setElegida] = useState('')
+
+  useEffect(() => {
+    listarComisiones()
+      .then(setComisiones)
+      .catch(() => setComisiones([]))
+  }, [])
 
   /**
    * El último pago imputado no está en el padrón (D10 lo deriva), así que se arma con el
@@ -133,18 +140,26 @@ export function AccessPage() {
     setAviso('Bloqueo forzado. Queda registrado con el usuario y la fecha de la operación.')
   }
 
-  async function copiar() {
-    const correos = await listarEmailsHabilitados(COMISION_DE_LA_COPIA)
+  async function copiar(codigo) {
+    let correos
+    try {
+      correos = await listarEmailsHabilitados(codigo)
+    } catch (error) {
+      // `/alumnos` no existe todavía: la acción falla y se informa, sin copiar nada.
+      setCopiados(null)
+      setAviso(error.message)
+      return
+    }
 
     if (correos.length === 0) {
       setCopiados(null)
-      setAviso(`No hay correos para copiar: ${COMISION_DE_LA_COPIA} no tiene alumnos habilitados.`)
+      setAviso(`No hay correos para copiar: ${codigo} no tiene alumnos habilitados.`)
       return
     }
 
     setCopiados(correos)
     setAviso(
-      `Se copiaron los correos de los alumnos habilitados de ${COMISION_DE_LA_COPIA}. Los bloqueados no van en la lista.`,
+      `Se copiaron los correos de los alumnos habilitados de ${codigo}. Los bloqueados no van en la lista.`,
     )
 
     // El portapapeles del navegador es un permiso que puede estar denegado. La lista queda
@@ -234,10 +249,35 @@ export function AccessPage() {
           <Button variante="peligro" onClick={forzar}>
             Forzar Bloqueo Manual
           </Button>
-          <Button variante="secundario" onClick={copiar}>
-            {`Copiar emails habilitados de ${COMISION_DE_LA_COPIA}`}
-          </Button>
         </div>
+
+        {comisiones !== null && (
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="w-full max-w-md">
+              <Campo etiqueta="Comisión" id="comision-copia">
+                <select
+                  id="comision-copia"
+                  value={elegida}
+                  onChange={(evento) => setElegida(evento.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                >
+                  <option value="">Elegí una comisión</option>
+                  {comisiones.map((comision) => (
+                    <option key={comision.codigo} value={comision.codigo}>
+                      {comision.codigo}
+                    </option>
+                  ))}
+                </select>
+              </Campo>
+            </div>
+
+            {elegida !== '' && (
+              <Button variante="secundario" onClick={() => copiar(elegida)}>
+                {`Copiar emails habilitados de ${elegida}`}
+              </Button>
+            )}
+          </div>
+        )}
 
         {aviso !== null && (
           <p role="status" className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">

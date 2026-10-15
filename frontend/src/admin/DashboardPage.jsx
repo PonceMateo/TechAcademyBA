@@ -1,66 +1,29 @@
+import { useEffect, useState } from 'react'
 import { useSession } from '../auth/SessionContext'
-import { Badge, Button, Card } from '../components/ui'
-import { TONO } from '../components/ui/paleta'
+import { Button, Card } from '../components/ui'
+import { obtenerResumenCatalogo } from '../services/dataService'
+import { formatFechaLarga } from '../utils/formato'
 
 /**
  * Tablero operativo (9.2), con la composición del diseño (`docs/design/figma-dashboards-overhaul/`).
  *
- * **Todo lo de esta pantalla es texto fijo.** No consulta datos —solo el nombre de la cuenta para
- * el saludo—, no calcula agregados y no navega: no hay historia de usuario que la cubra (la tabla
- * de cobertura de `design.md` lo dice en la fila 6). Los valores son los del prototipo y los del
- * cliente, y están escritos acá a propósito, no derivados: un tablero que calcula sobre datos de
- * ejemplo daría la impresión de estar midiendo algo real.
+ * **La fila de cuatro tarjetas se pinta siempre.** `COMISIONES` sale del catálogo y no de un agregado
+ * propio: muestra el conteo que devuelve `obtenerResumenCatalogo()` —el valor que informa la
+ * fuente— y no `listarComisiones().length`: el spec prohíbe calcular el agregado en la pantalla.
+ * `ALUMNOS INSCRIPTOS`, `COBROS PENDIENTES DE COBRO` y `CUPO PROMEDIO OCUPADO` no tienen endpoint
+ * detrás, así que su valor honesto es `—`: ninguna pantalla borra un elemento porque su dato no
+ * exista todavía (D43).
  *
- * **El `27%` del cupo promedio es el caso que más tentador es "arreglar".** El cálculo real sobre
- * las cinco comisiones del maquetado da 43 ocupados sobre 160 lugares, que redondea a 27%. Coincide
- * con el texto del prototipo, así que el número no es inventado. Igual: el spec prohíbe calcularlo
- * en tiempo de ejecución, y `src/mocks/mocks.test.js` verifica la coherencia de los números desde
- * el otro lado.
+ * **El pendiente es `—`, nunca un `0`.** La bandera es el propio dato (`resumen === null`): mientras
+ * la lectura no resuelve o el catálogo rechaza, `COMISIONES` muestra `—`; con la lectura resuelta
+ * muestra el conteo real, incluido un `0` real. El bloque `Alertas de Gestión Pendiente` vuelve con
+ * su encabezado y `—` en el cuerpo, porque sus líneas no tienen fuente ni historia de usuario detrás.
  *
- * **Los gráficos del prototipo no están.** El Figma muestra una sección `La academia en números`
- * con `1.248` alumnos activos, `32` comisiones y `$ 8,4 M` cobrados: son números del prototipo que
- * contradicen el maquetado, y Figma aporta cero datos (D40).
+ * **Los accesos rápidos son composición inerte.** Las tres acciones se pueden pulsar y no navegan
+ * ni ejecutan nada: ninguna historia de usuario cubre esta pantalla.
  *
- * **Ninguna alerta es un enlace.** La cuarta línea es la lista de espera, que es una función real
- * que el cliente confirmó y que queda fuera de este change: se muestra el caso y no se ofrece un
- * camino a una pantalla que no existe (D20).
+ * **La fecha del encabezado es la fecha real del día**, no un literal del maquetado (D43).
  */
-
-/** La línea de fecha del encabezado es un literal del maquetado, no una fecha calculada (D40). */
-const RESUMEN = 'Viernes 9 de octubre · Todo lo que necesitás para gestionar tu academia.'
-
-/** Los cuatro indicadores, con rótulo, valor y texto de apoyo literales. */
-const INDICADORES = Object.freeze([
-  { rotulo: 'ALUMNOS INSCRIPTOS', valor: '8', apoyo: 'en comisiones abiertas y en curso' },
-  { rotulo: 'COMISIONES', valor: '10', apoyo: 'en el catálogo' },
-  {
-    rotulo: 'COBROS PENDIENTES DE COBRO',
-    valor: '3',
-    apoyo: '3 comprobantes observados',
-  },
-  {
-    rotulo: 'CUPO PROMEDIO OCUPADO',
-    valor: '27%',
-    apoyo: 'sobre las comisiones del catálogo',
-  },
-])
-
-/** Los tres casos que el cliente reconoce como sus problemas, más la línea de lista de espera. */
-const ALERTAS = Object.freeze([
-  { texto: 'Comprobante ilegible de Agustina Benítez', chip: 'Urgente', tono: TONO.ROJO },
-  {
-    texto: 'Cheque de Banco Federal pendiente de acreditación',
-    chip: 'Observado',
-    tono: TONO.AMBAR,
-  },
-  { texto: 'Valeria Rossi debe la mitad del arancel', chip: 'Aviso', tono: TONO.GRIS },
-  {
-    texto:
-      'La comisión CUR-104 alcanzó su cupo de 20 inscriptos y figura cerrada por cupo. Hay lista de espera activa.',
-    chip: 'Aviso',
-    tono: TONO.GRIS,
-  },
-])
 
 /** Las tres acciones del personal. No navegan: ninguna historia las cubre. */
 const ACCESOS_RAPIDOS = Object.freeze([
@@ -69,8 +32,22 @@ const ACCESOS_RAPIDOS = Object.freeze([
   'Descargar Reporte del Día',
 ])
 
+/** Los tres indicadores que ninguna fuente respalda: su valor honesto es `—` (D43). */
+const INDICADORES_SIN_FUENTE = Object.freeze([
+  'ALUMNOS INSCRIPTOS',
+  'COBROS PENDIENTES DE COBRO',
+  'CUPO PROMEDIO OCUPADO',
+])
+
 export function DashboardPage() {
   const { session } = useSession()
+  const [resumen, setResumen] = useState(null)
+
+  useEffect(() => {
+    obtenerResumenCatalogo()
+      .then(setResumen)
+      .catch(() => setResumen(null))
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -78,48 +55,47 @@ export function DashboardPage() {
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
           {`Buen día, ${session.nombre}`}
         </h1>
-        <p className="mt-1 text-sm text-slate-600">{RESUMEN}</p>
+        <p className="mt-1 text-sm text-slate-600">
+          {`${formatFechaLarga()} · Todo lo que necesitás para gestionar tu academia.`}
+        </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {INDICADORES.map((indicador) => (
-          <Card key={indicador.rotulo}>
+        <Card>
+          <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+            COMISIONES
+          </p>
+          <p className="mt-2 text-3xl font-extrabold text-slate-900">
+            {resumen === null ? '—' : resumen.total_comisiones}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">en el catálogo</p>
+        </Card>
+
+        {INDICADORES_SIN_FUENTE.map((rotulo) => (
+          <Card key={rotulo}>
             <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
-              {indicador.rotulo}
+              {rotulo}
             </p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-900">{indicador.valor}</p>
-            <p className="mt-1 text-xs text-slate-500">{indicador.apoyo}</p>
+            <p className="mt-2 text-3xl font-extrabold text-slate-900">—</p>
           </Card>
         ))}
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <Card titulo="Alertas de Gestión Pendiente">
-          <ul className="space-y-3">
-            {ALERTAS.map((alerta) => (
-              <li
-                key={alerta.texto}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
-              >
-                <span className="text-sm text-slate-700">{alerta.texto}</span>
-                <Badge tono={alerta.tono}>{alerta.chip}</Badge>
-              </li>
-            ))}
-          </ul>
-        </Card>
+      <Card titulo="Alertas de Gestión Pendiente">
+        <p className="text-sm text-slate-500">—</p>
+      </Card>
 
-        <Card titulo="Accesos Rápidos del Personal">
-          <div className="flex flex-wrap gap-2">
-            {/* Botones sin `onClick`: se pueden pulsar y no pasa nada, porque ninguna historia
-                de usuario cubre esta pantalla. Deshabilitados se verían como caídos. */}
-            {ACCESOS_RAPIDOS.map((accion) => (
-              <Button key={accion} variante="secundario">
-                {accion}
-              </Button>
-            ))}
-          </div>
-        </Card>
-      </div>
+      <Card titulo="Accesos Rápidos del Personal">
+        <div className="flex flex-wrap gap-2">
+          {/* Botones sin `onClick`: se pueden pulsar y no pasa nada, porque ninguna historia
+              de usuario cubre esta pantalla. Deshabilitados se verían como caídos. */}
+          {ACCESOS_RAPIDOS.map((accion) => (
+            <Button key={accion} variante="secundario">
+              {accion}
+            </Button>
+          ))}
+        </div>
+      </Card>
     </div>
   )
 }

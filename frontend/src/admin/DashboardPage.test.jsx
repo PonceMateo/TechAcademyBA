@@ -1,41 +1,34 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { accountForRole, renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  accountForRole,
+  renderAppAs,
+  resetDataSource,
+  stubBackend,
+  stubDataSource,
+} from '../test/support'
+import { formatFechaLarga } from '../utils/formato'
 
 /**
  * Tablero operativo (9.2).
  *
- * **Los valores son texto fijo y eso es lo que se prueba.** No hay historia de usuario para esta
- * pantalla, así que el tablero no consulta datos ni calcula agregados. Un tablero que calculara
- * sobre datos de_example se vería midiendo algo real.
+ * **La fila de cuatro tarjetas y el bloque de alertas se pintan siempre.** El tablero lee
+ * `obtenerResumenCatalogo()` y muestra `COMISIONES` con el conteo que la fuente devuelve; las otras
+ * tres tarjetas y el bloque de alertas no tienen endpoint detrás, así que su valor es `—`. Mientras
+ * la lectura no resuelve —o rechaza— `COMISIONES` también es `—`, nunca un `0` (D43).
  *
- * El caso interesante es el de las tres acciones rápidas: el spec dice que se pueden pulsar y que
- * no pasa nada. Un botón deshabilitado cumpliría el "no pasa nada" y rompería el "se puede pulsar",
- * así que la prueba las aprieta y verifica que la ruta no cambie.
+ * **Los accesos rápidos se pueden pulsar y no pasa nada.** Un botón deshabilitado cumpliría el "no
+ * pasa nada" y rompería el "se puede pulsar", así que la prueba las aprieta y verifica que la ruta no
+ * cambie.
  *
- * **El encabezado del tablero es el saludo, no el título `Dashboard`.** Desde el change
- * `ui-figma-dashboards` el tablero abre con `Buen día, {cuenta}` y su línea de fecha placeholder; el
- * nombre de la sección queda en el ítem del menú y en el breadcrumb del armazón.
+ * **La fecha se afirma a través del helper**, nunca con un literal: el formato queda clavado en
+ * `formato.test.js` y acá solo se verifica el cableado.
  */
 
-/** Los cuatro indicadores con rótulo, valor y texto de apoyo literales. */
-const INDICADORES = [
-  ['ALUMNOS INSCRIPTOS', '8', 'en comisiones abiertas y en curso'],
-  ['COMISIONES', '10', 'en el catálogo'],
-  ['COBROS PENDIENTES DE COBRO', '3', '3 comprobantes observados'],
-  ['CUPO PROMEDIO OCUPADO', '27%', 'sobre las comisiones del catálogo'],
-]
-
-const ALERTAS = [
-  ['Comprobante ilegible de Agustina Benítez', 'Urgente'],
-  ['Cheque de Banco Federal pendiente de acreditación', 'Observado'],
-  ['Valeria Rossi debe la mitad del arancel', 'Aviso'],
-  [
-    'La comisión CUR-104 alcanzó su cupo de 20 inscriptos y figura cerrada por cupo. Hay lista de espera activa.',
-    'Aviso',
-  ],
-]
+/** El tablero abre con el saludo de la cuenta de la sesión y no con el nombre de la sección. */
+const SALUDO = `Buen día, ${accountForRole('ADMIN').nombre}`
+const RESUMEN = `${formatFechaLarga()} · Todo lo que necesitás para gestionar tu academia.`
 
 const ACCESOS_RAPIDOS = [
   'Registrar Cobranza',
@@ -43,58 +36,123 @@ const ACCESOS_RAPIDOS = [
   'Descargar Reporte del Día',
 ]
 
-/** El tablero abre con el saludo de la cuenta de la sesión y no con el nombre de la sección. */
-const SALUDO = `Buen día, ${accountForRole('ADMIN').nombre}`
+const ROTULOS = [
+  'COMISIONES',
+  'ALUMNOS INSCRIPTOS',
+  'COBROS PENDIENTES DE COBRO',
+  'CUPO PROMEDIO OCUPADO',
+]
 
-beforeEach(async () => {
+/** Monta el tablero con la fuente de datos de ejemplo o con la función sustituida que pida el caso. */
+async function entrar(overrides = null) {
   resetDataSource()
+  if (overrides !== null) {
+    stubDataSource(overrides)
+  }
   stubBackend()
   renderAppAs('ADMIN', '/admin')
   await screen.findByRole('heading', { name: SALUDO })
+}
+
+/** La tarjeta de un indicador: el rótulo es un `<p>` y su contenedor es el `<section>` de `Card`. */
+function tarjeta(rotulo) {
+  return screen.getByText(rotulo, { selector: 'p' }).parentElement
+}
+
+describe('encabezado', () => {
+  it('muestra la fecha real del día', async () => {
+    await entrar()
+
+    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
+  })
 })
 
-describe('indicadores', () => {
-  it.each(INDICADORES)('muestra %s con su valor y su texto de apoyo', (rotulo, valor, apoyo) => {
-    expect(screen.getByText(rotulo)).toBeInTheDocument()
-    expect(screen.getByText(valor)).toBeInTheDocument()
-    expect(screen.getByText(apoyo)).toBeInTheDocument()
+describe('los cuatro indicadores', () => {
+  it('muestra las cuatro tarjetas con sus rótulos', async () => {
+    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
+
+    for (const rotulo of ROTULOS) {
+      expect(screen.getByText(rotulo, { selector: 'p' })).toBeInTheDocument()
+    }
   })
 
-  it('no calcula el porcentaje de cupo: es el texto fijo del maquetado', () => {
-    // 43 ocupados sobre 160 lugares da 26,8%. Que se muestre 27% y no el cálculo es la prueba de
-    // que la pantalla no agrega nada.
-    expect(screen.getByText('27%')).toBeInTheDocument()
+  it('muestra COMISIONES con el conteo que devuelve el catálogo', async () => {
+    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
+
+    await waitFor(() => expect(tarjeta('COMISIONES')).toHaveTextContent('7'))
+    expect(screen.getByText('en el catálogo')).toBeInTheDocument()
+  })
+
+  it('muestra un 0 real cuando el catálogo informa cero', async () => {
+    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 0 }) })
+
+    await waitFor(() => expect(tarjeta('COMISIONES')).toHaveTextContent('0'))
+    expect(tarjeta('COMISIONES')).not.toHaveTextContent('—')
+  })
+
+  it('muestra las otras tres tarjetas con —, sin ningún número que las respalde', async () => {
+    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
+
+    for (const rotulo of ['ALUMNOS INSCRIPTOS', 'COBROS PENDIENTES DE COBRO', 'CUPO PROMEDIO OCUPADO']) {
+      expect(tarjeta(rotulo)).toHaveTextContent('—')
+    }
   })
 })
 
-describe('alertas de gestión pendiente', () => {
-  it('muestra el bloque con sus tres casos reales', () => {
+describe('el bloque de alertas', () => {
+  it('muestra su encabezado con — en el cuerpo y sin las alertas inventadas', async () => {
+    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
+
+    const alertas = screen.getByText('Alertas de Gestión Pendiente').closest('section')
+    expect(within(alertas).getByText('—')).toBeInTheDocument()
+
+    for (const inventada of [
+      'Comprobante ilegible de Agustina Benítez',
+      'Cheque de Banco Federal pendiente de acreditación',
+      'Valeria Rossi debe la mitad del arancel',
+      /lista de espera.*CUR-104/,
+    ]) {
+      expect(screen.queryByText(inventada)).not.toBeInTheDocument()
+    }
+    expect(screen.queryByText('27%')).not.toBeInTheDocument()
+  })
+})
+
+describe('mientras la lectura del catálogo no resuelve', () => {
+  it('pinta las cuatro tarjetas y el bloque de alertas con —, nunca un 0', async () => {
+    await entrar({ obtenerResumenCatalogo: () => new Promise(() => {}) })
+
+    for (const rotulo of ROTULOS) {
+      expect(tarjeta(rotulo)).toHaveTextContent('—')
+      expect(tarjeta(rotulo)).not.toHaveTextContent('0')
+    }
     expect(screen.getByText('Alertas de Gestión Pendiente')).toBeInTheDocument()
-
-    for (const texto of ALERTAS.slice(0, 3).map(([linea]) => linea)) {
-      expect(screen.getByText(texto)).toBeInTheDocument()
-    }
-    // `Aviso` aparece en la tercera y en la cuarta línea, así que son dos elementos y no uno.
-    expect(screen.getAllByText('Aviso')).toHaveLength(2)
-    expect(screen.getByText('Urgente')).toBeInTheDocument()
-    expect(screen.getByText('Observado')).toBeInTheDocument()
+    // Lo que no depende de la lectura sí se pinta.
+    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar Cobranza' })).toBeInTheDocument()
   })
 
-  it('muestra la cuarta línea de lista de espera, que es contenido de ejemplo', () => {
-    expect(screen.getByText(ALERTAS[3][0])).toBeInTheDocument()
-  })
+  it('conserva la forma con — si el catálogo rechaza', async () => {
+    await entrar({
+      obtenerResumenCatalogo: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
 
-  it('no convierte ninguna alerta en un enlace a una pantalla que no existe', () => {
-    const enlaces = screen.getAllByRole('link').map((enlace) => enlace.textContent)
-
-    for (const [texto] of ALERTAS) {
-      expect(enlaces).not.toContain(texto)
+    await waitFor(() => expect(tarjeta('COMISIONES')).toHaveTextContent('—'))
+    for (const rotulo of ROTULOS) {
+      expect(tarjeta(rotulo)).not.toHaveTextContent('0')
     }
+    expect(screen.getByText('Alertas de Gestión Pendiente')).toBeInTheDocument()
+    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar Cobranza' })).toBeInTheDocument()
   })
 })
 
 describe('accesos rápidos del personal', () => {
-  it('muestra las tres acciones', () => {
+  it('muestra las tres acciones', async () => {
+    await entrar()
+
     expect(screen.getByText('Accesos Rápidos del Personal')).toBeInTheDocument()
     for (const accion of ACCESOS_RAPIDOS) {
       expect(screen.getByRole('button', { name: accion })).toBeInTheDocument()
@@ -102,6 +160,8 @@ describe('accesos rápidos del personal', () => {
   })
 
   it('no navega ni ejecuta lógica al pulsarlas', async () => {
+    await entrar()
+
     const user = userEvent.setup()
     const navegar = vi.fn()
     window.addEventListener('popstate', navegar)
@@ -113,7 +173,6 @@ describe('accesos rápidos del personal', () => {
     expect(navegar).not.toHaveBeenCalled()
     // La sección sigue siendo el tablero: ninguna acción sacó a la secretaría de la pantalla.
     await waitFor(() => expect(screen.getByRole('heading', { name: SALUDO })).toBeInTheDocument())
-    expect(screen.getByText(ALERTAS[0][0])).toBeInTheDocument()
 
     window.removeEventListener('popstate', navegar)
   })

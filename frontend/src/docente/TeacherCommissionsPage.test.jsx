@@ -2,6 +2,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { accountForRole, renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 import { obtenerComisionesAsignadas } from '../services/dataService'
+import { formatFechaLarga } from '../utils/formato'
 
 /**
  * Comisiones asignadas del docente (10.2).
@@ -13,14 +14,15 @@ import { obtenerComisionesAsignadas } from '../services/dataService'
  * para lo que existe: ver un estado que el ejemplo no tiene sin inventar filas de ejemplo.
  *
  * **El encabezado es el saludo del tablero, no el título `Mis Comisiones`.** Desde el change
- * `ui-figma-dashboards` el índice del docente abre con `Buen día, {cuenta}` y su línea de fecha
- * placeholder; el nombre de la sección vive en el ítem del menú y en el breadcrumb del armazón.
+ * `ui-figma-dashboards` el índice del docente abre con `Buen día, {cuenta}` y su línea de fecha real
+ * del día; el nombre de la sección vive en el ítem del menú y en el breadcrumb del armazón.
  */
 
 const COLUMNAS = ['CÓDIGO', 'CURSO', 'DOCENTE', 'HORARIO', 'PRÓXIMA CLASE', 'ACCESO']
 
 /** El tablero abre con el saludo de la cuenta de la sesión. */
 const SALUDO = `Buen día, ${accountForRole('DOCENTE').nombre}`
+const RESUMEN = `${formatFechaLarga()} · Tu agenda y tus comisiones en un solo lugar.`
 
 beforeEach(async () => {
   resetDataSource()
@@ -28,6 +30,12 @@ beforeEach(async () => {
   renderAppAs('DOCENTE', '/docente')
   await screen.findByRole('heading', { name: SALUDO })
   await screen.findByText('CUR-101')
+})
+
+describe('encabezado', () => {
+  it('muestra la fecha real del día', () => {
+    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
+  })
 })
 
 describe('indicadores', () => {
@@ -122,7 +130,7 @@ describe('singular y plural de los contadores', () => {
 })
 
 describe('comisiones sin endpoint', () => {
-  it('deja los indicadores en cero y la tabla en su estado vacío', async () => {
+  it('conserva la forma con los cuatro indicadores en —, nunca en 0, y la tabla en su vacío', async () => {
     cleanup()
     stubDataSource({
       obtenerComisionesAsignadas: async () => {
@@ -135,8 +143,54 @@ describe('comisiones sin endpoint', () => {
     expect(
       await screen.findByText('No tenés comisiones asignadas en este período lectivo.'),
     ).toBeInTheDocument()
+    for (const rotulo of ['COMISIONES ACTIVAS', 'ALUMNOS HABILITADOS', 'BLOQUEADOS', 'PRÓXIMA CLASE']) {
+      const indicador = screen.getByText(rotulo, { selector: 'p' }).parentElement
+      expect(indicador).toHaveTextContent('—')
+      expect(indicador).not.toHaveTextContent('0')
+    }
+    expect(screen.getByText('Tu agenda')).toBeInTheDocument()
+    expect(screen.getByText('No tenés clases programadas en este período.')).toBeInTheDocument()
+  })
+})
+
+describe('docente sin comisiones asignadas', () => {
+  it('muestra un 0 real en los tres conteos y — en la próxima clase', async () => {
+    cleanup()
+    stubDataSource({ obtenerComisionesAsignadas: async () => [] })
+    renderAppAs('DOCENTE', '/docente')
+
+    // La lectura resuelve vacía: los conteos pasan de `—` a un `0` real.
+    await waitFor(() =>
+      expect(
+        screen.getByText('COMISIONES ACTIVAS', { selector: 'p' }).parentElement,
+      ).toHaveTextContent('0'),
+    )
     expect(
-      screen.getByText('COMISIONES ACTIVAS', { selector: 'p' }).parentElement,
-    ).toHaveTextContent('0')
+      screen.getByText('No tenés comisiones asignadas en este período lectivo.'),
+    ).toBeInTheDocument()
+    for (const rotulo of ['ALUMNOS HABILITADOS', 'BLOQUEADOS']) {
+      const indicador = screen.getByText(rotulo, { selector: 'p' }).parentElement
+      expect(indicador).toHaveTextContent('0')
+      expect(indicador).not.toHaveTextContent('—')
+    }
+    expect(screen.getByText('PRÓXIMA CLASE', { selector: 'p' }).parentElement).toHaveTextContent('—')
+  })
+})
+
+describe('el docente espera mientras cargan sus comisiones', () => {
+  it('pinta el tablero con — en los cuatro indicadores y ninguno en 0', async () => {
+    cleanup()
+    stubDataSource({ obtenerComisionesAsignadas: () => new Promise(() => {}) })
+    renderAppAs('DOCENTE', '/docente')
+    await screen.findByRole('heading', { name: SALUDO })
+
+    for (const rotulo of ['COMISIONES ACTIVAS', 'ALUMNOS HABILITADOS', 'BLOQUEADOS', 'PRÓXIMA CLASE']) {
+      const indicador = screen.getByText(rotulo, { selector: 'p' }).parentElement
+      expect(indicador).toHaveTextContent('—')
+      expect(indicador).not.toHaveTextContent('0')
+    }
+    // La tabla y la agenda se siguen pintando, cada una con su mensaje de vacío.
+    expect(screen.getByText('Comisiones asignadas')).toBeInTheDocument()
+    expect(screen.getByText('Tu agenda')).toBeInTheDocument()
   })
 })

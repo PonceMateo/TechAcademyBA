@@ -12,10 +12,10 @@ import { PERIODO_LECTIVO, SECCIONES_ADMIN } from './navegacion'
  * espera, en vez de contar que hay seis.
  *
  * **El pie ya no lleva la persona y el nombre de la cuenta se mudó a la barra superior.** Desde el
- * change `ui-figma-dashboards` el armazón muestra el tagline, el período lectivo y la marca de
- * actualización en el pie, y la cuenta —nombre, rol y `Cerrar sesión`— en el bloque de perfil de la
- * barra superior. Por eso el pie se prueba también por lo que **no** tiene: un nombre que quedó
- * duplicado haría creer que hay dos cuentas.
+ * change `ui-figma-dashboards` el armazón muestra el tagline y el período lectivo en el pie, sin
+ * ninguna línea de `Última actualización`, y la cuenta —nombre, rol y `Cerrar sesión`— en el bloque
+ * de perfil de la barra superior. Por eso el pie se prueba también por lo que **no** tiene: un
+ * nombre que quedó duplicado haría creer que hay dos cuentas.
  */
 
 const ETIQUETAS_ESPERADAS = [
@@ -28,7 +28,6 @@ const ETIQUETAS_ESPERADAS = [
 ]
 
 const TAGLINE = 'TechAcademy BA · Aprendemos, crecemos, conectamos.'
-const ULTIMA_ACTUALIZACION = 'Última actualización: 09:41'
 const NOMBRE_CUENTA = accountForRole('ADMIN').nombre
 
 /**
@@ -108,12 +107,12 @@ describe('armazón del shell de Administración', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
   })
 
-  it('muestra el pie con el tagline, el período lectivo y la última actualización', () => {
+  it('muestra el pie con el tagline y el período lectivo, sin la última actualización', () => {
     const pie = screen.getByRole('contentinfo')
 
     expect(pie).toHaveTextContent(TAGLINE)
     expect(pie).toHaveTextContent(PERIODO_LECTIVO)
-    expect(pie).toHaveTextContent(ULTIMA_ACTUALIZACION)
+    expect(pie).not.toHaveTextContent('Última actualización')
   })
 
   it('no deja el nombre de la cuenta ni la terminal en el pie', () => {

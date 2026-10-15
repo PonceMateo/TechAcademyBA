@@ -4,6 +4,11 @@
  * **Los separadores no se escriben a mano.** `$45.000` con punto de miles y `10/05/2026` con
  * barra son literales del spec de `admin-shell`, y salen de acá y no de una plantilla en cada
  * pantalla: si mañana hay un importe con centavos, se cambia en un lugar.
+ *
+ * **Acá conviven dos criterios de fecha, y es a propósito.** Las fechas del dominio son cadenas
+ * (`formatFechaCorta`) porque son fechas, no instantes, así que no pasan por `Date`; la fecha del
+ * encabezado (`formatFechaLarga`) es genuinamente el instante actual, y es el único lugar del
+ * módulo que usa `Date`.
  */
 
 /**
@@ -23,7 +28,10 @@ export function formatMoneda(monto) {
   return `$${MILES.format(monto)}`
 }
 
-/** `2026-05-10` → `10/05/2026`. Sin `Date`: las fechas del dominio son fechas, no instantes. */
+/**
+ * `2026-05-10` → `10/05/2026`. Sin `Date`: las fechas del dominio son fechas, no instantes (el
+ * instante actual lo formatea `formatFechaLarga`).
+ */
 export function formatFechaCorta(fecha) {
   if (!fecha) {
     return ''
@@ -31,4 +39,31 @@ export function formatFechaCorta(fecha) {
 
   const [anio, mes, dia] = String(fecha).split('-')
   return `${dia}/${mes}/${anio}`
+}
+
+const FECHA_LARGA = new Intl.DateTimeFormat('es-AR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+})
+
+/**
+ * La fecha del encabezado: `Viernes 9 de octubre`. Toma una fecha (por defecto, hoy) y normaliza
+ * lo que `Intl` intercala de más: capitaliza el día de la semana y quita la coma (`viernes, 9 de
+ * octubre` → `Viernes 9 de octubre`). El argumento existe para poder clavar el formato en un test
+ * con una fecha fija, sin congelar el reloj.
+ */
+export function formatFechaLarga(fecha = new Date()) {
+  const texto = FECHA_LARGA.format(fecha).replace(',', '')
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+/** Iniciales de la cuenta para el avatar: dos palabras, dos letras. */
+export function inicialesDe(nombre) {
+  return nombre
+    .split(/\s+/)
+    .filter((parte) => parte.length > 0)
+    .slice(0, 2)
+    .map((parte) => parte[0].toUpperCase())
+    .join('')
 }

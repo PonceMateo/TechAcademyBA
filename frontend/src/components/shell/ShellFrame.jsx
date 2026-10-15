@@ -5,6 +5,7 @@ import { useSession } from '../../auth/SessionContext'
 import { AvisoCambioContrasena } from '../session/AvisoCambioContrasena'
 import { Avatar, Badge, Button } from '../ui'
 import { MARCA_UI, TONO } from '../ui/paleta'
+import { inicialesDe } from '../../utils/formato'
 
 /**
  * Armazón de los tres shells (9.1, 10.1, 11.1), con el lenguaje visual del diseño
@@ -46,19 +47,8 @@ const ACENTOS = Object.freeze({
   alumno: Object.freeze({ rol: 'Alumno' }),
 })
 
-/** Pie del armazón: el tagline del maquetado y la marca de actualización, ambas literales. */
+/** Pie del armazón: el tagline del maquetado. */
 const TAGLINE = 'TechAcademy BA · Aprendemos, crecemos, conectamos.'
-const ULTIMA_ACTUALIZACION = 'Última actualización: 09:41'
-
-/** Iniciales de la cuenta para el avatar: dos palabras, dos letras. */
-function inicialesDe(nombre) {
-  return nombre
-    .split(/\s+/)
-    .filter((parte) => parte.length > 0)
-    .slice(0, 2)
-    .map((parte) => parte[0].toUpperCase())
-    .join('')
-}
 
 export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
   const { session, signOut } = useSession()
@@ -232,10 +222,7 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
 
         <footer className="superficie-cristal flex flex-wrap items-center justify-between gap-3 border-t border-white/60 px-4 py-3 text-xs text-slate-500 sm:px-6">
           <span>{TAGLINE}</span>
-          <span className="flex flex-wrap items-center gap-3">
-            <span>{periodoLectivo}</span>
-            <span>{ULTIMA_ACTUALIZACION}</span>
-          </span>
+          <span>{periodoLectivo}</span>
         </footer>
       </div>
     </div>

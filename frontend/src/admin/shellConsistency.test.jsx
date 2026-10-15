@@ -80,13 +80,11 @@ function componentesImportados(archivo) {
 }
 
 /**
- * Los armazones y los tableros no piden datos: un armazón dibuja el menú y el tablero de
- * Administración es texto fijo. Son las únicas pantallas de las tres secciones con esa excepción, y
- * las dos existen solo porque el tablero no tiene historia que la cubra.
+ * Los armazones no piden datos: dibujan el menú y le pasan la pantalla al armazón compartido. Son
+ * las únicas pantallas de las tres secciones con esa excepción.
  */
 const SIN_DATOS_POR_DISENO = [
   'AdminLayout.jsx',
-  'DashboardPage.jsx',
   'TeacherLayout.jsx',
   'StudentLayout.jsx',
 ]
@@ -128,13 +126,9 @@ describe('los tres shells comparten los componentes', () => {
     const sinCompartidos = pantallasDeTodosLosShells()
       .filter(({ archivo }) => componentesImportados(archivo).length === 0)
       .map(({ etiqueta, archivo }) => `${etiqueta}: ${relative(RAIZ_SRC, archivo)}`)
-      // El tablero de Administración es texto fijo y los armazones no dibujan nada: dibujan el menú y
-      // le pasan la pantalla al armazón compartido. Que los tres armazones usen `ShellFrame` lo
-      // afirma la prueba de abajo.
-      .filter(
-        (descripcion) =>
-          !descripcion.endsWith('DashboardPage.jsx') && !descripcion.includes('Layout.jsx'),
-      )
+      // Los armazones no dibujan nada: dibujan el menú y le pasan la pantalla al armazón
+      // compartido. Que los tres usen `ShellFrame` lo afirma la prueba de abajo.
+      .filter((descripcion) => !descripcion.includes('Layout.jsx'))
 
     expect(sinCompartidos).toEqual([])
   })
@@ -182,11 +176,14 @@ describe('el tablero de Administración dibuja con los componentes compartidos',
     stubBackend()
     renderAppAs('ADMIN', '/admin')
     await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
+    // El tablero lee el catálogo: hay que esperar a que la tarjeta se dibuje.
+    await screen.findByText('COMISIONES')
   })
 
-  it('marca el tablero con tarjetas, insignias y botones compartidos', () => {
+  it('marca el tablero con tarjetas y botones compartidos', () => {
+    // El tablero ya no dibuja `Badge`: las alertas que lo usaban se cayeron con el change
+    // `quitar-datos-inventados-frontend` porque dependían de endpoints que no existen.
     expect(document.querySelectorAll('[data-ui="card"]').length).toBeGreaterThan(0)
-    expect(document.querySelectorAll('[data-ui="badge"]').length).toBeGreaterThan(0)
     expect(document.querySelectorAll('[data-ui="button"]').length).toBeGreaterThan(0)
   })
 })
