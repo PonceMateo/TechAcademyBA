@@ -82,6 +82,23 @@ describe('alumno sin pagos', () => {
   })
 })
 
+describe('pagos sin endpoint', () => {
+  it('muestra que no hay pagos registrados y no queda en carga', async () => {
+    cleanup()
+    stubDataSource({
+      listarPagosAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+      listarInscripcionesAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    expect(await screen.findByText('No tenés pagos registrados.')).toBeInTheDocument()
+  })
+})
+
 describe('carga de comprobante', () => {
   // Los campos obligatorios llevan un asterisco en la etiqueta, así que se buscan por patrón.
   it('pide los campos del spec y tiene el botón de envío', () => {

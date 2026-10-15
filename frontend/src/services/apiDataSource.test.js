@@ -4,17 +4,13 @@ import { DataSourceError, createApiDataSource } from './apiDataSource'
 /**
  * La fuente real de la frontera de datos (D36).
  *
- * Acá se verifican las dos reglas que sostienen el resto del change, y las dos son sobre **qué hace
- * la fuente cuando la API no contesta bien**:
+ * Acá se verifica qué hace la fuente cuando la API no contesta bien, que ahora es una sola regla:
+ * **todo fallo se propaga**. Un 404, un 500, un error de red o el `detail` de un 422 suben tal
+ * cual; ninguno se disfraza de dato válido, porque un ejemplo mostrado como si fuera un dato hace
+ * creer que la pantalla funciona (D42).
  *
- * 1. Las lecturas caen al ejemplo **solo con 404**. Un 500 o un error de red se propagan, porque
- *    un ejemplo mostrado como si fuera un dato hace creer que la pantalla funciona.
- * 2. Los POST **nunca** caen, ni con 404. Es lo que separa una demo honesta de una que miente: si
- *    el alta cayera al ejemplo, escribiría en un arreglo de memoria y la secretaría se iría
- *    creyendo que guardó.
- *
- * La segunda es la que importa: el modo por omisión es `api`, así que un POST que cae al ejemplo es
- * el camino que se ejecuta siempre que el backend no está.
+ * Los POST son el caso que más importa: un alta que no llega a la base falla y lo dice, en vez de
+ * escribir en un arreglo de memoria y hacer creer a la secretaría que guardó.
  */
 
 function responder(status, cuerpo) {
@@ -77,13 +73,11 @@ describe('la fuente real usa las rutas del contrato', () => {
   })
 })
 
-describe('las lecturas caen al ejemplo solo con 404', () => {
-  it('devuelve el ejemplo cuando el endpoint no existe', async () => {
+describe('toda lectura que falla se propaga', () => {
+  it('propaga un 404 con su status en vez de inventar el dato', async () => {
     responder(404, { detail: 'Not Found' })
 
-    const comisiones = await createApiDataSource().listarAlumnos()
-
-    expect(comisiones).toHaveLength(6)
+    await expect(createApiDataSource().listarAlumnos()).rejects.toMatchObject({ status: 404 })
   })
 
   it('propaga un 500 en vez de inventar el dato', async () => {
@@ -118,7 +112,9 @@ describe('los POST nunca caen al ejemplo', () => {
 
     // Si cayera, el ejemplo devolvería un curso inventado y la pantalla confirmaría un alta que
     // no existe en la base. Por eso la promesa es que rechace.
-    await expect(createApiDataSource().crearCurso({ nombre: 'Excel' })).rejects.toThrow(DataSourceError)
+    await expect(createApiDataSource().crearCurso({ nombre: 'Excel' })).rejects.toThrow(
+      DataSourceError,
+    )
   })
 
   it('falla un alta de comisión con 500 en vez de escribir en el ejemplo', async () => {
@@ -138,15 +134,5 @@ describe('los POST nunca caen al ejemplo', () => {
     await expect(createApiDataSource().crearDocente({ nombre: 'Ada' })).rejects.toThrow(
       /No pudimos conectar/,
     )
-  })
-
-  it('no escribe en el ejemplo aunque el método de lectura sí sepa hacerlo', async () => {
-    // El mismo backend, con un método de cada tipo: el que lee cae, el que escribe no. Comparar
-    // los dos en el mismo test deja claro que la diferencia es el método, no el estado del server.
-    responder(404, { detail: 'Not Found' })
-    const fuente = createApiDataSource()
-
-    await expect(fuente.listarAlumnos()).resolves.toHaveLength(6)
-    await expect(fuente.crearDocente({ nombre: 'Ada' })).rejects.toThrow()
   })
 })

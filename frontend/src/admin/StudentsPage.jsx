@@ -103,11 +103,15 @@ export function StudentsPage() {
   useEffect(() => {
     // El filtro va al servicio, no sobre el arreglo ya cargado: el mismo criterio tiene que
     // servir cuando los datos vengan de la API y la consulta llegue al servidor.
-    buscarAlumnos(consulta).then(setAlumnos)
+    buscarAlumnos(consulta)
+      .then(setAlumnos)
+      .catch(() => setAlumnos([]))
   }, [consulta])
 
   useEffect(() => {
-    listarEmpresas().then(setEmpresas)
+    listarEmpresas()
+      .then(setEmpresas)
+      .catch(() => setEmpresas([]))
   }, [])
 
   return (

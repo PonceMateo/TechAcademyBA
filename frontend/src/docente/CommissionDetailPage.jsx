@@ -61,7 +61,9 @@ export function CommissionDetailPage() {
   const [copiados, setCopiados] = useState(null)
 
   useEffect(() => {
-    obtenerPadronComision(codigo).then(setPadron)
+    obtenerPadronComision(codigo)
+      .then(setPadron)
+      .catch(() => setPadron(null))
   }, [codigo])
 
   if (padron === null) {

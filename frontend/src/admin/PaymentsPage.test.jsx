@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Cobranzas e ingresos (9.6).
@@ -211,5 +211,27 @@ describe('acreditamiento automático', () => {
 
     expect(boton).toBeDisabled()
     expect(screen.getByText('Próximamente')).toBeInTheDocument()
+  })
+})
+
+describe('historial sin endpoint', () => {
+  it('deja el historial y el selector vacíos cuando la lectura falla', async () => {
+    cleanup()
+    stubDataSource({
+      listarCobranzas: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+      listarAlumnos: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ADMIN', '/admin/cobranzas')
+
+    await screen.findByRole('heading', { name: 'Registrar Cobranza Manual' })
+    // El historial queda sin tabla y el selector de alumno solo con su opción vacía.
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByLabelText(/Alumno a Imputar Pago/)).getAllByRole('option'),
+    ).toHaveLength(1)
   })
 })

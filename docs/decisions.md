@@ -529,6 +529,13 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   primera pregunta es si ya llegó la hora de borrar `conEjemploEnAusencia`.
 - **Dónde:** `frontend/src/services/dataSourceFactory.js`,
   `frontend/src/services/apiDataSource.js`, `docker-compose.yml`, `frontend/src/test/setup.js`.
+- **Modificación (2026-10-15): se retira la caída al ejemplo.** El "techo" de arriba ya no es un
+  pendiente. `resolveApiMode()` y `VITE_API_MODE` desaparecen: la fuente de ejecución es siempre la
+  API real y un 404 se propaga como cualquier otro error. El atajo existía para no dejar media
+  pantalla vacía mientras faltaban los endpoints; el equipo priorizó que ninguna pantalla muestre
+  maqueta como si fuera un dato.
+- **Dónde de la modificación:** `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/dataSourceFactory.js`, `.env.example`, `docker-compose.yml`.
 
 ---
 
@@ -1327,6 +1334,22 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   rollback. Borrar la rama destruiría el registro de lo que se probó, y fusionarla impondría
   una paleta —terracota, teal, índigo— que la decisión D40 reemplaza.
 - **Dónde:** rama `feat/ui-appearance-improvement`.
+
+---
+
+## Retiro de los mocks del frontend (change `quitar-mocks-del-frontend`)
+
+### D42 — Los mocks pasan a ser infraestructura de test, no una fuente elegible
+
+- **Fecha:** 2026-10-15
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `src/mocks/**` y `src/services/mockDataSource.js` se conservan solo para la
+  suite. `API_MODE.MOCK` sigue existiendo para que los tests pidan el modo explícitamente, pero la
+  aplicación de ejecución no puede seleccionarlo.
+- **Por qué:** los datos de ejemplo siguen siendo el default de los tests de pantalla; lo que se
+  elimina es la posibilidad de que la app corra sobre ellos.
+- **Dónde:** `frontend/src/services/dataSourceFactory.js`, `frontend/src/mocks/index.js`,
+  `frontend/src/test/setup.js`, `frontend/src/test/support.jsx`.
 
 ---
 

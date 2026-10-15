@@ -56,10 +56,12 @@ export function CourseDetailPage() {
   const [buscado, setBuscado] = useState(false)
 
   useEffect(() => {
-    obtenerDetalleInscripcion(codigo).then((resultado) => {
-      setDetalle(resultado)
-      setBuscado(true)
-    })
+    obtenerDetalleInscripcion(codigo)
+      .then((resultado) => {
+        setDetalle(resultado)
+        setBuscado(true)
+      })
+      .catch(() => setBuscado(true))
   }, [codigo])
 
   if (detalle === null) {

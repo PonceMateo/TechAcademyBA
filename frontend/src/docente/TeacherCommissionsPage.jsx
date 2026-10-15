@@ -70,7 +70,9 @@ export function TeacherCommissionsPage() {
   const [comisiones, setComisiones] = useState([])
 
   useEffect(() => {
-    obtenerComisionesAsignadas().then(setComisiones)
+    obtenerComisionesAsignadas()
+      .then(setComisiones)
+      .catch(() => setComisiones([]))
   }, [])
 
   const habilitados = comisiones.reduce((total, fila) => total + fila.habilitados, 0)

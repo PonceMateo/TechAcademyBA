@@ -1,6 +1,6 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 import { TITULO_MENU } from './navegacion'
 
 /**
@@ -114,5 +114,19 @@ describe('notas y certificación', () => {
 
     expect(items.join(' ')).not.toContain('Clases dictadas')
     expect(items.join(' ')).toContain('Notas y Certificación')
+  })
+})
+
+describe('perfil sin endpoint', () => {
+  it('muestra que no hay docente para mostrar', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerPerfilDocente: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('DOCENTE', '/docente/perfil')
+
+    expect(await screen.findByText('No hay ningún docente para mostrar.')).toBeInTheDocument()
   })
 })

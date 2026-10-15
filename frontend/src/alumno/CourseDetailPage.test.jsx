@@ -2,7 +2,7 @@ import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { forzarBloqueoManual, guardarLinkClase } from '../services/dataService'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Detalle de curso y acceso a la clase (11.3).
@@ -147,5 +147,20 @@ describe('navegación desde la tarjeta', () => {
     expect(
       await screen.findByRole('heading', { name: 'Desarrollo Web Full Stack · CUR-102' }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('detalle sin endpoint', () => {
+  it('muestra que no está inscripto y no queda buscando', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerDetalleInscripcion: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno/cursos/CUR-102')
+
+    expect(await screen.findByText('No estás inscripto en este curso.')).toBeInTheDocument()
+    expect(screen.queryByText('Buscando el curso que estás cursando…')).not.toBeInTheDocument()
   })
 })

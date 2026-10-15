@@ -1,24 +1,21 @@
 import { API_BASE_URL } from '../config/api'
 import { readStoredToken } from '../auth/tokenStorage'
-import { createMockDataSource } from './mockDataSource'
 
 /**
  * Implementación real de la frontera de datos: habla con el backend (D36).
  *
- * **Las lecturas que no tienen endpoint caen al ejemplo, solo con un 404.** Los endpoints que
- * existen son los del catálogo y del padrón de docentes. Los de alumnos, empresas, cobranzas,
- * habilitación y clases todavía no están escritos, y las pantallas que los usan tienen que seguir
- * mostrando algo: si el modo real es el default (D36) y no hubiera caída, el tablero, la pantalla
- * de alumnos y la de cobranzas quedarían vacías.
+ * **Toda lectura que falla se propaga como `DataSourceError`; no hay datos de ejemplo en su
+ * lugar.** Los endpoints que existen son los del catálogo y del padrón de docentes. Los de
+ * alumnos, empresas, cobranzas, habilitación y clases todavía no están escritos, así que las
+ * pantallas que los usan degradan a su estado vacío (D42).
  *
- * **Por qué solo 404 y no "cualquier error":** un error de red o un 500 disfrazado de dato
- * válido hace creer que la pantalla funciona. La ausencia de endpoint es el único caso en el que
- * el ejemplo es una respuesta honesta: lo que falta es el endpoint, y no hay dato que mostrar.
+ * **Un error nunca se disfraza de dato válido:** ni un 404, ni un 500, ni un error de red. Un 404
+ * es solo otro fallo —el endpoint no existe— y sube tal cual, con su `status`, para que la pantalla
+ * decida qué mostrar.
  *
- * **Los POST NUNCA caen. Es lo más importante de este archivo.** Un alta que no llega a la base
- * tiene que fallar y decir que no se guardó. Si cayera al ejemplo, escribiría en un arreglo de
- * memoria, la pantalla confirmaría un curso que no existe, y la secretaría se iría creyendo que
- * el sistema guarda. Es la diferencia entre una demo que miente y una demo honesta.
+ * **Los POST fallan y lo dicen.** Un alta que no llega a la base no se guarda en ningún lado: el
+ * error sube y la pantalla no confirma un alta que no existe. Es la diferencia entre una demo que
+ * miente y una demo honesta.
  *
  * **El token va en cada petición** porque el backend resuelve la sesión en cada request (M7): la
  * frontera de datos no tiene sesión propia. Se lee del mismo lugar que el login, para que haya un
@@ -56,21 +53,6 @@ const PATHS = Object.freeze({
   pagosAlumno: '/alumno/pagos',
   perfilAlumno: '/alumno/mi-perfil',
 })
-
-/**
- * Los métodos que **escriben**, y que por lo tanto nunca caen al ejemplo.
- *
- * Es una lista explícita y no un patrón de nombre, porque la consecuencia de equivocarse no es un
- * test rojo: es una secretaría que cree que guardó un curso que no está en la base.
- */
-const ESCRIBEN = new Set([
-  'crearCurso',
-  'crearComision',
-  'crearDocente',
-  'registrarCobranza',
-  'forzarBloqueoManual',
-  'guardarLinkClase',
-])
 
 async function request(path, { method = 'GET', body, query, params } = {}) {
   // Los `:nombre` del camino se reemplazan con `params`. Es lo que permite que `PATHS` declare
@@ -110,7 +92,8 @@ async function request(path, { method = 'GET', body, query, params } = {}) {
       // El `detail` del backend es texto de interfaz en es-AR y dice qué dato se repitió, así que
       // se sube tal cual: la pantalla lo muestra y no necesita saber de dónde viene.
       response.status >= 400 && response.status < 500 && response.status !== 404
-        ? (await leerDetalle(response)) ?? `La API respondió ${response.status} a ${method} ${ruta}.`
+        ? ((await leerDetalle(response)) ??
+            `La API respondió ${response.status} a ${method} ${ruta}.`)
         : `La API respondió ${response.status} a ${method} ${ruta}.`,
       response.status,
     )
@@ -188,7 +171,9 @@ export function createApiDataSource() {
       }
       return todos.filter((fila) =>
         [fila.nombre, fila.dni, fila.email].some((campo) =>
-          String(campo ?? '').toLowerCase().includes(aguja),
+          String(campo ?? '')
+            .toLowerCase()
+            .includes(aguja),
         ),
       )
     },
@@ -241,8 +226,7 @@ export function createApiDataSource() {
 
     /**
      * Ficha del docente que entra. La ruta es **provisional**: no hay endpoint escrito, así que
-     * esto da 404 y la lectura cae al ejemplo, que es lo que la pantalla del docente muestra
-     * mientras tanto (M33).
+     * esto da 404 y el fallo se propaga; la pantalla del docente muestra su estado vacío (M33).
      */
     async obtenerPerfilDocente() {
       return request(PATHS.perfilDocente)
@@ -286,41 +270,7 @@ export function createApiDataSource() {
     },
   }
 
-  return conEjemploEnAusencia(api)
-}
-
-/**
- * Envuelve las lecturas para que caigan al ejemplo cuando el endpoint no existe.
- *
- * `ponytail: la caída al ejemplo se borra cuando el shell tenga todos sus endpoints. Es un atajo
- * deliberado, no una arquitectura: mientras falten, es lo que evita que el modo real por omisión
- * deje media pantalla vacía.` (D36)
- */
-function conEjemploEnAusencia(api) {
-  const ejemplo = createMockDataSource()
-  const envuelto = { modo: api.modo }
-
-  for (const [nombre, metodo] of Object.entries(api)) {
-    if (nombre === 'modo' || ESCRIBEN.has(nombre) || typeof metodo !== 'function') {
-      envuelto[nombre] = metodo
-      continue
-    }
-
-    envuelto[nombre] = async (...argumentos) => {
-      try {
-        return await metodo(...argumentos)
-      } catch (error) {
-        const sinEndpoint = error instanceof DataSourceError && error.status === 404
-        const tieneEjemplo = typeof ejemplo[nombre] === 'function'
-        if (!sinEndpoint || !tieneEjemplo) {
-          throw error
-        }
-        return ejemplo[nombre](...argumentos)
-      }
-    }
-  }
-
-  return envuelto
+  return api
 }
 
 /**

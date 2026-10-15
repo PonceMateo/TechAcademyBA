@@ -83,13 +83,15 @@ export function StudentPaymentsPage() {
   const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
-    listarPagosAlumno().then((resultado) => {
-      setPagos(resultado)
-      setCargados(true)
-    })
-    listarInscripcionesAlumno().then((resultado) =>
-      setCursos(resultado.map((inscripcion) => inscripcion.codigo)),
-    )
+    listarPagosAlumno()
+      .then((resultado) => {
+        setPagos(resultado)
+        setCargados(true)
+      })
+      .catch(() => setCargados(true))
+    listarInscripcionesAlumno()
+      .then((resultado) => setCursos(resultado.map((inscripcion) => inscripcion.codigo)))
+      .catch(() => setCursos([]))
   }, [])
 
   function cambiar(campo) {

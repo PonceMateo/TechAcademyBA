@@ -103,3 +103,20 @@ describe('alumno sin inscripciones', () => {
     expect(screen.queryByRole('link', { name: 'Ver detalle' })).not.toBeInTheDocument()
   })
 })
+
+describe('alumno sin respuesta de la API', () => {
+  it('muestra el estado vacío y no deja la pantalla buscando', async () => {
+    cleanup()
+    stubDataSource({
+      listarInscripcionesAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno')
+
+    expect(
+      await screen.findByText('No tenés cursos activos en este período lectivo.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Ver detalle' })).not.toBeInTheDocument()
+  })
+})

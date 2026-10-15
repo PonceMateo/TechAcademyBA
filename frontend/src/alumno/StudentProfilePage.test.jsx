@@ -1,7 +1,7 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 import { TITULO_MENU } from './navegacion'
 
 /**
@@ -101,5 +101,19 @@ describe('ítems deshabilitados del menú', () => {
     renderAppAs('ALUMNO', '/alumno/pagar-la-cuota')
 
     expect(await screen.findByText('No encontramos esa página')).toBeInTheDocument()
+  })
+})
+
+describe('perfil sin endpoint', () => {
+  it('muestra que no hay alumno para mostrar', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerPerfilAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno/perfil')
+
+    expect(await screen.findByText('No hay ningún alumno para mostrar.')).toBeInTheDocument()
   })
 })

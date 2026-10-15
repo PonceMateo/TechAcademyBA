@@ -80,17 +80,23 @@ export function StudentCoursesPage() {
   const [cargadas, setCargadas] = useState(false)
 
   useEffect(() => {
-    listarInscripcionesAlumno().then(async (resultado) => {
-      setInscripciones(resultado)
+    listarInscripcionesAlumno()
+      .then(async (resultado) => {
+        setInscripciones(resultado)
 
-      // La agenda de la columna derecha son los próximos encuentros de las inscripciones que el
-      // alumno ya tiene, por el mismo servicio que usa el detalle del curso.
-      const detalles = await Promise.all(
-        resultado.map((inscripcion) => obtenerDetalleInscripcion(inscripcion.codigo)),
-      )
-      setAgenda(detalles.flatMap((detalle) => detalle?.proximos_encuentros ?? []))
-      setCargadas(true)
-    })
+        // La agenda de la columna derecha son los próximos encuentros de las inscripciones que el
+        // alumno ya tiene, por el mismo servicio que usa el detalle del curso.
+        const detalles = await Promise.all(
+          resultado.map((inscripcion) => obtenerDetalleInscripcion(inscripcion.codigo)),
+        )
+        setAgenda(detalles.flatMap((detalle) => detalle?.proximos_encuentros ?? []))
+        setCargadas(true)
+      })
+      .catch(() => {
+        setInscripciones([])
+        setAgenda([])
+        setCargadas(true)
+      })
   }, [])
 
   const primera = inscripciones[0]

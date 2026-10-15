@@ -49,7 +49,9 @@ export function TeacherProfilePage() {
   const [perfil, setPerfil] = useState(null)
 
   useEffect(() => {
-    obtenerPerfilDocente().then(setPerfil)
+    obtenerPerfilDocente()
+      .then(setPerfil)
+      .catch(() => {})
   }, [])
 
   if (perfil === null) {

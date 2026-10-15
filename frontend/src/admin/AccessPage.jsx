@@ -97,11 +97,16 @@ export function AccessPage() {
     setErrorMotivo(null)
     setMotivo('')
 
-    const encontrado = await buscarHabilitacion(consulta)
-    setResultado(encontrado)
-    setUltimoPago(
-      encontrado?.tipo === 'ALUMNO' ? await ultimoPagoAcreditado(encontrado.registro) : null,
-    )
+    try {
+      const encontrado = await buscarHabilitacion(consulta)
+      setResultado(encontrado)
+      setUltimoPago(
+        encontrado?.tipo === 'ALUMNO' ? await ultimoPagoAcreditado(encontrado.registro) : null,
+      )
+    } catch (error) {
+      setResultado(null)
+      setAviso(error.message)
+    }
   }
 
   async function forzar() {

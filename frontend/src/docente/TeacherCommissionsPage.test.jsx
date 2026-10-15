@@ -120,3 +120,23 @@ describe('singular y plural de los contadores', () => {
     await waitFor(() => expect(screen.getByText('0 bloqueados')).toBeInTheDocument())
   })
 })
+
+describe('comisiones sin endpoint', () => {
+  it('deja los indicadores en cero y la tabla en su estado vacío', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerComisionesAsignadas: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('DOCENTE', '/docente')
+
+    await screen.findByRole('heading', { name: SALUDO })
+    expect(
+      await screen.findByText('No tenés comisiones asignadas en este período lectivo.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('COMISIONES ACTIVAS', { selector: 'p' }).parentElement,
+    ).toHaveTextContent('0')
+  })
+})

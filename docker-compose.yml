@@ -91,9 +91,6 @@ services:
     build:
       context: ./frontend
     environment:
-      # D13: la fábrica de src/services resuelve mock o API con esta variable. Desde el change
-      # `altas-catalogo-docentes` el modo por defecto es el real: las altas se guardan.
-      VITE_API_MODE: ${VITE_API_MODE:-api}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
       # D14: el proxy de /api apunta al backend por nombre de servicio.
       VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://backend:8000}
@@ -110,8 +107,9 @@ services:
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
     depends_on:
-      # service_started y no service_healthy a propósito: el frontend usa datos de ejemplo
-      # (D14) y no debe dejar de arrancar porque el backend esté caído.
+      # service_started y no service_healthy a propósito: el frontend arranca sin esperar a que el
+      # backend esté sano. Ya no es por usar datos de ejemplo (D42), sino porque Vite resuelve el
+      # proxy recién al pedido y levanta igual.
       backend:
         condition: service_started
     healthcheck:

@@ -40,11 +40,13 @@ export function StudentProfilePage() {
   const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
-    obtenerPerfilAlumno().then((resultado) => {
-      setPerfil(resultado)
-      setEmail(resultado?.email ?? '')
-      setTelefono(resultado?.telefono ?? '')
-    })
+    obtenerPerfilAlumno()
+      .then((resultado) => {
+        setPerfil(resultado)
+        setEmail(resultado?.email ?? '')
+        setTelefono(resultado?.telefono ?? '')
+      })
+      .catch(() => {})
   }, [])
 
   if (perfil === null) {
