@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "skills": {
+    "banner-design": {
+      "source": "./.opencode/skills/banner-design",
+      "sourceType": "local",
+      "computedHash": "f859a951ded1109a38bcc7f18faf4581f9adbf0550df7a11c013e77a5b229541"
+    },
+    "brand": {
+      "source": "./.opencode/skills/brand",
+      "sourceType": "local",
+      "computedHash": "bd65dbd8de679805d1ad740c74a41b4f831d08ff0240390a7ed2947c62a896b9"
+    },
+    "design": {
+      "source": "./.opencode/skills/design",
+      "sourceType": "local",
+      "computedHash": "bb2e3ffee4b7b69e5a38ce08f6010ca79381d9f53b9dfadb33aee1ece6f1679a"
+    },
+    "design-system": {
+      "source": "./.opencode/skills/design-system",
+      "sourceType": "local",
+      "computedHash": "5a3dbae4a3c2ad9f96323d9bfae926b3c21bb1e3b066aa067906f577a2ff2545"
+    },
+    "fastapi": {
+      "source": "./.opencode/skills/fastapi",
+      "sourceType": "local",
+      "computedHash": "2f0ff30756b435168276e1a7eb78c07856118575ea174535de7ed86dc88c9be4"
+    },
+    "find-skills": {
+      "source": "./.opencode/skills/find-skills",
+      "sourceType": "local",
+      "computedHash": "913b9d37d0d54047dd65222bb8c67b2bf04e3cb87dcad1729068d7a8b2c8c396"
+    },
+    "grill-me": {
+      "source": "./.opencode/skills/grill-me",
+      "sourceType": "local",
+      "computedHash": "5e0c683385eafd83f106ac6c9d67dfbbfe5aa4b3fe65aad114eb1055a99c818f"
+    },
+    "grilling": {
+      "source": "./.opencode/skills/grilling",
+      "sourceType": "local",
+      "computedHash": "b698441baeef274a43d5bc3ba86dd004d3faaa11df7d2c62be08d9bc01308447"
+    },
+    "image-to-code": {
+      "source": "./.opencode/skills/image-to-code",
+      "sourceType": "local",
+      "computedHash": "58517b03b2a01f4c9ba65861559d03df931400871bbc200978c975b24bb92c73"
+    },
+    "openspec-apply-change": {
+      "source": "./.opencode/skills/openspec-apply-change",
+      "sourceType": "local",
+      "computedHash": "850f92cc59346675be7aaad42d7a78d6b7eac919f738d5793786522d5f86da3a"
+    },
+    "openspec-archive-change": {
+      "source": "./.opencode/skills/openspec-archive-change",
+      "sourceType": "local",
+      "computedHash": "e791a99dedb0c8267f4e22f5c5f6aba40dfa3d9c55fc29982a0c66e91be6c822"
+    },
+    "openspec-explore": {
+      "source": "./.opencode/skills/openspec-explore",
+      "sourceType": "local",
+      "computedHash": "37c2158ba6a6035ecb75cea953b917bcb0d658792b4919294063a1de47a51f5b"
+    },
+    "openspec-propose": {
+      "source": "./.opencode/skills/openspec-propose",
+      "sourceType": "local",
+      "computedHash": "98896685e46dc20d7cd2a2b50772e7cc76d8a4de481c2971236dff69ae55b705"
+    },
+    "openspec-sync-specs": {
+      "source": "./.opencode/skills/openspec-sync-specs",
+      "sourceType": "local",
+      "computedHash": "291e3e97b855eafc24ce7049073bf2a12570250eb4f2099e7dfeeea7e81056ab"
+    },
+    "openspec-update-change": {
+      "source": "./.opencode/skills/openspec-update-change",
+      "sourceType": "local",
+      "computedHash": "38a43c1e3c2bb9f16d262a20b1163c874d13810ecb0318b26f4739fbfd100fae"
+    },
+    "slides": {
+      "source": "./.opencode/skills/slides",
+      "sourceType": "local",
+      "computedHash": "a2b3559b58afc484548e1eb359e20495d11cf12b90da7c1fbba50efed9a70340"
+    },
+    "sql-optimization-patterns": {
+      "source": "./.opencode/skills/sql-optimization-patterns",
+      "sourceType": "local",
+      "computedHash": "6f9779817c6f1b077347687c2b16e884506a519d0c2a3eaa2c320709bf273139"
+    },
+    "supabase": {
+      "source": "./.opencode/skills/supabase",
+      "sourceType": "local",
+      "computedHash": "af1844ade632808fc0c15cf2db87daf3b2431c5262dc8a0c3ea7d70880fadf91"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "./.opencode/skills/supabase-postgres-best-practices",
+      "sourceType": "local",
+      "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    },
+    "ui-styling": {
+      "source": "./.opencode/skills/ui-styling",
+      "sourceType": "local",
+      "computedHash": "f2aa09e19f51e38ddc43ca6df6dd142b555eef2f5ecaed9deafffe2427c14564"
+    },
+    "ui-ux-pro-max": {
+      "source": "./.opencode/skills/ui-ux-pro-max",
+      "sourceType": "local",
+      "computedHash": "04eb7b59df09127b355eb7e3fac83e0371444f1dcb6318d2700eb6726d751588"
+    }
+  }
+}
