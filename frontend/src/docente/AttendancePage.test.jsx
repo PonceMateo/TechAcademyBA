@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Asistencia de la clase del día (10.4).
@@ -105,5 +105,22 @@ describe('la columna del día', () => {
     // La pantalla no dice una palabra sobre habilitación: el acceso lo decide la secretaría con el
     // comprobante del alumno, no una lista de asistencia.
     expect(screen.queryByText(/habilit/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('asistencia sin endpoint', () => {
+  it('muestra que no hay comisión asignada cuando falla la lectura de la asistencia', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerComisionesAsignadas: async () => [{ codigo: 'CUR-101' }],
+      obtenerAsistenciaComision: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('DOCENTE', '/docente/asistencia')
+
+    expect(
+      await screen.findByText('No hay ninguna comisión asignada para registrar asistencia.'),
+    ).toBeInTheDocument()
   })
 })

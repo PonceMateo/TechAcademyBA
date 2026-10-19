@@ -529,6 +529,13 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   primera pregunta es si ya llegó la hora de borrar `conEjemploEnAusencia`.
 - **Dónde:** `frontend/src/services/dataSourceFactory.js`,
   `frontend/src/services/apiDataSource.js`, `docker-compose.yml`, `frontend/src/test/setup.js`.
+- **Modificación (2026-10-15): se retira la caída al ejemplo.** El "techo" de arriba ya no es un
+  pendiente. `resolveApiMode()` y `VITE_API_MODE` desaparecen: la fuente de ejecución es siempre la
+  API real y un 404 se propaga como cualquier otro error. El atajo existía para no dejar media
+  pantalla vacía mientras faltaban los endpoints; el equipo priorizó que ninguna pantalla muestre
+  maqueta como si fuera un dato.
+- **Dónde de la modificación:** `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/dataSourceFactory.js`, `.env.example`, `docker-compose.yml`.
 
 ---
 
@@ -1313,6 +1320,10 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   `docs/design/figma-dashboards-overhaul/`,
   `frontend/src/components/shell/ShellFrame.jsx`, `frontend/src/index.css`,
   `frontend/src/*/navegacion.js`.
+- **Modificación (2026-10-15): la frase de cierre deja de ser cierta.** "Las fechas y la
+  `Última actualización` quedan literales placeholders" ya no es contrato vigente: las fechas de los
+  encabezados son la fecha real del día y el pie pierde `Última actualización`, porque un
+  placeholder que parece un dato es justo lo que se confundió con un dato real (D43).
 
 ---
 
@@ -1327,6 +1338,53 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   rollback. Borrar la rama destruiría el registro de lo que se probó, y fusionarla impondría
   una paleta —terracota, teal, índigo— que la decisión D40 reemplaza.
 - **Dónde:** rama `feat/ui-appearance-improvement`.
+
+---
+
+## Retiro de los mocks del frontend (change `quitar-mocks-del-frontend`)
+
+### D42 — Los mocks pasan a ser infraestructura de test, no una fuente elegible
+
+- **Fecha:** 2026-10-15
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `src/mocks/**` y `src/services/mockDataSource.js` se conservan solo para la
+  suite. `API_MODE.MOCK` sigue existiendo para que los tests pidan el modo explícitamente, pero la
+  aplicación de ejecución no puede seleccionarlo.
+- **Por qué:** los datos de ejemplo siguen siendo el default de los tests de pantalla; lo que se
+  elimina es la posibilidad de que la app corra sobre ellos.
+- **Dónde:** `frontend/src/services/dataSourceFactory.js`, `frontend/src/mocks/index.js`,
+  `frontend/src/test/setup.js`, `frontend/src/test/support.jsx`.
+
+---
+
+## Quitar los datos inventados del frontend (change `quitar-datos-inventados-frontend`)
+
+### D43 — El frontend conserva la forma de las pantallas y marca con `—` lo que ninguna fuente respalda
+
+- **Fecha:** 2026-10-15
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** se eliminan los literales de negocio escritos a mano de los tres tableros, los dos
+  perfiles, el pie del armazón y la acción de copia de `AccessPage`. Ninguna pantalla elimina un
+  elemento porque su dato no exista todavía: la pantalla conserva su forma y, donde la fuente no
+  puede responder, el valor es `—`. Donde la fuente responde se muestra el valor real, incluido un
+  `0` real. El valor `—` significa "todavía no lo sé" y SHALL NOT significar "cero"; un valor que
+  ninguna fuente respalde no se muestra nunca. Mientras una lectura no haya resuelto, el valor
+  afectado es `—`, nunca un `0` ni un literal. La fecha de los encabezados pasa a ser la fecha real
+  del día y el pie pierde `Última actualización`.
+- **Por qué:** el bootstrap fue una maqueta para una presentación; un alumno vio un tablero con
+  números falsos antes de que la consulta fallara. El equipo priorizó que ninguna pantalla muestre
+  un dato que no venga de la fuente, conservando la forma de la interfaz: la pantalla se desarma
+  menos y se ve exactamente qué falta, sin que un `0` o un literal afirmen algo que no se sabe.
+- **Corrige a D40:** su frase de cierre, "Las fechas y la `Última actualización` quedan literales
+  placeholders", deja de ser cierta. Las fechas son la fecha real del día y la `Última
+  actualización` se quita, porque un placeholder que parece un dato es justo lo que se confundió
+  con un dato real.
+- **Dónde:** `frontend/src/admin/DashboardPage.jsx`,
+  `frontend/src/admin/AccessPage.jsx`, `frontend/src/alumno/StudentCoursesPage.jsx`,
+  `frontend/src/alumno/StudentPaymentsPage.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`,
+  `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/docente/TeacherProfilePage.jsx`, `frontend/src/components/shell/ShellFrame.jsx`,
+  `frontend/src/utils/formato.js`.
 
 ---
 

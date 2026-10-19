@@ -1,7 +1,7 @@
-import { screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Habilitación de accesos (9.7).
@@ -138,6 +138,7 @@ describe('acciones excepcionales', () => {
   it('copia solo los correos de los alumnos habilitados de la comisión', async () => {
     const user = userEvent.setup()
 
+    await user.selectOptions(await screen.findByLabelText('Comisión'), 'CUR-101')
     await user.click(screen.getByRole('button', { name: 'Copiar emails habilitados de CUR-101' }))
 
     const copiados = await screen.findByLabelText('Correos copiados')
@@ -158,6 +159,7 @@ describe('acciones excepcionales', () => {
     await user.click(screen.getByRole('button', { name: 'Forzar Bloqueo Manual' }))
     await waitFor(() => expect(screen.getByText('BLOQUEADO')).toBeInTheDocument())
 
+    await user.selectOptions(await screen.findByLabelText('Comisión'), 'CUR-101')
     await user.click(screen.getByRole('button', { name: 'Copiar emails habilitados de CUR-101' }))
 
     expect(
@@ -165,11 +167,67 @@ describe('acciones excepcionales', () => {
     ).toBeInTheDocument()
     expect(screen.queryByLabelText('Correos copiados')).not.toBeInTheDocument()
   })
+
+  it('no pinta el selector ni la acción de copia mientras el catálogo no resuelve', async () => {
+    cleanup()
+    stubDataSource({ listarComisiones: () => new Promise(() => {}) })
+    renderAppAs('ADMIN', '/admin/habilitacion')
+    await screen.findByRole('heading', { name: 'Buscador de Alumnos y Cuentas Corporativas' })
+
+    expect(screen.queryByLabelText('Comisión')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Copiar emails habilitados/ }),
+    ).not.toBeInTheDocument()
+    // Lo que no depende del catálogo sí se pinta.
+    expect(screen.getByRole('button', { name: 'Forzar Bloqueo Manual' })).toBeInTheDocument()
+  })
+
+  it('no inventa una comisión cuando el catálogo rechaza', async () => {
+    cleanup()
+    stubDataSource({
+      listarComisiones: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ADMIN', '/admin/habilitacion')
+    await screen.findByRole('heading', { name: 'Buscador de Alumnos y Cuentas Corporativas' })
+
+    // El selector queda sin comisiones y la acción de copia nunca aparece.
+    await screen.findByLabelText('Comisión')
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.queryByRole('option', { name: 'CUR-101' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Copiar emails habilitados/ }),
+    ).not.toBeInTheDocument()
+  })
 })
 
 describe('emisión de certificados', () => {
   it('se muestra deshabilitada y con la etiqueta Próximamente', () => {
     expect(screen.getByRole('button', { name: 'Emitir certificados' })).toBeDisabled()
     expect(screen.getByText('Próximamente')).toBeInTheDocument()
+  })
+})
+
+describe('consulta sin endpoint', () => {
+  it('avisa cuando la lectura del último pago falla y no deja una ficha a medias', async () => {
+    cleanup()
+    stubDataSource({
+      buscarHabilitacion: async () => ({
+        tipo: 'ALUMNO',
+        registro: { nombre: 'Juan Ignacio Pérez' },
+      }),
+      listarCobranzas: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ADMIN', '/admin/habilitacion')
+    await screen.findByRole('heading', { name: 'Buscador de Alumnos y Cuentas Corporativas' })
+
+    const user = userEvent.setup()
+    await consultar(user, '38.456.789')
+
+    expect(await screen.findByText('No pudimos conectar con el servidor.')).toBeInTheDocument()
+    expect(screen.getByText(/Todavía no consultaste a nadie/)).toBeInTheDocument()
   })
 })

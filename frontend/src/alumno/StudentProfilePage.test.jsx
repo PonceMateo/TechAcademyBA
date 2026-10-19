@@ -1,7 +1,14 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import {
+  accountForRole,
+  renderAppAs,
+  resetDataSource,
+  stubBackend,
+  stubDataSource,
+} from '../test/support'
+import { inicialesDe } from '../utils/formato'
 import { TITULO_MENU } from './navegacion'
 
 /**
@@ -22,11 +29,12 @@ beforeEach(async () => {
 })
 
 describe('tarjeta de identidad', () => {
-  it('muestra el avatar, el nombre, el chip de permisos y la nota', () => {
+  it('muestra el avatar y el nombre de la cuenta de la sesión, el chip y la nota', () => {
+    const cuenta = accountForRole('ALUMNO')
     const identidad = within(screen.getByRole('heading', { name: 'Identidad' }).closest('section'))
 
-    expect(identidad.getByText('CR')).toBeInTheDocument()
-    expect(identidad.getByText('Camila Rodríguez')).toBeInTheDocument()
+    expect(identidad.getByText(inicialesDe(cuenta.nombre))).toBeInTheDocument()
+    expect(identidad.getByText(cuenta.nombre)).toBeInTheDocument()
     expect(identidad.getByText('ALUMNO · PERMISOS MÍNIMOS')).toBeInTheDocument()
     expect(identidad.getByText('Solo podés editar tus datos de contacto.')).toBeInTheDocument()
   })
@@ -101,5 +109,19 @@ describe('ítems deshabilitados del menú', () => {
     renderAppAs('ALUMNO', '/alumno/pagar-la-cuota')
 
     expect(await screen.findByText('No encontramos esa página')).toBeInTheDocument()
+  })
+})
+
+describe('perfil sin endpoint', () => {
+  it('muestra que no hay alumno para mostrar', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerPerfilAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno/perfil')
+
+    expect(await screen.findByText('No hay ningún alumno para mostrar.')).toBeInTheDocument()
   })
 })

@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Alumnos e inscripciones (9.5).
@@ -167,5 +167,26 @@ describe('cuentas corporativas', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByText('10 personas, falta enviar la nómina')).toBeInTheDocument()
+  })
+})
+
+describe('padrón sin endpoint', () => {
+  it('deja el padrón y las cuentas corporativas vacíos cuando la lectura falla', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+      listarEmpresas: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+
+    await screen.findByRole('heading', { name: 'Padrón de Alumnos Regulares' })
+    expect(await screen.findByText('No se encontraron resultados.')).toBeInTheDocument()
+    // Las dos tablas quedan sin filas: la de alumnos muestra su `vacio` y la de empresas no dibuja
+    // ninguna tabla.
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })

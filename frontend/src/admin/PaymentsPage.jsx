@@ -100,8 +100,12 @@ export function PaymentsPage() {
   const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
-    listarCobranzas().then(setCobranzas)
-    listarAlumnos().then(setAlumnos)
+    listarCobranzas()
+      .then(setCobranzas)
+      .catch(() => setCobranzas([]))
+    listarAlumnos()
+      .then(setAlumnos)
+      .catch(() => setAlumnos([]))
   }, [])
 
   /** El selector imputa a un alumno del padrón; el titular del comprobante no. */

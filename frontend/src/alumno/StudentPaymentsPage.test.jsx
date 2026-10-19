@@ -82,6 +82,35 @@ describe('alumno sin pagos', () => {
   })
 })
 
+describe('alumno esperando la respuesta de la API', () => {
+  it('no pinta ni las filas ni el mensaje de que no hay pagos', async () => {
+    cleanup()
+    stubDataSource({ listarPagosAlumno: () => new Promise(() => {}) })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+    await screen.findByRole('heading', { name: 'Mis Pagos' })
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByText('No tenés pagos registrados.')).not.toBeInTheDocument()
+  })
+})
+
+describe('pagos sin endpoint', () => {
+  it('muestra que no hay pagos registrados y no queda en carga', async () => {
+    cleanup()
+    stubDataSource({
+      listarPagosAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+      listarInscripcionesAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    expect(await screen.findByText('No tenés pagos registrados.')).toBeInTheDocument()
+  })
+})
+
 describe('carga de comprobante', () => {
   // Los campos obligatorios llevan un asterisco en la etiqueta, así que se buscan por patrón.
   it('pide los campos del spec y tiene el botón de envío', () => {

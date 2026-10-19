@@ -41,23 +41,25 @@ export function AttendancePage() {
   const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
-    obtenerComisionesAsignadas().then(async (comisiones) => {
-      if (comisiones.length === 0) {
-        return
-      }
+    obtenerComisionesAsignadas()
+      .then(async (comisiones) => {
+        if (comisiones.length === 0) {
+          return
+        }
 
-      const cargada = await obtenerAsistenciaComision(comisiones[0].codigo)
-      setAsistencia(cargada)
+        const cargada = await obtenerAsistenciaComision(comisiones[0].codigo)
+        setAsistencia(cargada)
 
-      const claseDelDia = cargada?.clases.find((clase) => clase.editable)
-      if (claseDelDia !== undefined) {
-        setMarcasDelDia(
-          Object.fromEntries(
-            cargada.filas.map((fila) => [fila.alumno_id, fila.marcas[claseDelDia.fecha]]),
-          ),
-        )
-      }
-    })
+        const claseDelDia = cargada?.clases.find((clase) => clase.editable)
+        if (claseDelDia !== undefined) {
+          setMarcasDelDia(
+            Object.fromEntries(
+              cargada.filas.map((fila) => [fila.alumno_id, fila.marcas[claseDelDia.fecha]]),
+            ),
+          )
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const claseDelDia = useMemo(

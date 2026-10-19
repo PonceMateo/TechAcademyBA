@@ -83,13 +83,15 @@ export function StudentPaymentsPage() {
   const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
-    listarPagosAlumno().then((resultado) => {
-      setPagos(resultado)
-      setCargados(true)
-    })
-    listarInscripcionesAlumno().then((resultado) =>
-      setCursos(resultado.map((inscripcion) => inscripcion.codigo)),
-    )
+    listarPagosAlumno()
+      .then((resultado) => {
+        setPagos(resultado)
+        setCargados(true)
+      })
+      .catch(() => setCargados(true))
+    listarInscripcionesAlumno()
+      .then((resultado) => setCursos(resultado.map((inscripcion) => inscripcion.codigo)))
+      .catch(() => setCursos([]))
   }, [])
 
   function cambiar(campo) {
@@ -128,11 +130,12 @@ export function StudentPaymentsPage() {
       <h2 className="text-xl font-semibold text-slate-900">Mis Pagos</h2>
 
       <Card titulo="Historial de comprobantes">
-        {cargados && pagos.length === 0 ? (
-          <p className="text-sm text-slate-600">{SIN_PAGOS}</p>
-        ) : (
-          <Table columnas={COLUMNAS} filas={pagos} claveDeFila={(fila) => fila.id} />
-        )}
+        {cargados &&
+          (pagos.length === 0 ? (
+            <p className="text-sm text-slate-600">{SIN_PAGOS}</p>
+          ) : (
+            <Table columnas={COLUMNAS} filas={pagos} claveDeFila={(fila) => fila.id} />
+          ))}
       </Card>
 
       <Card titulo="Cargar comprobante">

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useSession } from '../auth/SessionContext'
 import { Avatar, Badge, Button, Card, Input } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { obtenerPerfilAlumno } from '../services/dataService'
+import { inicialesDe } from '../utils/formato'
 
 /**
  * Perfil del alumno (11.5).
@@ -19,14 +21,11 @@ import { obtenerPerfilAlumno } from '../services/dataService'
  * **La edición es local y lo dice.** No hay endpoint para actualizar el contacto (M17) y la pantalla
  * muestra la confirmación y el valor nuevo en el campo, que es lo que el maqueteado promete.
  *
- * **El avatar y el nombre de la tarjeta son del maquetado, no de la sesión.** Son los mismos
- * placeholders del cliente que ya mostraba el pie del armazón; desde el change
- * `ui-figma-dashboards` el pie muestra el tagline y el período lectivo, así que estos dos literales
- * son contenido de esta tarjeta y viven acá.
+ * **El avatar y el nombre de la tarjeta son de la cuenta de la sesión, no del maquetado.** Las
+ * iniciales salen de `inicialesDe`, el mismo helper de la barra superior, y el nombre es el de
+ * quien entró (M25). El bloque `Datos personales` sí sigue mostrando el perfil de ejemplo, porque
+ * su endpoint todavía no existe: la dualidad es conocida y aceptada.
  */
-const PIE_AVATAR = 'CR'
-const PIE_NOMBRE = 'Camila Rodríguez'
-
 const CHIP_PERMISOS = 'ALUMNO · PERMISOS MÍNIMOS'
 const NOTA_PERMISOS = 'Solo podés editar tus datos de contacto.'
 const LEYENDO_SOLO_LECTURA = 'solo lectura'
@@ -34,17 +33,20 @@ const LEYENDO_SOLO_LECTURA = 'solo lectura'
 const AVISO_GUARDADO = 'Datos de contacto actualizados.'
 
 export function StudentProfilePage() {
+  const { session } = useSession()
   const [perfil, setPerfil] = useState(null)
   const [email, setEmail] = useState('')
   const [telefono, setTelefono] = useState('')
   const [aviso, setAviso] = useState(null)
 
   useEffect(() => {
-    obtenerPerfilAlumno().then((resultado) => {
-      setPerfil(resultado)
-      setEmail(resultado?.email ?? '')
-      setTelefono(resultado?.telefono ?? '')
-    })
+    obtenerPerfilAlumno()
+      .then((resultado) => {
+        setPerfil(resultado)
+        setEmail(resultado?.email ?? '')
+        setTelefono(resultado?.telefono ?? '')
+      })
+      .catch(() => {})
   }, [])
 
   if (perfil === null) {
@@ -62,10 +64,10 @@ export function StudentProfilePage() {
 
       <Card titulo="Identidad">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar iniciales={PIE_AVATAR} tamano="grande" />
+          <Avatar iniciales={inicialesDe(session.nombre)} tamano="grande" />
 
           <div>
-            <p className="text-lg font-semibold text-slate-900">{PIE_NOMBRE}</p>
+            <p className="text-lg font-semibold text-slate-900">{session.nombre}</p>
             <div className="mt-2">
               <Badge tono={TONO.DORADO}>{CHIP_PERMISOS}</Badge>
             </div>

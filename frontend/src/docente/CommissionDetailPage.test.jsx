@@ -1,7 +1,7 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
  * Detalle de comisión con su padrón (10.3).
@@ -181,6 +181,20 @@ describe('selección de la comisión', () => {
     resetDataSource()
     stubBackend()
     renderAppAs('DOCENTE', '/docente/alumnos/CUR-999')
+
+    expect(await screen.findByText('No hay ninguna comisión con ese código.')).toBeInTheDocument()
+  })
+})
+
+describe('padrón sin endpoint', () => {
+  it('muestra que no hay comisión con ese código cuando la lectura falla', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerPadronComision: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('DOCENTE', '/docente/alumnos/CUR-101')
 
     expect(await screen.findByText('No hay ninguna comisión con ese código.')).toBeInTheDocument()
   })

@@ -1,6 +1,13 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { renderAppAs, resetDataSource, stubBackend } from '../test/support'
+import {
+  accountForRole,
+  renderAppAs,
+  resetDataSource,
+  stubBackend,
+  stubDataSource,
+} from '../test/support'
+import { inicialesDe } from '../utils/formato'
 import { TITULO_MENU } from './navegacion'
 
 /**
@@ -28,13 +35,14 @@ async function entrar(ruta = '/docente/perfil') {
 beforeEach(() => entrar())
 
 describe('tarjeta de identidad', () => {
-  it('muestra el avatar, el nombre, el chip de permisos y la nota', () => {
-    // El nombre también está en el pie del shell: se afirma sobre la tarjeta de identidad para no
-    // depender de cuál de los dos encuentra la consulta.
+  it('muestra el avatar y el nombre de la cuenta de la sesión, el chip y la nota', () => {
+    const cuenta = accountForRole('DOCENTE')
+    // El nombre de la cuenta también está en la barra superior: se afirma sobre la tarjeta de
+    // identidad para no depender de cuál de los dos encuentra la consulta.
     const identidad = within(screen.getByRole('heading', { name: 'Identidad' }).closest('section'))
 
-    expect(identidad.getByText('PM')).toBeInTheDocument()
-    expect(identidad.getByText('Profe Martín')).toBeInTheDocument()
+    expect(identidad.getByText(inicialesDe(cuenta.nombre))).toBeInTheDocument()
+    expect(identidad.getByText(cuenta.nombre)).toBeInTheDocument()
     expect(identidad.getByText('DOCENTE · PERMISOS REDUCIDOS')).toBeInTheDocument()
     expect(
       identidad.getByText('Los cambios administrativos deben solicitarse a Secretaría BA.'),
@@ -114,5 +122,19 @@ describe('notas y certificación', () => {
 
     expect(items.join(' ')).not.toContain('Clases dictadas')
     expect(items.join(' ')).toContain('Notas y Certificación')
+  })
+})
+
+describe('perfil sin endpoint', () => {
+  it('muestra que no hay docente para mostrar', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerPerfilDocente: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('DOCENTE', '/docente/perfil')
+
+    expect(await screen.findByText('No hay ningún docente para mostrar.')).toBeInTheDocument()
   })
 })

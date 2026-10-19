@@ -1,12 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  API_MODE,
-  configurarFuenteDeDatos,
-  createDataSource,
-  resolveApiMode,
-} from './dataSourceFactory'
+import { API_MODE, configurarFuenteDeDatos, createDataSource } from './dataSourceFactory'
 import { createMockDataSource } from './mockDataSource'
 import { buscarDocentes, listarComisiones } from './dataService'
 
@@ -45,20 +40,6 @@ function ComisionesProbe() {
 }
 
 describe('resolución de la implementación', () => {
-  it('usa api por defecto, y mock solo cuando se lo piden', () => {
-    expect(resolveApiMode({ VITE_API_MODE: 'api' })).toBe(API_MODE.API)
-    expect(resolveApiMode({ VITE_API_MODE: 'mock' })).toBe(API_MODE.MOCK)
-  })
-
-  it('cae en api con un valor escrito mal o ausente, para que las altas se guarden', () => {
-    // D36: `api` es el valor por defecto porque el backend tiene los endpoints del catálogo. Un
-    // valor mal escrito tiene que dejar guardar, no dejar de guardar: el error de una demo que no
-    // guarda nada se descubre tarde.
-    expect(resolveApiMode({ VITE_API_MODE: 'API' })).toBe(API_MODE.API)
-    expect(resolveApiMode({})).toBe(API_MODE.API)
-    expect(resolveApiMode(undefined)).toBe(API_MODE.API)
-  })
-
   it('rechaza un modo sin implementación con un mensaje que dice cuáles hay', () => {
     expect(() => createDataSource({ modo: 'graphql' })).toThrow(/No hay implementación/)
   })
