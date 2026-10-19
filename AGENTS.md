@@ -64,6 +64,17 @@ mantener, y una línea se responde en un rato.
 Si la respuesta te cambia el modelo o una regla de negocio, recién ahí es una
 propuesta.
 
+## Arranque de una propuesta o una feature
+
+Antes de abrir un SDD (`/opsx-propose`) o de empezar una historia de usuario, corré
+`grill-me`. El grilling recorre el árbol de decisiones en rondas y pregunta cada
+frontera con multiple choice: sirve para llegar a un entendimiento compartido del
+alcance antes de escribir una línea.
+
+No abras la propuesta ni la rama hasta que el usuario confirme que el
+entendimiento es compartido. Si el grilling revela que cambia el contrato, recién
+ahí corresponde una propuesta.
+
 ## Ramas
 
 - `feat/hu-<n>-<slug>` — historia de usuario `<n>`. Ejemplo: `feat/hu-27-estado-habilitacion`.
