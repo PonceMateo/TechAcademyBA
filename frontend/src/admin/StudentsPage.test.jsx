@@ -170,6 +170,64 @@ describe('cuentas corporativas', () => {
   })
 })
 
+describe('alta de cuenta corporativa', () => {
+  function abrirModalDeEmpresa(user) {
+    return user.click(screen.getByRole('button', { name: '+ Nueva Empresa' }))
+  }
+
+  it('abre el modal con razón social, CUIT y la casilla de Factura A', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+
+    expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Razón Social/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/CUIT/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Requiere Factura A')).toBeInTheDocument()
+  })
+
+  it('no envía el alta sin razón social', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
+
+    expect(
+      await screen.findByText('La razón social es obligatoria.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
+  })
+
+  it('da de alta la empresa y la agrega a la tabla', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+    await user.type(screen.getByLabelText(/Razón Social/), 'Delta Logística SRL')
+    await user.type(screen.getByLabelText(/CUIT/), '30-71234567-8')
+    await user.click(screen.getByLabelText('Requiere Factura A'))
+    await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText('Delta Logística SRL')).toBeInTheDocument()
+    expect(screen.getByText('30-71234567-8')).toBeInTheDocument()
+  })
+
+  it('muestra el motivo del backend y deja el modal abierto cuando el CUIT está duplicado', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+    await user.type(screen.getByLabelText(/Razón Social/), 'Otra Empresa')
+    await user.type(screen.getByLabelText(/CUIT/), '30-71665544-9')
+    await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
+
+    expect(
+      await screen.findByText(/Ya hay una empresa registrada con ese CUIT/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Otra Empresa')).toBeInTheDocument()
+  })
+})
+
 describe('padrón sin endpoint', () => {
   it('deja el padrón y las cuentas corporativas vacíos cuando la lectura falla', async () => {
     cleanup()

@@ -5,9 +5,9 @@ import { readStoredToken } from '../auth/tokenStorage'
  * Implementación real de la frontera de datos: habla con el backend (D36).
  *
  * **Toda lectura que falla se propaga como `DataSourceError`; no hay datos de ejemplo en su
- * lugar.** Los endpoints que existen son los del catálogo y del padrón de docentes. Los de
- * alumnos, empresas, cobranzas, habilitación y clases todavía no están escritos, así que las
- * pantallas que los usan degradan a su estado vacío (D42).
+ * lugar.** Los endpoints que existen son los del catálogo, del padrón de docentes y de
+ * empresas. Los de alumnos, cobranzas, habilitación y clases todavía no están escritos, así
+ * que las pantallas que los usan degradan a su estado vacío (D42).
  *
  * **Un error nunca se disfraza de dato válido:** ni un 404, ni un 500, ni un error de red. Un 404
  * es solo otro fallo —el endpoint no existe— y sube tal cual, con su `status`, para que la pantalla
@@ -30,9 +30,9 @@ export class DataSourceError extends Error {
 }
 
 /**
- * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes` y `sedes` quedaron **confirmadas**
- * por los endpoints reales del change `altas-catalogo-docentes`; las demás siguen provisionales
- * (M33) hasta que exista su endpoint.
+ * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes`, `sedes` y `empresas` quedaron
+ * **confirmadas** por los endpoints reales de los changes `altas-catalogo-docentes` y
+ * `hu-18-alta-empresa`; las demás siguen provisionales (M33) hasta que exista su endpoint.
  */
 const PATHS = Object.freeze({
   cursos: '/cursos',
@@ -194,6 +194,10 @@ export function createApiDataSource() {
 
     async listarEmpresas() {
       return request(PATHS.empresas)
+    },
+
+    async crearEmpresa(datos) {
+      return request(PATHS.empresas, { method: 'POST', body: datos })
     },
 
     async listarCobranzas() {

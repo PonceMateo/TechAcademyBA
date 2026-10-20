@@ -11,6 +11,7 @@ import {
   LINKS_DE_CLASE,
   SEDES,
 } from '../mocks'
+import { TIPO_FACTURA } from '../domain/enums'
 import { normalizeCode, normalizeCuit, normalizeDocumento } from '../domain/normalize'
 
 /**
@@ -289,6 +290,33 @@ export function createMockDataSource() {
 
     async listarEmpresas() {
       return copiar(store.empresas)
+    },
+
+    /**
+     * Alta de cuenta corporativa de ejemplo (18): agrega la fila al store y la devuelve con la
+     * misma forma que la fuente real. El duplicado se resuelve sobre el CUIT normalizado (D6),
+     * como el backend, para que la pantalla pruebe el rechazo igual con las dos fuentes.
+     */
+    async crearEmpresa({ razon_social, cuit, requiere_factura_a }) {
+      const cuit_norm = normalizeCuit(cuit)
+      const existente = store.empresas.find((empresa) => empresa.cuit_norm === cuit_norm)
+      if (existente !== undefined) {
+        throw new Error(
+          `Ya hay una empresa registrada con ese CUIT: ${existente.razon_social} (CUIT ${existente.cuit}).`,
+        )
+      }
+
+      const empresa = {
+        id: siguienteId(store.empresas),
+        razon_social,
+        cuit,
+        cuit_norm,
+        preferencia_factura: requiere_factura_a ? TIPO_FACTURA.A : TIPO_FACTURA.B,
+        requiere_factura_a,
+        nomina_empleados: '',
+      }
+      store.empresas.push(empresa)
+      return { ...empresa }
     },
 
     async listarSedes() {
