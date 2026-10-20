@@ -33,14 +33,14 @@ MAX_PASSWORD_BYTES = 72
 #: token sin `exp` se lea como eternal y que uno sin `rol` llegue hasta la autorización.
 CLAIMS_REQUERIDOS = ("exp", "iat", "sub", "rol", "email")
 
-#: Contraseña de las cuentas de demostración, y también de las cuentas que crea el alta de
-#: docente durante esta fase. Es pública a propósito: es lo que pide la spec para el entorno de
-#: desarrollo y lo que el README documenta.
+#: Contraseña de las cuentas de demostración, y también de las cuentas que crean los altas de
+#: docente y de alumno durante esta fase. Es pública a propósito: es lo que pide la spec para el
+#: entorno de desarrollo y lo que el README documenta. **Solo para desarrollo** (D44).
 #:
-#: Vive acá y no en `services/seed.py` porque son dos los que la necesitan —el seed y el alta
-#: de docente— y en `core` está el resto del manejo de contraseñas. Las cuentas reales nunca
-#: se crean con esta contraseña: cuando exista el alta de alumno (historia #13), su cuenta
-#: tendrá su propia decisión.
+#: Vive acá y no en `services/seed.py` porque son varios los que la necesitan —el seed, el alta de
+#: docente y el alta de alumno— y en `core` está el resto del manejo de contraseñas. Las cuentas
+#: reales nunca se crean con esta contraseña: la contraseña aleatoria por alumno y su envío
+#: dependen de la decisión de credenciales que el equipo todavía no tomó.
 CONTRASEÑA_DEMO = "Demo2026!"
 
 

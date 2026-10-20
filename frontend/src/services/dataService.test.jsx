@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { API_MODE, configurarFuenteDeDatos, createDataSource } from './dataSourceFactory'
 import { createMockDataSource } from './mockDataSource'
-import { buscarDocentes, listarComisiones } from './dataService'
+import { buscarDocentes, crearAlumno, listarAlumnos, listarComisiones } from './dataService'
 
 /**
  * La frontera de datos (8.2).
@@ -95,6 +95,28 @@ describe('la implementación de ejemplo', () => {
     expect(await buscarDocentes('30.665.330')).toHaveLength(1)
     expect(await buscarDocentes('gonzalez@')).toHaveLength(1)
     expect(await buscarDocentes('no existe')).toHaveLength(0)
+  })
+
+  it('agrega el alumno dado de alta al padrón de ejemplo, sin inscripción', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const creado = await crearAlumno({
+      documento: '30.111.222',
+      nombre: 'Rocío Álvarez',
+      email: 'rocio.alvarez@techacademy.invalid',
+      telefono: null,
+    })
+
+    expect(creado).toMatchObject({
+      nombre: 'Rocío Álvarez',
+      documento: '30.111.222',
+      tipo_documento: 'DNI',
+      comision: null,
+      categoria: null,
+      porcentaje_beca: null,
+      acceso: null,
+    })
+    expect((await listarAlumnos()).map((alumno) => alumno.nombre)).toContain('Rocío Álvarez')
   })
 
   it('agrega la cobranza registrada al historial', async () => {

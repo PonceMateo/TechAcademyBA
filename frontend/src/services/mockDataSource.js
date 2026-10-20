@@ -287,6 +287,32 @@ export function createMockDataSource() {
       return buscarPorTexto(store.alumnos, texto, ['nombre', 'documento'])
     },
 
+    /**
+     * Alta de alumno de ejemplo (historia #13): agrega la fila al store y la devuelve con la
+     * misma forma que la fuente real.
+     *
+     * El alumno recién creado no tiene inscripción, así que comisión, categoría, porcentaje de
+     * beca y acceso van en `null`: la pantalla los muestra como `Sin comisión` y `—` (D43), sin
+     * inventar datos que pertenecen a historias posteriores.
+     */
+    async crearAlumno({ documento, nombre, email, telefono }) {
+      const alumno = {
+        id: siguienteId(store.alumnos),
+        nombre,
+        documento,
+        tipo_documento: 'DNI',
+        email,
+        telefono: telefono ?? null,
+        activo: true,
+        comision: null,
+        categoria: null,
+        porcentaje_beca: null,
+        acceso: null,
+      }
+      store.alumnos.push(alumno)
+      return { ...alumno }
+    },
+
     async listarEmpresas() {
       return copiar(store.empresas)
     },

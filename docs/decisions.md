@@ -1388,6 +1388,52 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+## Alta de alumno (change `hu-13-alta-alumno`)
+
+### D44 — El alta de alumno es DNI-only, con contraseña demo, sin correo y con un 409 que solo nombra el campo
+
+- **Fecha:** 2026-10-20
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el `POST /alumnos` de la historia #13 acepta `documento`, `nombre`, `email` y
+  `telefono`, guarda `tipo_documento = DNI` y no admite un campo `tipo_documento` en el cuerpo
+  (`extra="forbid"`, 422). El DNI se acepta con puntos, espacios o guiones, se guarda tal como lo
+  escribió la secretaría y se normaliza a solo dígitos en `documento_norm`, que es la columna del
+  índice único. El pasaporte y el documento nulo siguen admitidos por el esquema, pero el alta con
+  pasaporte queda diferida a la HU 47, que está en `Won't`, y a la definición del cliente (P6).
+- **Contraseña de demostración:** la cuenta `ALUMNO` se crea en la misma transacción que el
+  alumno, con `CONTRASEÑA_DEMO = "Demo2026!"` almacenada como hash bcrypt, `is_active = true` y
+  `must_change_password = false`, igual que el alta de docente y el seed (D18). La contraseña es
+  **solo para desarrollo**: es pública y compartida, y la contraseña aleatoria por alumno depende
+  de la decisión de credenciales que sigue abierta (P11).
+- **Sin envío de correo:** el alta no llama a `EmailService` ni envía nada. El envío de
+  credenciales y el tratamiento de su fallo no están aprobados; llamar a la implementación de log
+  simularía un envío que no existe. La pantalla avisa que la cuenta se creó pero las credenciales
+  no se enviaron.
+- **409 sin los datos del alumno existente:** el rechazo por documento o email repetido responde
+  `409` con un mensaje que nombra el campo repetido y no incluye el nombre ni el documento del
+  alumno existente. Cuando el correo ya pertenece a otro padrón, el mensaje repite el email
+  informado y nombra ese padrón —docentes o cuentas—, que es lo que pide el escenario «email
+  tomado en otro padrón»; el email es un dato que el operador ya escribió. Es una **desviación
+  consciente** del criterio de la historia #13, que pide mostrar el alumno existente, y queda
+  pendiente de aprobación del equipo (P11).
+- **Por qué:** el padrón no tenía alta real y sin padrón no se pueden construir las inscripciones,
+  las cobranzas ni la habilitación. Las cuatro decisiones comparten el mismo criterio: esta fase
+  maqueta y no puede inventar reglas de negocio ni datos de contacto. Se prefiere un alta
+  reversible —una cuenta con contraseña demo— antes que un alumno sin cuenta que no se nota hasta
+  que alguien intenta entrar.
+- **Dónde:** `backend/app/schemas/validators.py`, `backend/app/schemas/alumnos.py`,
+  `backend/app/services/alumnos.py`, `backend/app/api/alumnos.py`,
+  `backend/app/api/router.py`, `backend/app/core/security.py`,
+  `frontend/src/admin/StudentsPage.jsx`, `frontend/src/services/dataService.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/admin/StudentsPage.test.jsx`, `frontend/src/services/apiDataSource.test.js` y
+  `frontend/src/services/dataService.test.jsx`.
+- **Pendiente:** aprobación del equipo de las dos desviaciones (DNI-only y `409` sin el alumno
+  existente) y decisión de envío de credenciales. La historia se referencia con `Refs #13`, no se
+  cierra.
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven
@@ -1403,6 +1449,7 @@ con el cliente o entre los tres del equipo.
 | P7 | Dígito verificador del CUIL | Cliente | El CUIL es único pero **ya no es obligatorio** (D33): lo que sigue pendiente es validar su dígito verificador cuando venga cargado, y el equipo no lo pidió. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
 | P10 | Firma de la Definition of Done | Equipo | Se firmó el recorrido el 2026-10-03, en local y después de que el PR #45 saliera mergeado, así que la firma quedó en `docs/verificacion-definition-of-done.md` y no en el PR. La fila de **revisión de la lista** sigue sin firmar: la hace alguien distinto de quien recorrió la interfaz. |
+| P11 | Desviaciones de la HU 13 y envío de credenciales | Equipo | Aprobar el alta DNI-only y el `409` que no muestra el alumno existente (D44), y decidir si las credenciales se envían por correo. Mientras tanto la cuenta se crea con la contraseña demo y el alta no envía nada. |
 
 ### P4 — Resuelto: todos los montos son pesos argentinos
 

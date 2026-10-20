@@ -11,7 +11,9 @@ distribución de D19.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.validators import EmailConForma
 
 
 class DocenteCreate(BaseModel):
@@ -26,23 +28,9 @@ class DocenteCreate(BaseModel):
     nombre: str = Field(min_length=1, max_length=80)
     apellido: str = Field(min_length=1, max_length=80)
     dni: str = Field(min_length=1, max_length=20)
-    email: str = Field(min_length=3, max_length=255)
+    # La forma del email la valida `app.schemas.validators`, la misma que usa el alta de alumno.
+    email: EmailConForma = Field(min_length=3, max_length=255)
     telefono: str | None = Field(default=None, max_length=40)
-
-    @field_validator("email")
-    @classmethod
-    def _email_con_forma(cls, valor: str) -> str:
-        """Formato mínimo de correo: algo, una arroba, algo.
-
-        No se baja a la regla completa de RFC 5322 porque acepta direcciones que no existen y
-        rechaza direcciones que sí. Lo que importa es que un correo mal escrito no llegue a
-        ser el acceso de alguien, y `str_strip_whitespace` ya evita el espacio de más que
-        rompe la comparación con `usuario.email`.
-        """
-        local, _, dominio = valor.partition("@")
-        if not local or not dominio or "." not in dominio or dominio.endswith("."):
-            raise ValueError("El email no tiene un formato válido.")
-        return valor
 
 
 class DocenteOut(BaseModel):
