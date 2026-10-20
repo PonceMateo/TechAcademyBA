@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Badge, Card, Input, StatusIndicator, Table } from '../components/ui'
+import { Badge, Button, Card, Input, Modal, StatusIndicator, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { CATEGORIA_INSCRIPCION, TIPO_FACTURA } from '../domain/enums'
-import { buscarAlumnos, listarEmpresas } from '../services/dataService'
+import { CATEGORIA_INSCRIPCION } from '../domain/enums'
+import { buscarAlumnos, crearEmpresa, listarEmpresas } from '../services/dataService'
 
 /**
  * Alumnos e inscripciones (9.5).
@@ -88,17 +88,26 @@ const COLUMNAS_EMPRESAS = [
   {
     clave: 'factura',
     titulo: 'PREFERENCIA FACTURA',
-    render: (fila) => (
-      <Badge tono={TONO.CELESTE}>{fila.preferencia_factura === TIPO_FACTURA.A ? 'A' : 'B'}</Badge>
-    ),
+    render: (fila) => <Badge tono={TONO.CELESTE}>{fila.requiere_factura_a ? 'A' : 'B'}</Badge>,
   },
-  { clave: 'nomina', titulo: 'NÓMINA DE EMPLEADOS', render: (fila) => fila.nomina_empleados },
+  {
+    clave: 'nomina',
+    titulo: 'NÓMINA DE EMPLEADOS',
+    render: (fila) => fila.nomina_empleados || '—',
+  },
 ]
+
+const EMPRESA_VACIA = { razon_social: '', cuit: '', requiere_factura_a: false }
 
 export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
   const [consulta, setConsulta] = useState('')
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [campos, setCampos] = useState(EMPRESA_VACIA)
+  const [errores, setErrores] = useState({})
+  const [fallo, setFallo] = useState(null)
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
     // El filtro va al servicio, no sobre el arreglo ya cargado: el mismo criterio tiene que
@@ -113,6 +122,59 @@ export function StudentsPage() {
       .then(setEmpresas)
       .catch(() => setEmpresas([]))
   }, [])
+
+  function cambiar(campo) {
+    return (evento) =>
+      setCampos((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  function cerrarModal() {
+    setModalAbierto(false)
+    setCampos(EMPRESA_VACIA)
+    setErrores({})
+    setFallo(null)
+  }
+
+  function validar() {
+    const encontrados = {}
+
+    if (campos.razon_social.trim() === '') {
+      encontrados.razon_social = 'La razón social es obligatoria.'
+    }
+    if (campos.cuit.trim() === '') {
+      encontrados.cuit = 'El CUIT es obligatorio.'
+    }
+
+    return encontrados
+  }
+
+  async function guardar() {
+    const encontrados = validar()
+    setErrores(encontrados)
+
+    if (Object.keys(encontrados).length > 0) {
+      return
+    }
+
+    setGuardando(true)
+    setFallo(null)
+    try {
+      const creada = await crearEmpresa({
+        razon_social: campos.razon_social,
+        cuit: campos.cuit,
+        requiere_factura_a: campos.requiere_factura_a,
+      })
+      setEmpresas((anteriores) => [...anteriores, creada])
+      cerrarModal()
+    } catch (error) {
+      // Un alta rechazada —duplicado, CUIT con dígito verificador inválido— deja el modal
+      // abierto con lo que escribió la secretaría y el motivo tal como lo informa la fuente
+      // (D36), que en el duplicado identifica la empresa existente.
+      setFallo(error?.message ?? 'No se pudo guardar la empresa.')
+    } finally {
+      setGuardando(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -134,11 +196,80 @@ export function StudentsPage() {
         />
       </Card>
 
-      <Card titulo="Cuentas Corporativas Vinculadas">
+      <Card
+        titulo="Cuentas Corporativas Vinculadas"
+        acciones={
+          <Button variante="secundario" onClick={() => setModalAbierto(true)}>
+            + Nueva Empresa
+          </Button>
+        }
+      >
         {/* El alta de cuenta corporativa vive en esta misma pantalla, no en una pantalla
             separada de empresas: es lo que dice el spec y evita un ítem de más. */}
-        <Table columnas={COLUMNAS_EMPRESAS} filas={empresas} />
+        <Table
+          columnas={COLUMNAS_EMPRESAS}
+          filas={empresas}
+          vacio={<p className="text-sm text-slate-500">No hay cuentas corporativas registradas.</p>}
+        />
       </Card>
+
+      <Modal
+        abierto={modalAbierto}
+        titulo="Nueva Empresa"
+        onClose={cerrarModal}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarModal}>
+              Cancelar
+            </Button>
+            <Button onClick={guardar} disabled={guardando}>
+              {guardando ? 'Guardando…' : 'Guardar Empresa'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Input
+            id="empresa-razon-social"
+            etiqueta="Razón Social"
+            valor={campos.razon_social}
+            onChange={cambiar('razon_social')}
+            obligatorio
+            error={errores.razon_social ?? null}
+          />
+          <Input
+            id="empresa-cuit"
+            etiqueta="CUIT"
+            valor={campos.cuit}
+            onChange={cambiar('cuit')}
+            obligatorio
+            error={errores.cuit ?? null}
+          />
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              id="empresa-factura-a"
+              type="checkbox"
+              checked={campos.requiere_factura_a}
+              onChange={(evento) =>
+                setCampos((anteriores) => ({
+                  ...anteriores,
+                  requiere_factura_a: evento.target.checked,
+                }))
+              }
+            />
+            Requiere Factura A
+          </label>
+        </div>
+
+        {fallo !== null && (
+          <p
+            role="alert"
+            className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            {fallo}
+          </p>
+        )}
+      </Modal>
     </div>
   )
 }

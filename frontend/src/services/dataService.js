@@ -80,6 +80,14 @@ export function listarEmpresas() {
   return getDataSource().listarEmpresas()
 }
 
+/**
+ * Alta de cuenta corporativa (18). El contrato lleva razón social, CUIT y si requiere
+ * Factura A; la nómina de empleados es la historia #19 y no forma parte del alta.
+ */
+export function crearEmpresa(datos) {
+  return getDataSource().crearEmpresa(datos)
+}
+
 export function listarSedes() {
   return getDataSource().listarSedes()
 }
