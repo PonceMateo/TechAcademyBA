@@ -206,6 +206,42 @@ export function createApiDataSource() {
       return request(PATHS.alumnos, { query: { q: texto } })
     },
 
+    /** Edición de los datos personales (historia #17). Conserva el `id` y el legajo. */
+    async editarAlumno(id, datos) {
+      return request(`${PATHS.alumnos}/${id}`, { method: 'PUT', body: datos })
+    },
+
+    /**
+     * Restablecimiento administrativo de la contraseña (historia #17). No devuelve la
+     * contraseña en claro: el backend guarda solo el hash y exige el cambio en el próximo ingreso.
+     */
+    async restablecerPasswordAlumno(id, newPassword) {
+      return request(`${PATHS.alumnos}/${id}/password`, {
+        method: 'POST',
+        body: { new_password: newPassword },
+      })
+    },
+
+    /** Baja lógica (historia #17): el alumno y su cuenta quedan inactivos, sin borrar filas. */
+    async eliminarAlumno(id) {
+      return request(`${PATHS.alumnos}/${id}`, { method: 'DELETE' })
+    },
+
+    /** Consulta si el alta corresponde a un alumno inactivo y se puede reactivar (historia #17). */
+    async buscarAlumnoReactivable({ documento, email }) {
+      return request(`${PATHS.alumnos}/reactivable`, {
+        query: { documento, email },
+      })
+    },
+
+    /**
+     * Reactivación (historia #17): conserva el registro y devuelve una nueva contraseña inicial
+     * para que el administrador la entregue.
+     */
+    async reactivarAlumno(id, datos) {
+      return request(`${PATHS.alumnos}/${id}/reactivar`, { method: 'POST', body: datos })
+    },
+
     /** Alta de inscripción (historia #14): vincula un alumno a una comisión. */
     async crearInscripcion(datos) {
       return request(PATHS.inscripciones, { method: 'POST', body: datos })

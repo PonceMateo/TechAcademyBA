@@ -3,7 +3,17 @@ import { useEffect, useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { API_MODE, configurarFuenteDeDatos, createDataSource } from './dataSourceFactory'
 import { createMockDataSource } from './mockDataSource'
-import { buscarDocentes, crearAlumno, listarAlumnos, listarComisiones } from './dataService'
+import {
+  buscarAlumnoReactivable,
+  buscarDocentes,
+  crearAlumno,
+  editarAlumno,
+  eliminarAlumno,
+  listarAlumnos,
+  listarComisiones,
+  reactivarAlumno,
+  restablecerPasswordAlumno,
+} from './dataService'
 
 /**
  * La frontera de datos (8.2).
@@ -118,6 +128,64 @@ describe('la implementación de ejemplo', () => {
       password_inicial: 'rocio30111222',
     })
     expect((await listarAlumnos()).map((alumno) => alumno.nombre)).toContain('Rocío Álvarez')
+  })
+
+  it('edita, restablece la contraseña y da de baja en el padrón de ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const editado = await editarAlumno(1, {
+      documento: '38.456.789',
+      nombre: 'Juan Pérez Editado',
+      email: 'juan.editado@techacademy.invalid',
+      telefono: null,
+    })
+    expect(editado).toMatchObject({ id: 1, nombre: 'Juan Pérez Editado' })
+
+    await restablecerPasswordAlumno(1, 'NuevaClave2026')
+    const dadoDeBaja = await eliminarAlumno(1)
+    expect(dadoDeBaja.activo).toBe(false)
+
+    const restantes = await listarAlumnos()
+    expect(restantes.map((alumno) => alumno.id)).not.toContain(1)
+    expect(restantes).toHaveLength(5)
+  })
+
+  it('reactiva el mismo alumno dado de baja y le renueva la contraseña inicial', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await eliminarAlumno(1)
+    const reactivable = await buscarAlumnoReactivable({
+      documento: '38.456.789',
+      email: 'juan.perez@gmail.com',
+    })
+    expect(reactivable).toMatchObject({ id: 1, activo: false })
+
+    const reactivado = await reactivarAlumno(1, {
+      documento: '38.456.789',
+      nombre: 'Juan Ignacio Pérez',
+      email: 'juan.perez@gmail.com',
+      telefono: null,
+    })
+    expect(reactivado).toMatchObject({
+      id: 1,
+      activo: true,
+      password_inicial: 'juan38456789',
+    })
+
+    const activos = await listarAlumnos()
+    expect(activos.map((alumno) => alumno.id)).toContain(1)
+    expect(activos).toHaveLength(6)
+  })
+
+  it('no ofrece reactivar un alumno que sigue activo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const reactivable = await buscarAlumnoReactivable({
+      documento: '38.456.789',
+      email: 'juan.perez@gmail.com',
+    })
+
+    expect(reactivable).toBeNull()
   })
 
   it('agrega la cobranza registrada al historial', async () => {

@@ -20,6 +20,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.security import MAX_PASSWORD_BYTES
 from app.schemas.validators import EmailConForma
 
 #: Lo único que puede aparecer en un DNI además de sus dígitos: puntos, espacios y guiones.
@@ -57,6 +58,26 @@ class AlumnoCreate(BaseModel):
         if len(_SOLO_DIGITOS.sub("", valor)) not in _DIGITOS_DNI:
             raise ValueError("El DNI debe tener 7 u 8 dígitos.")
         return valor
+
+
+class AlumnoUpdate(AlumnoCreate):
+    """Cuerpo de `PUT /alumnos/{id}` (historia #17).
+
+    Repite el contrato del alta a propósito: el modal edita el formulario completo y así ningún
+    campo puede quedar afuera. Las validaciones de DNI y email son las mismas del alta.
+    """
+
+
+class RestablecerPasswordRequest(BaseModel):
+    """Cuerpo de `POST /alumnos/{id}/password` (historia #17).
+
+    El administrador define la nueva contraseña; se guarda solo su hash y la cuenta queda con
+    cambio obligatorio en el siguiente ingreso. La contraseña no se devuelve en claro.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    new_password: str = Field(min_length=8, max_length=MAX_PASSWORD_BYTES)
 
 
 class ComisionAsignadaOut(BaseModel):

@@ -89,6 +89,43 @@ export function crearAlumno(datos) {
   return getDataSource().crearAlumno(datos)
 }
 
+/**
+ * Edición de los datos personales del alumno (historia #17). Conserva el `id` y el legajo;
+ * la respuesta trae la fila actualizada y la pantalla la fusiona con la que ya mostraba.
+ */
+export function editarAlumno(id, datos) {
+  return getDataSource().editarAlumno(id, datos)
+}
+
+/**
+ * Restablecimiento administrativo de la contraseña (historia #17). La nueva contraseña no se
+ * devuelve en claro y la cuenta queda obligada a cambiarla en el próximo ingreso.
+ */
+export function restablecerPasswordAlumno(id, newPassword) {
+  return getDataSource().restablecerPasswordAlumno(id, newPassword)
+}
+
+/** Baja lógica del alumno (historia #17): conserva inscripciones, pagos e historial. */
+export function eliminarAlumno(id) {
+  return getDataSource().eliminarAlumno(id)
+}
+
+/**
+ * Consulta si un alta choca con un alumno dado de baja y se puede reactivar (historia #17).
+ * Devuelve el registro inactivo o `null`; no modifica nada.
+ */
+export function buscarAlumnoReactivable(datos) {
+  return getDataSource().buscarAlumnoReactivable(datos)
+}
+
+/**
+ * Reactiva el mismo registro en lugar de crear un duplicado (historia #17). Devuelve el alumno
+ * activo y una nueva contraseña inicial, que la pantalla muestra una sola vez.
+ */
+export function reactivarAlumno(id, datos) {
+  return getDataSource().reactivarAlumno(id, datos)
+}
+
 export function listarEmpresas() {
   return getDataSource().listarEmpresas()
 }

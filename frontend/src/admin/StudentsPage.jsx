@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react'
 import { Badge, Button, Card, Input, Modal, StatusIndicator, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
-import { crearAlumno, crearEmpresa, buscarAlumnos, listarEmpresas } from '../services/dataService'
+import {
+  buscarAlumnoReactivable,
+  buscarAlumnos,
+  crearAlumno,
+  crearEmpresa,
+  editarAlumno,
+  eliminarAlumno,
+  listarEmpresas,
+  reactivarAlumno,
+  restablecerPasswordAlumno,
+} from '../services/dataService'
 
 /**
  * Alumnos e inscripciones (9.5 y 13).
@@ -159,6 +169,28 @@ export function StudentsPage() {
   const [credenciales, setCredenciales] = useState(null)
   const [falloAlumno, setFalloAlumno] = useState(null)
   const [guardandoAlumno, setGuardandoAlumno] = useState(false)
+  const [mensaje, setMensaje] = useState(null)
+
+  const [alumnoEditando, setAlumnoEditando] = useState(null)
+  const [camposEdicion, setCamposEdicion] = useState(CAMPOS_ALUMNO_VACIOS)
+  const [erroresEdicion, setErroresEdicion] = useState({})
+  const [falloEdicion, setFalloEdicion] = useState(null)
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
+
+  const [alumnoPassword, setAlumnoPassword] = useState(null)
+  const [nuevaPassword, setNuevaPassword] = useState('')
+  const [confirmarPassword, setConfirmarPassword] = useState('')
+  const [erroresPassword, setErroresPassword] = useState({})
+  const [falloPassword, setFalloPassword] = useState(null)
+  const [guardandoPassword, setGuardandoPassword] = useState(false)
+
+  const [alumnoAEliminar, setAlumnoAEliminar] = useState(null)
+  const [falloBaja, setFalloBaja] = useState(null)
+  const [eliminando, setEliminando] = useState(false)
+
+  const [alumnoReactivar, setAlumnoReactivar] = useState(null)
+  const [falloReactivar, setFalloReactivar] = useState(null)
+  const [reactivando, setReactivando] = useState(false)
 
   const [modalEmpresaAbierto, setModalEmpresaAbierto] = useState(false)
   const [camposEmpresa, setCamposEmpresa] = useState(CAMPOS_EMPRESA_VACIOS)
@@ -192,9 +224,9 @@ export function StudentsPage() {
     setFalloAlumno(null)
   }
 
-  function validarAlumno() {
+  function validarAlumno(campos = camposAlumno) {
     const encontrados = {}
-    const documento = camposAlumno.documento.trim()
+    const documento = campos.documento.trim()
     const digitos = documento.replace(/\D/g, '')
 
     if (documento === '') {
@@ -202,12 +234,12 @@ export function StudentsPage() {
     } else if (!DNI_CON_SEPARADORES.test(documento) || ![7, 8].includes(digitos.length)) {
       encontrados.documento = 'El DNI debe tener 7 u 8 dígitos.'
     }
-    if (camposAlumno.nombre.trim() === '') {
+    if (campos.nombre.trim() === '') {
       encontrados.nombre = 'El nombre es obligatorio.'
     }
-    if (camposAlumno.email.trim() === '') {
+    if (campos.email.trim() === '') {
       encontrados.email = 'El email es obligatorio.'
-    } else if (!emailConForma(camposAlumno.email.trim())) {
+    } else if (!emailConForma(campos.email.trim())) {
       encontrados.email = 'El email no tiene un formato válido.'
     }
 
@@ -242,6 +274,24 @@ export function StudentsPage() {
         password: creado.password_inicial,
       })
     } catch (error) {
+      if (error?.status === 409) {
+        try {
+          const reactivable = await buscarAlumnoReactivable({
+            documento: camposAlumno.documento,
+            email: camposAlumno.email,
+          })
+          if (reactivable !== null && reactivable !== undefined) {
+            // Se oculta el formulario sin descartarlo: si el administrador cancela la
+            // reactivación, vuelve al alta con lo que ya había cargado.
+            setModalAlumnoAbierto(false)
+            setAlumnoReactivar(reactivable)
+            setFalloAlumno(null)
+            return
+          }
+        } catch {
+          // Si la consulta de reactivación falla, se muestra el rechazo original del alta.
+        }
+      }
       setFalloAlumno(error?.message ?? 'No se pudo guardar el alumno.')
     } finally {
       setGuardandoAlumno(false)
@@ -250,6 +300,189 @@ export function StudentsPage() {
 
   function cerrarCredenciales() {
     setCredenciales(null)
+  }
+
+  function abrirEdicion(alumno) {
+    setAlumnoEditando(alumno)
+    setCamposEdicion({
+      documento: alumno.documento ?? '',
+      nombre: alumno.nombre,
+      email: alumno.email,
+      telefono: alumno.telefono ?? '',
+    })
+    setErroresEdicion({})
+    setFalloEdicion(null)
+  }
+
+  function cerrarEdicion() {
+    setAlumnoEditando(null)
+    setCamposEdicion(CAMPOS_ALUMNO_VACIOS)
+    setErroresEdicion({})
+    setFalloEdicion(null)
+  }
+
+  function cambiarEdicion(campo) {
+    return (evento) =>
+      setCamposEdicion((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  async function guardarEdicion() {
+    const encontrados = validarAlumno(camposEdicion)
+    setErroresEdicion(encontrados)
+
+    if (Object.keys(encontrados).length > 0) {
+      return
+    }
+
+    setGuardandoEdicion(true)
+    setFalloEdicion(null)
+    try {
+      const actualizado = await editarAlumno(alumnoEditando.id, {
+        documento: camposEdicion.documento,
+        nombre: camposEdicion.nombre,
+        email: camposEdicion.email,
+        telefono: camposEdicion.telefono === '' ? null : camposEdicion.telefono,
+      })
+      setAlumnos((anteriores) =>
+        anteriores.map((fila) =>
+          fila.id === actualizado.id
+            ? {
+                ...fila,
+                ...actualizado,
+                // La respuesta de edición no calcula comisión, categoría ni acceso: se conserva
+                // lo que la fila ya mostraba para no borrar datos de otras historias.
+                comision: fila.comision,
+                categoria: fila.categoria,
+                porcentaje_beca: fila.porcentaje_beca,
+                acceso: fila.acceso,
+              }
+            : fila,
+        ),
+      )
+      cerrarEdicion()
+      setMensaje(`Los datos de ${actualizado.nombre} se actualizaron correctamente.`)
+    } catch (error) {
+      setFalloEdicion(error?.message ?? 'No se pudo guardar la edición.')
+    } finally {
+      setGuardandoEdicion(false)
+    }
+  }
+
+  function abrirPassword(alumno) {
+    setAlumnoPassword(alumno)
+    setNuevaPassword('')
+    setConfirmarPassword('')
+    setErroresPassword({})
+    setFalloPassword(null)
+  }
+
+  function cerrarPassword() {
+    setAlumnoPassword(null)
+    setNuevaPassword('')
+    setConfirmarPassword('')
+    setErroresPassword({})
+    setFalloPassword(null)
+  }
+
+  async function guardarPassword() {
+    const encontrados = {}
+    if (nuevaPassword.length < 8) {
+      encontrados.nuevaPassword = 'La contraseña debe tener al menos 8 caracteres.'
+    }
+    if (confirmarPassword !== nuevaPassword) {
+      encontrados.confirmarPassword = 'Las contraseñas no coinciden.'
+    }
+    setErroresPassword(encontrados)
+
+    if (Object.keys(encontrados).length > 0) {
+      return
+    }
+
+    setGuardandoPassword(true)
+    setFalloPassword(null)
+    try {
+      await restablecerPasswordAlumno(alumnoPassword.id, nuevaPassword)
+      const nombre = alumnoPassword.nombre
+      cerrarPassword()
+      setMensaje(
+        `Contraseña de ${nombre} restablecida. Deberá cambiarla en su próximo ingreso.`,
+      )
+    } catch (error) {
+      setFalloPassword(error?.message ?? 'No se pudo restablecer la contraseña.')
+    } finally {
+      setGuardandoPassword(false)
+    }
+  }
+
+  function abrirBaja(alumno) {
+    setAlumnoAEliminar(alumno)
+    setFalloBaja(null)
+  }
+
+  function cerrarBaja() {
+    setAlumnoAEliminar(null)
+    setFalloBaja(null)
+  }
+
+  async function confirmarBaja() {
+    setEliminando(true)
+    setFalloBaja(null)
+    try {
+      const nombre = alumnoAEliminar.nombre
+      await eliminarAlumno(alumnoAEliminar.id)
+      setAlumnos((anteriores) => anteriores.filter((fila) => fila.id !== alumnoAEliminar.id))
+      cerrarBaja()
+      setMensaje(`Alumno ${nombre} dado de baja correctamente.`)
+    } catch (error) {
+      setFalloBaja(error?.message ?? 'No se pudo dar de baja al alumno.')
+    } finally {
+      setEliminando(false)
+    }
+  }
+
+  function cerrarReactivar({ volverAlFormulario = false } = {}) {
+    setAlumnoReactivar(null)
+    setFalloReactivar(null)
+    if (volverAlFormulario) {
+      // El alta quedó oculta pero con sus campos intactos.
+      setModalAlumnoAbierto(true)
+    }
+  }
+
+  function volverDelAvisoDeReactivacion() {
+    cerrarReactivar({ volverAlFormulario: true })
+  }
+
+  async function confirmarReactivar() {
+    setReactivando(true)
+    setFalloReactivar(null)
+    try {
+      const creado = await reactivarAlumno(alumnoReactivar.id, {
+        documento: camposAlumno.documento,
+        nombre: camposAlumno.nombre,
+        email: camposAlumno.email,
+        telefono: camposAlumno.telefono === '' ? null : camposAlumno.telefono,
+      })
+      // La fila vuelve a estar activa; se refresca el padrón para traer comisión, categoría y
+      // acceso calculados por la fuente.
+      setAlumnos((anteriores) =>
+        anteriores.some((fila) => fila.id === creado.id)
+          ? anteriores.map((fila) => (fila.id === creado.id ? creado : fila))
+          : [...anteriores, creado],
+      )
+      buscarAlumnos(consulta).then(setAlumnos).catch(() => {})
+      cerrarReactivar()
+      cerrarModalAlumno()
+      setCredenciales({
+        nombre: creado.nombre,
+        email: creado.email,
+        password: creado.password_inicial,
+      })
+    } catch (error) {
+      setFalloReactivar(error?.message ?? 'No se pudo reactivar al alumno.')
+    } finally {
+      setReactivando(false)
+    }
   }
 
   function cambiarEmpresa(campo) {
@@ -305,8 +538,53 @@ export function StudentsPage() {
     }
   }
 
+  const columnasAlumnos = [
+    ...COLUMNAS_ALUMNOS,
+    {
+      clave: 'acciones',
+      titulo: 'ACCIONES',
+      render: (fila) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <Button
+            variante="secundario"
+            tamano="chico"
+            className="whitespace-nowrap"
+            onClick={() => abrirEdicion(fila)}
+          >
+            Editar
+          </Button>
+          <Button
+            variante="secundario"
+            tamano="chico"
+            className="whitespace-nowrap"
+            onClick={() => abrirPassword(fila)}
+          >
+            Restablecer contraseña
+          </Button>
+          <Button
+            variante="peligro"
+            tamano="chico"
+            className="whitespace-nowrap"
+            onClick={() => abrirBaja(fila)}
+          >
+            Eliminar alumno
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-4">
+      {mensaje !== null && (
+        <p
+          role="status"
+          className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+        >
+          {mensaje}
+        </p>
+      )}
+
       <Card
         titulo="Padrón de Alumnos Regulares"
         acciones={
@@ -326,7 +604,7 @@ export function StudentsPage() {
         </div>
 
         <Table
-          columnas={COLUMNAS_ALUMNOS}
+          columnas={columnasAlumnos}
           filas={alumnos}
           vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
         />
@@ -505,6 +783,192 @@ export function StudentsPage() {
           >
             {falloEmpresa}
           </p>
+        )}
+      </Modal>
+
+      <Modal
+        abierto={alumnoEditando !== null}
+        titulo="Editar Alumno"
+        onClose={cerrarEdicion}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarEdicion}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarEdicion} disabled={guardandoEdicion}>
+              {guardandoEdicion ? 'Guardando…' : 'Guardar Cambios'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            id="editar-alumno-dni"
+            etiqueta="DNI"
+            valor={camposEdicion.documento}
+            onChange={cambiarEdicion('documento')}
+            obligatorio
+            error={erroresEdicion.documento ?? null}
+          />
+          <Input
+            id="editar-alumno-nombre"
+            etiqueta="Nombre"
+            valor={camposEdicion.nombre}
+            onChange={cambiarEdicion('nombre')}
+            obligatorio
+            error={erroresEdicion.nombre ?? null}
+          />
+          <Input
+            id="editar-alumno-email"
+            etiqueta="Email"
+            type="email"
+            valor={camposEdicion.email}
+            onChange={cambiarEdicion('email')}
+            obligatorio
+            error={erroresEdicion.email ?? null}
+          />
+          <Input
+            id="editar-alumno-telefono"
+            etiqueta="Teléfono"
+            valor={camposEdicion.telefono}
+            onChange={cambiarEdicion('telefono')}
+          />
+        </div>
+
+        {falloEdicion !== null && (
+          <p
+            role="alert"
+            className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            {falloEdicion}
+          </p>
+        )}
+
+        <p className="mt-4 text-xs text-slate-500">
+          El alumno conserva su legajo, sus inscripciones y su historial de pagos.
+        </p>
+      </Modal>
+
+      <Modal
+        abierto={alumnoPassword !== null}
+        titulo="Restablecer contraseña"
+        onClose={cerrarPassword}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarPassword}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarPassword} disabled={guardandoPassword}>
+              {guardandoPassword ? 'Guardando…' : 'Restablecer contraseña'}
+            </Button>
+          </>
+        }
+      >
+        {alumnoPassword !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              Nueva contraseña para <span className="font-medium">{alumnoPassword.nombre}</span>.
+              La anterior dejará de ser válida y deberá cambiarla en su próximo ingreso.
+            </p>
+            <Input
+              id="alumno-nueva-password"
+              etiqueta="Nueva contraseña"
+              type="password"
+              valor={nuevaPassword}
+              onChange={(evento) => setNuevaPassword(evento.target.value)}
+              obligatorio
+              error={erroresPassword.nuevaPassword ?? null}
+            />
+            <Input
+              id="alumno-confirmar-password"
+              etiqueta="Confirmar contraseña"
+              type="password"
+              valor={confirmarPassword}
+              onChange={(evento) => setConfirmarPassword(evento.target.value)}
+              obligatorio
+              error={erroresPassword.confirmarPassword ?? null}
+            />
+
+            {falloPassword !== null && (
+              <p
+                role="alert"
+                className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              >
+                {falloPassword}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        abierto={alumnoAEliminar !== null}
+        titulo="Eliminar Alumno"
+        onClose={cerrarBaja}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarBaja}>
+              Cancelar
+            </Button>
+            <Button variante="peligro" onClick={confirmarBaja} disabled={eliminando}>
+              {eliminando ? 'Eliminando…' : 'Confirmar baja'}
+            </Button>
+          </>
+        }
+      >
+        {alumnoAEliminar !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              ¿Confirmás la baja de{' '}
+              <span className="font-medium">{alumnoAEliminar.nombre}</span>? Dejará de aparecer en
+              el padrón y no podrá iniciar sesión.
+            </p>
+
+            {falloBaja !== null && (
+              <p
+                role="alert"
+                className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              >
+                {falloBaja}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        abierto={alumnoReactivar !== null}
+        titulo="Reactivar alumno"
+        onClose={volverDelAvisoDeReactivacion}
+        pie={
+          <>
+            <Button variante="secundario" onClick={volverDelAvisoDeReactivacion}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarReactivar} disabled={reactivando}>
+              {reactivando ? 'Reactivando…' : 'Reactivar alumno'}
+            </Button>
+          </>
+        }
+      >
+        {alumnoReactivar !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              El alumno{' '}
+              <span className="font-medium">{alumnoReactivar.nombre}</span> fue dado de baja
+              anteriormente. Podés reactivar el mismo registro: conservará su legajo,
+              inscripciones, pagos e historial, y recibirá una nueva contraseña inicial.
+            </p>
+
+            {falloReactivar !== null && (
+              <p
+                role="alert"
+                className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              >
+                {falloReactivar}
+              </p>
+            )}
+          </div>
         )}
       </Modal>
     </div>

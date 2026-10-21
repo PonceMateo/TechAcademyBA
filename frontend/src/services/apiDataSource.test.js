@@ -150,6 +150,55 @@ describe('el alta de alumno', () => {
   })
 })
 
+describe('edición, contraseña y baja de alumno', () => {
+  it('usa PUT, POST y DELETE sobre el alumno indicado', async () => {
+    const fetchMock = responder(200, { id: 7, activo: true })
+
+    const fuente = createApiDataSource()
+    await fuente.editarAlumno(7, {
+      documento: '30.111.222',
+      nombre: 'Rocío Álvarez',
+      email: 'rocio.alvarez@techacademy.invalid',
+      telefono: null,
+    })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PUT')
+
+    await fuente.restablecerPasswordAlumno(7, 'NuevaClave2026')
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7\/password$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual({
+      new_password: 'NuevaClave2026',
+    })
+
+    await fuente.eliminarAlumno(7)
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('DELETE')
+  })
+
+  it('consulta la reactivación y la confirma sobre el mismo alumno', async () => {
+    const fetchMock = responder(200, { id: 7, activo: false })
+    const fuente = createApiDataSource()
+    const datos = {
+      documento: '30.111.222',
+      nombre: 'Rocío Álvarez',
+      email: 'rocio.alvarez@techacademy.invalid',
+      telefono: null,
+    }
+
+    await fuente.buscarAlumnoReactivable({ documento: datos.documento, email: datos.email })
+    const consulta = new URL(ultimaRuta(fetchMock), 'http://localhost')
+    expect(consulta.pathname).toMatch(/\/alumnos\/reactivable$/)
+    expect(consulta.searchParams.get('documento')).toBe(datos.documento)
+    expect(consulta.searchParams.get('email')).toBe(datos.email)
+
+    await fuente.reactivarAlumno(7, datos)
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7\/reactivar$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual(datos)
+  })
+})
+
 describe('los POST nunca caen al ejemplo', () => {
   it('falla un alta de curso con 404 en vez de escribir en el ejemplo', async () => {
     responder(404, { detail: 'Not Found' })
