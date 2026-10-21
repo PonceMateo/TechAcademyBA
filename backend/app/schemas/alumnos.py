@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict
 class ComisionAsignadaOut(BaseModel):
     """Comisión del padrón. Hoy siempre `None` hasta que exista la inscripción real."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     codigo: str
     nombre: str
 

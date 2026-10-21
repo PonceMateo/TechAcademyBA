@@ -59,22 +59,31 @@ const COLUMNAS_ALUMNOS = [
   {
     clave: 'comision',
     titulo: 'COMISIÓN ASIGNADA',
-    render: (fila) => (
-      <span>
-        <span className="font-medium">{fila.comision.codigo}</span>{' '}
-        <span className="text-slate-500">{fila.comision.nombre}</span>
-      </span>
-    ),
+    render: (fila) =>
+      fila.comision ? (
+        <span>
+          <span className="font-medium">{fila.comision.codigo}</span>{' '}
+          <span className="text-slate-500">{fila.comision.nombre}</span>
+        </span>
+      ) : (
+        <span className="text-slate-500">Sin comisión</span>
+      ),
   },
   {
     clave: 'categoria',
     titulo: 'CATEGORÍA ARANCELARIA',
-    render: (fila) => columnaCategoria(fila.categoria, fila.porcentaje_beca),
+    render: (fila) =>
+      fila.categoria ? columnaCategoria(fila.categoria, fila.porcentaje_beca) : <span className="text-slate-500">—</span>,
   },
   {
     clave: 'acceso',
     titulo: 'ACCESO PLATAFORMA',
-    render: (fila) => <StatusIndicator estado={fila.acceso.estado} causa={fila.acceso.causa} />,
+    render: (fila) =>
+      fila.acceso ? (
+        <StatusIndicator estado={fila.acceso.estado} causa={fila.acceso.causa} />
+      ) : (
+        <span className="text-slate-500">—</span>
+      ),
   },
 ]
 

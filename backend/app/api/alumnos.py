@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
@@ -26,8 +26,9 @@ _solo_admin = require_roles(Rol.ADMIN)
 def listar_alumnos(
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
+    q: str | None = Query(default=None),
 ) -> list[AlumnoOut]:
     resultado = []
-    for alumno in alumnos.listar_alumnos(session):
+    for alumno in alumnos.listar_alumnos(session, q):
         resultado.append(AlumnoOut.model_validate(alumno))
     return resultado
