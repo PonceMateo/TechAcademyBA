@@ -8,6 +8,8 @@ import {
   obtenerResumenCatalogo,
   crearComision,
   crearCurso,
+  crearInscripcion,
+  listarAlumnos,
   listarComisiones,
   listarCursos,
   listarDocentes,
@@ -118,6 +120,12 @@ export function CoursesPage() {
   const [catalogoListo, setCatalogoListo] = useState(false)
   const [modalComision, setModalComision] = useState(false)
   const [modalCurso, setModalCurso] = useState(false)
+  const [modalInscripcion, setModalInscripcion] = useState(false)
+  const [alumnos, setAlumnos] = useState([])
+  const [alumnoSeleccionado, setAlumnoSeleccionado] = useState('')
+  const [comisionSeleccionada, setComisionSeleccionada] = useState('')
+  const [falloInscripcion, setFalloInscripcion] = useState(null)
+  const [guardandoInscripcion, setGuardandoInscripcion] = useState(false)
   const [campos, setCampos] = useState(CAMPOS_COMISION_VACIOS)
   const [camposCurso, setCamposCurso] = useState(CAMPOS_CURSO_VACIOS)
   const [errores, setErrores] = useState({})
@@ -135,6 +143,7 @@ export function CoursesPage() {
       setCatalogoListo(true)
     })
     listarDocentes().then(setDocentes)
+    listarAlumnos().then(setAlumnos)
     listarSedes().then(setSedes)
     obtenerResumenCatalogo().then(setResumen)
   }, [])
@@ -211,6 +220,49 @@ export function CoursesPage() {
     setCamposCurso(CAMPOS_CURSO_VACIOS)
     setErroresCurso({})
     setFallo(null)
+  }
+
+  function abrirModalInscripcion(comisionId = '') {
+    setComisionSeleccionada(comisionId === '' ? '' : String(comisionId))
+    setAlumnoSeleccionado('')
+    setFalloInscripcion(null)
+    setModalInscripcion(true)
+  }
+
+  function cerrarModalInscripcion() {
+    setModalInscripcion(false)
+    setComisionSeleccionada('')
+    setAlumnoSeleccionado('')
+    setFalloInscripcion(null)
+  }
+
+  async function guardarInscripcion() {
+    if (alumnoSeleccionado === '' || comisionSeleccionada === '') {
+      setFalloInscripcion('Elegí el alumno y la comisión.')
+      return
+    }
+    setGuardandoInscripcion(true)
+    setFalloInscripcion(null)
+    try {
+      await crearInscripcion({
+        alumno_id: Number(alumnoSeleccionado),
+        comision_id: Number(comisionSeleccionada),
+        categoria: 'PARTICULAR',
+      })
+      // Actualización optimista: la vacante baja en uno sin recargar.
+      setComisiones((anteriores) =>
+        anteriores.map((comision) =>
+          comision.id === Number(comisionSeleccionada)
+            ? { ...comision, vacantes: Math.max((comision.vacantes ?? 0) - 1, 0) }
+            : comision,
+        ),
+      )
+      cerrarModalInscripcion()
+    } catch (error) {
+      setFalloInscripcion(error?.message ?? 'No se pudo inscribir al alumno.')
+    } finally {
+      setGuardandoInscripcion(false)
+    }
   }
 
   function validar() {
@@ -322,6 +374,7 @@ export function CoursesPage() {
           resumen={resumen}
           onNuevoCurso={() => setModalCurso(true)}
           onNuevaComision={abrirModalComision}
+          onInscribir={() => abrirModalInscripcion()}
           onAbrir={abrirCurso}
         />
       )
@@ -337,6 +390,7 @@ export function CoursesPage() {
           resumen={resumen}
           onVolver={() => navegar('/admin/cursos')}
           onNuevaComision={abrirModalComision}
+          onInscribir={() => abrirModalInscripcion()}
         />
       )
     }
@@ -506,6 +560,56 @@ export function CoursesPage() {
           lo genera el sistema a partir del curso.
         </p>
       </Modal>
+
+      <Modal
+        abierto={modalInscripcion}
+        titulo="Inscribir Alumno"
+        onClose={cerrarModalInscripcion}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarModalInscripcion}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarInscripcion} disabled={guardandoInscripcion}>
+              {guardandoInscripcion ? 'Guardando…' : 'Inscribir'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Campo id="comision-inscripcion" etiqueta="Comisión" obligatorio>
+            <select
+              id="comision-inscripcion"
+              value={comisionSeleccionada}
+              onChange={(evento) => setComisionSeleccionada(evento.target.value)}
+            >
+              <option value="">Seleccionar…</option>
+              {comisiones.map((comision) => (
+                <option key={comision.id} value={String(comision.id)}>
+                  {comision.codigo} · {comision.curso.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+
+          <Campo id="alumno-inscripcion" etiqueta="Alumno" obligatorio>
+            <select
+              id="alumno-inscripcion"
+              value={alumnoSeleccionado}
+              onChange={(evento) => setAlumnoSeleccionado(evento.target.value)}
+            >
+              <option value="">Seleccionar…</option>
+              {alumnos.map((alumno) => (
+                <option key={alumno.id} value={String(alumno.id)}>
+                  {alumno.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+
+          {falloInscripcion !== null && <MensajeFallo>{falloInscripcion}</MensajeFallo>}
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -522,6 +626,7 @@ function VistaCursos({
   resumen,
   onNuevoCurso,
   onNuevaComision,
+  onInscribir,
   onAbrir,
 }) {
   return (
@@ -534,6 +639,9 @@ function VistaCursos({
             + Nuevo Curso
           </Button>
           <Button onClick={onNuevaComision}>+ Nueva Comisión</Button>
+          <Button variante="secundario" onClick={onInscribir}>
+            + Inscribir Alumno
+          </Button>
         </div>
       }
     >
@@ -587,7 +695,7 @@ function TarjetaCurso({ curso, total, onAbrir }) {
 }
 
 /** Vista de comisiones: la tabla del curso de la ruta, con el mismo formato de siempre. */
-function VistaComisiones({ curso, comisiones, resumen, onVolver, onNuevaComision }) {
+function VistaComisiones({ curso, comisiones, resumen, onVolver, onNuevaComision, onInscribir }) {
   return (
     <Card
       titulo="Comisiones Activas"
@@ -599,6 +707,9 @@ function VistaComisiones({ curso, comisiones, resumen, onVolver, onNuevaComision
             Volver a cursos
           </Button>
           <Button onClick={onNuevaComision}>+ Nueva Comisión</Button>
+          <Button variante="secundario" onClick={onInscribir}>
+            + Inscribir Alumno
+          </Button>
         </div>
       }
     >

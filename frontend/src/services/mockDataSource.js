@@ -282,6 +282,27 @@ export function createMockDataSource() {
       return copiar(store.alumnos)
     },
 
+    async crearInscripcion({ alumno_id, comision_id }) {
+      const comision = store.comisiones.find((c) => c.id === comision_id)
+      if (!comision) {
+        throw new Error('La comisión no existe.')
+      }
+      const existente = store.inscripciones?.find(
+        (i) => i.alumno_id === alumno_id && i.comision_id === comision_id,
+      )
+      if (existente) {
+        throw new Error('El alumno ya está inscripto en esa comisión.')
+      }
+      if ((comision.inscriptos ?? 0) >= comision.cupo_maximo) {
+        throw new Error('La comisión no tiene vacantes.')
+      }
+      comision.inscriptos = (comision.inscriptos ?? 0) + 1
+      comision.vacantes = comision.cupo_maximo - comision.inscriptos
+      store.inscripciones = store.inscripciones || []
+      store.inscripciones.push({ alumno_id, comision_id, estado: 'ACTIVA' })
+      return { id: store.inscripciones.length, alumno_id, comision_id, categoria: 'PARTICULAR', estado: 'ACTIVA' }
+    },
+
     /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
     async buscarAlumnos(texto) {
       return buscarPorTexto(store.alumnos, texto, ['nombre', 'documento'])
