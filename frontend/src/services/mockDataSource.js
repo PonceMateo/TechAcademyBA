@@ -11,6 +11,7 @@ import {
   LINKS_DE_CLASE,
   SEDES,
 } from '../mocks'
+import { TIPO_FACTURA } from '../domain/enums'
 import { normalizeCode, normalizeCuit, normalizeDocumento } from '../domain/normalize'
 
 /**
@@ -56,6 +57,22 @@ function copiar(registros) {
 /** El identificador siguiente de una colección: el máximo + 1, o 1 si está vacía. */
 function siguienteId(registros) {
   return registros.reduce((mayor, registro) => Math.max(mayor, registro.id ?? 0), 0) + 1
+}
+
+/**
+ * La contraseña inicial del alta de alumno (D45): `<primer nombre><DNI>`, en minúsculas y sin
+ * tildes. Es la misma convención que aplica el backend; la fuente de ejemplo la replica para que
+ * la pantalla muestre el mismo texto con las dos fuentes.
+ */
+function passwordInicial(nombre, documento) {
+  const primerNombre = String(nombre).trim().split(/\s+/)[0] ?? ''
+  const sinTildes = primerNombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+  const digitos = String(documento).replace(/\D/g, '')
+  return `${sinTildes || 'alumno'}${digitos}`
 }
 
 /**
@@ -308,8 +325,62 @@ export function createMockDataSource() {
       return buscarPorTexto(store.alumnos, texto, ['nombre', 'documento'])
     },
 
+    /**
+     * Alta de alumno de ejemplo (historia #13): agrega la fila al store y la devuelve con la
+     * misma forma que la fuente real.
+     *
+     * El alumno recién creado no tiene inscripción, así que comisión, categoría, porcentaje de
+     * beca y acceso van en `null`: la pantalla los muestra como `Sin comisión` y `—` (D43), sin
+     * inventar datos que pertenecen a historias posteriores.
+     */
+    async crearAlumno({ documento, nombre, email, telefono }) {
+      const alumno = {
+        id: siguienteId(store.alumnos),
+        nombre,
+        documento,
+        tipo_documento: 'DNI',
+        email,
+        telefono: telefono ?? null,
+        activo: true,
+        comision: null,
+        categoria: null,
+        porcentaje_beca: null,
+        acceso: null,
+      }
+      store.alumnos.push(alumno)
+      // La contraseña se devuelve una sola vez, como en el backend: no se guarda en el padrón.
+      return { ...alumno, password_inicial: passwordInicial(nombre, documento) }
+    },
+
     async listarEmpresas() {
       return copiar(store.empresas)
+    },
+
+    /**
+     * Alta de cuenta corporativa de ejemplo (18): agrega la fila al store y la devuelve con la
+     * misma forma que la fuente real. El duplicado se resuelve sobre el CUIT normalizado (D6),
+     * como el backend, para que la pantalla pruebe el rechazo igual con las dos fuentes.
+     */
+    async crearEmpresa({ razon_social, cuit, requiere_factura_a }) {
+      const cuit_norm = normalizeCuit(cuit)
+      const existente = store.empresas.find((empresa) => empresa.cuit_norm === cuit_norm)
+      if (existente !== undefined) {
+        throw new Error(
+          `Ya hay una empresa registrada con ese CUIT: ${existente.razon_social} (CUIT ${existente.cuit}).`,
+        )
+      }
+
+      const empresa = {
+        id: siguienteId(store.empresas),
+        razon_social,
+        cuit,
+        cuit_norm,
+        preferencia_factura: requiere_factura_a ? TIPO_FACTURA.A : TIPO_FACTURA.B,
+        requiere_factura_a,
+        nomina_empleados: '',
+      }
+      store.empresas.push(empresa)
+      return { ...empresa }
     },
 
     async listarSedes() {

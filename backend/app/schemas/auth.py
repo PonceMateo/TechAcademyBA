@@ -30,6 +30,18 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=MAX_PASSWORD_BYTES)
 
 
+class CambioPasswordRequest(BaseModel):
+    """Cuerpo de `POST /auth/change-password` (D45).
+
+    `current_password` es la contraseña inicial que el administrador entregó; `new_password` es
+    la que el alumno elige en su primer ingreso. El mínimo de ocho caracteres es la única regla
+    de fortaleza de esta fase; el máximo es el de bcrypt.
+    """
+
+    current_password: str = Field(min_length=1, max_length=MAX_PASSWORD_BYTES)
+    new_password: str = Field(min_length=8, max_length=MAX_PASSWORD_BYTES)
+
+
 class LoginResponse(BaseModel):
     """Respuesta de `POST /auth/login` con credenciales válidas.
 

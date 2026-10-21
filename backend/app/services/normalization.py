@@ -59,3 +59,40 @@ def normalize_document(value: str | None) -> str | None:
         return None
     digits = _NON_DIGIT.sub("", value)
     return digits or None
+
+
+#: Pesos del dígito verificador del CUIT, según la regla de AFIP. Son los mismos que usa el
+#: CHECK `ck_empresa_cuit_digito` de la base (historia #18): esta función le habla al operador
+#: con un 422 claro, y la base le habla a cualquier otro camino que intente escribir el dato.
+_CUIT_PESOS = (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)
+
+
+def cuit_digito_verificador(primeros_diez: str) -> str:
+    """Dígito verificador de un CUIT a partir de sus diez primeros dígitos.
+
+    >>> cuit_digito_verificador("3012345678")
+    '1'
+    """
+    total = sum(int(digito) * peso for digito, peso in zip(primeros_diez, _CUIT_PESOS, strict=True))
+    resto = total % 11
+    if resto == 0:
+        return "0"
+    if resto == 1:
+        return "9"
+    return str(11 - resto)
+
+
+def cuit_es_valido(value: str) -> bool:
+    """¿El valor tiene once dígitos y un dígito verificador correcto? (historia #18)
+
+    >>> cuit_es_valido("30-12345678-1")
+    True
+    >>> cuit_es_valido("30123456782")
+    False
+    >>> cuit_es_valido("3012345678")
+    False
+    """
+    digitos = normalize_document(value)
+    if digitos is None or len(digitos) != 11:
+        return False
+    return cuit_digito_verificador(digitos[:10]) == digitos[10]

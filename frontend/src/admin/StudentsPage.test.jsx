@@ -1,14 +1,16 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
- * Alumnos e inscripciones (9.5).
+ * Alumnos e inscripciones (9.5 y 13).
  *
- * Lo que se prueba es lo que el prototipo no tenía: las cuatro categorías con su color y los dos
- * bloqueos con su causa. Si la causa no aparece al lado del estado, la pantalla vuelve a ser la del
- * prototipo y el cliente pierde la diferencia entre "no pagó" y "no se pudo leer el comprobante".
+ * Lo que se prueba es lo que el prototipo no tenía: las cuatro categorías con su color, los dos
+ * bloqueos con su causa, el alta real con sus validaciones y los huecos de comisión, categoría y
+ * acceso para el alumno que todavía no tiene inscripción. Si la causa no aparece al lado del
+ * estado, la pantalla vuelve a ser la del prototipo y el cliente pierde la diferencia entre "no
+ * pagó" y "no se pudo leer el comprobante".
  */
 
 const COLUMNAS_ALUMNOS = [
@@ -21,6 +23,31 @@ const COLUMNAS_ALUMNOS = [
 ]
 
 const COLUMNAS_EMPRESAS = ['RAZÓN SOCIAL', 'CUIT', 'PREFERENCIA FACTURA', 'NÓMINA DE EMPLEADOS']
+
+const ALTA = {
+  documento: '30.111.222',
+  nombre: 'Rocío Álvarez',
+  email: 'rocio.alvarez@techacademy.invalid',
+  telefono: '011 4000-0005',
+}
+
+/** La contraseña inicial que genera el alta: `<primer nombre><DNI>` (D45). */
+const PASSWORD_INICIAL = 'rocio30111222'
+
+/** La fila que devuelve una fuente real después de un alta: sin inscripción, con huecos. */
+function filaCreada(datos = ALTA) {
+  return {
+    id: 99,
+    ...datos,
+    tipo_documento: 'DNI',
+    activo: true,
+    comision: null,
+    categoria: null,
+    porcentaje_beca: null,
+    acceso: null,
+    password_inicial: PASSWORD_INICIAL,
+  }
+}
 
 beforeEach(async () => {
   resetDataSource()
@@ -40,6 +67,19 @@ function filaDe(nombre) {
   return within(tablaAlumnos())
     .getAllByRole('row')
     .find((fila) => fila.cells[1].textContent === nombre)
+}
+
+async function abrirModal() {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: '+ Nuevo Alumno' }))
+  return user
+}
+
+async function completarAlta(user, datos = ALTA) {
+  await user.type(screen.getByLabelText(/^DNI/), datos.documento)
+  await user.type(screen.getByLabelText(/^Nombre/), datos.nombre)
+  await user.type(screen.getByLabelText(/^Email/), datos.email)
+  await user.type(screen.getByLabelText(/^Teléfono/), datos.telefono)
 }
 
 describe('padrón de alumnos', () => {
@@ -139,6 +179,149 @@ describe('padrón de alumnos', () => {
     await waitFor(() => expect(screen.queryByText('Juan Ignacio Pérez')).not.toBeInTheDocument())
     expect(screen.getByText('Valeria Rossi')).toBeInTheDocument()
   })
+
+  it('deja Sin comisión y guiones en la fila del alumno sin inscripción', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 9,
+          nombre: 'Nuevo Alumno',
+          documento: '30.111.222',
+          tipo_documento: 'DNI',
+          email: 'nuevo@techacademy.invalid',
+          telefono: null,
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ],
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+
+    await screen.findByText('Nuevo Alumno')
+
+    const fila = filaDe('Nuevo Alumno')
+    expect(fila.cells[3]).toHaveTextContent('Sin comisión')
+    expect(fila.cells[4]).toHaveTextContent('—')
+    expect(fila.cells[5]).toHaveTextContent('—')
+  })
+})
+
+describe('alta de alumno', () => {
+  it('abre el modal con los campos del spec y sin tipo de documento', async () => {
+    await abrirModal()
+
+    expect(screen.getByRole('dialog', { name: 'Nuevo Alumno' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^DNI/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Nombre/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Email/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Teléfono/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar Alumno' })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/tipo de documento/i)).not.toBeInTheDocument()
+  })
+
+  it('valida los campos obligatorios antes de enviar', async () => {
+    const crearAlumno = vi.fn()
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    expect(await screen.findByText('El DNI es obligatorio.')).toBeInTheDocument()
+    expect(screen.getByText('El nombre es obligatorio.')).toBeInTheDocument()
+    expect(screen.getByText('El email es obligatorio.')).toBeInTheDocument()
+    expect(crearAlumno).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un DNI que no tiene 7 u 8 dígitos y un email sin forma', async () => {
+    const crearAlumno = vi.fn()
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user, { ...ALTA, documento: '123', email: 'rocio@' })
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    expect(await screen.findByText('El DNI debe tener 7 u 8 dígitos.')).toBeInTheDocument()
+    expect(screen.getByText('El email no tiene un formato válido.')).toBeInTheDocument()
+    expect(crearAlumno).not.toHaveBeenCalled()
+  })
+
+  it('da de alta, cierra el formulario, incorpora la fila y muestra las credenciales en un modal', async () => {
+    const crearAlumno = vi.fn(async (datos) => filaCreada(datos))
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    const dialogo = await screen.findByRole('dialog', { name: 'Credenciales del alumno' })
+    expect(dialogo).toHaveTextContent(ALTA.nombre)
+    expect(dialogo).toHaveTextContent(ALTA.email)
+    expect(dialogo).toHaveTextContent(PASSWORD_INICIAL)
+    expect(dialogo).not.toHaveTextContent('No se envió ningún correo')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(crearAlumno).toHaveBeenCalledWith(ALTA)
+    expect(filaDe(ALTA.nombre).cells[0]).toHaveTextContent(ALTA.documento)
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Entendido' }))
+    expect(
+      screen.queryByRole('dialog', { name: 'Credenciales del alumno' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('mantiene el modal abierto con lo cargado cuando la fuente rechaza el alta', async () => {
+    const crearAlumno = vi.fn(async () => {
+      throw new Error('Ya hay un alumno registrado con ese documento.')
+    })
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    expect(
+      await screen.findByText('Ya hay un alumno registrado con ese documento.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nuevo Alumno' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^DNI/)).toHaveValue(ALTA.documento)
+    expect(screen.getByLabelText(/^Nombre/)).toHaveValue(ALTA.nombre)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('no confirma nada cuando el alta no llega a la base', async () => {
+    const crearAlumno = vi.fn(async () => {
+      throw new Error('No pudimos conectar con el servidor.')
+    })
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    expect(await screen.findByText('No pudimos conectar con el servidor.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nuevo Alumno' })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText(/dado de alta/)).not.toBeInTheDocument())
+  })
 })
 
 describe('cuentas corporativas', () => {
@@ -167,6 +350,62 @@ describe('cuentas corporativas', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByText('10 personas, falta enviar la nómina')).toBeInTheDocument()
+  })
+})
+
+describe('alta de cuenta corporativa', () => {
+  function abrirModalDeEmpresa(user) {
+    return user.click(screen.getByRole('button', { name: '+ Nueva Empresa' }))
+  }
+
+  it('abre el modal con razón social, CUIT y la casilla de Factura A', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+
+    expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/Razón Social/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/CUIT/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Requiere Factura A')).toBeInTheDocument()
+  })
+
+  it('no envía el alta sin razón social', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
+
+    expect(await screen.findByText('La razón social es obligatoria.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
+  })
+
+  it('da de alta la empresa y la agrega a la tabla', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+    await user.type(screen.getByLabelText(/Razón Social/), 'Delta Logística SRL')
+    await user.type(screen.getByLabelText(/CUIT/), '30-71234567-8')
+    await user.click(screen.getByLabelText('Requiere Factura A'))
+    await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText('Delta Logística SRL')).toBeInTheDocument()
+    expect(screen.getByText('30-71234567-8')).toBeInTheDocument()
+  })
+
+  it('muestra el motivo del backend y deja el modal abierto cuando el CUIT está duplicado', async () => {
+    const user = userEvent.setup()
+
+    await abrirModalDeEmpresa(user)
+    await user.type(screen.getByLabelText(/Razón Social/), 'Otra Empresa')
+    await user.type(screen.getByLabelText(/CUIT/), '30-71665544-9')
+    await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
+
+    expect(
+      await screen.findByText(/Ya hay una empresa registrada con ese CUIT/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Otra Empresa')).toBeInTheDocument()
   })
 })
 

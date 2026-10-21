@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api import alumnos, auth, authorization_probe, catalogo, health, inscripciones, padron
+from app.api import (
+    alumnos,
+    auth,
+    authorization_probe,
+    catalogo,
+    empresas,
+    health,
+    inscripciones,
+    padron,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -16,5 +25,6 @@ api_router.include_router(auth.router)
 api_router.include_router(catalogo.router)
 api_router.include_router(padron.router)
 api_router.include_router(alumnos.router)
+api_router.include_router(empresas.router)
 api_router.include_router(inscripciones.router)
 api_router.include_router(authorization_probe.router)

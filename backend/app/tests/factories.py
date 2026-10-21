@@ -219,7 +219,7 @@ def crear_usuario_docente(
     docente: Docente | None = None,
     email: str = "rita.molina.login@techacademy.invalid",
     is_active: bool = True,
-    must_change_password: bool = True,
+    must_change_password: bool = False,
 ) -> Usuario:
     docente = docente or crear_docente(session, email="rita.molina@techacademy.invalid")
     return _persistir(
@@ -242,7 +242,7 @@ def crear_usuario_alumno(
     alumno: Alumno | None = None,
     email: str = "agustina.benitez.login@techacademy.invalid",
     is_active: bool = True,
-    must_change_password: bool = True,
+    must_change_password: bool = False,
 ) -> Usuario:
     """Falta en el padrón de pruebas hasta el work unit 5: `ALUMNO` es uno de los tres
     roles y sin esta cuenta no se puede probar la autorización por rol."""

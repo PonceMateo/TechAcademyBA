@@ -18,7 +18,7 @@ import secrets
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import hashear_password, verificar_password
+from app.core.security import MAX_PASSWORD_BYTES, hashear_password, verificar_password
 from app.models.padron import Usuario
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 #: dependencia de autorización: uno habla del par correo y contraseña, el otro del token
 #: que falta o no sirve, y mezclarlos sería menos claro sin ganar nada.
 CREDENCIALES_INVALIDAS = "Credenciales inválidas."
+
+#: Mensaje del cambio de contraseña cuando la actual no coincide. Es distinto del genérico del
+#: login a propósito: acá la cuenta ya está autenticada y el usuario necesita saber qué corregir.
+PASSWORD_ACTUAL_INCORRECTA = "La contraseña actual no es correcta."
+
+#: Mínimo de la contraseña nueva. Ocho caracteres es la regla de esta fase; el máximo lo pone
+#: bcrypt y lo valida el contrato.
+PASSWORD_MIN_LENGTH = 8
 
 
 class CredencialesInvalidas(Exception):
@@ -38,6 +46,17 @@ class CredencialesInvalidas(Exception):
 
     def __init__(self) -> None:
         super().__init__(CREDENCIALES_INVALIDAS)
+
+
+class PasswordActualIncorrecta(Exception):
+    """La contraseña actual informada no coincide con la de la cuenta autenticada."""
+
+    def __init__(self) -> None:
+        super().__init__(PASSWORD_ACTUAL_INCORRECTA)
+
+
+class PasswordInvalida(ValueError):
+    """La contraseña nueva no cumple la regla: es corta, igual a la actual o demasiado larga."""
 
 
 #: Hash de referencia para igualar el tiempo de respuesta entre "no existe" y "no coincide".
@@ -74,6 +93,36 @@ def autenticar(session: Session, email: str, password: str) -> Usuario:
         logger.info("Intento de acceso con contraseña incorrecta.")
         raise CredencialesInvalidas
 
+    return usuario
+
+
+def cambiar_password(session: Session, usuario: Usuario, actual: str, nueva: str) -> Usuario:
+    """Cambia la contraseña de la cuenta autenticada y levanta el cambio obligatorio (D45).
+
+    **La cuenta pendiente puede llegar hasta acá y a ninguna otra ruta de rol.** Es el único
+    camino que el backend deja abierto para que el alumno salga del estado pendiente: si no,
+    quedaría encerrado entre un 403 y una pantalla que no lo deja entrar.
+
+    Exige la contraseña actual, que es la que el administrador entregó. La nueva se guarda como
+    hash bcrypt y `must_change_password` pasa a `false` en la misma transacción, así que un
+    cambio a medias no deja la cuenta con una contraseña nueva y el indicador viejo.
+    """
+    if not verificar_password(actual, usuario.password_hash):
+        raise PasswordActualIncorrecta
+    if nueva == actual:
+        raise PasswordInvalida("La contraseña nueva tiene que ser distinta de la actual.")
+    if len(nueva) < PASSWORD_MIN_LENGTH:
+        raise PasswordInvalida(
+            f"La contraseña nueva tiene que tener al menos {PASSWORD_MIN_LENGTH} caracteres."
+        )
+    if len(nueva.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise PasswordInvalida(
+            f"La contraseña nueva no puede superar los {MAX_PASSWORD_BYTES} bytes."
+        )
+
+    usuario.password_hash = hashear_password(nueva)
+    usuario.must_change_password = False
+    session.commit()
     return usuario
 
 

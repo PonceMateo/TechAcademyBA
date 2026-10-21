@@ -34,7 +34,7 @@ def test_token_valido_devuelve_la_identidad(api_client, db_session: Session) -> 
         "email": docente.email,
         "rol": "DOCENTE",
         "nombre": f"{docente.docente.nombre} {docente.docente.apellido}",
-        "must_change_password": True,
+        "must_change_password": False,
     }
 
 
