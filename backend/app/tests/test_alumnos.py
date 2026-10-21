@@ -11,7 +11,9 @@ Lo que estos tests afirman por debajo de la respuesta:
 - el correo ya tomado en el padrón de docentes se rechaza, porque la unicidad cruzada la sostiene
   el servicio (M1);
 - el alumno y su cuenta se crean juntos: si falla la cuenta no queda el alumno;
-- la cuenta entra al sistema con la contraseña de demostración, guardada como hash bcrypt;
+- la contraseña inicial se genera como `<primer nombre><DNI>`, se devuelve una sola vez en el
+  alta y en la base queda solo su hash bcrypt (D45);
+- la cuenta nace con `must_change_password` en `true` y una cuenta pendiente no accede al padrón;
 - el listado devuelve los huecos de comisión, categoría y acceso en `null`, sin inventarlos.
 
 Corre contra la base de pruebas de verdad (D15): el índice único sobre `documento_norm` y el
@@ -40,8 +42,8 @@ from app.tests.factories import (
     token_de_prueba,
 )
 
-#: Contraseña de las cuentas de demostración: la misma del seed y del alta de docente.
-CONTRASENA = "Demo2026!"
+#: Contraseña inicial que genera el alta: primer nombre en minúsculas + DNI normalizado (D45).
+CONTRASENA_INICIAL = "juan38456789"
 
 ALTA = {
     "documento": "38.456.789",
@@ -203,15 +205,37 @@ def test_documento_y_email_repetidos_a_la_vez_informan_el_documento(
 # --------------------------------------------------- transacción y cuenta
 
 
-def test_la_cuenta_se_crea_con_la_contrasena_demo_y_sin_cambio_pendiente(
+def test_el_alta_devuelve_la_password_inicial_generada(cliente_admin: TestClient) -> None:
+    """D45: la contraseña inicial es `<primer nombre><DNI>` y se muestra al administrador."""
+    respuesta = cliente_admin.post("/alumnos", json=ALTA)
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["password_inicial"] == CONTRASENA_INICIAL
+
+
+@pytest.mark.parametrize(
+    ("nombre", "documento", "esperada"),
+    [
+        ("Juan Ignacio Pérez", "38.456.789", "juan38456789"),
+        ("Rocío Álvarez", "30.111.222", "rocio30111222"),
+        ("Ángel", "30111222", "angel30111222"),
+    ],
+)
+def test_la_password_inicial_normaliza_nombre_y_dni(
+    nombre: str, documento: str, esperada: str
+) -> None:
+    assert servicio_alumnos.generar_password_inicial(nombre, documento) == esperada
+
+
+def test_la_cuenta_se_crea_con_la_password_inicial_y_cambio_pendiente(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     cliente_admin.post("/alumnos", json=ALTA)
 
-    usuario = autenticar(db_session, ALTA["email"], CONTRASENA)
+    usuario = autenticar(db_session, ALTA["email"], CONTRASENA_INICIAL)
 
     assert usuario.rol == Rol.ALUMNO.value
-    assert usuario.must_change_password is False, "D18: sin cambio pendiente"
+    assert usuario.must_change_password is True, "D45: cambio obligatorio en el primer ingreso"
     assert usuario.is_active is True
     assert usuario.alumno_id is not None
 
@@ -223,8 +247,17 @@ def test_la_contrasena_se_guarda_como_hash_bcrypt(
 
     usuario = db_session.scalar(select(Usuario).where(Usuario.email == ALTA["email"]))
 
-    assert usuario.password_hash != CONTRASENA
+    assert usuario.password_hash != CONTRASENA_INICIAL
     assert usuario.password_hash.startswith("$2b$"), usuario.password_hash
+
+
+def test_el_alta_no_expone_la_password_en_el_padron(cliente_admin: TestClient) -> None:
+    cliente_admin.post("/alumnos", json=ALTA)
+
+    respuesta = cliente_admin.get("/alumnos")
+
+    assert respuesta.status_code == 200
+    assert all("password_inicial" not in fila for fila in respuesta.json())
 
 
 def test_si_falla_la_cuenta_no_queda_el_alumno(
@@ -294,6 +327,29 @@ def test_un_docente_no_lee_ni_escribe_el_padron_de_alumnos(
     assert respuesta.status_code == 403
     assert respuesta.headers["X-Roles-Admitidos"] == "ADMIN"
     assert db_session.scalar(select(Alumno).where(Alumno.email == ALTA["email"])) is None
+
+
+def test_una_cuenta_pendiente_de_cambio_no_accede_a_las_rutas_de_rol(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """D45: el backend bloquea las rutas de rol hasta que la contraseña se cambie."""
+    alumno = crear_alumno(
+        db_session, documento="30111222", email="pendiente@techacademy.invalid"
+    )
+    cuenta = crear_usuario_alumno(
+        db_session,
+        alumno=alumno,
+        email="pendiente@techacademy.invalid",
+        must_change_password=True,
+    )
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(cuenta)))
+
+    respuesta = api_client.get("/auth/probe/alumno")
+
+    assert respuesta.status_code == 403, respuesta.text
+    assert "cambiar tu contraseña" in respuesta.json()["detail"]
+    # La sesión sí se puede leer: es lo que le permite a la interfaz saber por qué está bloqueada.
+    assert api_client.get("/auth/me").status_code == 200
 
 
 def test_el_alta_sin_token_es_401(api_client: TestClient) -> None:

@@ -31,6 +31,9 @@ const ALTA = {
   telefono: '011 4000-0005',
 }
 
+/** La contraseña inicial que genera el alta: `<primer nombre><DNI>` (D45). */
+const PASSWORD_INICIAL = 'rocio30111222'
+
 /** La fila que devuelve una fuente real después de un alta: sin inscripción, con huecos. */
 function filaCreada(datos = ALTA) {
   return {
@@ -42,6 +45,7 @@ function filaCreada(datos = ALTA) {
     categoria: null,
     porcentaje_beca: null,
     acceso: null,
+    password_inicial: PASSWORD_INICIAL,
   }
 }
 
@@ -263,7 +267,7 @@ describe('alta de alumno', () => {
     expect(crearAlumno).not.toHaveBeenCalled()
   })
 
-  it('da de alta, cierra el modal, incorpora la fila y avisa que no se enviaron credenciales', async () => {
+  it('da de alta, cierra el formulario, incorpora la fila y muestra las credenciales en un modal', async () => {
     const crearAlumno = vi.fn(async (datos) => filaCreada(datos))
     cleanup()
     stubDataSource({ crearAlumno })
@@ -274,13 +278,19 @@ describe('alta de alumno', () => {
     await completarAlta(user)
     await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
 
-    expect(await screen.findByText(ALTA.nombre)).toBeInTheDocument()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Alumno Rocío Álvarez dado de alta. La cuenta se creó, pero no se enviaron las credenciales.',
-    )
+    const dialogo = await screen.findByRole('dialog', { name: 'Credenciales del alumno' })
+    expect(dialogo).toHaveTextContent(ALTA.nombre)
+    expect(dialogo).toHaveTextContent(ALTA.email)
+    expect(dialogo).toHaveTextContent(PASSWORD_INICIAL)
+    expect(dialogo).not.toHaveTextContent('No se envió ningún correo')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(crearAlumno).toHaveBeenCalledWith(ALTA)
     expect(filaDe(ALTA.nombre).cells[0]).toHaveTextContent(ALTA.documento)
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Entendido' }))
+    expect(
+      screen.queryByRole('dialog', { name: 'Credenciales del alumno' }),
+    ).not.toBeInTheDocument()
   })
 
   it('mantiene el modal abierto con lo cargado cuando la fuente rechaza el alta', async () => {
@@ -376,9 +386,7 @@ describe('alta de cuenta corporativa', () => {
     await abrirModalDeEmpresa(user)
     await user.click(screen.getByRole('button', { name: 'Guardar Empresa' }))
 
-    expect(
-      await screen.findByText('La razón social es obligatoria.'),
-    ).toBeInTheDocument()
+    expect(await screen.findByText('La razón social es obligatoria.')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Nueva Empresa' })).toBeInTheDocument()
   })
 

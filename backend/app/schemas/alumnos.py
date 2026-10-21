@@ -94,3 +94,14 @@ class AlumnoOut(BaseModel):
     categoria: str | None = None
     porcentaje_beca: Decimal | None = None
     acceso: AccesoAlumnoOut | None = None
+
+
+class AlumnoCreadoOut(AlumnoOut):
+    """Respuesta de `POST /alumnos`: la fila del padrón más la contraseña inicial (D45).
+
+    `password_inicial` viaja **solo en el alta**, y en claro una única vez, para que el
+    administrador se la entregue al alumno. No se envía por correo y la base guarda solo el hash.
+    `GET /alumnos` usa `AlumnoOut` y no la expone.
+    """
+
+    password_inicial: str

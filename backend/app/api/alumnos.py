@@ -22,7 +22,7 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
-from app.schemas.alumnos import AlumnoCreate, AlumnoOut
+from app.schemas.alumnos import AlumnoCreadoOut, AlumnoCreate, AlumnoOut
 from app.services import alumnos
 from app.services.emails import EmailAlreadyRegistered
 
@@ -42,7 +42,7 @@ def listar_alumnos(
 
 @router.post(
     "",
-    response_model=AlumnoOut,
+    response_model=AlumnoCreadoOut,
     status_code=status.HTTP_201_CREATED,
     summary="Dar de alta un alumno",
 )
@@ -50,20 +50,22 @@ def crear_alumno(
     cuerpo: AlumnoCreate,
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
-) -> AlumnoOut:
+) -> AlumnoCreadoOut:
     """Alta de alumno. El cuerpo admite documento, nombre, email y teléfono: **ningún campo de
     tipo de documento**, porque esta entrega registra solo DNI y un `tipo_documento` en el JSON
     es un 422.
 
-    Crea el alumno y su cuenta de acceso en una sola transacción, con la contraseña de
-    demostración y sin cambio pendiente. **No envía ningún correo.**
+    Crea el alumno y su cuenta de acceso en una sola transacción. La cuenta nace con una
+    contraseña inicial generada —`<primer nombre><DNI>`— y con cambio obligatorio en el primer
+    ingreso. **No envía ningún correo**: la respuesta trae `password_inicial` para que el
+    administrador se la entregue al alumno.
 
-    201 con el alumno, 409 si el documento o el email ya están registrados —el mensaje dice
-    cuál—, 422 si falta un campo obligatorio, el DNI no tiene 7 u 8 dígitos o el email no tiene
-    forma, y 409 si el correo ya está en otro padrón.
+    201 con el alumno y la contraseña inicial, 409 si el documento o el email ya están
+    registrados —el mensaje dice cuál—, 422 si falta un campo obligatorio, el DNI no tiene 7 u 8
+    dígitos o el email no tiene forma, y 409 si el correo ya está en otro padrón.
     """
     try:
-        alumno = alumnos.crear_alumno(session, cuerpo)
+        alta = alumnos.crear_alumno(session, cuerpo)
     except alumnos.AlumnoDuplicado as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except EmailAlreadyRegistered as error:
@@ -73,4 +75,7 @@ def crear_alumno(
             status.HTTP_409_CONFLICT, detail="El alta chocó con un dato ya existente."
         ) from error
 
-    return AlumnoOut.model_validate(alumno)
+    return AlumnoCreadoOut(
+        **AlumnoOut.model_validate(alta.alumno).model_dump(),
+        password_inicial=alta.password_inicial,
+    )

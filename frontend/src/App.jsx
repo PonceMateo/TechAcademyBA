@@ -7,7 +7,12 @@ import { PaymentsPage } from './admin/PaymentsPage'
 import { StudentsPage } from './admin/StudentsPage'
 import { TeachersPage } from './admin/TeachersPage'
 import { RequireRole } from './auth/RequireRole'
-import { FORBIDDEN_PATH, LOGIN_PATH, homePathForRole } from './auth/roleRoutes'
+import {
+  CHANGE_PASSWORD_PATH,
+  FORBIDDEN_PATH,
+  LOGIN_PATH,
+  homePathForRole,
+} from './auth/roleRoutes'
 import { SESSION_STATUS, SessionProvider, useSession } from './auth/SessionContext'
 import { CourseDetailPage } from './alumno/CourseDetailPage'
 import { StudentCoursesPage } from './alumno/StudentCoursesPage'
@@ -20,6 +25,7 @@ import { TeacherCommissionsPage } from './docente/TeacherCommissionsPage'
 import { TeacherLayout } from './docente/TeacherLayout'
 import { TeacherProfilePage } from './docente/TeacherProfilePage'
 import { TeacherStudentsPage } from './docente/TeacherStudentsPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
 import { LoadingPage } from './pages/LoadingPage'
 import { LoginPage } from './pages/LoginPage'
@@ -36,6 +42,10 @@ function RootRedirect() {
 
   if (status === SESSION_STATUS.LOADING) {
     return <LoadingPage />
+  }
+
+  if (session?.must_change_password) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />
   }
 
   return <Navigate to={session ? homePathForRole(session.rol) : LOGIN_PATH} replace />
@@ -55,6 +65,9 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path={LOGIN_PATH} element={<LoginPage />} />
+      {/* D45: pantalla intermedia obligatoria para la cuenta recién creada. No cuelga de
+          ningún shell porque la cuenta todavía no puede entrar a su sección. */}
+      <Route path={CHANGE_PASSWORD_PATH} element={<ChangePasswordPage />} />
       <Route path={FORBIDDEN_PATH} element={<ForbiddenPage />} />
 
       <Route

@@ -17,7 +17,7 @@ contrato de esta entrega. WHEN el alta es exitosa, SHALL responder `201` con el 
 
 #### Scenario: Alta de alumno correcta
 - **WHEN** se envían un DNI de 7 u 8 dígitos, un nombre, un email y un teléfono de un alumno cuyos datos no están registrados
-- **THEN** el sistema responde `201` con el alumno creado, su `tipo_documento` en `DNI` y el alumno queda disponible en la consulta del padrón
+- **THEN** el sistema responde `201` con el alumno creado, su `tipo_documento` en `DNI`, su `password_inicial` y el alumno queda disponible en la consulta del padrón
 
 #### Scenario: DNI escrito con puntos, espacios o guiones
 - **WHEN** se informa un DNI como `38.456.789`, `38 456 789` o `38-456-789`
@@ -88,29 +88,38 @@ aprobación del equipo.
 - **WHEN** el alta se rechaza por un documento o un email repetido
 - **THEN** la respuesta contiene solo el motivo y el campo repetido, sin el nombre, el documento ni el email del alumno existente. Esta es una desviación consciente del criterio de la historia #13 y queda pendiente de aprobación
 
-### Requirement: Creación transaccional de la cuenta de acceso
+### Requirement: Creación transaccional de la cuenta de acceso con contraseña inicial
 
-WHEN el alta sea exitosa, el sistema SHALL crear en una sola transacción el `Alumno` y un
-`Usuario` con rol `ALUMNO`, el email del alumno y el vínculo `alumno_id`. La contraseña SHALL
-ser la de demostración, almacenada como hash bcrypt y nunca en texto plano. La cuenta SHALL
-quedar activa y sin cambio de contraseña pendiente. El alta SHALL NOT enviar ningún correo.
-Si falla la creación de cualquiera de las dos filas, no SHALL quedar ninguna.
+El alta SHALL crear en una sola transacción el `Alumno` y un `Usuario` con rol `ALUMNO`, su
+email y el vínculo `alumno_id`. SHALL generar una contraseña inicial `<primer nombre><DNI>` y
+guardarla solo como hash bcrypt; SHALL devolverla en claro únicamente en `POST /alumnos` como
+`password_inicial`, y `GET /alumnos` SHALL NOT exponerla. La cuenta SHALL quedar activa y con
+`must_change_password` en `true`. El alta SHALL NOT enviar correo. Si falla una fila, no SHALL
+quedar ninguna.
 
 #### Scenario: Alumno y cuenta en la misma operación
 - **WHEN** el alta de un alumno es exitosa
-- **THEN** quedan creados el alumno y su cuenta de acceso con rol `ALUMNO`, y la cuenta puede iniciar sesión con la contraseña de demostración
+- **THEN** quedan creados el alumno y su cuenta de acceso con rol `ALUMNO`, y la cuenta puede iniciar sesión con la contraseña inicial que devolvió el alta
 
-#### Scenario: La cuenta no queda con cambio de contraseña pendiente
+#### Scenario: La contraseña inicial sigue la convención del proyecto
+- **WHEN** se da de alta a `Juan Ignacio Pérez` con DNI `38.456.789`
+- **THEN** la respuesta trae `password_inicial = juan38456789` y la cuenta inicia sesión con esa contraseña
+
+#### Scenario: La contraseña inicial se muestra una sola vez
+- **WHEN** se consulta `GET /alumnos` después del alta
+- **THEN** ninguna fila incluye `password_inicial`; el dato solo estuvo en la respuesta del alta para que el administrador lo entregue
+
+#### Scenario: La cuenta queda con cambio de contraseña pendiente
 - **WHEN** se consulta la cuenta creada por el alta
-- **THEN** `must_change_password` es `false`, de manera coherente con las cuentas de demostración y con el alta de docente, porque el flujo de cambio de contraseña todavía no existe
+- **THEN** `must_change_password` es `true`, porque la contraseña inicial la conoce el administrador y el alumno debe elegir una propia en su primer ingreso
 
 #### Scenario: La contraseña se guarda como hash
 - **WHEN** se inspecciona la cuenta creada
-- **THEN** la base guarda un hash bcrypt y no la contraseña de demostración en texto plano
+- **THEN** la base guarda un hash bcrypt y no la contraseña inicial en texto plano
 
 #### Scenario: El alta no envía credenciales
 - **WHEN** el alta de un alumno es exitosa
-- **THEN** el sistema no envía ningún correo y la pantalla informa que la cuenta se creó pero las credenciales no se enviaron
+- **THEN** el sistema no envía ningún correo y la pantalla muestra al administrador el usuario y la contraseña inicial para que se los entregue
 
 #### Scenario: Falla la creación de la cuenta
 - **WHEN** el alta del alumno no puede crear la cuenta de acceso

@@ -1,9 +1,9 @@
 import { API_BASE_URL } from '../config/api'
 
 /**
- * Cliente HTTP del backend. Es **la única llamada de red que hace la interfaz** (D14):
- * autenticar y leer la sesión. El resto de las pantallas consume `src/services/`, que es
- * la frontera de datos de D13 y llega con el grupo 8.
+ * Cliente HTTP del backend. Es **la única llamada de red de autenticación** (D14):
+ * autenticar, leer la sesión y cambiar la contraseña. El resto de las pantallas consume
+ * `src/services/`, que es la frontera de datos de D13 y llega con el grupo 8.
  *
  * Las formas que se consumen acá son exactamente las del backend:
  *
@@ -94,4 +94,22 @@ export function login({ email, password }) {
  */
 export function fetchCurrentSession(token) {
   return request('/auth/me', { token })
+}
+
+/**
+ * Cambia la contraseña de la cuenta autenticada y levanta el cambio obligatorio (D45).
+ *
+ * El cuerpo va en inglés como el resto del contrato (`current_password`, `new_password`) y la
+ * respuesta es la sesión ya actualizada, con `must_change_password` en `false`: no hace falta
+ * pedir `GET /auth/me` otra vez.
+ *
+ * @throws {AuthError} 400 si la contraseña actual no coincide, 422 si la nueva no cumple la
+ * regla y 401 si el token ya no sirve.
+ */
+export function changePassword({ token, currentPassword, newPassword }) {
+  return request('/auth/change-password', {
+    method: 'POST',
+    token,
+    body: { current_password: currentPassword, new_password: newPassword },
+  })
 }

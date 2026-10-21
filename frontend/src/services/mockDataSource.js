@@ -60,6 +60,22 @@ function siguienteId(registros) {
 }
 
 /**
+ * La contraseña inicial del alta de alumno (D45): `<primer nombre><DNI>`, en minúsculas y sin
+ * tildes. Es la misma convención que aplica el backend; la fuente de ejemplo la replica para que
+ * la pantalla muestre el mismo texto con las dos fuentes.
+ */
+function passwordInicial(nombre, documento) {
+  const primerNombre = String(nombre).trim().split(/\s+/)[0] ?? ''
+  const sinTildes = primerNombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+  const digitos = String(documento).replace(/\D/g, '')
+  return `${sinTildes || 'alumno'}${digitos}`
+}
+
+/**
  * La fila de docente con la forma que consume la pantalla, que es la de la fuente real.
  *
  * El ejemplo guarda el nombre ya junto y el conte en `comisiones_asignadas`, porque así venía de
@@ -311,7 +327,8 @@ export function createMockDataSource() {
         acceso: null,
       }
       store.alumnos.push(alumno)
-      return { ...alumno }
+      // La contraseña se devuelve una sola vez, como en el backend: no se guarda en el padrón.
+      return { ...alumno, password_inicial: passwordInicial(nombre, documento) }
     },
 
     async listarEmpresas() {

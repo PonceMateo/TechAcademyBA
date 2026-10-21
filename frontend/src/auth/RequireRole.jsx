@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router'
 import { LoadingPage } from '../pages/LoadingPage'
-import { FORBIDDEN_PATH, LOGIN_PATH } from './roleRoutes'
+import { CHANGE_PASSWORD_PATH, FORBIDDEN_PATH, LOGIN_PATH } from './roleRoutes'
 import { SESSION_STATUS, useSession } from './SessionContext'
 
 /**
@@ -26,6 +26,12 @@ export function RequireRole({ allowedRoles, children }) {
 
   if (status === SESSION_STATUS.ANONYMOUS) {
     return <Navigate to={LOGIN_PATH} replace />
+  }
+
+  // D45: una cuenta pendiente de cambio no entra a ninguna sección. El backend también la
+  // bloquea con 403; esto evita mostrarle una pantalla que solo va a fallar.
+  if (session.must_change_password) {
+    return <Navigate to={CHANGE_PASSWORD_PATH} replace />
   }
 
   if (!allowedRoles.includes(session.rol)) {

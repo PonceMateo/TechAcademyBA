@@ -115,6 +115,7 @@ describe('la implementación de ejemplo', () => {
       categoria: null,
       porcentaje_beca: null,
       acceso: null,
+      password_inicial: 'rocio30111222',
     })
     expect((await listarAlumnos()).map((alumno) => alumno.nombre)).toContain('Rocío Álvarez')
   })

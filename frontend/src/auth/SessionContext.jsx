@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { fetchCurrentSession, login } from './authClient'
-import { LOGIN_PATH, homePathForRole } from './roleRoutes'
+import { changePassword as changePasswordRequest, fetchCurrentSession, login } from './authClient'
+import { CHANGE_PASSWORD_PATH, LOGIN_PATH, homePathForRole } from './roleRoutes'
 import { clearStoredToken, readStoredToken, storeToken } from './tokenStorage'
 
 /**
@@ -79,10 +79,38 @@ export function SessionProvider({ children }) {
       const session = await fetchCurrentSession(result.access_token)
       storeToken(result.access_token)
       setState({ status: SESSION_STATUS.AUTHENTICATED, session })
-      navigate(homePathForRole(session.rol), { replace: true })
+      // D45: una cuenta pendiente no entra a su sección; va directo al cambio obligatorio.
+      navigate(session.must_change_password ? CHANGE_PASSWORD_PATH : homePathForRole(session.rol), {
+        replace: true,
+      })
       return session
     },
     [navigate],
+  )
+
+  /**
+   * Cambia la contraseña y actualiza la sesión en memoria (D45).
+   *
+   * La respuesta del backend ya trae `must_change_password` en `false`, así que no hace falta
+   * releer el `/auth/me`. Recién después de esto la cuenta puede entrar a su sección.
+   */
+  const changePassword = useCallback(
+    async ({ currentPassword, newPassword }) => {
+      const token = readStoredToken()
+      if (!token || !state.session) {
+        throw new Error('No hay una sesión para cambiar la contraseña.')
+      }
+
+      const session = await changePasswordRequest({
+        token,
+        currentPassword,
+        newPassword,
+      })
+      setState({ status: SESSION_STATUS.AUTHENTICATED, session })
+      navigate(homePathForRole(session.rol), { replace: true })
+      return session
+    },
+    [navigate, state.session],
   )
 
   const signOut = useCallback(() => {
@@ -92,8 +120,8 @@ export function SessionProvider({ children }) {
   }, [navigate])
 
   const value = useMemo(
-    () => ({ status: state.status, session: state.session, signIn, signOut }),
-    [state.status, state.session, signIn, signOut],
+    () => ({ status: state.status, session: state.session, signIn, changePassword, signOut }),
+    [state.status, state.session, signIn, changePassword, signOut],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

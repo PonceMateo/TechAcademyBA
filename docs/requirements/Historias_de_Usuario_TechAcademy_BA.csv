@@ -143,15 +143,15 @@ Dado que el DNI/Pasaporte y el email no están registrados
 Cuando completo DNI/Pasaporte, nombre, email y teléfono y confirmo
 Entonces el alumno se crea en el padrón único
 
-Escenario: Envío de credenciales
+Escenario: Credenciales iniciales
 Dado que el alumno se registró correctamente
 Cuando finaliza el alta
-Entonces el sistema le envía un mail con su usuario y una contraseña generada automáticamente para ingresar a ver sus datos
+Entonces el sistema genera una contraseña inicial con el nombre y el DNI del alumno y se la muestra al administrador para que se la entregue, sin enviar ningún correo
 
-Escenario: Falla en el envío del mail
-Dado que el alta se completó pero el mail no pudo enviarse
-Cuando finaliza el alta
-Entonces el alumno queda registrado y el sistema informa al administrador que el envío falló
+Escenario: Cambio obligatorio en el primer ingreso
+Dado un alumno con su contraseña inicial
+Cuando inicia sesión por primera vez
+Entonces el sistema lo obliga a cambiar la contraseña antes de acceder a las funcionalidades
 
 Escenario: Documento duplicado
 Dado un alumno existente con el mismo DNI/Pasaporte o email
@@ -161,7 +161,7 @@ Entonces el sistema rechaza el alta y muestra el alumno existente
 Escenario: Email inválido
 Dado que ingreso un email con formato incorrecto
 Cuando intento guardar
-Entonces el sistema rechaza el alta e indica el error de formato",Must,3,Enviar mail al usuario de su registro junto con una contraseña automática para ingresar a ver sus datos? como cuando te registran en el siu
+Entonces el sistema rechaza el alta e indica el error de formato",Must,3,Las credenciales se muestran al administrador al confirmar el alta y no se envían por correo. El alumno debe cambiar la contraseña inicial en su primer ingreso.
 ,14,Inscribir alumno,"Como administrador, quiero inscribir a un alumno a una comisión, para vincularlo con un curso concreto.","Escenario: Inscripción exitosa
 Dado un alumno registrado y una comisión con vacantes
 Cuando inscribo al alumno en la comisión

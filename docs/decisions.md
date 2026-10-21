@@ -1390,7 +1390,7 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ## Alta de alumno (change `hu-13-alta-alumno`)
 
-### D44 — El alta de alumno es DNI-only, con contraseña demo, sin correo y con un 409 que solo nombra el campo
+### D44 — El alta de alumno es DNI-only, sin correo y con un 409 que solo nombra el campo
 
 - **Fecha:** 2026-10-20
 - **Autor:** Equipo TechAcademy BA
@@ -1400,15 +1400,12 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   escribió la secretaría y se normaliza a solo dígitos en `documento_norm`, que es la columna del
   índice único. El pasaporte y el documento nulo siguen admitidos por el esquema, pero el alta con
   pasaporte queda diferida a la HU 47, que está en `Won't`, y a la definición del cliente (P6).
-- **Contraseña de demostración:** la cuenta `ALUMNO` se crea en la misma transacción que el
-  alumno, con `CONTRASEÑA_DEMO = "Demo2026!"` almacenada como hash bcrypt, `is_active = true` y
-  `must_change_password = false`, igual que el alta de docente y el seed (D18). La contraseña es
-  **solo para desarrollo**: es pública y compartida, y la contraseña aleatoria por alumno depende
-  de la decisión de credenciales que sigue abierta (P11).
-- **Sin envío de correo:** el alta no llama a `EmailService` ni envía nada. El envío de
-  credenciales y el tratamiento de su fallo no están aprobados; llamar a la implementación de log
-  simularía un envío que no existe. La pantalla avisa que la cuenta se creó pero las credenciales
-  no se enviaron.
+- **Credenciales:** la cuenta `ALUMNO` se crea en la misma transacción que el alumno, con una
+  contraseña inicial generada y `must_change_password = true` (D45). Esta decisión no define la
+  contraseña: solo fija que el alta no envía nada y que la cuenta nace pendiente de cambio.
+- **Sin envío de correo:** el alta no llama a `EmailService` ni envía nada. La contraseña inicial
+  se muestra una sola vez al administrador en la respuesta del alta y él se la entrega al alumno.
+  No hay envío que simular ni fallo de envío que informar.
 - **409 sin los datos del alumno existente:** el rechazo por documento o email repetido responde
   `409` con un mensaje que nombra el campo repetido y no incluye el nombre ni el documento del
   alumno existente. Cuando el correo ya pertenece a otro padrón, el mensaje repite el email
@@ -1417,10 +1414,10 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   consciente** del criterio de la historia #13, que pide mostrar el alumno existente, y queda
   pendiente de aprobación del equipo (P11).
 - **Por qué:** el padrón no tenía alta real y sin padrón no se pueden construir las inscripciones,
-  las cobranzas ni la habilitación. Las cuatro decisiones comparten el mismo criterio: esta fase
+  las cobranzas ni la habilitación. Las decisiones comparten el mismo criterio: esta fase
   maqueta y no puede inventar reglas de negocio ni datos de contacto. Se prefiere un alta
-  reversible —una cuenta con contraseña demo— antes que un alumno sin cuenta que no se nota hasta
-  que alguien intenta entrar.
+  reversible —una cuenta con contraseña inicial conocida y cambio obligatorio— antes que un
+  alumno sin cuenta que no se nota hasta que alguien intenta entrar.
 - **Dónde:** `backend/app/schemas/validators.py`, `backend/app/schemas/alumnos.py`,
   `backend/app/services/alumnos.py`, `backend/app/api/alumnos.py`,
   `backend/app/api/router.py`, `backend/app/core/security.py`,
@@ -1429,8 +1426,41 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
   `frontend/src/admin/StudentsPage.test.jsx`, `frontend/src/services/apiDataSource.test.js` y
   `frontend/src/services/dataService.test.jsx`.
 - **Pendiente:** aprobación del equipo de las dos desviaciones (DNI-only y `409` sin el alumno
-  existente) y decisión de envío de credenciales. La historia se referencia con `Refs #13`, no se
-  cierra.
+  existente). La historia se referencia con `Refs #13`, no se cierra.
+
+---
+
+### D45 — Contraseña inicial `<primer nombre><DNI>` mostrada al administrador, con cambio obligatorio
+
+- **Fecha:** 2026-10-21
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el alta de alumno genera una contraseña inicial con la convención
+  `<primer nombre><DNI>`: primer nombre en minúsculas, sin tildes ni signos, y el DNI normalizado a
+  dígitos. `Juan Ignacio Pérez` con `38.456.789` recibe `juan38456789`; `Rocío Álvarez` con
+  `30.111.222`, `rocio30111222`. El nombre se corta a 32 caracteres para no acercarse al límite de
+  72 bytes de bcrypt. La contraseña en claro se devuelve **solo** en `POST /alumnos` como
+  `password_inicial`, se muestra una vez en un modal de la pantalla y no se envía por correo. La
+  base guarda exclusivamente el hash bcrypt.
+- **Cambio obligatorio:** la cuenta nace con `must_change_password = true`. `POST
+  /auth/change-password` recibe `current_password` y `new_password`, verifica la actual, exige al
+  menos ocho caracteres y que la nueva sea distinta, guarda el hash y deja el indicador en `false`
+  en la misma transacción. Responde `SesionActual` para que el frontend no relea `/auth/me`.
+- **Bloqueo del backend:** `require_roles` devuelve `403` a una cuenta pendiente con el mensaje
+  `Tenés que cambiar tu contraseña antes de usar el sistema.` y el encabezado
+  `X-Cambio-Password-Pendiente: true`. El login, `GET /auth/me` y el cambio de contraseña siguen
+  accesibles: son las rutas que permiten salir del estado pendiente. La regla vive en el servidor
+  y no solo en la interfaz porque el backend es la frontera de seguridad (D2).
+- **Por qué:** la contraseña sigue una convención adivinable y la conoce el administrador; dejarla
+  como definitiva convertiría el alta en una cuenta insegura. Mostrarla una sola vez resuelve la
+  entrega sin correo y sin guardar credenciales en el padrón. El ejemplo de la convención está en
+  el design del change.
+- **Dónde:** `backend/app/services/alumnos.py`, `backend/app/schemas/alumnos.py`,
+  `backend/app/api/alumnos.py`, `backend/app/schemas/auth.py`,
+  `backend/app/services/auth.py`, `backend/app/api/auth.py`, `backend/app/api/deps.py`,
+  `backend/app/tests/test_alumnos.py`, `backend/app/tests/test_auth_change_password.py`,
+  `frontend/src/pages/ChangePasswordPage.jsx`, `frontend/src/auth/authClient.js`,
+  `frontend/src/auth/SessionContext.jsx`, `frontend/src/auth/RequireRole.jsx`,
+  `frontend/src/admin/StudentsPage.jsx` y `frontend/src/test/support.jsx`.
 
 ---
 
@@ -1449,7 +1479,7 @@ con el cliente o entre los tres del equipo.
 | P7 | Dígito verificador del CUIL | Cliente | El CUIL es único pero **ya no es obligatorio** (D33): lo que sigue pendiente es validar su dígito verificador cuando venga cargado, y el equipo no lo pidió. |
 | P8 | `.gitattributes` con `* text=auto eol=lf` | Equipo | Con `core.autocrlf=true` en Windows, git rompe el `end_of_line = lf` de `.editorconfig` en cada clon. Ver más abajo. |
 | P10 | Firma de la Definition of Done | Equipo | Se firmó el recorrido el 2026-10-03, en local y después de que el PR #45 saliera mergeado, así que la firma quedó en `docs/verificacion-definition-of-done.md` y no en el PR. La fila de **revisión de la lista** sigue sin firmar: la hace alguien distinto de quien recorrió la interfaz. |
-| P11 | Desviaciones de la HU 13 y envío de credenciales | Equipo | Aprobar el alta DNI-only y el `409` que no muestra el alumno existente (D44), y decidir si las credenciales se envían por correo. Mientras tanto la cuenta se crea con la contraseña demo y el alta no envía nada. |
+| P11 | Desviaciones de la HU 13 | Equipo | Aprobar el alta DNI-only y el `409` que no muestra el alumno existente (D44). El envío de credenciales ya se decidió: no se envía correo, la contraseña inicial se muestra al administrador y el alumno debe cambiarla en su primer ingreso (D45). |
 
 ### P4 — Resuelto: todos los montos son pesos argentinos
 

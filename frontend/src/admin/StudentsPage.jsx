@@ -27,7 +27,9 @@ import { crearAlumno, crearEmpresa, listarAlumnos, listarEmpresas } from '../ser
  * email y teléfono opcional —nunca `tipo_documento`, porque esta entrega registra solo DNI
  * (D44)— y valida en el cliente lo mismo que valida el backend antes de enviar. Un rechazo de la
  * fuente deja el modal abierto con lo cargado y muestra el motivo; un fallo de red no confirma
- * nada. Al confirmar, el aviso aclara que la cuenta se creó pero las credenciales no se enviaron.
+ * nada. Al confirmar, un modal superpuesto muestra **usuario y contraseña inicial** para que el
+ * administrador se los entregue al alumno: no se envía ningún correo y el alumno deberá cambiarla
+ * en su primer ingreso (D45).
  *
  * **El buscador está deshabilitado con `Próximamente`.** La búsqueda por DNI o email es la
  * historia #16 y no se adelanta con un filtro local que daría una falsa sensación de búsqueda.
@@ -152,7 +154,7 @@ export function StudentsPage() {
   const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
   const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
   const [erroresAlumno, setErroresAlumno] = useState({})
-  const [aviso, setAviso] = useState(null)
+  const [credenciales, setCredenciales] = useState(null)
   const [falloAlumno, setFalloAlumno] = useState(null)
   const [guardandoAlumno, setGuardandoAlumno] = useState(false)
 
@@ -230,14 +232,22 @@ export function StudentsPage() {
       })
       setAlumnos((anteriores) => [...anteriores, creado])
       cerrarModalAlumno()
-      setAviso(
-        `Alumno ${creado.nombre} dado de alta. La cuenta se creó, pero no se enviaron las credenciales.`,
-      )
+      // D45: la contraseña inicial se muestra una sola vez, en un modal, para que Secretaría se
+      // la entregue al alumno. No se envía por correo.
+      setCredenciales({
+        nombre: creado.nombre,
+        email: creado.email,
+        password: creado.password_inicial,
+      })
     } catch (error) {
       setFalloAlumno(error?.message ?? 'No se pudo guardar el alumno.')
     } finally {
       setGuardandoAlumno(false)
     }
+  }
+
+  function cerrarCredenciales() {
+    setCredenciales(null)
   }
 
   function cambiarEmpresa(campo) {
@@ -322,14 +332,41 @@ export function StudentsPage() {
         />
       </Card>
 
-      {aviso !== null && (
-        <p
-          role="status"
-          className="rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
-        >
-          {aviso}
-        </p>
-      )}
+      <Modal
+        abierto={credenciales !== null}
+        titulo="Credenciales del alumno"
+        onClose={cerrarCredenciales}
+        pie={<Button onClick={cerrarCredenciales}>Entendido</Button>}
+      >
+        {credenciales !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              Alumno <span className="font-medium">{credenciales.nombre}</span> dado de alta.
+              Entregale estas credenciales:
+            </p>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Usuario
+                </dt>
+                <dd className="mt-1 break-all text-sm font-medium text-slate-900">
+                  {credenciales.email}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Contraseña inicial
+                </dt>
+                <dd className="mt-1">
+                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-900">
+                    {credenciales.password}
+                  </code>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         abierto={modalAlumnoAbierto}
@@ -390,8 +427,9 @@ export function StudentsPage() {
         )}
 
         <p className="mt-4 text-xs text-slate-500">
-          El alumno se crea con una cuenta de acceso para ese email. Las credenciales no se envían
-          todavía.
+          El alumno se crea con una cuenta de acceso para ese email y una contraseña inicial
+          generada con su nombre y su DNI. La vas a ver al confirmar el alta: no se envía ningún
+          correo y el alumno deberá cambiarla en su primer ingreso.
         </p>
       </Modal>
 

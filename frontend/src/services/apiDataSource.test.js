@@ -115,11 +115,17 @@ describe('el alta de alumno', () => {
   }
 
   it('hace POST a /alumnos con el cuerpo tal cual lo arma la pantalla', async () => {
-    const fetchMock = responder(201, { id: 7, ...ALTA, tipo_documento: 'DNI' })
+    const fetchMock = responder(201, {
+      id: 7,
+      ...ALTA,
+      tipo_documento: 'DNI',
+      password_inicial: 'rocio30111222',
+    })
 
     const creado = await createApiDataSource().crearAlumno(ALTA)
 
     expect(creado).toMatchObject({ id: 7, nombre: 'Rocío Álvarez' })
+    expect(creado.password_inicial).toBe('rocio30111222')
     const [url, opciones] = fetchMock.mock.calls.at(-1)
     expect(url).toMatch(/\/alumnos$/)
     expect(opciones.method).toBe('POST')

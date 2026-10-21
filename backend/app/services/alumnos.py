@@ -8,14 +8,14 @@ cuenta `ALUMNO` sin alumno la impide el CHECK `rol_vinculo_coherente`, y un alum
 tiene acceso a la plataforma. Si falla cualquiera de las dos inserciones, se revierte la
 transacción y no queda ninguna.
 
-**La contraseña es la de demostración y la cuenta nace sin cambio pendiente.** Es la misma
-decisión que el alta de docente y el seed (D18), y por el mismo motivo: el flujo de cambio de
-contraseña no existe, así que marcar la cuenta como pendiente mandaría al alumno a un cartel que
-dice que todavía no está disponible. La contraseña es **solo para desarrollo** (D44).
+**La contraseña inicial se genera y se muestra una sola vez.** Es `<primer nombre><DNI>`, en
+minúsculas y sin tildes: `Juan Ignacio Pérez` con `38.456.789` recibe `juan38456789` (D45). El
+administrador la ve en la respuesta del alta y se la entrega al alumno; **no se envía por
+correo**. En la base queda solo su hash bcrypt.
 
-**El alta no envía ningún correo.** El envío de credenciales está pendiente de una decisión del
-equipo y llamar a `EmailService` simularía un envío que no existe; la pantalla aclara que la
-cuenta se creó pero las credenciales no se enviaron.
+**La cuenta nace con `must_change_password = true`.** El alumno tiene que cambiar la contraseña
+en su primer ingreso antes de usar el sistema: el backend rechaza las rutas de rol mientras el
+indicador siga pendiente (D45).
 
 **Los duplicados se buscan en este orden: documento y después email.** Cuando los dos están
 repetidos, el mensaje habla del documento, que es el identificador que la secretaría tiene a
@@ -26,12 +26,15 @@ restricción (D44).
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import CONTRASEÑA_DEMO, hashear_password
+from app.core.security import MAX_PASSWORD_BYTES, hashear_password
 from app.models.enums import Rol, TipoDocumento
 from app.models.padron import Alumno, Usuario
 from app.schemas.alumnos import AlumnoCreate
@@ -39,6 +42,25 @@ from app.services.emails import ensure_email_available
 from app.services.normalization import normalize_document
 
 logger = logging.getLogger(__name__)
+
+#: Parte del nombre que entra en la contraseña inicial. El DNI aporta hasta 8 dígitos, así que con
+#: 32 caracteres la contraseña nunca se acerca al límite de 72 bytes que procesa bcrypt.
+_MAX_NOMBRE_EN_PASSWORD = 32
+
+#: Caracteres que se conservan del primer nombre: letras sin tildes y dígitos, en minúsculas.
+_NON_ALPHANUMERIC_LOWER = re.compile(r"[^a-z0-9]+")
+
+
+@dataclass(frozen=True)
+class AltaAlumno:
+    """Resultado del alta: el alumno y la contraseña inicial que hay que entregar.
+
+    La contraseña en claro **no se persiste**: viaja en esta respuesta y el administrador se la
+    entrega al alumno. La base guarda solo el hash.
+    """
+
+    alumno: Alumno
+    password_inicial: str
 
 #: Restricciones que PostgreSQL levanta en el alta de un alumno, por nombre. La comparación va
 #: por nombre de restricción y no por el texto del mensaje, porque el texto cambia entre
@@ -64,13 +86,44 @@ class AlumnoDuplicado(Exception):
         super().__init__(f"Ya hay un alumno registrado con ese {campo}.")
 
 
-def crear_alumno(session: Session, datos: AlumnoCreate) -> Alumno:
+def generar_password_inicial(nombre: str, documento: str) -> str:
+    """Genera la contraseña inicial del alumno: `<primer nombre><DNI>` (D45).
+
+    El primer nombre va en minúsculas, sin tildes y sin signos; el DNI, solo sus dígitos. Así
+    `Rocío Álvarez` con `30.111.222` recibe `rocio30111222`. Es una convención que la secretaría
+    puede dictar en voz alta y que el alumno cambia en su primer ingreso.
+
+    >>> generar_password_inicial("Juan Ignacio Pérez", "38.456.789")
+    'juan38456789'
+    >>> generar_password_inicial("Ángel", "30111222")
+    'angel30111222'
+    """
+    primer_nombre = nombre.strip().split()[0] if nombre.strip() else ""
+    descompuesto = unicodedata.normalize("NFKD", primer_nombre)
+    sin_tildes = "".join(char for char in descompuesto if not unicodedata.combining(char))
+    limpio = _NON_ALPHANUMERIC_LOWER.sub("", sin_tildes.lower())[:_MAX_NOMBRE_EN_PASSWORD]
+    digitos = normalize_document(documento) or ""
+    password = f"{limpio or 'alumno'}{digitos}"
+
+    # El DNI del contrato tiene 7 u 8 dígitos y el nombre se corta, así que hoy no se alcanza.
+    # La comprobación queda para que la convención no pueda producir una clave que bcrypt
+    # truncaría en silencio si mañana cambia el contrato.
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError("la contraseña inicial supera el límite de bcrypt")
+
+    return password
+
+
+def crear_alumno(session: Session, datos: AlumnoCreate) -> AltaAlumno:
     """Crea el alumno y su cuenta de acceso, en una sola transacción.
 
     El documento se guarda tal como lo informó la secretaría y la forma normalizada —solo
     dígitos— es la que sostiene el índice único, para que `38.456.789` colisione con `38456789`.
     La unicidad cruzada de correo entre los tres padrones la sigue sosteniendo
     `ensure_email_available` (M1): tres índices únicos son tres índices por tabla.
+
+    Devuelve el alumno junto con la contraseña inicial en claro, que la ruta muestra al
+    administrador. La base guarda solo su hash y la cuenta queda pendiente de cambio (D45).
     """
     documento_norm = normalize_document(datos.documento)
     existente = session.scalar(select(Alumno.id).where(Alumno.documento_norm == documento_norm))
@@ -78,6 +131,8 @@ def crear_alumno(session: Session, datos: AlumnoCreate) -> Alumno:
         raise AlumnoDuplicado("documento")
 
     ensure_email_available(session, datos.email)
+
+    password_inicial = generar_password_inicial(datos.nombre, datos.documento)
 
     alumno = Alumno(
         nombre=datos.nombre,
@@ -95,10 +150,10 @@ def crear_alumno(session: Session, datos: AlumnoCreate) -> Alumno:
             Usuario(
                 email=datos.email,
                 nombre=datos.nombre,
-                password_hash=hashear_password(CONTRASEÑA_DEMO),
+                password_hash=hashear_password(password_inicial),
                 rol=Rol.ALUMNO.value,
-                # Ver el docstring del módulo: el flujo de cambio de contraseña no existe.
-                must_change_password=False,
+                # El alumno tiene que cambiarla en su primer ingreso (D45).
+                must_change_password=True,
                 is_active=True,
                 alumno_id=alumno.id,
             )
@@ -114,7 +169,7 @@ def crear_alumno(session: Session, datos: AlumnoCreate) -> Alumno:
         session.rollback()
         raise
 
-    return alumno
+    return AltaAlumno(alumno=alumno, password_inicial=password_inicial)
 
 
 def listar_alumnos(session: Session) -> list[Alumno]:

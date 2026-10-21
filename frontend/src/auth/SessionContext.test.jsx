@@ -82,16 +82,53 @@ describe('contexto de sesión', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('avisa que la contraseña está pendiente, sin ofrecer un flujo que todavía no existe', async () => {
+  it('manda al cambio obligatorio cuando la contraseña está pendiente', async () => {
     vi.unstubAllGlobals()
     stubBackend([accountForRole('ALUMNO', { must_change_password: true })])
 
     renderApp('/login')
     await fillLoginForm(DEMO_ACCOUNTS.find((account) => account.rol === 'ALUMNO'))
 
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('pendiente el cambio de contraseña')
-    expect(alert).toHaveTextContent('no está disponible')
+    expect(await screen.findByRole('heading', { name: 'Cambiá tu contraseña' })).toBeInTheDocument()
+    expect(currentPath()).toBe('/cambiar-contrasena')
+    // No entra a su sección hasta cambiarla.
+    expect(screen.queryByRole('button', { name: /Agustina Benítez/ })).not.toBeInTheDocument()
+  })
+
+  it('después de cambiar la contraseña entra a la sección del rol', async () => {
+    vi.unstubAllGlobals()
+    stubBackend([accountForRole('ALUMNO', { must_change_password: true })])
+
+    renderApp('/login')
+    const user = await fillLoginForm(DEMO_ACCOUNTS.find((account) => account.rol === 'ALUMNO'))
+    await screen.findByRole('heading', { name: 'Cambiá tu contraseña' })
+
+    await user.type(screen.getByLabelText('Contraseña actual'), 'Demo2026!')
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'ClaveNueva2026!')
+    await user.type(screen.getByLabelText('Repetí la contraseña nueva'), 'ClaveNueva2026!')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('button', { name: /Agustina Benítez/ })).toBeInTheDocument()
+    expect(currentPath()).toBe('/alumno')
+  })
+
+  it('no cambia la contraseña si la actual no coincide', async () => {
+    vi.unstubAllGlobals()
+    stubBackend([accountForRole('ALUMNO', { must_change_password: true })])
+
+    renderApp('/login')
+    const user = await fillLoginForm(DEMO_ACCOUNTS.find((account) => account.rol === 'ALUMNO'))
+    await screen.findByRole('heading', { name: 'Cambiá tu contraseña' })
+
+    await user.type(screen.getByLabelText('Contraseña actual'), 'no-es-la-clave')
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'ClaveNueva2026!')
+    await user.type(screen.getByLabelText('Repetí la contraseña nueva'), 'ClaveNueva2026!')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La contraseña actual no es correcta.',
+    )
+    expect(currentPath()).toBe('/cambiar-contrasena')
   })
 
   it('no da por pendiente una contraseña que ya se cambió', async () => {

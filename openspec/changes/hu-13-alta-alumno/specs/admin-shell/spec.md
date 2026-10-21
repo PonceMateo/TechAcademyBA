@@ -20,9 +20,12 @@ Alumno`. El modal SHALL reutilizar el diseño y los componentes del modal de Doc
 SHALL NOT modificar colores, tipografías, navegación ni estilos globales. El formulario
 SHALL NOT pedir `tipo_documento`: esta entrega registra solo DNI.
 
-WHEN el alta es exitosa, la pantalla SHALL cerrar el modal, mostrar un aviso con el nombre
-del alumno e incorporar al padrón el alumno que devuelve la fuente. El aviso SHALL aclarar
-que la cuenta de acceso se creó pero que las credenciales no se enviaron. WHEN el alta es rechazada, la
+WHEN el alta es exitosa, la pantalla SHALL cerrar el modal de alta, abrir un modal superpuesto
+con las credenciales e incorporar al padrón el alumno que devuelve la fuente. El modal SHALL
+mostrar el nombre del alumno, el usuario —el email— y la contraseña inicial que devuelve el alta,
+reutilizando los componentes visuales existentes y conservando la identidad visual del sistema, y
+SHALL poder cerrarse con su botón de cierre o con su acción de cierre. La contraseña inicial SHALL
+NOT incorporarse a la fila del padrón ni pedirse de nuevo a la fuente. WHEN el alta es rechazada, la
 pantalla SHALL mantener el formulario abierto con lo que el operador completó y SHALL
 mostrar el motivo que devuelve la fuente, sin confirmar el alta. WHEN la fuente no puede
 registrar el alta, la pantalla SHALL fallar y SHALL NOT mostrar una confirmación.
@@ -67,7 +70,11 @@ de empresas.
 
 #### Scenario: Alta de alumno correcta
 - **WHEN** el usuario completa DNI, nombre, email y teléfono de un alumno no registrado y pulsa `Guardar Alumno`
-- **THEN** el modal se cierra, la pantalla muestra el aviso con el nombre del alumno y el padrón incorpora el alumno creado, y el aviso aclara que las credenciales no se enviaron
+- **THEN** el modal de alta se cierra, se abre el modal de credenciales, la pantalla incorpora el alumno creado al padrón y el modal muestra el nombre, el usuario y la contraseña inicial
+
+#### Scenario: El usuario cierra el modal de credenciales
+- **WHEN** el usuario pulsa la acción de cierre del modal de credenciales o su botón de cerrar
+- **THEN** el modal se cierra y la pantalla queda en el padrón, sin un bloque de credenciales fijo dentro de la página
 
 #### Scenario: Alta rechazada por dato duplicado
 - **WHEN** la fuente rechaza el alta porque el DNI o el email ya están registrados
