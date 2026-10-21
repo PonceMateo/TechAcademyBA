@@ -83,36 +83,8 @@ async function completarAlta(user, datos = ALTA) {
 }
 
 describe('padrón de alumnos', () => {
-  it('muestra el buscador deshabilitado con la leyenda Próximamente', () => {
-    const buscador = screen.getByLabelText(/^Buscar alumno/)
-
-    expect(buscador).toHaveAttribute('placeholder', 'Buscar por DNI o Nombre…')
-    expect(buscador).toBeDisabled()
-    expect(screen.getByText('(Próximamente)')).toBeInTheDocument()
-  })
-
-  it('no filtra ni navega desde el buscador', async () => {
-    const user = userEvent.setup()
-    const buscador = screen.getByLabelText(/^Buscar alumno/)
-
-    await user.type(buscador, 'Valeria')
-
-    expect(buscador).toHaveValue('')
-    expect(screen.getByText('Juan Ignacio Pérez')).toBeInTheDocument()
-    expect(screen.getByText('Valeria Rossi')).toBeInTheDocument()
-  })
-
-  it('no llama a buscarAlumnos, porque la búsqueda es la historia #16', async () => {
-    const buscarAlumnos = vi.fn(async () => {
-      throw new Error('la pantalla no debería buscar')
-    })
-    cleanup()
-    stubDataSource({ buscarAlumnos })
-    renderAppAs('ADMIN', '/admin/alumnos')
-
-    await screen.findByText('Juan Ignacio Pérez')
-
-    expect(buscarAlumnos).not.toHaveBeenCalled()
+  it('muestra el buscador con el placeholder del spec', () => {
+    expect(screen.getByPlaceholderText('Buscar por DNI o Nombre…')).toBeInTheDocument()
   })
 
   it('muestra las columnas en el orden que fija el spec', () => {
@@ -191,10 +163,27 @@ describe('padrón de alumnos', () => {
     expect(filaDe('Valeria Rossi').cells[5]).toHaveTextContent('debe saldo')
   })
 
+  it('informa que la búsqueda no arrojó resultados', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Buscar alumno'), 'DNI que no existe')
+
+    expect(await screen.findByText('No se encontraron resultados.')).toBeInTheDocument()
+  })
+
+  it('filtra por nombre', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Buscar alumno'), 'Valeria')
+
+    await waitFor(() => expect(screen.queryByText('Juan Ignacio Pérez')).not.toBeInTheDocument())
+    expect(screen.getByText('Valeria Rossi')).toBeInTheDocument()
+  })
+
   it('deja Sin comisión y guiones en la fila del alumno sin inscripción', async () => {
     cleanup()
     stubDataSource({
-      listarAlumnos: async () => [
+      buscarAlumnos: async () => [
         {
           id: 9,
           nombre: 'Nuevo Alumno',
@@ -424,7 +413,7 @@ describe('padrón sin endpoint', () => {
   it('deja el padrón y las cuentas corporativas vacíos cuando la lectura falla', async () => {
     cleanup()
     stubDataSource({
-      listarAlumnos: async () => {
+      buscarAlumnos: async () => {
         throw new Error('No pudimos conectar con el servidor.')
       },
       listarEmpresas: async () => {

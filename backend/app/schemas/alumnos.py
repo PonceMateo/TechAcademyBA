@@ -1,4 +1,4 @@
-"""Contrato de entrada y salida del padrón de alumnos (historia #13).
+"""Contrato de entrada y salida del padrón de alumnos (historias #13 y #16).
 
 **El alta acepta solo DNI.** No hay campo `tipo_documento` y los esquemas son `extra="forbid"`,
 así que un `POST /alumnos` que lo informe se rechaza con 422: el servicio guarda
@@ -60,7 +60,9 @@ class AlumnoCreate(BaseModel):
 
 
 class ComisionAsignadaOut(BaseModel):
-    """La comisión de la fila del padrón. Hoy siempre `None`: la inscripción es la HU 14."""
+    """La comisión de la fila del padrón. `None` mientras el alumno no tenga inscripción."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     codigo: str
     nombre: str

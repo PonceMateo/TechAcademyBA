@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Badge, Button, Card, Input, Modal, StatusIndicator, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
-import { crearAlumno, crearEmpresa, listarAlumnos, listarEmpresas } from '../services/dataService'
+import { crearAlumno, crearEmpresa, buscarAlumnos, listarEmpresas } from '../services/dataService'
 
 /**
  * Alumnos e inscripciones (9.5 y 13).
@@ -31,8 +31,9 @@ import { crearAlumno, crearEmpresa, listarAlumnos, listarEmpresas } from '../ser
  * administrador se los entregue al alumno: no se envía ningún correo y el alumno deberá cambiarla
  * en su primer ingreso (D45).
  *
- * **El buscador está deshabilitado con `Próximamente`.** La búsqueda por DNI o email es la
- * historia #16 y no se adelanta con un filtro local que daría una falsa sensación de búsqueda.
+ * **El buscador consulta a la fuente por DNI o email (historia #16).** El filtro va al servicio,
+ * no sobre el arreglo ya cargado: el mismo criterio sirve con datos de ejemplo y con la API, y la
+ * consulta llega al servidor cuando el endpoint la resuelve.
  */
 
 /** Las cuatro categorías del enum con el color que las distingue en pantalla. */
@@ -151,6 +152,7 @@ const CAMPOS_EMPRESA_VACIOS = { razon_social: '', cuit: '', requiere_factura_a: 
 export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
+  const [consulta, setConsulta] = useState('')
   const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
   const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
   const [erroresAlumno, setErroresAlumno] = useState({})
@@ -165,12 +167,12 @@ export function StudentsPage() {
   const [guardandoEmpresa, setGuardandoEmpresa] = useState(false)
 
   useEffect(() => {
-    // El padrón se carga una vez. La búsqueda es la historia #16: filtrar en memoria lo ya
-    // traído daría una búsqueda que no cubre el padrón completo y habría que reescribirla.
-    listarAlumnos()
+    // El filtro va al servicio, no sobre el arreglo ya cargado: el mismo criterio tiene que
+    // servir cuando los datos vengan de la API y la consulta llegue al servidor.
+    buscarAlumnos(consulta)
       .then(setAlumnos)
       .catch(() => setAlumnos([]))
-  }, [])
+  }, [consulta])
 
   useEffect(() => {
     listarEmpresas()
@@ -317,10 +319,8 @@ export function StudentsPage() {
           <Input
             id="buscar-alumno"
             etiqueta="Buscar alumno"
-            valor=""
-            readOnly
-            disabled
-            leyenda="Próximamente"
+            valor={consulta}
+            onChange={(evento) => setConsulta(evento.target.value)}
             placeholder="Buscar por DNI o Nombre…"
           />
         </div>

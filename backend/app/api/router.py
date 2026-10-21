@@ -15,6 +15,7 @@ from app.api import (
     catalogo,
     empresas,
     health,
+    inscripciones,
     padron,
 )
 
@@ -25,4 +26,5 @@ api_router.include_router(catalogo.router)
 api_router.include_router(padron.router)
 api_router.include_router(alumnos.router)
 api_router.include_router(empresas.router)
+api_router.include_router(inscripciones.router)
 api_router.include_router(authorization_probe.router)

@@ -37,6 +37,7 @@ export class DataSourceError extends Error {
  */
 const PATHS = Object.freeze({
   cursos: '/cursos',
+  inscripciones: '/inscripciones',
   comisiones: '/comisiones',
   docentes: '/docentes',
   alumnos: '/alumnos',
@@ -200,9 +201,14 @@ export function createApiDataSource() {
       return request(PATHS.alumnos, { method: 'POST', body: datos })
     },
 
-    /** Búsqueda por DNI o email: es la historia #16, todavía no la usa ninguna pantalla. */
+    /** Búsqueda por DNI o email (historia #16): el filtro lo resuelve el backend con `?q=`. */
     async buscarAlumnos(texto) {
       return request(PATHS.alumnos, { query: { q: texto } })
+    },
+
+    /** Alta de inscripción (historia #14): vincula un alumno a una comisión. */
+    async crearInscripcion(datos) {
+      return request(PATHS.inscripciones, { method: 'POST', body: datos })
     },
 
     // ------------------------------------ endpoints que todavía no existen

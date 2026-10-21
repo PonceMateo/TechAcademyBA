@@ -72,6 +72,10 @@ export function listarAlumnos() {
   return getDataSource().listarAlumnos()
 }
 
+export function crearInscripcion(datos) {
+  return getDataSource().crearInscripcion(datos)
+}
+
 export function buscarAlumnos(texto) {
   return getDataSource().buscarAlumnos(texto)
 }

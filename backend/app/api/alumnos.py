@@ -1,4 +1,4 @@
-"""Padrón de alumnos: consulta y alta (historia #13).
+"""Padrón de alumnos: consulta, búsqueda y alta (historias #13 y #16).
 
 Las rutas son de Administración, igual que las del padrón de docentes: exigen rol `ADMIN` con
 `require_roles`, que devuelve 403 a cualquier otro rol y 401 si falta el token. La lógica de
@@ -8,13 +8,16 @@ negocio está en `app/services/alumnos.py`; acá solo se traduce a un código HT
 alumno existente: es la desviación consciente del criterio «muestra el alumno existente» de la
 historia #13, registrada en D44 y pendiente de aprobación del equipo. Si el correo ya pertenece a
 otro padrón, el mensaje nombra ese padrón, como pide el escenario correspondiente.
+
+La consulta del padrón acepta `?q=` para buscar por DNI o email (historia #16) y devuelve la
+comisión y la categoría de la inscripción del alumno cuando existe.
 """
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -36,8 +39,9 @@ _solo_admin = require_roles(Rol.ADMIN)
 def listar_alumnos(
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
+    q: str | None = Query(default=None),
 ) -> list[AlumnoOut]:
-    return [AlumnoOut.model_validate(a) for a in alumnos.listar_alumnos(session)]
+    return [AlumnoOut.model_validate(a) for a in alumnos.listar_alumnos(session, q)]
 
 
 @router.post(
