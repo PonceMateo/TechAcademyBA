@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { AuthError } from '../auth/authClient'
 import { SESSION_STATUS, useSession } from '../auth/SessionContext'
-import { homePathForRole } from '../auth/roleRoutes'
+import { CHANGE_PASSWORD_PATH, homePathForRole } from '../auth/roleRoutes'
 
 /**
  * Aviso informativo del patrón único de login del prototipo (desviación 12 de
@@ -47,7 +47,12 @@ export function LoginPage() {
   }
 
   if (status === SESSION_STATUS.AUTHENTICATED) {
-    return <Navigate to={homePathForRole(session.rol)} replace />
+    return (
+      <Navigate
+        to={session.must_change_password ? CHANGE_PASSWORD_PATH : homePathForRole(session.rol)}
+        replace
+      />
+    )
   }
 
   return (

@@ -135,6 +135,30 @@ export function stubBackend(accounts = DEMO_ACCOUNTS) {
       })
     }
 
+    if (method === 'POST' && url.endsWith('/auth/change-password')) {
+      const token = String(headers.Authorization ?? '').replace('Bearer ', '')
+      const account = byToken.get(token)
+      if (account === undefined) {
+        return jsonResponse(401, { detail: 'Token inválido o ausente.' })
+      }
+      const { current_password: actual, new_password: nueva } = JSON.parse(options.body)
+      if (actual !== DEMO_PASSWORD) {
+        return jsonResponse(400, { detail: 'La contraseña actual no es correcta.' })
+      }
+      if (nueva.length < 8) {
+        return jsonResponse(422, {
+          detail: 'La contraseña nueva tiene que tener al menos 8 caracteres.',
+        })
+      }
+      if (nueva === actual) {
+        return jsonResponse(422, {
+          detail: 'La contraseña nueva tiene que ser distinta de la actual.',
+        })
+      }
+      account.must_change_password = false
+      return jsonResponse(200, account)
+    }
+
     if (method === 'GET' && url.endsWith('/auth/me')) {
       const token = String(headers.Authorization ?? '').replace('Bearer ', '')
       const account = byToken.get(token)

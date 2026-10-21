@@ -5,9 +5,9 @@ import { readStoredToken } from '../auth/tokenStorage'
  * Implementación real de la frontera de datos: habla con el backend (D36).
  *
  * **Toda lectura que falla se propaga como `DataSourceError`; no hay datos de ejemplo en su
- * lugar.** Los endpoints que existen son los del catálogo, del padrón de docentes y de
- * empresas. Los de alumnos, cobranzas, habilitación y clases todavía no están escritos, así
- * que las pantallas que los usan degradan a su estado vacío (D42).
+ * lugar.** Los endpoints que existen son los del catálogo, el padrón de docentes, el alta y la
+ * consulta del padrón de alumnos y las empresas. Los de cobranzas, habilitación y clases todavía
+ * no están escritos, así que las pantallas que los usan degradan a su estado vacío (D42).
  *
  * **Un error nunca se disfraza de dato válido:** ni un 404, ni un 500, ni un error de red. Un 404
  * es solo otro fallo —el endpoint no existe— y sube tal cual, con su `status`, para que la pantalla
@@ -30,9 +30,10 @@ export class DataSourceError extends Error {
 }
 
 /**
- * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes`, `sedes` y `empresas` quedaron
- * **confirmadas** por los endpoints reales de los changes `altas-catalogo-docentes` y
- * `hu-18-alta-empresa`; las demás siguen provisionales (M33) hasta que exista su endpoint.
+ * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes`, `alumnos`, `empresas` y `sedes`
+ * quedaron **confirmadas** por los endpoints reales de los changes `altas-catalogo-docentes`,
+ * `hu-13-alta-alumno` y `hu-18-alta-empresa`; las demás siguen provisionales (M33) hasta que
+ * exista su endpoint.
  */
 const PATHS = Object.freeze({
   cursos: '/cursos',
@@ -182,15 +183,29 @@ export function createApiDataSource() {
       return filaDeDocente(await request(PATHS.docentes, { method: 'POST', body: datos }))
     },
 
-    // ------------------------------------ endpoints que todavía no existen
-
+    /**
+     * Padrón de alumnos (historia #13). La respuesta trae los datos personales y deja en `null`
+     * comisión, categoría, porcentaje de beca y acceso mientras el alumno no tenga inscripción.
+     */
     async listarAlumnos() {
       return request(PATHS.alumnos)
     },
 
+    /**
+     * Alta de alumno (historia #13). **El contrato no lleva `tipo_documento`**: esta entrega
+     * registra solo DNI (D44). El error del backend sube tal cual, con su `detail`, para que el
+     * modal diga qué dato se repitió.
+     */
+    async crearAlumno(datos) {
+      return request(PATHS.alumnos, { method: 'POST', body: datos })
+    },
+
+    /** Búsqueda por DNI o email: es la historia #16, todavía no la usa ninguna pantalla. */
     async buscarAlumnos(texto) {
       return request(PATHS.alumnos, { query: { q: texto } })
     },
+
+    // ------------------------------------ endpoints que todavía no existen
 
     async listarEmpresas() {
       return request(PATHS.empresas)

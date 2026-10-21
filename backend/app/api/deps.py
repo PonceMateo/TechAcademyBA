@@ -44,6 +44,11 @@ MENSAJE_TOKEN_INVALIDO = "Token inválido o ausente."
 #: motivo: no hay nada que ocultar y el mensaje es el que le sirve al usuario.
 MENSAJE_SIN_PERMISOS = "Tu rol no tiene acceso a esta sección."
 
+#: Respuesta de 403 de una cuenta con cambio de contraseña pendiente (D45). No es un problema de
+#: rol: la cuenta es válida, pero todavía no puede usar las funciones normales. El único camino
+#: habilitado es `POST /auth/change-password`, y `GET /auth/me` para que la interfaz sepa por qué.
+MENSAJE_CAMBIO_PASSWORD_PENDIENTE = "Tenés que cambiar tu contraseña antes de usar el sistema."
+
 #: `auto_error=False` para que la respuesta la arme esta capa: el esquema de autenticación
 #: de FastAPI devuelve 403 cuando no encuentra encabezado, y el 401 tiene que ser
 #: responsabilidad de `get_current_user`, con su mensaje y su `WWW-Authenticate`.
@@ -94,6 +99,16 @@ def require_roles(*roles: Rol | str) -> Callable[[Usuario], Usuario]:
     declarados = ", ".join(sorted(admitidos))
 
     def dependencia(usuario: Annotated[Usuario, Depends(get_current_user)]) -> Usuario:
+        # D45: una cuenta pendiente de cambio no puede usar ninguna ruta de rol. El bloqueo vive
+        # acá y no en `get_current_user` porque `/auth/me` y `/auth/change-password` tienen que
+        # seguir siendo alcanzables para que el usuario pueda salir del estado pendiente. Se
+        # evalúa antes del rol: el estado de la cuenta es anterior a qué sección intenta abrir.
+        if usuario.must_change_password:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=MENSAJE_CAMBIO_PASSWORD_PENDIENTE,
+                headers={"X-Cambio-Password-Pendiente": "true"},
+            )
         if usuario.rol not in admitidos:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

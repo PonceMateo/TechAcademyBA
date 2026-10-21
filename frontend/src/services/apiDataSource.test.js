@@ -106,6 +106,50 @@ describe('toda lectura que falla se propaga', () => {
   })
 })
 
+describe('el alta de alumno', () => {
+  const ALTA = {
+    documento: '30.111.222',
+    nombre: 'Rocío Álvarez',
+    email: 'rocio.alvarez@techacademy.invalid',
+    telefono: null,
+  }
+
+  it('hace POST a /alumnos con el cuerpo tal cual lo arma la pantalla', async () => {
+    const fetchMock = responder(201, {
+      id: 7,
+      ...ALTA,
+      tipo_documento: 'DNI',
+      password_inicial: 'rocio30111222',
+    })
+
+    const creado = await createApiDataSource().crearAlumno(ALTA)
+
+    expect(creado).toMatchObject({ id: 7, nombre: 'Rocío Álvarez' })
+    expect(creado.password_inicial).toBe('rocio30111222')
+    const [url, opciones] = fetchMock.mock.calls.at(-1)
+    expect(url).toMatch(/\/alumnos$/)
+    expect(opciones.method).toBe('POST')
+    expect(JSON.parse(opciones.body)).toEqual(ALTA)
+  })
+
+  it('propaga el 409 con el motivo que nombra el dato repetido', async () => {
+    responder(409, { detail: 'Ya hay un alumno registrado con ese documento.' })
+
+    await expect(createApiDataSource().crearAlumno(ALTA)).rejects.toThrow(/documento/)
+  })
+
+  it('falla con un error de conexión en vez de confirmar un alta que no llegó', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    await expect(createApiDataSource().crearAlumno(ALTA)).rejects.toThrow(/No pudimos conectar/)
+  })
+})
+
 describe('los POST nunca caen al ejemplo', () => {
   it('falla un alta de curso con 404 en vez de escribir en el ejemplo', async () => {
     responder(404, { detail: 'Not Found' })

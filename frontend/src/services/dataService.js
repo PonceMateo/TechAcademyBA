@@ -76,6 +76,15 @@ export function buscarAlumnos(texto) {
   return getDataSource().buscarAlumnos(texto)
 }
 
+/**
+ * Alta de alumno (historia #13). **El contrato no lleva `tipo_documento`**: esta entrega registra
+ * solo DNI (D44). La promesa **nunca cae al ejemplo**: un alta que no llega a la base tiene que
+ * fallar y decirlo, porque la pantalla no puede confirmar un alumno que no existe.
+ */
+export function crearAlumno(datos) {
+  return getDataSource().crearAlumno(datos)
+}
+
 export function listarEmpresas() {
   return getDataSource().listarEmpresas()
 }

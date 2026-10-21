@@ -18,6 +18,13 @@ export const ROLE_HOME_PATHS = Object.freeze({
 export const LOGIN_PATH = '/login'
 export const FORBIDDEN_PATH = '/403'
 
+/**
+ * Cambio obligatorio de contraseña en el primer ingreso (D45). Vive fuera de las tres secciones
+ * porque la cuenta todavía no puede entrar a ninguna: el backend le responde 403 en todas las
+ * rutas de rol hasta que la cambie.
+ */
+export const CHANGE_PASSWORD_PATH = '/cambiar-contrasena'
+
 /** Un rol que no está en el mapa no tiene sección propia: vuelve al login. */
 export function homePathForRole(role) {
   return ROLE_HOME_PATHS[role] ?? LOGIN_PATH

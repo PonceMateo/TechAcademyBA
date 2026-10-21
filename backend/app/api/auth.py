@@ -21,8 +21,15 @@ from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.security import crear_token_acceso
 from app.models.padron import Usuario
-from app.schemas.auth import LoginRequest, LoginResponse, SesionActual
-from app.services.auth import CREDENCIALES_INVALIDAS, CredencialesInvalidas, autenticar
+from app.schemas.auth import CambioPasswordRequest, LoginRequest, LoginResponse, SesionActual
+from app.services.auth import (
+    CREDENCIALES_INVALIDAS,
+    CredencialesInvalidas,
+    PasswordActualIncorrecta,
+    PasswordInvalida,
+    autenticar,
+    cambiar_password,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -55,6 +62,36 @@ def login(cuerpo: LoginRequest, session: Annotated[Session, Depends(get_db)]) ->
         rol=usuario.rol,
         must_change_password=usuario.must_change_password,
     )
+
+
+@router.post(
+    "/change-password",
+    response_model=SesionActual,
+    summary="Cambiar la contraseña de la cuenta",
+)
+def change_password(
+    cuerpo: CambioPasswordRequest,
+    usuario: Annotated[Usuario, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> SesionActual:
+    """Cambia la contraseña y levanta el cambio obligatorio (D45).
+
+    Es la única ruta de negocio que una cuenta pendiente puede usar, junto con `GET /auth/me`:
+    el resto responde 403 mientras `must_change_password` siga en `true`.
+
+    200 con la sesión actualizada, 400 si la contraseña actual no coincide, 422 si la nueva es
+    corta o igual a la actual y 401 sin token.
+    """
+    try:
+        actualizado = cambiar_password(
+            session, usuario, cuerpo.current_password, cuerpo.new_password
+        )
+    except PasswordActualIncorrecta as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    except PasswordInvalida as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+    return SesionActual.model_validate(actualizado)
 
 
 @router.get("/me", response_model=SesionActual, summary="Consultar la sesión actual")

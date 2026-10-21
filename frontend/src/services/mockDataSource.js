@@ -60,6 +60,22 @@ function siguienteId(registros) {
 }
 
 /**
+ * La contraseña inicial del alta de alumno (D45): `<primer nombre><DNI>`, en minúsculas y sin
+ * tildes. Es la misma convención que aplica el backend; la fuente de ejemplo la replica para que
+ * la pantalla muestre el mismo texto con las dos fuentes.
+ */
+function passwordInicial(nombre, documento) {
+  const primerNombre = String(nombre).trim().split(/\s+/)[0] ?? ''
+  const sinTildes = primerNombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+  const digitos = String(documento).replace(/\D/g, '')
+  return `${sinTildes || 'alumno'}${digitos}`
+}
+
+/**
  * La fila de docente con la forma que consume la pantalla, que es la de la fuente real.
  *
  * El ejemplo guarda el nombre ya junto y el conte en `comisiones_asignadas`, porque así venía de
@@ -286,6 +302,33 @@ export function createMockDataSource() {
     /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
     async buscarAlumnos(texto) {
       return buscarPorTexto(store.alumnos, texto, ['nombre', 'documento'])
+    },
+
+    /**
+     * Alta de alumno de ejemplo (historia #13): agrega la fila al store y la devuelve con la
+     * misma forma que la fuente real.
+     *
+     * El alumno recién creado no tiene inscripción, así que comisión, categoría, porcentaje de
+     * beca y acceso van en `null`: la pantalla los muestra como `Sin comisión` y `—` (D43), sin
+     * inventar datos que pertenecen a historias posteriores.
+     */
+    async crearAlumno({ documento, nombre, email, telefono }) {
+      const alumno = {
+        id: siguienteId(store.alumnos),
+        nombre,
+        documento,
+        tipo_documento: 'DNI',
+        email,
+        telefono: telefono ?? null,
+        activo: true,
+        comision: null,
+        categoria: null,
+        porcentaje_beca: null,
+        acceso: null,
+      }
+      store.alumnos.push(alumno)
+      // La contraseña se devuelve una sola vez, como en el backend: no se guarda en el padrón.
+      return { ...alumno, password_inicial: passwordInicial(nombre, documento) }
     },
 
     async listarEmpresas() {
