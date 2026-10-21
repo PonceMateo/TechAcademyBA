@@ -54,7 +54,7 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
         )
     ) or 0
     if inscriptas >= comision.cupo_maximo:
-        raise CupoLleno("La comisión no tiene vacantes.")
+        raise CupoLleno("La comisión está completa.")
 
     inscripcion = Inscripcion(
         alumno_id=datos.alumno_id,

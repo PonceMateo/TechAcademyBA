@@ -294,7 +294,7 @@ export function createMockDataSource() {
         throw new Error('El alumno ya está inscripto en esa comisión.')
       }
       if ((comision.inscriptos ?? 0) >= comision.cupo_maximo) {
-        throw new Error('La comisión no tiene vacantes.')
+        throw new Error('La comisión está completa.')
       }
       comision.inscriptos = (comision.inscriptos ?? 0) + 1
       comision.vacantes = comision.cupo_maximo - comision.inscriptos
