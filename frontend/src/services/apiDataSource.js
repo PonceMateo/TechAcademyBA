@@ -36,6 +36,7 @@ export class DataSourceError extends Error {
  */
 const PATHS = Object.freeze({
   cursos: '/cursos',
+  inscripciones: '/inscripciones',
   comisiones: '/comisiones',
   docentes: '/docentes',
   alumnos: '/alumnos',
@@ -186,6 +187,10 @@ export function createApiDataSource() {
 
     async listarAlumnos() {
       return request(PATHS.alumnos)
+    },
+
+    async crearInscripcion(datos) {
+      return request(PATHS.inscripciones, { method: 'POST', body: datos })
     },
 
     async buscarAlumnos(texto) {
