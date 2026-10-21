@@ -296,7 +296,7 @@ export function createMockDataSource() {
     },
 
     async listarAlumnos() {
-      return copiar(store.alumnos)
+      return copiar(store.alumnos.filter((alumno) => alumno.activo !== false))
     },
 
     async crearInscripcion({ alumno_id, comision_id }) {
@@ -322,7 +322,11 @@ export function createMockDataSource() {
 
     /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
     async buscarAlumnos(texto) {
-      return buscarPorTexto(store.alumnos, texto, ['nombre', 'documento'])
+      return buscarPorTexto(
+        store.alumnos.filter((alumno) => alumno.activo !== false),
+        texto,
+        ['nombre', 'documento'],
+      )
     },
 
     /**
@@ -349,6 +353,122 @@ export function createMockDataSource() {
       }
       store.alumnos.push(alumno)
       // La contraseña se devuelve una sola vez, como en el backend: no se guarda en el padrón.
+      return { ...alumno, password_inicial: passwordInicial(nombre, documento) }
+    },
+
+    /**
+     * Edición de ejemplo (historia #17): conserva el `id` y reemplaza los datos personales.
+     * Los duplicados se comparan con el documento normalizado y el email exacto, como el backend.
+     */
+    async editarAlumno(id, { documento, nombre, email, telefono }) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === id)
+      if (!alumno) {
+        throw new Error('El alumno no existe.')
+      }
+      const documentoNormalizado = String(documento).replace(/\D/g, '')
+      const documentoRepetido = store.alumnos.some(
+        (candidato) =>
+          candidato.id !== id &&
+          String(candidato.documento ?? '').replace(/\D/g, '') === documentoNormalizado,
+      )
+      if (documentoRepetido) {
+        throw new Error('Ya hay un alumno registrado con ese documento.')
+      }
+      const emailRepetido = store.alumnos.some(
+        (candidato) => candidato.id !== id && candidato.email === email,
+      )
+      if (emailRepetido) {
+        throw new Error('Ya hay un alumno registrado con ese email.')
+      }
+
+      Object.assign(alumno, {
+        documento,
+        tipo_documento: 'DNI',
+        nombre,
+        email,
+        telefono: telefono ?? null,
+      })
+      return { ...alumno }
+    },
+
+    /** Restablecimiento de contraseña de ejemplo: la nueva no se guarda ni se devuelve. */
+    async restablecerPasswordAlumno(id, newPassword) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === id)
+      if (!alumno) {
+        throw new Error('El alumno no existe.')
+      }
+      if (newPassword.length < 8) {
+        throw new Error('La contraseña nueva tiene que tener al menos 8 caracteres.')
+      }
+      return { ...alumno }
+    },
+
+    /** Baja lógica de ejemplo: el alumno deja de aparecer, pero la fila del store se conserva. */
+    async eliminarAlumno(id) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === id)
+      if (!alumno) {
+        throw new Error('El alumno no existe.')
+      }
+      if (alumno.activo === false) {
+        throw new Error('El alumno ya está dado de baja.')
+      }
+      alumno.activo = false
+      return { ...alumno }
+    },
+
+    /** Detección de reactivación de ejemplo, con las mismas reglas de conflicto que el backend. */
+    async buscarAlumnoReactivable({ documento, email }) {
+      const documentoNormalizado = String(documento).replace(/\D/g, '')
+      const porDocumento = store.alumnos.find(
+        (alumno) => String(alumno.documento ?? '').replace(/\D/g, '') === documentoNormalizado,
+      )
+      const porEmail = store.alumnos.find((alumno) => alumno.email === email)
+      if (
+        (porDocumento && porDocumento.activo !== false) ||
+        (porEmail && porEmail.activo !== false)
+      ) {
+        return null
+      }
+      if (porDocumento && porEmail && porDocumento.id !== porEmail.id) {
+        return null
+      }
+      const alumno = porDocumento || porEmail
+      return alumno && alumno.activo === false ? { ...alumno } : null
+    },
+
+    /** Reactivación de ejemplo: conserva el `id` y devuelve una nueva contraseña inicial. */
+    async reactivarAlumno(id, { documento, nombre, email, telefono }) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === id)
+      if (!alumno) {
+        throw new Error('El alumno no existe.')
+      }
+      if (alumno.activo !== false) {
+        throw new Error('El alumno ya está activo.')
+      }
+      const documentoNormalizado = String(documento).replace(/\D/g, '')
+      const documentoRepetido = store.alumnos.some(
+        (candidato) =>
+          candidato.id !== id &&
+          String(candidato.documento ?? '').replace(/\D/g, '') === documentoNormalizado,
+      )
+      if (documentoRepetido) {
+        throw new Error('Ya hay un alumno registrado con ese documento.')
+      }
+      const emailRepetido = store.alumnos.some(
+        (candidato) => candidato.id !== id && candidato.email === email,
+      )
+      if (emailRepetido) {
+        throw new Error('Ya hay un alumno registrado con ese email.')
+      }
+
+      Object.assign(alumno, {
+        documento,
+        tipo_documento: 'DNI',
+        nombre,
+        email,
+        telefono: telefono ?? null,
+        activo: true,
+      })
       return { ...alumno, password_inicial: passwordInicial(nombre, documento) }
     },
 

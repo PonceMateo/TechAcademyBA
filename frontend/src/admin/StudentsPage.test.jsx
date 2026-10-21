@@ -20,6 +20,7 @@ const COLUMNAS_ALUMNOS = [
   'COMISIÓN ASIGNADA',
   'CATEGORÍA ARANCELARIA',
   'ACCESO PLATAFORMA',
+  'ACCIONES',
 ]
 
 const COLUMNAS_EMPRESAS = ['RAZÓN SOCIAL', 'CUIT', 'PREFERENCIA FACTURA', 'NÓMINA DE EMPLEADOS']
@@ -149,6 +150,17 @@ describe('padrón de alumnos', () => {
     for (const habilitado of habilitados) {
       expect(habilitado.className).toContain('text-green-800')
     }
+  })
+
+  it('mantiene los botones de acciones en una sola línea', () => {
+    const botones = within(filaDe('Juan Ignacio Pérez')).getAllByRole('button')
+
+    expect(botones.map((boton) => boton.textContent)).toEqual([
+      'Editar',
+      'Restablecer contraseña',
+      'Eliminar alumno',
+    ])
+    botones.forEach((boton) => expect(boton).toHaveClass('whitespace-nowrap'))
   })
 
   it('muestra cada bloqueo con su causa al lado del estado', () => {
@@ -321,6 +333,242 @@ describe('alta de alumno', () => {
     expect(screen.getByRole('dialog', { name: 'Nuevo Alumno' })).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText(/dado de alta/)).not.toBeInTheDocument())
+  })
+})
+
+describe('edición y baja de alumnos', () => {
+  it('abre la edición con los datos de la fila y actualiza el padrón', async () => {
+    const editarAlumno = vi.fn(async (id, datos) => ({ id, ...datos, activo: true }))
+    cleanup()
+    stubDataSource({ editarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Editar' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Editar Alumno' })
+    expect(within(dialogo).getByLabelText(/^DNI/)).toHaveValue('38.456.789')
+    expect(within(dialogo).getByLabelText(/^Nombre/)).toHaveValue('Juan Ignacio Pérez')
+
+    await user.clear(within(dialogo).getByLabelText(/^Nombre/))
+    await user.type(within(dialogo).getByLabelText(/^Nombre/), 'Juan Pérez Editado')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(await screen.findByText('Juan Pérez Editado')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('se actualizaron correctamente')
+    expect(editarAlumno).toHaveBeenCalledWith(1, {
+      documento: '38.456.789',
+      nombre: 'Juan Pérez Editado',
+      email: 'juan.perez@gmail.com',
+      telefono: null,
+    })
+    expect(screen.queryByRole('dialog', { name: 'Editar Alumno' })).not.toBeInTheDocument()
+  })
+
+  it('deja el modal abierto cuando la edición choca con un dato duplicado', async () => {
+    const editarAlumno = vi.fn(async () => {
+      throw new Error('Ya hay un alumno registrado con ese documento.')
+    })
+    cleanup()
+    stubDataSource({ editarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Editar' }))
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(
+      await screen.findByText('Ya hay un alumno registrado con ese documento.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar Alumno' })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('restablece la contraseña sin mostrarla en claro y avisa', async () => {
+    const restablecerPasswordAlumno = vi.fn(async () => ({ id: 1 }))
+    cleanup()
+    stubDataSource({ restablecerPasswordAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(
+      within(filaDe('Juan Ignacio Pérez')).getByRole('button', {
+        name: 'Restablecer contraseña',
+      }),
+    )
+    const dialogo = screen.getByRole('dialog', { name: 'Restablecer contraseña' })
+    await user.type(within(dialogo).getByLabelText(/^Nueva contraseña/), 'NuevaClave2026')
+    await user.type(within(dialogo).getByLabelText(/^Confirmar contraseña/), 'NuevaClave2026')
+    await user.click(within(dialogo).getByRole('button', { name: 'Restablecer contraseña' }))
+
+    expect(restablecerPasswordAlumno).toHaveBeenCalledWith(1, 'NuevaClave2026')
+    expect(await screen.findByRole('status')).toHaveTextContent('restablecida')
+    expect(screen.queryByText('NuevaClave2026')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('dialog', { name: 'Restablecer contraseña' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('no restablece si las contraseñas no coinciden', async () => {
+    const restablecerPasswordAlumno = vi.fn()
+    cleanup()
+    stubDataSource({ restablecerPasswordAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(
+      within(filaDe('Juan Ignacio Pérez')).getByRole('button', {
+        name: 'Restablecer contraseña',
+      }),
+    )
+    const dialogo = screen.getByRole('dialog', { name: 'Restablecer contraseña' })
+    await user.type(within(dialogo).getByLabelText(/^Nueva contraseña/), 'NuevaClave2026')
+    await user.type(within(dialogo).getByLabelText(/^Confirmar contraseña/), 'OtraClave2026')
+    await user.click(within(dialogo).getByRole('button', { name: 'Restablecer contraseña' }))
+
+    expect(await screen.findByText('Las contraseñas no coinciden.')).toBeInTheDocument()
+    expect(restablecerPasswordAlumno).not.toHaveBeenCalled()
+  })
+
+  it('pide confirmación antes de la baja y saca la fila al confirmar', async () => {
+    const eliminarAlumno = vi.fn(async () => ({ id: 1, activo: false }))
+    cleanup()
+    stubDataSource({ eliminarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(
+      within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Eliminar alumno' }),
+    )
+    const dialogo = screen.getByRole('dialog', { name: 'Eliminar Alumno' })
+    expect(dialogo).toHaveTextContent('Juan Ignacio Pérez')
+    expect(dialogo).not.toHaveTextContent('Es una baja lógica')
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Confirmar baja' }))
+
+    expect(eliminarAlumno).toHaveBeenCalledWith(1)
+    await waitFor(() => expect(screen.queryByText('Juan Ignacio Pérez')).not.toBeInTheDocument())
+    expect(screen.getByRole('status')).toHaveTextContent('dado de baja correctamente')
+    expect(screen.queryByRole('dialog', { name: 'Eliminar Alumno' })).not.toBeInTheDocument()
+  })
+
+  it('cancela la baja sin modificar el padrón', async () => {
+    const eliminarAlumno = vi.fn()
+    cleanup()
+    stubDataSource({ eliminarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(
+      within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Eliminar alumno' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(eliminarAlumno).not.toHaveBeenCalled()
+    expect(screen.getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('mantiene la confirmación abierta si la baja falla', async () => {
+    const eliminarAlumno = vi.fn(async () => {
+      throw new Error('El alumno ya está dado de baja.')
+    })
+    cleanup()
+    stubDataSource({ eliminarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = userEvent.setup()
+
+    await user.click(
+      within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Eliminar alumno' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Confirmar baja' }))
+
+    expect(await screen.findByText('El alumno ya está dado de baja.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Eliminar Alumno' })).toBeInTheDocument()
+    expect(filaDe('Juan Ignacio Pérez')).toBeTruthy()
+  })
+})
+
+describe('reactivación de alumnos dados de baja', () => {
+  const INACTIVO = {
+    id: 55,
+    nombre: ALTA.nombre,
+    documento: ALTA.documento,
+    email: ALTA.email,
+    activo: false,
+  }
+
+  it('ofrece reactivar el mismo registro y muestra las nuevas credenciales', async () => {
+    const crearAlumno = vi.fn(async () => {
+      throw Object.assign(new Error('Ya hay un alumno registrado con ese documento.'), {
+        status: 409,
+      })
+    })
+    const buscarAlumnoReactivable = vi.fn(async () => INACTIVO)
+    const reactivarAlumno = vi.fn(async (id, datos) => ({
+      id,
+      ...datos,
+      activo: true,
+      password_inicial: PASSWORD_INICIAL,
+    }))
+    cleanup()
+    stubDataSource({ crearAlumno, buscarAlumnoReactivable, reactivarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    const aviso = await screen.findByRole('dialog', { name: 'Reactivar alumno' })
+    expect(aviso).toHaveTextContent('fue dado de baja anteriormente')
+    expect(aviso).toHaveTextContent(ALTA.nombre)
+    expect(screen.queryByRole('dialog', { name: 'Nuevo Alumno' })).not.toBeInTheDocument()
+    expect(buscarAlumnoReactivable).toHaveBeenCalledWith({
+      documento: ALTA.documento,
+      email: ALTA.email,
+    })
+
+    await user.click(within(aviso).getByRole('button', { name: 'Reactivar alumno' }))
+
+    expect(reactivarAlumno).toHaveBeenCalledWith(55, ALTA)
+    const credenciales = await screen.findByRole('dialog', { name: 'Credenciales del alumno' })
+    expect(credenciales).toHaveTextContent(PASSWORD_INICIAL)
+    expect(screen.queryByRole('dialog', { name: 'Nuevo Alumno' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Reactivar alumno' })).not.toBeInTheDocument()
+  })
+
+  it('cancela la reactivación sin modificar datos ni crear un duplicado', async () => {
+    const crearAlumno = vi.fn(async () => {
+      throw Object.assign(new Error('Ya hay un alumno registrado con ese documento.'), {
+        status: 409,
+      })
+    })
+    const buscarAlumnoReactivable = vi.fn(async () => INACTIVO)
+    const reactivarAlumno = vi.fn()
+    cleanup()
+    stubDataSource({ crearAlumno, buscarAlumnoReactivable, reactivarAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    const aviso = await screen.findByRole('dialog', { name: 'Reactivar alumno' })
+    expect(screen.queryByRole('dialog', { name: 'Nuevo Alumno' })).not.toBeInTheDocument()
+    await user.click(within(aviso).getByRole('button', { name: 'Cancelar' }))
+
+    expect(reactivarAlumno).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'Reactivar alumno' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Nuevo Alumno' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^DNI/)).toHaveValue(ALTA.documento)
   })
 })
 

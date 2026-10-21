@@ -1464,6 +1464,60 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+## Edición y baja de alumnos (change `hu-17-edicion-baja-alumno`)
+
+### D46 — La HU 17 incluye edición, restablecimiento de contraseña y baja lógica
+
+- **Fecha:** 2026-10-21
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** la historia #17 se amplía para incluir la **baja lógica** además de la edición de
+  DNI, nombre, email y teléfono. El requisito oficial del CSV se actualizó con los escenarios de
+  baja antes de implementar. La baja marca `alumno.activo = false` y `usuario.is_active = false`;
+  no borra filas ni relaciones. `GET /alumnos` filtra los inactivos y el login ya rechaza cuentas
+  inactivas, así que el alumno no aparece ni puede entrar, pero conserva inscripciones, pagos e
+  historial.
+- **Edición:** `PUT /alumnos/{id}` conserva el `id` y el legajo, reutiliza las validaciones del
+  alta y sincroniza `nombre` y `email` del `Usuario` vinculado en la misma transacción. Los
+  duplicados de DNI o email responden `409` con el campo repetido.
+- **Contraseña:** `POST /alumnos/{id}/password` recibe la nueva contraseña, guarda solo su hash,
+  invalida la anterior y deja `must_change_password = true` para el siguiente ingreso. No se
+  envía correo ni se devuelve la contraseña en claro.
+- **Por qué:** sin edición, un DNI mal cargado obliga a crear un duplicado; sin baja lógica, un
+  alumno que deja de asistir queda en el padrón para siempre. Las columnas de estado ya existían,
+  así que no hace falta migración y el historial no se toca.
+- **Dónde:** `backend/app/schemas/alumnos.py`, `backend/app/services/alumnos.py`,
+  `backend/app/api/alumnos.py`, `backend/app/tests/test_alumnos_gestion.py`,
+  `frontend/src/admin/StudentsPage.jsx`, `frontend/src/services/dataService.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js` y
+  `frontend/src/admin/StudentsPage.test.jsx`.
+
+---
+
+### D47 — Reactivación del alumno dado de baja, sin duplicar el registro
+
+- **Fecha:** 2026-10-21
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** cuando un alta choca con un alumno **inactivo**, la pantalla consulta
+  `GET /alumnos/reactivable?documento=&email=` y, si el registro es reactivable, muestra un modal
+  con la opción **Reactivar alumno**. Confirmar llama a `POST /alumnos/{id}/reactivar` con los
+  datos del formulario; cancelar no escribe nada. El registro conserva su `id`, sus inscripciones,
+  pagos e historial, vuelve a `activo = true` y su cuenta a `is_active = true`.
+- **Acceso:** la reactivación genera una nueva contraseña inicial con la convención de la HU 13
+  (`<primer nombre><DNI>`), guarda solo su hash y deja `must_change_password = true`. La respuesta
+  la devuelve una sola vez para que el administrador la entregue, igual que el alta.
+- **Conflictos:** si el DNI o el email pertenece a otro registro activo, o el correo está tomado
+  por otro padrón o cuenta, no se ofrece la reactivación y el alta sigue respondiendo `409`. Nunca
+  se crea un duplicado ni se liberan los índices únicos del alumno inactivo.
+- **Por qué:** el historial de un alumno que vuelve tiene que seguir siendo el mismo. Borrar y
+  volver a crear perdería inscripciones y pagos, y reutilizar el email de la cuenta sin
+  reactivarla dejaría un acceso inactivo e inconsistente.
+- **Dónde:** `backend/app/services/alumnos.py`, `backend/app/api/alumnos.py`,
+  `backend/app/tests/test_alumnos_gestion.py`, `frontend/src/admin/StudentsPage.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js` y `frontend/src/admin/StudentsPage.test.jsx`.
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven

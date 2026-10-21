@@ -204,7 +204,7 @@ Escenario: Alumno inexistente
 Dado que no existe un alumno con ese DNI o email
 Cuando ejecuto la búsqueda
 Entonces el sistema informa que no se encontraron resultados",Must,1,
-,17,Editar datos alumno,"Como administrador, quiero editar los datos personales del alumno (DNI, Nombre, contraseña, mail, etc), para recuperar cuentas en caso de pérdida de acceso.","Escenario: Edición exitosa
+,17,"Editar datos alumno, baja lógica y reactivación","Como administrador, quiero editar los datos personales del alumno (DNI, Nombre, contraseña, mail, etc), poder darlo de baja lógica y reactivarlo si vuelve, para recuperar cuentas en caso de pérdida de acceso y conservar su historial sin eliminarlo físicamente.","Escenario: Edición exitosa
 Dado un alumno registrado
 Cuando modifico DNI, nombre, mail o teléfono y guardo
 Entonces los cambios se guardan y sus inscripciones y pagos siguen asociados al mismo legajo
@@ -217,7 +217,42 @@ Entonces el alumno puede ingresar con la nueva contraseña y la anterior deja de
 Escenario: Dato duplicado
 Dado que el nuevo DNI o mail pertenece a otro alumno
 Cuando intento guardar
-Entonces el sistema rechaza el cambio e informa el conflicto",Should,3,
+Entonces el sistema rechaza el cambio e informa el conflicto
+
+Escenario: Baja lógica del alumno
+Dado un alumno registrado con inscripciones y pagos
+Cuando confirmo la opción «Eliminar alumno» desde su ficha o registro
+Entonces el alumno queda dado de baja lógica, deja de aparecer en el listado habitual y no puede iniciar sesión, y sus inscripciones, pagos e historial se conservan en PostgreSQL asociados al mismo legajo
+
+Escenario: Cancelar la baja
+Dado la confirmación de baja de un alumno
+Cuando cancelo la operación
+Entonces el alumno sigue activo y no se modifica ningún registro
+
+Escenario: La baja no afecta a otros registros
+Dado un alumno dado de baja
+Cuando consulto otros alumnos, inscripciones o pagos
+Entonces el resto de los registros sigue disponible y sin cambios
+
+Escenario: Reactivación de un alumno dado de baja
+Dado un alumno dado de baja con DNI o email registrado
+Cuando el administrador intenta darlo de alta de nuevo
+Entonces el sistema detecta que el alumno fue dado de baja anteriormente y ofrece la opción «Reactivar alumno»
+
+Escenario: Reactivación confirmada
+Dado el aviso de que el alumno fue dado de baja anteriormente
+Cuando el administrador confirma «Reactivar alumno»
+Entonces se reactiva el mismo registro con el mismo ID, legajo, inscripciones, pagos e historial, vuelve a aparecer en el listado de activos y recibe una nueva contraseña inicial que deberá cambiar en su próximo inicio de sesión
+
+Escenario: Reactivación cancelada
+Dado el aviso de que el alumno fue dado de baja anteriormente
+Cuando el administrador cancela la reactivación
+Entonces no se modifica ningún dato del alumno ni se crea un duplicado
+
+Escenario: Conflicto real en la reactivación
+Dado que el DNI o el email pertenece a otro registro activo
+Cuando el administrador intenta reactivar al alumno dado de baja
+Entonces el sistema rechaza la reactivación e informa el conflicto",Should,3,"Ampliación de alcance: incluye baja lógica (no eliminación física) y reactivación del mismo registro, documentada en openspec/changes/hu-17-edicion-baja-alumno."
 4 - Cuentas Corporativas,18,Alta Empresa,"Como administrador, quiero dar de alta una empresa con Razón Social, CUIT y necesidad de Factura A, para gestionar paquetes cerrados.","Escenario: Alta exitosa
 Dado que el CUIT no está registrado
 Cuando completo Razón Social, un CUIT válido e indico si requiere Factura A
