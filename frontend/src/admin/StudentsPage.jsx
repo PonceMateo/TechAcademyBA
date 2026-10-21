@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Badge, Button, Card, Input, Modal, StatusIndicator, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { CATEGORIA_INSCRIPCION, TIPO_FACTURA } from '../domain/enums'
-import { crearAlumno, listarAlumnos, listarEmpresas } from '../services/dataService'
+import { CATEGORIA_INSCRIPCION } from '../domain/enums'
+import { crearAlumno, crearEmpresa, listarAlumnos, listarEmpresas } from '../services/dataService'
 
 /**
  * Alumnos e inscripciones (9.5 y 13).
@@ -134,24 +134,33 @@ const COLUMNAS_EMPRESAS = [
   {
     clave: 'factura',
     titulo: 'PREFERENCIA FACTURA',
-    render: (fila) => (
-      <Badge tono={TONO.CELESTE}>{fila.preferencia_factura === TIPO_FACTURA.A ? 'A' : 'B'}</Badge>
-    ),
+    render: (fila) => <Badge tono={TONO.CELESTE}>{fila.requiere_factura_a ? 'A' : 'B'}</Badge>,
   },
-  { clave: 'nomina', titulo: 'NÓMINA DE EMPLEADOS', render: (fila) => fila.nomina_empleados },
+  {
+    clave: 'nomina',
+    titulo: 'NÓMINA DE EMPLEADOS',
+    render: (fila) => fila.nomina_empleados || '—',
+  },
 ]
 
-const CAMPOS_VACIOS = { documento: '', nombre: '', email: '', telefono: '' }
+const CAMPOS_ALUMNO_VACIOS = { documento: '', nombre: '', email: '', telefono: '' }
+const CAMPOS_EMPRESA_VACIOS = { razon_social: '', cuit: '', requiere_factura_a: false }
 
 export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
-  const [modalAbierto, setModalAbierto] = useState(false)
-  const [campos, setCampos] = useState(CAMPOS_VACIOS)
-  const [errores, setErrores] = useState({})
+  const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
+  const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
+  const [erroresAlumno, setErroresAlumno] = useState({})
   const [aviso, setAviso] = useState(null)
-  const [fallo, setFallo] = useState(null)
-  const [guardando, setGuardando] = useState(false)
+  const [falloAlumno, setFalloAlumno] = useState(null)
+  const [guardandoAlumno, setGuardandoAlumno] = useState(false)
+
+  const [modalEmpresaAbierto, setModalEmpresaAbierto] = useState(false)
+  const [camposEmpresa, setCamposEmpresa] = useState(CAMPOS_EMPRESA_VACIOS)
+  const [erroresEmpresa, setErroresEmpresa] = useState({})
+  const [falloEmpresa, setFalloEmpresa] = useState(null)
+  const [guardandoEmpresa, setGuardandoEmpresa] = useState(false)
 
   useEffect(() => {
     // El padrón se carga una vez. La búsqueda es la historia #16: filtrar en memoria lo ya
@@ -167,20 +176,21 @@ export function StudentsPage() {
       .catch(() => setEmpresas([]))
   }, [])
 
-  function cambiar(campo) {
-    return (evento) => setCampos((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  function cambiarAlumno(campo) {
+    return (evento) =>
+      setCamposAlumno((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
   }
 
-  function cerrarModal() {
-    setModalAbierto(false)
-    setCampos(CAMPOS_VACIOS)
-    setErrores({})
-    setFallo(null)
+  function cerrarModalAlumno() {
+    setModalAlumnoAbierto(false)
+    setCamposAlumno(CAMPOS_ALUMNO_VACIOS)
+    setErroresAlumno({})
+    setFalloAlumno(null)
   }
 
-  function validar() {
+  function validarAlumno() {
     const encontrados = {}
-    const documento = campos.documento.trim()
+    const documento = camposAlumno.documento.trim()
     const digitos = documento.replace(/\D/g, '')
 
     if (documento === '') {
@@ -188,45 +198,98 @@ export function StudentsPage() {
     } else if (!DNI_CON_SEPARADORES.test(documento) || ![7, 8].includes(digitos.length)) {
       encontrados.documento = 'El DNI debe tener 7 u 8 dígitos.'
     }
-    if (campos.nombre.trim() === '') {
+    if (camposAlumno.nombre.trim() === '') {
       encontrados.nombre = 'El nombre es obligatorio.'
     }
-    if (campos.email.trim() === '') {
+    if (camposAlumno.email.trim() === '') {
       encontrados.email = 'El email es obligatorio.'
-    } else if (!emailConForma(campos.email.trim())) {
+    } else if (!emailConForma(camposAlumno.email.trim())) {
       encontrados.email = 'El email no tiene un formato válido.'
     }
 
     return encontrados
   }
 
-  async function guardar() {
-    const encontrados = validar()
-    setErrores(encontrados)
+  async function guardarAlumno() {
+    const encontrados = validarAlumno()
+    setErroresAlumno(encontrados)
 
     if (Object.keys(encontrados).length > 0) {
       return
     }
 
-    setGuardando(true)
-    setFallo(null)
+    setGuardandoAlumno(true)
+    setFalloAlumno(null)
     try {
       // Sin `tipo_documento`: el contrato no lo admite (D44).
       const creado = await crearAlumno({
-        documento: campos.documento,
-        nombre: campos.nombre,
-        email: campos.email,
-        telefono: campos.telefono === '' ? null : campos.telefono,
+        documento: camposAlumno.documento,
+        nombre: camposAlumno.nombre,
+        email: camposAlumno.email,
+        telefono: camposAlumno.telefono === '' ? null : camposAlumno.telefono,
       })
       setAlumnos((anteriores) => [...anteriores, creado])
-      cerrarModal()
+      cerrarModalAlumno()
       setAviso(
         `Alumno ${creado.nombre} dado de alta. La cuenta se creó, pero no se enviaron las credenciales.`,
       )
     } catch (error) {
-      setFallo(error?.message ?? 'No se pudo guardar el alumno.')
+      setFalloAlumno(error?.message ?? 'No se pudo guardar el alumno.')
     } finally {
-      setGuardando(false)
+      setGuardandoAlumno(false)
+    }
+  }
+
+  function cambiarEmpresa(campo) {
+    return (evento) =>
+      setCamposEmpresa((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  function cerrarModalEmpresa() {
+    setModalEmpresaAbierto(false)
+    setCamposEmpresa(CAMPOS_EMPRESA_VACIOS)
+    setErroresEmpresa({})
+    setFalloEmpresa(null)
+  }
+
+  function validarEmpresa() {
+    const encontrados = {}
+
+    if (camposEmpresa.razon_social.trim() === '') {
+      encontrados.razon_social = 'La razón social es obligatoria.'
+    }
+    if (camposEmpresa.cuit.trim() === '') {
+      encontrados.cuit = 'El CUIT es obligatorio.'
+    }
+
+    return encontrados
+  }
+
+  async function guardarEmpresa() {
+    const encontrados = validarEmpresa()
+    setErroresEmpresa(encontrados)
+
+    if (Object.keys(encontrados).length > 0) {
+      return
+    }
+
+    setGuardandoEmpresa(true)
+    setFalloEmpresa(null)
+    try {
+      const creada = await crearEmpresa({
+        razon_social: camposEmpresa.razon_social,
+        cuit: camposEmpresa.cuit,
+        requiere_factura_a: camposEmpresa.requiere_factura_a,
+      })
+      setEmpresas((anteriores) => [...anteriores, creada])
+      cerrarModalEmpresa()
+    } catch (error) {
+      // Un alta rechazada —duplicado, CUIT con dígito verificador inválido— deja el modal
+      // abierto con lo que escribió la secretaría y el motivo tal como lo informa la fuente
+      // (D36), que en el duplicado identifica la empresa existente.
+      setFalloEmpresa(error?.message ?? 'No se pudo guardar la empresa.')
+    } finally {
+      setGuardandoEmpresa(false)
     }
   }
 
@@ -235,7 +298,7 @@ export function StudentsPage() {
       <Card
         titulo="Padrón de Alumnos Regulares"
         acciones={
-          <Button variante="secundario" onClick={() => setModalAbierto(true)}>
+          <Button variante="secundario" onClick={() => setModalAlumnoAbierto(true)}>
             + Nuevo Alumno
           </Button>
         }
@@ -269,16 +332,16 @@ export function StudentsPage() {
       )}
 
       <Modal
-        abierto={modalAbierto}
+        abierto={modalAlumnoAbierto}
         titulo="Nuevo Alumno"
-        onClose={cerrarModal}
+        onClose={cerrarModalAlumno}
         pie={
           <>
-            <Button variante="secundario" onClick={cerrarModal}>
+            <Button variante="secundario" onClick={cerrarModalAlumno}>
               Cancelar
             </Button>
-            <Button onClick={guardar} disabled={guardando}>
-              {guardando ? 'Guardando…' : 'Guardar Alumno'}
+            <Button onClick={guardarAlumno} disabled={guardandoAlumno}>
+              {guardandoAlumno ? 'Guardando…' : 'Guardar Alumno'}
             </Button>
           </>
         }
@@ -287,42 +350,42 @@ export function StudentsPage() {
           <Input
             id="alumno-dni"
             etiqueta="DNI"
-            valor={campos.documento}
-            onChange={cambiar('documento')}
+            valor={camposAlumno.documento}
+            onChange={cambiarAlumno('documento')}
             obligatorio
-            error={errores.documento ?? null}
+            error={erroresAlumno.documento ?? null}
           />
           <Input
             id="alumno-nombre"
             etiqueta="Nombre"
-            valor={campos.nombre}
-            onChange={cambiar('nombre')}
+            valor={camposAlumno.nombre}
+            onChange={cambiarAlumno('nombre')}
             obligatorio
-            error={errores.nombre ?? null}
+            error={erroresAlumno.nombre ?? null}
           />
           <Input
             id="alumno-email"
             etiqueta="Email"
             type="email"
-            valor={campos.email}
-            onChange={cambiar('email')}
+            valor={camposAlumno.email}
+            onChange={cambiarAlumno('email')}
             obligatorio
-            error={errores.email ?? null}
+            error={erroresAlumno.email ?? null}
           />
           <Input
             id="alumno-telefono"
             etiqueta="Teléfono"
-            valor={campos.telefono}
-            onChange={cambiar('telefono')}
+            valor={camposAlumno.telefono}
+            onChange={cambiarAlumno('telefono')}
           />
         </div>
 
-        {fallo !== null && (
+        {falloAlumno !== null && (
           <p
             role="alert"
             className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
           >
-            {fallo}
+            {falloAlumno}
           </p>
         )}
 
@@ -332,11 +395,80 @@ export function StudentsPage() {
         </p>
       </Modal>
 
-      <Card titulo="Cuentas Corporativas Vinculadas">
+      <Card
+        titulo="Cuentas Corporativas Vinculadas"
+        acciones={
+          <Button variante="secundario" onClick={() => setModalEmpresaAbierto(true)}>
+            + Nueva Empresa
+          </Button>
+        }
+      >
         {/* El alta de cuenta corporativa vive en esta misma pantalla, no en una pantalla
             separada de empresas: es lo que dice el spec y evita un ítem de más. */}
-        <Table columnas={COLUMNAS_EMPRESAS} filas={empresas} />
+        <Table
+          columnas={COLUMNAS_EMPRESAS}
+          filas={empresas}
+          vacio={<p className="text-sm text-slate-500">No hay cuentas corporativas registradas.</p>}
+        />
       </Card>
+
+      <Modal
+        abierto={modalEmpresaAbierto}
+        titulo="Nueva Empresa"
+        onClose={cerrarModalEmpresa}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarModalEmpresa}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarEmpresa} disabled={guardandoEmpresa}>
+              {guardandoEmpresa ? 'Guardando…' : 'Guardar Empresa'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Input
+            id="empresa-razon-social"
+            etiqueta="Razón Social"
+            valor={camposEmpresa.razon_social}
+            onChange={cambiarEmpresa('razon_social')}
+            obligatorio
+            error={erroresEmpresa.razon_social ?? null}
+          />
+          <Input
+            id="empresa-cuit"
+            etiqueta="CUIT"
+            valor={camposEmpresa.cuit}
+            onChange={cambiarEmpresa('cuit')}
+            obligatorio
+            error={erroresEmpresa.cuit ?? null}
+          />
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              id="empresa-factura-a"
+              type="checkbox"
+              checked={camposEmpresa.requiere_factura_a}
+              onChange={(evento) =>
+                setCamposEmpresa((anteriores) => ({
+                  ...anteriores,
+                  requiere_factura_a: evento.target.checked,
+                }))
+              }
+            />
+            Requiere Factura A
+          </label>
+        </div>
+
+        {falloEmpresa !== null && (
+          <p
+            role="alert"
+            className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            {falloEmpresa}
+          </p>
+        )}
+      </Modal>
     </div>
   )
 }
