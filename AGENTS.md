@@ -148,13 +148,26 @@ de cada máquina no se listan acá y no se asumen para el resto del equipo.
 | Skill | Categoría | Cuándo |
 |---|---|---|
 | `fastapi` | backend | Rutas, schemas, dependencias, SSE |
+| `fastapi-python` | backend | APIs y operaciones async con FastAPI |
+| `fastapi-templates` | backend | Armar un proyecto FastAPI nuevo, con async y DI |
+| `pydantic` | backend | Modelos, validación, settings y serialización |
+| `python-testing-patterns` | backend | Tests con pytest, fixtures, mocks y TDD |
 | `supabase-postgres-best-practices` | base de datos | Antes de tocar schema, migraciones o índices |
 | `sql-optimization-patterns` | base de datos | Consultas lentas, EXPLAIN, índices |
+| `sqlalchemy` | base de datos | Modelos y queries del ORM |
+| `sqlalchemy-alembic-expert-best-practices-code-review` | base de datos | Escribir o revisar migraciones de Alembic |
 | `vercel-react-best-practices` | frontend | Componentes, hooks, data fetching |
 | `ui-styling` | frontend | Componentes, Tailwind, shadcn, temas |
 | `vercel-react-view-transitions` | frontend | Transiciones y animaciones de ruta |
 | `image-to-code` | frontend | Implementar una pantalla desde una imagen |
+| `composition-patterns` | frontend | Componentes compuestos, props booleanas, React 19 |
+| `frontend-design` | frontend | Dirección visual de una UI nueva |
+| `tailwind-css-patterns` | frontend | Layouts responsive y utilidades Tailwind |
+| `vite` | frontend | Configuración de Vite, plugins, SSR |
+| `vitest` | frontend | Tests unitarios con Vitest y coverage |
+| `seo` | frontend | Meta tags, structured data, sitemap |
 | `ui-ux-pro-max` | diseño | Pantallas nuevas, revisión de UX, accesibilidad |
+| `accessibility` | diseño | Auditoría a11y, WCAG, teclado, lectores de pantalla |
 | `design-system` | diseño | Tokens y escalas tipográficas |
 | `design` | diseño | Identidad, logos, mockups |
 | `brand` | diseño | Voz y consistencia de marca |
@@ -169,6 +182,7 @@ de cada máquina no se listan acá y no se asumen para el resto del equipo.
 | `grilling` | planificación | Interrogatorio para acordar alcance |
 | `grill-me` | planificación | Igual que `grilling`, en inglés |
 | `find-skills` | utilidades | Buscar o instalar skills nuevas |
+| `python-executor` | utilidades | Scripts Python en sandbox: datos, scraping, imágenes |
 | `supabase` | base de datos | Proyecto de Supabase en producción: schema, auth, RLS, logs |
 
 
