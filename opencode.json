@@ -17,7 +17,9 @@
     "codegraph": {
       "type": "local",
       "command": [
-        "codegraph",
+        "npx",
+        "-y",
+        "@colbymchenry/codegraph",
         "serve",
         "--mcp"
       ],

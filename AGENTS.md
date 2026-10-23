@@ -141,12 +141,14 @@ donde se discuten las alternativas.
 ## Herramientas
 
 Los servidores MCP están declarados en `opencode.json`, así que llegan con el `pull`. Si uno
-aparece caído, la causa casi siempre es que el binario no está en el `PATH` de esa máquina, no
-la configuración.
+aparece caído, la causa casi siempre es la herramienta que lo lanza (Node, `npx`, un binario)
+y no la configuración.
 
-- **CodeGraph** indexa el repo en `.codegraph/`, que es local y no está versionado. Sin índice
-  devuelve vacío en lugar de error: usá Read, Grep y Glob hasta que exista. Indexar es
-  decisión del equipo, no del agente: si falta, avisá y seguí.
+- **CodeGraph** indexa el repo en `.codegraph/`, que es local y no está versionado. El MCP se
+  lanza con `npx` desde `opencode.json`, así que no hace falta instalarlo en la máquina. Si el
+  índice falta, corré `npx -y @colbymchenry/codegraph init` desde la raíz del repo y después
+  usá CodeGraph como siempre. Si `npx` no existe (máquina sin Node), no insistas: avisale al
+  usuario y seguí con Read, Grep y Glob.
 - **Context7** es para documentación de librerías. La lógica del proyecto se lee en el repo.
 - **Engram** conserva decisiones entre sesiones. Se registra con `engram setup opencode`, que
   escribe en la configuración global de cada máquina y por eso no está en el repo.
