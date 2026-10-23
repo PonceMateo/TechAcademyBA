@@ -158,26 +158,13 @@ export function createApiDataSource() {
     },
 
     /**
-     * Búsqueda de docentes: filtra la lista ya traída, en el cliente.
+     * Búsqueda de docentes (historia #10): el criterio y el orden los resuelve el backend.
      *
-     * `GET /docentes` no acepta un parámetro de búsqueda porque la historia #10, que es la que
-     * lo pide, está fuera de este change. Filtrar acá mantiene el buscador de la pantalla
-     * andando con datos reales; cuando llegue #10, la búsqueda pasa al servidor y esto se
-     * convierte en el `?q=` que el endpoint va a definir.
+     * La pantalla no filtra ni reordena la respuesta: recibe las filas ya ordenadas por
+     * coincidencia y las muestra en ese orden.
      */
     async buscarDocentes(texto) {
-      const aguja = texto.trim().toLowerCase()
-      const todos = (await request(PATHS.docentes)).map(filaDeDocente)
-      if (aguja === '') {
-        return todos
-      }
-      return todos.filter((fila) =>
-        [fila.nombre, fila.dni, fila.email].some((campo) =>
-          String(campo ?? '')
-            .toLowerCase()
-            .includes(aguja),
-        ),
-      )
+      return (await request(PATHS.docentes, { query: { q: texto } })).map(filaDeDocente)
     },
 
     async crearDocente(datos) {
@@ -335,20 +322,24 @@ export function createApiDataSource() {
 }
 
 /**
- * La fila de docente como la consume la pantalla: nombre completo y conte de comisiones.
+ * La fila de docente como la consume la pantalla: nombre completo, comisiones y su conte.
  *
  * El modelo tiene `nombre` y `apellido` por separado y una cuenta derivada de comisiones; el
- * ejemplo traía el nombre ya junto y el campo `comisiones_asignadas`. La unión vive acá, en la
- * frontera, para que `TeachersPage` no tenga que saber de dónde viene la fila.
+ * ejemplo trae el nombre ya junto y `comisiones_asignadas`. La unión vive acá, en la frontera,
+ * para que `TeachersPage` no tenga que saber de dónde viene la fila. La lista `comisiones` es la
+ * que muestra el código y el nombre del curso (historia #10), y el conte se conserva como derivado
+ * de esa misma lista.
  *
  * `catedra` no existe en el modelo: se manda `null` para que la columna muestre un guion en vez de
  * inventar un dato.
  */
 function filaDeDocente(docente) {
+  const comisiones = docente.comisiones ?? []
   return {
     ...docente,
     nombre: `${docente.nombre} ${docente.apellido}`,
     catedra: null,
-    comisiones_asignadas: docente.cantidad_comisiones ?? 0,
+    comisiones,
+    comisiones_asignadas: docente.cantidad_comisiones ?? comisiones.length,
   }
 }

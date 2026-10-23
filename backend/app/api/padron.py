@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -36,8 +36,15 @@ _solo_admin = require_roles(Rol.ADMIN)
 def listar_docentes(
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
+    q: str | None = Query(default=None, max_length=100),
 ) -> list[DocenteOut]:
-    return [DocenteOut.model_validate(d) for d in padron.listar_docentes(session)]
+    """Padrón de docentes activos, con búsqueda opcional por nombre, apellido, DNI o email.
+
+    `q` busca desde el comienzo de las palabras del nombre o del apellido, en orden, y desde el
+    comienzo del DNI o del email. Sin `q`, devuelve el listado habitual. La respuesta incluye las
+    comisiones reales de cada docente (historia #10).
+    """
+    return [DocenteOut.model_validate(d) for d in padron.listar_docentes(session, q)]
 
 
 @router.post(
@@ -75,4 +82,5 @@ def crear_docente(
     # La respuesta recién creada no tiene nada que contar: el docente todavía no tiene
     # comisiones asignadas.
     docente.cantidad_comisiones = 0
+    docente.comisiones = []  # type: ignore[attr-defined]
     return DocenteOut.model_validate(docente)

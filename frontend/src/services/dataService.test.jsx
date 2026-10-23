@@ -98,13 +98,40 @@ describe('la implementación de ejemplo', () => {
     expect(comisiones.find((c) => c.codigo === 'CUR-101').vacantes).toBe(7)
   })
 
-  it('filtra el padrón de docentes por nombre, DNI o email', async () => {
+  it('filtra el padrón de docentes por prefijo de palabra, orden y campo', async () => {
     configurarFuenteDeDatos(createMockDataSource())
 
-    expect(await buscarDocentes('Santi')).toHaveLength(1)
-    expect(await buscarDocentes('30.665.330')).toHaveLength(1)
-    expect(await buscarDocentes('gonzalez@')).toHaveLength(1)
+    expect((await buscarDocentes('santi')).map((d) => d.id)).toEqual([3])
+    expect((await buscarDocentes('martin')).map((d) => d.id)).toEqual([1])
+    expect((await buscarDocentes('30.665')).map((d) => d.id)).toEqual([5])
+    expect((await buscarDocentes('profemartin')).map((d) => d.id)).toEqual([1])
+    expect((await buscarDocentes('rios')).map((d) => d.id)).toEqual([4])
+    expect((await buscarDocentes('RÍOS')).map((d) => d.id)).toEqual([4])
     expect(await buscarDocentes('no existe')).toHaveLength(0)
+
+    // Una sola letra busca al comienzo de una palabra, no en el medio.
+    expect((await buscarDocentes('a')).map((d) => d.id)).toEqual([3])
+
+    // Las palabras conservan su orden.
+    expect((await buscarDocentes('santi ads')).map((d) => d.id)).toEqual([3])
+    expect(await buscarDocentes('ads santi')).toHaveLength(0)
+
+    // El DNI también se busca por prefijo, no por cualquier fragmento.
+    expect(await buscarDocentes('665')).toHaveLength(0)
+  })
+
+  it('devuelve las comisiones reales del ejemplo y su conte derivado', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const [santi] = await buscarDocentes('santi')
+    expect(santi.comisiones).toEqual([
+      { id: 5, codigo: 'CUR-103', nombre: 'Marketing Digital & Ads' },
+    ])
+    expect(santi.comisiones_asignadas).toBe(1)
+
+    const [laura] = await buscarDocentes('laura')
+    expect(laura.comisiones).toEqual([])
+    expect(laura.comisiones_asignadas).toBe(0)
   })
 
   it('agrega el alumno dado de alta al padrón de ejemplo, sin inscripción', async () => {

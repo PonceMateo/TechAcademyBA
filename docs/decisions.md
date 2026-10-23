@@ -1518,6 +1518,44 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+## Búsqueda de docentes (change `hu-10-buscar-docente`)
+
+### D48 — La búsqueda de docentes se resuelve en el servidor, por prefijo de palabra y sin `unaccent`
+
+- **Fecha:** 2026-10-23
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `GET /docentes` acepta `q` opcional (máximo 100 caracteres). El servicio filtra
+  solo docentes con `activo = true` y busca por el **comienzo** de cada palabra del nombre y del
+  apellido, respetando el orden de las palabras de la consulta; el DNI se compara por prefijo de
+  sus dígitos, con o sin puntos, espacios o guiones, y el email por prefijo de su valor
+  normalizado. Una consulta vacía o de solo espacios devuelve el listado habitual y una sin
+  coincidencias devuelve `[]`. No hay mínimo de caracteres. Una sola letra se limita al nombre y
+  al apellido: no arrastra filas por el comienzo de un email.
+- **Normalización:** se hace en Python con `normalize_name` y `normalize_document`, no con la
+  extensión `unaccent` de PostgreSQL ni con columnas normalizadas nuevas. El padrón es acotado y
+  así se evita una migración y una dependencia de permisos; si el volumen crece, el criterio se
+  puede mover a la base sin cambiar el contrato.
+- **Orden:** primero las coincidencias de nombre (por la posición de la primera palabra que
+  coincide), después DNI y al final email; `id` desempata de forma estable. Así `Alfonso Pérez`
+  aparece antes que `Rita Alonso` al buscar `al`.
+- **Comisiones:** la respuesta agrega `comisiones` con `{id, codigo, nombre}` desde las filas
+  reales de `comision` y el nombre del curso, cargadas en una sola consulta con
+  `selectinload(Comision.curso)`. Se conserva `cantidad_comisiones`, ahora derivada de esa lista.
+  Un docente sin comisiones recibe `[]` y la pantalla muestra `Sin comisión`.
+- **Pantalla:** `TeachersPage` espera 300 ms desde la última tecla, cancela el temporizador
+  anterior, descarta la respuesta de una consulta vieja y consulta sin demora al vaciar el campo.
+  Una sola letra dispara la búsqueda. El alta y la identidad visual no cambian.
+- **Fuente de ejemplo:** `mockDataSource` aplica el mismo criterio y deriva las comisiones de su
+  catálogo; no usa el conteo `comisiones_asignadas` de la planilla, que no es una relación.
+- **Dónde:** `backend/app/schemas/padron.py`, `backend/app/services/padron.py`,
+  `backend/app/api/padron.py`, `backend/app/tests/test_docentes_busqueda.py`,
+  `frontend/src/admin/TeachersPage.jsx`, `frontend/src/domain/normalize.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/admin/TeachersPage.test.jsx`, `frontend/src/services/dataService.test.jsx` y
+  `frontend/src/services/apiDataSource.test.js`.
+
+---
+
 ## Fuente de verdad del backlog
 
 ### D49 — GitHub Projects es la única fuente viva del backlog

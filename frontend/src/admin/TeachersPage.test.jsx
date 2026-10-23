@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
@@ -27,12 +27,28 @@ const COLUMNAS = [
 ]
 
 const DOCENTES = [
-  ['Profe Martín', '28.114.402', 'Programación', '1'],
-  ['Lic. Laura Benítez', '31.902.118', 'Desarrollo Web', '1'],
-  ['Santi Ads', '33.450.771', 'Marketing', '2'],
-  ['Dr. Marcelo Ríos', '26.771.905', 'Datos', '1'],
-  ['Ing. González', '30.665.330', 'Programación', '1'],
+  ['Profe Martín', '28.114.402', 'CUR-101 · Python Inicial'],
+  ['Lic. Laura Benítez', '31.902.118', 'Sin comisión'],
+  ['Santi Ads', '33.450.771', 'CUR-103 · Marketing Digital & Ads'],
+  ['Dr. Marcelo Ríos', '26.771.905', 'Sin comisión'],
+  ['Ing. González', '30.665.330', 'CUR-108 · Java Backend Spring'],
 ]
+
+/** Una fila mínima con la forma que devuelve la fuente, para los casos que el ejemplo no tiene. */
+function docenteDePrueba(id, nombre) {
+  return {
+    id,
+    nombre,
+    dni: `30.000.00${id}`,
+    cuil: null,
+    email: `docente${id}@techacademy.invalid`,
+    telefono: null,
+    catedra: null,
+    activo: true,
+    comisiones: [],
+    comisiones_asignadas: 0,
+  }
+}
 
 beforeEach(async () => {
   resetDataSource()
@@ -60,16 +76,16 @@ describe('listado de docentes', () => {
     }
   })
 
-  it('deja a Santi Ads con dos comisiones y a los otros con una', () => {
+  it('muestra las comisiones reales de cada docente y Sin comisión cuando no tiene', () => {
     const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
     const asignadas = (nombre) =>
       filas.find((fila) => fila.cells[0].textContent === nombre).cells[6].textContent
 
-    expect(asignadas('Santi Ads')).toBe('2')
-    expect(asignadas('Profe Martín')).toBe('1')
-    expect(asignadas('Lic. Laura Benítez')).toBe('1')
-    expect(asignadas('Dr. Marcelo Ríos')).toBe('1')
-    expect(asignadas('Ing. González')).toBe('1')
+    expect(asignadas('Profe Martín')).toBe('CUR-101 · Python Inicial')
+    expect(asignadas('Lic. Laura Benítez')).toBe('Sin comisión')
+    expect(asignadas('Santi Ads')).toBe('CUR-103 · Marketing Digital & Ads')
+    expect(asignadas('Dr. Marcelo Ríos')).toBe('Sin comisión')
+    expect(asignadas('Ing. González')).toBe('CUR-108 · Java Backend Spring')
   })
 
   it('muestra el estado Activa en verde en las cinco filas', () => {
@@ -103,21 +119,136 @@ describe('buscador', () => {
     expect(screen.getByText('Santi Ads')).toBeInTheDocument()
   })
 
+  it('busca por apellido sin distinguir mayúsculas ni tildes', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Buscar docente'), 'RÍOS')
+
+    await waitFor(() => expect(screen.queryByText('Profe Martín')).not.toBeInTheDocument())
+    expect(screen.getByText('Dr. Marcelo Ríos')).toBeInTheDocument()
+  })
+
+  it('dispara la búsqueda con una sola letra y no busca en el medio de la palabra', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Buscar docente'), 'a')
+
+    // Si no se disparara con una letra, el listado inicial seguiría mostrando a todos.
+    await waitFor(() => expect(screen.queryByText('Profe Martín')).not.toBeInTheDocument())
+    expect(screen.getByText('Santi Ads')).toBeInTheDocument()
+    // Laura contiene una `a` en el medio de `Laura`, pero ninguna palabra empieza con `a`.
+    expect(screen.queryByText('Lic. Laura Benítez')).not.toBeInTheDocument()
+  })
+
+  it('respeta el orden de las palabras de la consulta', async () => {
+    const user = userEvent.setup()
+    const buscador = screen.getByLabelText('Buscar docente')
+
+    await user.type(buscador, 'santi ads')
+
+    await waitFor(() => expect(screen.queryByText('Profe Martín')).not.toBeInTheDocument())
+    expect(screen.getByText('Santi Ads')).toBeInTheDocument()
+
+    await user.clear(buscador)
+    await user.type(buscador, 'ads santi')
+
+    expect(await screen.findByText('No se encontraron docentes')).toBeInTheDocument()
+  })
+
   it('filtra por DNI', async () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Buscar docente'), '30.665.330')
 
-    await waitFor(() => expect(screen.getByText('Ing. González')).toBeInTheDocument())
-    expect(screen.queryByText('Santi Ads')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Santi Ads')).not.toBeInTheDocument())
+    expect(screen.getByText('Ing. González')).toBeInTheDocument()
   })
 
-  it('informa que no encontró resultados', async () => {
+  it('espera 300 ms desde la última tecla antes de consultar', async () => {
+    const buscar = vi.fn(async () => [])
+    stubDataSource({ buscarDocentes: buscar })
+    vi.useFakeTimers()
+
+    try {
+      fireEvent.change(screen.getByLabelText('Buscar docente'), { target: { value: 'r' } })
+
+      expect(buscar).not.toHaveBeenCalled()
+      await act(async () => {
+        vi.advanceTimersByTime(299)
+      })
+      expect(buscar).not.toHaveBeenCalled()
+
+      await act(async () => {
+        vi.advanceTimersByTime(1)
+      })
+      expect(buscar).toHaveBeenCalledTimes(1)
+      expect(buscar).toHaveBeenCalledWith('r')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('descarta la respuesta vieja cuando llega después de una más reciente', async () => {
+    const pendientes = new Map()
+    const buscar = vi.fn((texto) => {
+      if (texto === '') {
+        return Promise.resolve([])
+      }
+      return new Promise((resolver) => pendientes.set(texto, resolver))
+    })
+    stubDataSource({ buscarDocentes: buscar })
+    const user = userEvent.setup()
+    const buscador = screen.getByLabelText('Buscar docente')
+
+    await user.type(buscador, 'a')
+    await waitFor(() => expect(pendientes.has('a')).toBe(true))
+    await user.type(buscador, 'b')
+    await waitFor(() => expect(pendientes.has('ab')).toBe(true))
+
+    await act(async () => {
+      pendientes.get('ab')([docenteDePrueba(2, 'Beto Nueva')])
+    })
+    await waitFor(() => expect(screen.getByText('Beto Nueva')).toBeInTheDocument())
+
+    await act(async () => {
+      pendientes.get('a')([docenteDePrueba(1, 'Ana Vieja')])
+    })
+    expect(screen.queryByText('Ana Vieja')).not.toBeInTheDocument()
+    expect(screen.getByText('Beto Nueva')).toBeInTheDocument()
+  })
+
+  it('muestra primero la coincidencia en la primera palabra del nombre', async () => {
+    const rita = docenteDePrueba(1, 'Rita Alonso')
+    const alfonso = docenteDePrueba(2, 'Alfonso Pérez')
+    stubDataSource({ buscarDocentes: vi.fn(async () => [alfonso, rita]) })
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Buscar docente'), 'al')
+
+    await waitFor(() => expect(screen.getByText('Alfonso Pérez')).toBeInTheDocument())
+    const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(filas.map((fila) => fila.cells[0].textContent)).toEqual(['Alfonso Pérez', 'Rita Alonso'])
+  })
+
+  it('vuelve al listado habitual al vaciar el buscador', async () => {
+    const user = userEvent.setup()
+    const buscador = screen.getByLabelText('Buscar docente')
+
+    await user.type(buscador, 'Santi')
+    await waitFor(() => expect(screen.queryByText('Profe Martín')).not.toBeInTheDocument())
+
+    await user.clear(buscador)
+
+    await waitFor(() => expect(screen.getByText('Profe Martín')).toBeInTheDocument())
+    expect(screen.getByText('Santi Ads')).toBeInTheDocument()
+  })
+
+  it('informa que no encontró docentes', async () => {
     const user = userEvent.setup()
 
     await user.type(screen.getByLabelText('Buscar docente'), 'Nadie con ese nombre')
 
-    expect(await screen.findByText('No se encontraron resultados.')).toBeInTheDocument()
+    expect(await screen.findByText('No se encontraron docentes')).toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })

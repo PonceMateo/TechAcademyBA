@@ -9,9 +9,10 @@ import { markAsExample } from './placeholderNotice'
  * alta real no lo pide. El dígito verificador no se valida en el modelo todavía (decisión
  * pendiente P7), así que estos valores son de ejemplo y no tienen por qué pasar esa validación.
  *
- * `comisiones_asignadas` es el conteo que el cliente registra, no un cálculo sobre las comisiones
- * del maquetado: el padrón del cliente cubre diez comisiones y `comisiones.js` muestra cinco, así
- * que derivarlo de esas cinco daría un número distinto al que el cliente reconoce.
+ * `comisiones_asignadas` es el conteo que registra la planilla del cliente y no se usa como
+ * relación: el padrón del cliente cubre diez comisiones y `comisiones.js` muestra cinco. La fuente
+ * de ejemplo (historia #10) ignora ese conteo y deriva la lista y el número del catálogo de
+ * comisiones, que es lo que la pantalla muestra.
  *
  * El estado va como `activo` y no como texto: el modelo hace baja lógica con un booleano y no
  * tiene columna de estado de docente. La columna `ESTADO` de la pantalla muestra el literal

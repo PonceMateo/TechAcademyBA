@@ -27,6 +27,22 @@ export function normalizeCode(value) {
 }
 
 /**
+ * Parte un texto en palabras normalizadas, sin tildes y en mayúscula.
+ *
+ * La búsqueda de docentes compara el comienzo de cada palabra, así que necesita conservar los
+ * límites entre palabras que `normalizeCode` borra. La descomposición NFD separa la tilde de la
+ * vocal y el combinante se descarta: `Gómez` y `Gomez` producen la misma palabra.
+ */
+export function normalizeWords(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .split(/[^0-9A-Z]+/)
+    .filter(Boolean)
+}
+
+/**
  * Documento normalizado: los puntos y los guiones desaparecen. `38.456.789` y `38456789` son
  * el mismo documento, igual que en la base.
  */
