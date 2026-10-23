@@ -38,7 +38,7 @@ Mapa de carpetas: sección "Estructura".
    Siempre con `--limit 100` (sin eso recorta a 30 y parece que faltan
    historias) y filtrá con `--jq`. Cada historia es un issue `H/U <n> · <título>`;
    el número del issue no es el de la historia. Priority es MoSCoW (`Must`, `Should`, `Could`, `Won't`). 
-Una historia está terminada cuando `Status` es `Done`, no cuando el issue está cerrado.
+   Una historia está terminada cuando `Status` es `Done`, no cuando el issue está cerrado.
 2. **Contextualización del problema** (`docs/requirements/`): modelo de negocio.
 3. **Maqueta PPTX:** alcance negociado y los dos caminos de MVP.
 4. **Figma:** pantallas y estilo. Aporta cero datos.
@@ -71,7 +71,7 @@ implementarla.
 ## Arranque de una planificación
 
 Al iniciar una planificación (`/opsx-propose` o una historia), preguntale al
-usuario **una sola vez y con opción múltiple** si quiere hacer una sesión de
+usuario **una sola vez, con opciones Sí / No**, si quiere hacer una sesión de
 preguntas exhaustiva para calibrar el alcance (es opcional; explicalo sin jerga).
 
 - **Sí:** cargá `grill-me`. No escribas ni abras la rama hasta que el usuario
@@ -149,13 +149,18 @@ aparece conectado, no inventes el estado de la base.
 Los MCP se declaran en `opencode.json`. Si uno falla, casi siempre es el binario
 que lo lanza (Node, `npx`), no la config.
 
-- **gh.** Si falta: `winget install --id GitHub.cli -e` (Windows) o
-  `brew install gh` (macOS); preguntá antes de instalar. Login una vez por
-  máquina: `gh auth login --web -s project` (o `gh auth refresh -s project`). Nunca
-  pidas el token por chat.
-- **CodeGraph.** Indexa el repo en `.codegraph/` (local). Si falta el índice,
-  preguntá una vez si correr `npx -y @colbymchenry/codegraph init`. Si no hay
-  Node, avisá y seguí con Read, Grep y Glob.
+Cada vez que acá diga "preguntá", usá la herramienta de preguntas de opencode
+(`question`, opción múltiple), no texto libre.
+
+- **gh.** Si necesitás el board y `gh` no está instalado o no tiene sesión,
+  preguntá con «Sí (abre una pestaña nueva)» / «No». Instalar:
+  `winget install --id GitHub.cli -e` (Windows), `brew install gh` (macOS/Linux) o, si en linux no funciona, consultá la guía oficial de instalación (https://github.com/cli/cli/blob/trunk/docs/install_linux.md). 
+  Login una vez por máquina: `gh auth login --web -s project` (o
+  `gh auth refresh -s project`). Nunca pidas el token por chat.
+- **CodeGraph.** Indexa el repo en `.codegraph/` (local). Si el índice no existe
+  o CodeGraph devuelve vacío, preguntá una vez con «Sí (recomendado)» / «No» si
+  correr `npx -y @colbymchenry/codegraph init`. Si no hay Node, avisá y seguí con
+  Read, Grep y Glob.
 - **Context7.** Documentación de librerías; la lógica del proyecto se lee en el repo.
 - **Engram.** Memoria entre sesiones; se configura por máquina con `engram setup opencode`.
 
