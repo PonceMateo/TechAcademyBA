@@ -146,23 +146,34 @@ aparece conectado, no inventes el estado de la base.
 
 ## Herramientas
 
+Estas herramientas ordenan el flujo de desarrollo y ahorran tokens. Las marcadas
+como (esencial) tienen que funcionar: si una falla, avisale al usuario y seguí
+con el plan B indicado en su punto.
+
 Los MCP se declaran en `opencode.json`. Si uno falla, casi siempre es el binario
 que lo lanza (Node, `npx`), no la config.
 
-Cada vez que acá diga "preguntá", usá la herramienta de preguntas de opencode
-(`question`, opción múltiple), no texto libre.
+Cada vez que este archivo diga "preguntá", usá la herramienta de preguntas de
+opencode (`question`, opción múltiple), no texto libre.
 
-- **gh.** Si necesitás el board y `gh` no está instalado o no tiene sesión,
-  preguntá con «Sí (abre una pestaña nueva)» / «No». Instalar:
-  `winget install --id GitHub.cli -e` (Windows), `brew install gh` (macOS/Linux) o, si en linux no funciona, consultá la guía oficial de instalación (https://github.com/cli/cli/blob/trunk/docs/install_linux.md). 
+- **gh (esencial).** Si necesitás el board y `gh` no está instalado o no tiene
+  sesión, preguntá con «Sí (abre una pestaña nueva)» / «No». Instalar:
+  `winget install --id GitHub.cli -e` (Windows), `brew install gh` (macOS/Linux)
+  o, si en Linux no funciona, consultá la guía oficial
+  (https://github.com/cli/cli/blob/trunk/docs/install_linux.md).
   Login una vez por máquina: `gh auth login --web -s project` (o
   `gh auth refresh -s project`). Nunca pidas el token por chat.
-- **CodeGraph.** Indexa el repo en `.codegraph/` (local). Si el índice no existe
-  o CodeGraph devuelve vacío, preguntá una vez con «Sí (recomendado)» / «No» si
-  correr `npx -y @colbymchenry/codegraph init`. Si no hay Node, avisá y seguí con
-  Read, Grep y Glob.
-- **Context7.** Documentación de librerías; la lógica del proyecto se lee en el repo.
-- **Engram.** Memoria entre sesiones; se configura por máquina con `engram setup opencode`.
+  Plan B: si el usuario no quiere instalarlo, seguí con lo que haya en el repo y
+  decilo.
+- **CodeGraph (esencial).** Indexa el repo en `.codegraph/` (local). Si el índice
+  no existe o devuelve vacío, preguntá una vez con «Sí (recomendado)» / «No» si
+  correr `npx -y @colbymchenry/codegraph init`.
+  Plan B: si no hay Node o el usuario dice que no, usá Read, Grep y Glob.
+- **Context7 (esencial).** Documentación de librerías; la lógica del proyecto se
+  lee en el repo.
+  Plan B: no inventes APIs ni versiones; avisá que no pudiste verificarlas.
+- **Engram.** Memoria entre sesiones; se configura por máquina con
+  `engram setup opencode`. Si falla, seguí sin memoria.
 
 ## Convenciones técnicas
 
