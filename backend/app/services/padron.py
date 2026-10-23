@@ -20,10 +20,12 @@ esto se revierte** y la cuenta nace con `must_change_password = True`, como dice
 from __future__ import annotations
 
 import logging
+import re
+from types import SimpleNamespace
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.security import CONTRASEÑA_DEMO, hashear_password
 from app.models.catalogo import Comision
@@ -31,9 +33,12 @@ from app.models.enums import Rol
 from app.models.padron import Docente, Usuario
 from app.schemas.padron import DocenteCreate
 from app.services.emails import ensure_email_available
-from app.services.normalization import normalize_document
+from app.services.normalization import normalize_document, normalize_name
 
 logger = logging.getLogger(__name__)
+
+#: Un DNI se busca solo cuando la consulta tiene dígitos y separadores, no cuando mezcla letras.
+_DNI_CON_SEPARADORES = re.compile(r"^[0-9.\s-]+$")
 
 #: Restricciones que PostgreSQL levanta en el alta de un docente, por nombre. La comparación va
 #: por nombre de restricción y no por el texto del mensaje, porque el texto cambia entre
@@ -98,26 +103,138 @@ def crear_docente(session: Session, datos: DocenteCreate) -> Docente:
     return docente
 
 
-def listar_docentes(session: Session) -> list[Docente]:
-    """Docentes con la cantidad de comisiones asignadas ya resuelta.
+def listar_docentes(session: Session, consulta: str | None = None) -> list[Docente]:
+    """Docentes activos, con sus comisiones y ordenados por coincidencia (historia #10).
 
-    `cantidad_comisiones` sale de una sola consulta agrupada, por el mismo motivo que las
-    vacantes del catálogo: recorrer las comisiones docente por docente sería una consulta por
-    fila. La cuenta se arma desde `Comision` porque el modelo no declara la relación inversa.
+    La búsqueda compara desde el comienzo de las palabras del nombre y del apellido, en orden, y
+    desde el comienzo del DNI o del email. El orden resultante prioriza la coincidencia en la
+    primera palabra del nombre, después las palabras posteriores o el apellido, después el DNI y
+    al final el email; `id` desempata.
+
+    Las comisiones salen de una sola consulta con `selectinload(Comision.curso)`: recorrer las
+    comisiones docente por docente sería una consulta por fila. `cantidad_comisiones` se deriva
+    de esa misma lista y se conserva por compatibilidad con la pantalla anterior.
     """
-    docentes = list(session.scalars(select(Docente).order_by(Docente.id)))
-
-    conteo = dict(
-        session.execute(
-            select(Comision.docente_id, func.count(Comision.id))
-            .where(Comision.docente_id.is_not(None))
-            .group_by(Comision.docente_id)
-        ).all()
+    docentes = list(
+        session.scalars(select(Docente).where(Docente.activo.is_(True)).order_by(Docente.id))
     )
 
-    for docente in docentes:
-        docente.cantidad_comisiones = conteo.get(docente.id, 0)
+    aguja = consulta.strip() if consulta else ""
+    if aguja:
+        palabras = _palabras(aguja)
+        encontrados: list[tuple[tuple[int, int, int], Docente]] = []
+        for docente in docentes:
+            clave = _clave_de_coincidencia(docente, aguja, palabras)
+            if clave is not None:
+                encontrados.append((clave, docente))
+        encontrados.sort(key=lambda par: par[0])
+        docentes = [docente for _, docente in encontrados]
+
+    _asignar_comisiones(session, docentes)
     return docentes
+
+
+def _palabras(texto: str) -> list[str]:
+    """Parte un texto en palabras normalizadas, sin tildes ni signos."""
+    palabras: list[str] = []
+    for parte in texto.split():
+        normalizada = normalize_name(parte)
+        if normalizada:
+            palabras.append(normalizada)
+    return palabras
+
+
+def _posicion_en_nombre(docente: Docente, palabras: list[str]) -> int | None:
+    """Índice de la primera palabra del nombre que coincide, o `None` si no hay coincidencia.
+
+    Cada palabra de la consulta tiene que empezar una palabra distinta del nombre completo, en
+    orden. Así `ana gom` encuentra `Ana María Gómez`, pero `gom ana` no invierte el orden.
+    """
+    nombre = _palabras(f"{docente.nombre} {docente.apellido}")
+    if not palabras or not nombre:
+        return None
+
+    posicion = 0
+    primera: int | None = None
+    for palabra in palabras:
+        encontrada = next(
+            (
+                indice
+                for indice in range(posicion, len(nombre))
+                if nombre[indice].startswith(palabra)
+            ),
+            None,
+        )
+        if encontrada is None:
+            return None
+        if primera is None:
+            primera = encontrada
+        posicion = encontrada + 1
+
+    return primera
+
+
+def _coincide_dni(docente: Docente, aguja: str) -> bool:
+    """El DNI se busca con o sin separadores y por el comienzo de sus dígitos."""
+    if not _DNI_CON_SEPARADORES.fullmatch(aguja):
+        return False
+    digitos = normalize_document(aguja)
+    return bool(digitos and docente.dni_norm.startswith(digitos))
+
+
+def _coincide_email(docente: Docente, aguja: str) -> bool:
+    """El email se busca por el comienzo de su valor normalizado."""
+    normalizada = normalize_name(aguja)
+    return bool(normalizada and normalize_name(docente.email).startswith(normalizada))
+
+
+def _clave_de_coincidencia(
+    docente: Docente, aguja: str, palabras: list[str]
+) -> tuple[int, int, int] | None:
+    """Clave de orden del docente, o `None` si no coincide con la consulta.
+
+    La primera componente prioriza nombre sobre DNI y email; la segunda, la posición de la
+    primera palabra que coincide dentro del nombre; la tercera es el desempate estable. Una sola
+    letra solo puede coincidir con el nombre o el apellido: el spec pide que no arrastre filas
+    por el comienzo de un email.
+    """
+    posicion = _posicion_en_nombre(docente, palabras)
+    if posicion is not None:
+        return (0, posicion, docente.id)
+    if len(palabras) == 1 and len(palabras[0]) == 1 and palabras[0].isalpha():
+        return None
+    if _coincide_dni(docente, aguja):
+        return (1, 0, docente.id)
+    if len(palabras) == 1 and _coincide_email(docente, aguja):
+        return (2, 0, docente.id)
+    return None
+
+
+def _asignar_comisiones(session: Session, docentes: list[Docente]) -> None:
+    """Carga las comisiones de todos los docentes en una sola consulta."""
+    identificadores = [docente.id for docente in docentes]
+    por_docente: dict[int, list[SimpleNamespace]] = {}
+
+    if identificadores:
+        comisiones = session.scalars(
+            select(Comision)
+            .where(Comision.docente_id.in_(identificadores))
+            .options(selectinload(Comision.curso))
+            .order_by(Comision.id)
+        )
+        for comision in comisiones:
+            por_docente.setdefault(comision.docente_id, []).append(
+                SimpleNamespace(
+                    id=comision.id,
+                    codigo=comision.codigo,
+                    nombre=comision.curso.nombre,
+                )
+            )
+
+    for docente in docentes:
+        asignadas = por_docente.get(docente.id, [])
+        docente.comisiones = asignadas  # type: ignore[attr-defined]
+        docente.cantidad_comisiones = len(asignadas)  # type: ignore[attr-defined]
 
 
 def _traducir_duplicado(error: IntegrityError) -> None:

@@ -12,7 +12,12 @@ import {
   SEDES,
 } from '../mocks'
 import { TIPO_FACTURA } from '../domain/enums'
-import { normalizeCode, normalizeCuit, normalizeDocumento } from '../domain/normalize'
+import {
+  normalizeCode,
+  normalizeCuit,
+  normalizeDocumento,
+  normalizeWords,
+} from '../domain/normalize'
 
 /**
  * Implementación de ejemplo de la frontera de datos (D13).
@@ -81,14 +86,118 @@ function passwordInicial(nombre, documento) {
  * El ejemplo guarda el nombre ya junto y el conte en `comisiones_asignadas`, porque así venía de
  * la planilla del cliente; la fuente real devuelve `nombre` y `apellido` por separado y
  * `cantidad_comisiones`. La unión vive acá, en la frontera, para que la pantalla no tenga que
- * saber de dónde viene la fila (D33, M33).
+ * saber de dónde viene la fila (D33, M33). Las comisiones se pasan ya derivadas del catálogo de
+ * ejemplo: la pantalla muestra el código y el curso, no el conte de la planilla.
  */
-function filaDeDocente(docente) {
+function filaDeDocente(docente, comisiones = []) {
+  const asignadas = comisiones ?? []
   return {
     ...docente,
     nombre: `${docente.nombre} ${docente.apellido ?? ''}`.trim(),
-    comisiones_asignadas: docente.cantidad_comisiones ?? docente.comisiones_asignadas ?? 0,
+    comisiones: asignadas,
+    comisiones_asignadas: asignadas.length,
   }
+}
+
+/** Las comisiones reales del ejemplo para un docente, sin inventar las que no están. */
+function comisionesDelDocente(store, docenteId) {
+  return store.comisiones
+    .filter((comision) => comision.docente_id === docenteId)
+    .map((comision) => ({
+      id: comision.id,
+      codigo: comision.codigo,
+      nombre: comision.curso.nombre,
+    }))
+}
+
+const PREFIJO_DE_DNI = /^[0-9.\s-]+$/
+
+/** Posición de la primera palabra del nombre que coincide, respetando el orden de la consulta. */
+function posicionDeCoincidencia(palabrasNombre, palabrasConsulta) {
+  if (palabrasConsulta.length === 0) {
+    return null
+  }
+
+  let desde = 0
+  let primera = null
+  for (const palabra of palabrasConsulta) {
+    let encontrada = -1
+    for (let indice = desde; indice < palabrasNombre.length; indice += 1) {
+      if (palabrasNombre[indice].startsWith(palabra)) {
+        encontrada = indice
+        break
+      }
+    }
+    if (encontrada === -1) {
+      return null
+    }
+    if (primera === null) {
+      primera = encontrada
+    }
+    desde = encontrada + 1
+  }
+  return primera
+}
+
+/**
+ * Clave de orden de una coincidencia, o `null` si el docente no coincide.
+ *
+ * La primera componente prioriza nombre, después DNI y al final email; la segunda, la posición de
+ * la primera palabra que coincide dentro del nombre; la tercera desempata por `id`.
+ */
+function claveDeCoincidencia(docente, aguja) {
+  const palabras = normalizeWords(aguja)
+  const nombre = `${docente.nombre ?? ''} ${docente.apellido ?? ''}`
+  const posicion = posicionDeCoincidencia(normalizeWords(nombre), palabras)
+  if (posicion !== null) {
+    return [0, posicion, docente.id]
+  }
+
+  // Una sola letra se queda en el nombre y el apellido: no arrastra filas por el email.
+  if (palabras.length === 1 && palabras[0].length === 1 && /[A-Z]/.test(palabras[0])) {
+    return null
+  }
+
+  if (PREFIJO_DE_DNI.test(aguja)) {
+    const digitos = aguja.replace(/\D/g, '')
+    const dni = String(docente.dni ?? '').replace(/\D/g, '')
+    if (digitos !== '' && dni.startsWith(digitos)) {
+      return [1, 0, docente.id]
+    }
+  }
+
+  const email = normalizeCode(aguja)
+  if (palabras.length === 1 && email !== '' && normalizeCode(docente.email).startsWith(email)) {
+    return [2, 0, docente.id]
+  }
+
+  return null
+}
+
+function compararClaves(izquierda, derecha) {
+  for (let indice = 0; indice < izquierda.length; indice += 1) {
+    if (izquierda[indice] !== derecha[indice]) {
+      return izquierda[indice] - derecha[indice]
+    }
+  }
+  return 0
+}
+
+function buscarDocentesEnStore(store, texto) {
+  const aguja = String(texto ?? '').trim()
+  const activos = store.docentes.filter((docente) => docente.activo !== false)
+  const encontrados =
+    aguja === ''
+      ? activos
+      : activos
+          .map((docente) => ({ docente, clave: claveDeCoincidencia(docente, aguja) }))
+          .filter(({ clave }) => clave !== null)
+          .sort((izquierda, derecha) => compararClaves(izquierda.clave, derecha.clave))
+          .map(({ docente }) => docente)
+
+  return encontrados.map((docente) =>
+    filaDeDocente(docente, comisionesDelDocente(store, docente.id)),
+  )
 }
 
 function buscarPorTexto(registros, texto, campos) {
@@ -200,12 +309,14 @@ export function createMockDataSource() {
     },
 
     async listarDocentes() {
-      return store.docentes.map(filaDeDocente)
+      return store.docentes
+        .filter((docente) => docente.activo !== false)
+        .map((docente) => filaDeDocente(docente, comisionesDelDocente(store, docente.id)))
     },
 
     /** Búsqueda por nombre, apellido, DNI o email: lo que el buscador de la pantalla promete. */
     async buscarDocentes(texto) {
-      return buscarPorTexto(store.docentes, texto, ['nombre', 'dni', 'email']).map(filaDeDocente)
+      return buscarDocentesEnStore(store, texto)
     },
 
     /**
@@ -241,7 +352,12 @@ export function createMockDataSource() {
       for (const comision of store.comisiones) {
         const curso = comision.curso
         if (curso && !vistos.has(curso.codigo)) {
-          vistos.set(curso.codigo, { ...curso, id: vistos.size + 1, activo: true, descripcion: null })
+          vistos.set(curso.codigo, {
+            ...curso,
+            id: vistos.size + 1,
+            activo: true,
+            descripcion: null,
+          })
         }
       }
       return [...vistos.values()]
