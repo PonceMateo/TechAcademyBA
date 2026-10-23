@@ -146,9 +146,11 @@ y no la configuración.
 
 - **CodeGraph** indexa el repo en `.codegraph/`, que es local y no está versionado. El MCP se
   lanza con `npx` desde `opencode.json`, así que no hace falta instalarlo en la máquina. Si el
-  índice falta, corré `npx -y @colbymchenry/codegraph init` desde la raíz del repo y después
-  usá CodeGraph como siempre. Si `npx` no existe (máquina sin Node), no insistas: avisale al
-  usuario y seguí con Read, Grep y Glob.
+  índice falta (primera vez en esa máquina), no lo inicialices por tu cuenta: en la primera
+  tarea del repo, sea la que sea, preguntale al usuario si lo inicializás con
+  `npx -y @colbymchenry/codegraph init` (recomendado: tarda un par de segundos y mejora todas
+  las consultas) o si seguís con Read, Grep y Glob. Si `npx` no existe (máquina sin Node),
+  avisale y seguí con Read, Grep y Glob.
 - **Context7** es para documentación de librerías. La lógica del proyecto se lee en el repo.
 - **Engram** conserva decisiones entre sesiones. Se registra con `engram setup opencode`, que
   escribe en la configuración global de cada máquina y por eso no está en el repo.
