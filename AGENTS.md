@@ -18,6 +18,38 @@ que está entre ellos.
 - `docs/glossary.md` traduce la terminología del cliente: consultalo antes de
   nombrar un concepto del dominio.
 
+## Herramientas
+
+Antes de cualquier tarea, incluida una planificación, corré una sola vez por
+sesión `node .opencode/commands/check-tools.mjs`. Si todas las líneas dicen OK,
+seguí. Si alguna no, hacé su pregunta de abajo y resolvela antes de arrancar
+ninguna skill ni planificación.
+
+Cada vez que este archivo diga "preguntá", usá la herramienta `question` de
+opencode (opción múltiple), no texto libre. Si un MCP falla, casi siempre es el
+binario que lo lanza (Node, `npx`), no la config de `opencode.json`.
+
+- **gh** (`FALTA`, `SIN_SESION` o `SIN_SCOPE_PROJECT`). Preguntá con «Sí (abre
+  una pestaña nueva)» / «No». Por qué conviene el Sí: el backlog vive en el
+  board de GitHub y, sin `gh`, no podés leer las historias actuales ni su
+  estado, y trabajarías con información del repo que puede estar desactualizada.
+  Instalar: `winget install --id GitHub.cli -e` (Windows), `brew install gh`
+  (macOS/Linux) o, si en Linux no funciona, la guía oficial
+  (https://github.com/cli/cli/blob/trunk/docs/install_linux.md).
+  Login: `gh auth login --web -s project` (o `gh auth refresh -s project`).
+  Nunca pidas el token por chat.
+  Plan B: si el usuario no quiere, seguí con lo que haya en el repo y decilo.
+- **CodeGraph** (`SIN_INDICE` o devuelve vacío). Preguntá una vez con «Sí
+  (recomendado)» / «No» si correr `npx -y @colbymchenry/codegraph init`. Por qué
+  conviene el Sí: el índice permite encontrar símbolos y llamadas sin leer
+  archivos enteros, así que gasta menos tokens y acierta más; es local y se
+  hace una sola vez por máquina.
+  Plan B: si no hay Node o dice que no, usá Read, Grep y Glob.
+- **Context7.** Documentación de librerías. Si falla, no inventes APIs ni
+  versiones y avisá que no pudiste verificarlas.
+- **Engram.** Memoria entre sesiones (`engram setup opencode`, por máquina). Si
+  falla, seguí sin memoria.
+
 ## Comandos y estructura
 
 Todo corre en contenedores con `docker compose`, no con Python ni Node locales.
@@ -35,10 +67,20 @@ Mapa de carpetas: sección "Estructura".
    gh issue view <número> --json title,body,state
    ```
 
+   Copiá el primer comando tal cual, sin cambiar los campos del `--jq`, y filtrá
+   las filas después (por ejemplo, `| Select-String "Done"` en PowerShell). Nunca
+   vuelques el JSON completo del board: trae el cuerpo de cada issue.
+
    Siempre con `--limit 100` (sin eso recorta a 30 y parece que faltan
-   historias) y filtrá con `--jq`. Cada historia es un issue `H/U <n> · <título>`;
-   el número del issue no es el de la historia. Priority es MoSCoW (`Must`, `Should`, `Could`, `Won't`). 
-   Una historia está terminada cuando `Status` es `Done`, no cuando el issue está cerrado.
+   historias). Cada historia es un issue `H/U <n> · <título>`; el número del
+   issue no es el de la historia. Priority es MoSCoW (`Must`, `Should`, `Could`,
+   `Won't`). Una historia está terminada cuando `Status` es `Done`, no cuando el
+   issue está cerrado.
+
+   En Windows (PowerShell) no uses `head`, `grep`, `ls -la`, `&&` ni rutas
+   `/tmp`: usá `Select-Object -First N`, `Select-String`,
+   `Get-ChildItem -Force`, `;` y `$env:TEMP`. No pongas comillas dobles dentro de
+   `--jq` (PowerShell 5.1 las pierde y `jq` falla).
 2. **Contextualización del problema** (`docs/requirements/`): modelo de negocio.
 3. **Maqueta PPTX:** alcance negociado y los dos caminos de MVP.
 4. **Figma:** pantallas y estilo. Aporta cero datos.
@@ -143,37 +185,6 @@ no entra en ninguna de estas áreas, no cargues skills.
 El proyecto vive en Supabase + Vercel. Si el MCP de Supabase está conectado,
 usá `supabase` en tareas que lo toquen. Hoy `opencode.json` no lo declara: si no
 aparece conectado, no inventes el estado de la base.
-
-## Herramientas
-
-Estas herramientas ordenan el flujo de desarrollo y ahorran tokens. Las marcadas
-como (esencial) tienen que funcionar: si una falla, avisale al usuario y seguí
-con el plan B indicado en su punto.
-
-Los MCP se declaran en `opencode.json`. Si uno falla, casi siempre es el binario
-que lo lanza (Node, `npx`), no la config.
-
-Cada vez que este archivo diga "preguntá", usá la herramienta de preguntas de
-opencode (`question`, opción múltiple), no texto libre.
-
-- **gh (esencial).** Si necesitás el board y `gh` no está instalado o no tiene
-  sesión, preguntá con «Sí (abre una pestaña nueva)» / «No». Instalar:
-  `winget install --id GitHub.cli -e` (Windows), `brew install gh` (macOS/Linux)
-  o, si en Linux no funciona, consultá la guía oficial
-  (https://github.com/cli/cli/blob/trunk/docs/install_linux.md).
-  Login una vez por máquina: `gh auth login --web -s project` (o
-  `gh auth refresh -s project`). Nunca pidas el token por chat.
-  Plan B: si el usuario no quiere instalarlo, seguí con lo que haya en el repo y
-  decilo.
-- **CodeGraph (esencial).** Indexa el repo en `.codegraph/` (local). Si el índice
-  no existe o devuelve vacío, preguntá una vez con «Sí (recomendado)» / «No» si
-  correr `npx -y @colbymchenry/codegraph init`.
-  Plan B: si no hay Node o el usuario dice que no, usá Read, Grep y Glob.
-- **Context7 (esencial).** Documentación de librerías; la lógica del proyecto se
-  lee en el repo.
-  Plan B: no inventes APIs ni versiones; avisá que no pudiste verificarlas.
-- **Engram.** Memoria entre sesiones; se configura por máquina con
-  `engram setup opencode`. Si falla, seguí sin memoria.
 
 ## Convenciones técnicas
 
