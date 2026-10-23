@@ -1520,7 +1520,7 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ## Fuente de verdad del backlog
 
-### D48 — GitHub Projects es la única fuente viva del backlog
+### D49 — GitHub Projects es la única fuente viva del backlog
 
 - **Fecha:** 2026-10-23
 - **Autor:** Mateo Ponce
