@@ -1,5 +1,17 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "opencode": {
+      "models": {
+        "deepseek-v4.1-flash-free": {
+          "limit": {
+            "context": 800000,
+            "output": 128000
+          }
+        }
+      }
+    }
+  },
   "mcp": {
     "codegraph": {
       "type": "local",
