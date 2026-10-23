@@ -77,9 +77,24 @@ ahí corresponde una propuesta.
 
 ## Ramas
 
-- `feat/hu-<n>-<slug>` — historia de usuario `<n>`. Ejemplo: `feat/hu-27-estado-habilitacion`.
+Toda rama lleva al final el nombre y el apellido de quien la crea, en ese orden
+y con guiones: `<tipo>/<slug>/<Nombre>-<Apellido>`.
+
+- `feat/hu-<n>-<slug>` — historia de usuario `<n>`. Ejemplo:
+  `feat/hu-27-estado-habilitacion/Mateo-Ponce`.
 - `fix/<slug>` — corrección sin historia asociada.
 - `chore/<slug>` — higiene, tooling, documentación, configuración.
+
+Integrantes y su `git config user.name`:
+
+| `user.name`     | Autor de la rama    |
+|-----------------|---------------------|
+| `PonceMateo`    | `Mateo-Ponce`       |
+| `santitorrens1` | `Santiago-Torrens`  |
+| `agutor`        | `Agustin-Torres`    |
+
+Antes de crear la rama, mirá `git config user.name`. Si no está en esta tabla,
+no adivines: preguntá con una pregunta de tres opciones, una por integrante.
 
 Rama base: `main`. Un work unit, un commit.
 
