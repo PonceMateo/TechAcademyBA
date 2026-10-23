@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Badge, Button, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { buscarDocentes, crearDocente } from '../services/dataService'
@@ -38,7 +38,21 @@ const COLUMNAS = [
   {
     clave: 'comisiones',
     titulo: 'COMISIONES ASIGNADAS',
-    render: (fila) => fila.comisiones_asignadas,
+    render: (fila) => {
+      const comisiones = fila.comisiones ?? []
+      if (comisiones.length === 0) {
+        return <span className="text-slate-500">Sin comisión</span>
+      }
+      return (
+        <span className="block space-y-1">
+          {comisiones.map((comision) => (
+            <span key={comision.id} className="block">
+              {comision.codigo} · {comision.nombre}
+            </span>
+          ))}
+        </span>
+      )
+    },
   },
   {
     clave: 'estado',
@@ -60,9 +74,27 @@ export function TeachersPage() {
   const [aviso, setAviso] = useState(null)
   const [fallo, setFallo] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  const ultimaConsulta = useRef(0)
 
   useEffect(() => {
-    buscarDocentes(consulta).then(setDocentes)
+    // Un contador identifica cada consulta y la limpieza apaga la anterior: una respuesta vieja
+    // no puede pisar el resultado más reciente, aunque el temporizador ya se haya disparado.
+    const consultaActual = ultimaConsulta.current + 1
+    ultimaConsulta.current = consultaActual
+    let vigente = true
+    const demora = consulta.trim() === '' ? 0 : 300
+    const temporizador = setTimeout(() => {
+      buscarDocentes(consulta).then((resultado) => {
+        if (vigente && consultaActual === ultimaConsulta.current) {
+          setDocentes(resultado)
+        }
+      })
+    }, demora)
+
+    return () => {
+      vigente = false
+      clearTimeout(temporizador)
+    }
   }, [consulta])
 
   function cambiar(campo) {
@@ -143,7 +175,7 @@ export function TeachersPage() {
         <Table
           columnas={COLUMNAS}
           filas={docentes}
-          vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
+          vacio={<p className="text-sm text-slate-500">No se encontraron docentes</p>}
         />
       </Card>
 

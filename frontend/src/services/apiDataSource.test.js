@@ -51,6 +51,32 @@ describe('la fuente real usa las rutas del contrato', () => {
     expect(ultimaRuta(fetchMock)).toMatch(/\/sedes$/)
   })
 
+  it('busca docentes con q y mapea las comisiones de la respuesta', async () => {
+    const fetchMock = responder(200, [
+      {
+        id: 1,
+        nombre: 'Rita',
+        apellido: 'Molina',
+        dni: '30111222',
+        cuil: null,
+        email: 'rita.molina@techacademy.invalid',
+        telefono: null,
+        activo: true,
+        cantidad_comisiones: 1,
+        comisiones: [{ id: 7, codigo: 'CUR101-1', nombre: 'Python Inicial' }],
+      },
+    ])
+
+    const [fila] = await createApiDataSource().buscarDocentes('rita molina')
+
+    expect(ultimaRuta(fetchMock)).toMatch(/\/docentes\?q=rita\+molina$/)
+    expect(fila).toMatchObject({
+      nombre: 'Rita Molina',
+      comisiones_asignadas: 1,
+      comisiones: [{ id: 7, codigo: 'CUR101-1', nombre: 'Python Inicial' }],
+    })
+  })
+
   it('manda el cuerpo del alta tal cual lo arma la pantalla', async () => {
     const fetchMock = responder(200, { id: 1, codigo: 'CUR001' })
 

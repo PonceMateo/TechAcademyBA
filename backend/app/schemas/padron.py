@@ -33,11 +33,26 @@ class DocenteCreate(BaseModel):
     telefono: str | None = Field(default=None, max_length=40)
 
 
+class ComisionDeDocenteOut(BaseModel):
+    """Comisión asignada a un docente, tal como la muestra el padrón (historia #10).
+
+    `codigo` es el derivado `{curso.codigo}-{numero}` (D34) y `nombre` es el nombre del curso. No
+    se devuelve el `curso_id` ni la comisión completa: la pantalla solo necesita identificar la
+    comisión y decir qué se dicta.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    codigo: str
+    nombre: str
+
+
 class DocenteOut(BaseModel):
     """Fila de `GET /docentes` y respuesta de `POST /docentes`.
 
-    `cuil` puede venir `None` (D33) y `cantidad_comisiones` es una derivación por consulta,
-    consistente con D10: la pantalla ya la muestra y no vale la pena guardarla.
+    `cuil` puede venir `None` (D33), `comisiones` sale de las relaciones reales de `comision`
+    (historia #10) y `cantidad_comisiones` se conserva como derivación de esa misma lista.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -51,3 +66,4 @@ class DocenteOut(BaseModel):
     telefono: str | None
     activo: bool
     cantidad_comisiones: int
+    comisiones: list[ComisionDeDocenteOut] = Field(default_factory=list)
