@@ -106,6 +106,13 @@ Este proyecto maqueta: cerrar issues a medias hace que el backlog mienta sobre
 el estado real del producto. La plantilla del PR pide el issue o `ninguno,
 cambio menor`.
 
+## Migraciones
+
+Si la rama toca `backend/alembic/` (una versión nueva o modificada), avisale al
+usuario antes de pushear a `main`: el deploy de Vercel no corre
+`alembic upgrade head`, así que la migración de Supabase en producción se aplica
+a mano. Pushear sin aplicarla deja el backend contra un schema que no existe.
+
 ## Decisiones
 
 Toda decisión técnica no funcional, y la causa raíz de un error, se registra en
@@ -132,6 +139,45 @@ causa casi siempre es el binario que lo lanza (Node, `npx`), no la config.
 - **Engram.** Memoria entre sesiones; se configura con `engram setup opencode`
   en la configuración global de cada máquina, por eso no está en el repo.
 
+## Skills por área
+
+Estas son las skills de este repo (`.opencode/skills/`). Cargá la que
+corresponda antes de tocar el código. Las skills globales
+de cada máquina no se listan acá y no se asumen para el resto del equipo.
+
+| Skill | Categoría | Cuándo |
+|---|---|---|
+| `fastapi` | backend | Rutas, schemas, dependencias, SSE |
+| `supabase-postgres-best-practices` | base de datos | Antes de tocar schema, migraciones o índices |
+| `sql-optimization-patterns` | base de datos | Consultas lentas, EXPLAIN, índices |
+| `vercel-react-best-practices` | frontend | Componentes, hooks, data fetching |
+| `ui-styling` | frontend | Componentes, Tailwind, shadcn, temas |
+| `vercel-react-view-transitions` | frontend | Transiciones y animaciones de ruta |
+| `image-to-code` | frontend | Implementar una pantalla desde una imagen |
+| `ui-ux-pro-max` | diseño | Pantallas nuevas, revisión de UX, accesibilidad |
+| `design-system` | diseño | Tokens y escalas tipográficas |
+| `design` | diseño | Identidad, logos, mockups |
+| `brand` | diseño | Voz y consistencia de marca |
+| `banner-design` | diseño | Banners y piezas para redes |
+| `slides` | diseño | Presentaciones HTML |
+| `openspec-explore` | OpenSpec | Pensar un cambio antes de proponerlo |
+| `openspec-propose` | OpenSpec | Crear un change con todos sus artefactos |
+| `openspec-update-change` | OpenSpec | Revisar los artefactos de un change |
+| `openspec-apply-change` | OpenSpec | Implementar las tareas de un change |
+| `openspec-sync-specs` | OpenSpec | Pasar el delta a los specs principales |
+| `openspec-archive-change` | OpenSpec | Archivar un change terminado |
+| `grilling` | planificación | Interrogatorio para acordar alcance |
+| `grill-me` | planificación | Igual que `grilling`, en inglés |
+| `find-skills` | utilidades | Buscar o instalar skills nuevas |
+| `supabase` | base de datos | Proyecto de Supabase en producción: schema, auth, RLS, logs |
+
+
+El proyecto vive en Supabase + Vercel en producción. Si el MCP de Supabase está
+conectado, usá `supabase` en cualquier tarea que lo toque, y
+`supabase-postgres-best-practices` antes de cambiar el schema. Hoy
+`opencode.json` no declara ese MCP: si no aparece conectado, no inventes el
+estado de la base.
+
 ## Convenciones técnicas
 
 No se negocian por historia; el detalle está en `docs/decisions.md`.
@@ -144,8 +190,8 @@ No se negocian por historia; el detalle está en `docs/decisions.md`.
   `Inscripcion`, `Cobranza`, sin tildes en el código. Nombres, código y paths en
   inglés; el glosario traduce hacia afuera.
 - **La UI es es-AR** y no hay i18n: los strings no se extraen.
-- **Solo el login llama al backend.** El resto del frontend consume
-  `src/services/`, única frontera de datos; los componentes no importan
-  `src/mocks/` ni conocen la fuente.
-- **Los datos del maquetado son placeholders.** La secretaría carga los reales
-  cuando el sistema esté funcional.
+- **Los componentes no llaman al backend.** Todo pasa por `src/services/`, única
+  frontera de datos, salvo el login y el cambio de contraseña
+  (`src/auth/authClient.js`). Los componentes no importan `src/mocks/` ni
+  conocen la fuente. `src/mocks/` es solo infraestructura de test: no agregues
+  datos inventados a las pantallas.
