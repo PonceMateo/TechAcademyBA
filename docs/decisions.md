@@ -1672,3 +1672,38 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/mockDataSource.js`, `frontend/src/services/dataService.test.jsx` y
   `frontend/src/services/apiDataSource.test.js`.
+
+---
+
+## Edición de comisión (change `hu-4-editar-comision`)
+
+### D51 — El cupo se valida contra las inscripciones activas y la edición no toca el resto del contrato
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** `PUT /comisiones/{id}` actualiza `docente_id`, `dias_horarios`, `arancel` y
+  `cupo_maximo`. El curso, el número, la modalidad, la sede y el código quedan fuera del contrato
+  con `extra="forbid"`, así que mandarlos responde `422` y la comisión conserva esos valores. El
+  código derivado `{curso.codigo}-{numero}` (D34) tampoco cambia: no es una columna.
+- **Cupo:** la reducción se compara contra las inscripciones en estado `ACTIVA`, el mismo criterio
+  que `vacantes` (D10) y que el rechazo de la comisión llena. `EN_ESPERA`, `BAJA` y `COMPLETADA` no
+  ocupan banco. Cuando el cupo nuevo es menor, la API responde `422` —y no `409`, que queda para
+  los conflictos de unicidad— con un mensaje que dice cuántos inscriptos hay. No hay CHECK en la
+  base: la cantidad vive en otra tabla y un CHECK no puede consultarla.
+- **Techo asumido:** la cuenta de inscriptos y el `UPDATE` no están serializados contra una
+  inscripción simultánea, igual que hoy el alta de inscripción cuenta y después inserta. Cerrarlo
+  de verdad exige `SELECT ... FOR UPDATE` en los dos caminos, y el de inscripción no es de esta
+  historia; a la escala del proyecto la ventana es despreciable y una edición posterior lo corrige.
+- **Inscriptos en el modal:** la pantalla los deriva como `cupo_maximo - vacantes` de la fila, sin
+  agregar un campo al contrato. Es un dato de contexto para que la secretaría vea el piso; la
+  autoridad es el servidor y su rechazo se muestra tal cual.
+- **Docente inactivo:** el selector ofrece el docente asignado aunque no esté activo, rotulado
+  `(baja)`, porque `GET /docentes` devuelve solo activos y sin esa opción una comisión con un
+  docente dado de baja no se podría guardar ni para corregir el arancel.
+- **Por qué:** el texto de la HU 4 pide corregir la oferta sin tocar inscripciones ni pagos, y el
+  cupo es el único dato nuevo del que hay que impedir un estado incoherente.
+- **Dónde:** `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`,
+  `backend/app/api/catalogo.py`, `backend/app/tests/test_edicion_comision.py`,
+  `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/CoursesPage.test.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js` y
+  `frontend/src/services/mockDataSource.js`.
