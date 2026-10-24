@@ -1556,6 +1556,48 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+### D49 — La HU 21 registra la cobranza y la solicitud de Factura A, sin emitir factura
+
+- **Fecha:** 2026-10-23
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `POST /cobranzas` y `GET /cobranzas` son de Administración
+  (`require_roles(Rol.ADMIN)`) y persisten `Pagador`, `Cobranza` e `Imputacion` en una sola
+  transacción. Un alta incompleta no deja filas parciales.
+- **Pagador:** se crea uno por operación, sin deduplicación ni padrón de pagadores. El formulario
+  no captura documento en los pagos normales y el cliente pidió no administrar un maestro de
+  terceros; el nombre del titular se conserva tal como se ingresó. La HU 22 podrá agregar la
+  búsqueda o el padrón sin cambiar el contrato de esta historia.
+- **Imputación:** el formulario elige un alumno, pero el modelo exige una inscripción. Se agrega
+  `GET /alumnos/{id}/inscripciones` y `POST /cobranzas` acepta `inscripcion_id`. El backend valida
+  que la inscripción exista, pertenezca al alumno y esté `ACTIVA`. Si se omite y el alumno tiene
+  exactamente una activa, la usa; con cero o varias responde 422. No se elige la "más reciente":
+  imputar a una comisión equivocada es peor que pedir una elección.
+- **Factura A:** la HU 21 **no crea registros `Factura`**. La solicitud queda en
+  `cobranza.factura_a_solicitada` (migración aditiva `0004_cobranza_factura_a`) y el CUIT válido
+  se guarda en `Pagador.documento` y `Pagador.documento_norm`. La emisión es la HU 25. Sin
+  solicitud no se asume Factura B: el historial muestra `A` solo cuando se pidió y `—` en los
+  demás casos.
+- **Validación:** Pydantic rechaza fecha futura en `America/Argentina/Buenos_Aires`, importe
+  menor o igual a cero, medio o estado fuera del enum, causa vacía cuando el comprobante no está
+  acreditado y CUIT sin dígito verificador. Los CHECKs de la base siguen como segunda defensa.
+  Un error de integridad se traduce a 422 con un mensaje de interfaz, sin exponer SQL.
+- **Historial:** `GET /cobranzas` ordena por fecha e id descendente, devuelve pagador e imputación
+  resueltos y acepta `q` para coincidencia parcial por nombre de titular. El frontend recarga el
+  historial después de un `201` y solo confirma cuando la API respondió bien.
+- **Pantalla:** conserva los campos y la identidad visual. Al elegir alumno carga sus
+  inscripciones activas: con una la muestra seleccionada, con varias ofrece el selector
+  `Comisión a Imputar`, sin ninguna bloquea el alta imputada. El CUIT aparece solo al marcar
+  Factura A. La fecha futura se valida antes de enviar.
+- **Dónde:** `backend/app/models/cobranza.py`, `backend/alembic/versions/0004_cobranza_factura_a.py`,
+  `backend/app/schemas/cobranzas.py`, `backend/app/services/cobranzas.py`,
+  `backend/app/api/cobranzas.py`, `backend/app/api/alumnos.py`, `backend/app/api/router.py`,
+  `backend/app/services/inscripciones.py`, `backend/app/tests/test_cobranzas_api.py`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/admin/PaymentsPage.jsx`,
+  `frontend/src/admin/PaymentsPage.test.jsx` y las pruebas de la frontera de datos.
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven

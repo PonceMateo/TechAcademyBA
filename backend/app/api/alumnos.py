@@ -32,7 +32,8 @@ from app.schemas.alumnos import (
     AlumnoUpdate,
     RestablecerPasswordRequest,
 )
-from app.services import alumnos
+from app.schemas.inscripciones import ComisionDisponibleOut, InscripcionDisponibleOut
+from app.services import alumnos, inscripciones
 from app.services.auth import PasswordInvalida
 from app.services.emails import EmailAlreadyRegistered
 
@@ -49,6 +50,40 @@ def listar_alumnos(
     q: str | None = Query(default=None),
 ) -> list[AlumnoOut]:
     return [AlumnoOut.model_validate(a) for a in alumnos.listar_alumnos(session, q)]
+
+
+@router.get(
+    "/{alumno_id}/inscripciones",
+    response_model=list[InscripcionDisponibleOut],
+    summary="Consultar las inscripciones activas de un alumno",
+)
+def listar_inscripciones_del_alumno(
+    alumno_id: int,
+    session: Annotated[Session, Depends(get_db)],
+    _admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> list[InscripcionDisponibleOut]:
+    """Inscripciones ACTIVA del alumno, para elegir a cuál imputar una cobranza (HU 21).
+
+    Si el alumno no existe responde 404. La pantalla usa esta consulta para seleccionar sola la
+    única inscripción, pedir una elección cuando hay varias o bloquear el pago imputado cuando no
+    hay ninguna.
+    """
+    try:
+        lista = inscripciones.listar_inscripciones_activas(session, alumno_id)
+    except inscripciones.AlumnoNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+    return [
+        InscripcionDisponibleOut(
+            id=inscripcion.id,
+            estado=inscripcion.estado,
+            comision=ComisionDisponibleOut(
+                codigo=inscripcion.comision.codigo,
+                nombre=inscripcion.comision.curso.nombre,
+            ),
+        )
+        for inscripcion in lista
+    ]
 
 
 @router.post(

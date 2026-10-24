@@ -223,16 +223,20 @@ describe('la implementación de ejemplo', () => {
       fecha: '2026-06-01',
       titular: 'Juan Ignacio Pérez',
       medio: 'EFECTIVO',
-      facturaTipo: 'B',
+      factura_a_solicitada: false,
       importe: 45000,
       estado: 'ACREDITADO',
-      alumnoId: 1,
+      alumno_id: 1,
+      inscripcion_id: 1,
     })
 
     const despues = await fuente.listarCobranzas()
     expect(despues).toHaveLength(antes.length + 1)
     expect(despues[0].fecha).toBe('2026-06-01')
     expect(despues[0].imputacion.nombre).toBe('Juan Ignacio Pérez')
+    // HU 21: sin solicitud no se inventa una Factura B.
+    expect(despues[0].factura).toBeNull()
+    expect(despues[0].factura_a_solicitada).toBe(false)
   })
 
   it('deja la causa vacía cuando el cobro queda acreditado', async () => {
@@ -242,13 +246,37 @@ describe('la implementación de ejemplo', () => {
       fecha: '2026-06-02',
       titular: 'Alguien',
       medio: 'CHEQUE',
-      facturaTipo: 'A',
+      factura_a_solicitada: true,
+      cuit_titular: '30-12345678-1',
       importe: 1000,
       estado: 'ACREDITADO',
-      alumnoId: 1,
+      alumno_id: 1,
+      inscripcion_id: 1,
     })
 
     expect(cobranza.causa).toBeNull()
+    expect(cobranza.factura).toBe('A')
+  })
+
+  it('busca en el historial por coincidencia parcial del titular', async () => {
+    const fuente = createMockDataSource()
+
+    const coincidencias = await fuente.listarCobranzas('rodríguez')
+    expect(coincidencias.length).toBeGreaterThan(0)
+    expect(
+      coincidencias.every((fila) => fila.pagador.nombre.toLowerCase().includes('rodríguez')),
+    ).toBe(true)
+
+    expect(await fuente.listarCobranzas('nadie con ese nombre')).toHaveLength(0)
+  })
+
+  it('devuelve la inscripción del alumno para elegir a dónde imputar', async () => {
+    const fuente = createMockDataSource()
+
+    const inscripciones = await fuente.listarInscripcionesDeAlumno(1)
+    expect(inscripciones).toHaveLength(1)
+    expect(inscripciones[0].estado).toBe('ACTIVA')
+    expect(inscripciones[0].comision.codigo).toBe('CUR-101')
   })
 
   it('exige motivo para forzar un bloqueo y anota el usuario con la fecha', async () => {

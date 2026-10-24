@@ -25,3 +25,18 @@ class InscripcionOut(BaseModel):
     comision_id: int
     categoria: str
     estado: str
+
+
+class ComisionDisponibleOut(BaseModel):
+    """Comisión que la pantalla muestra al elegir a qué inscripción imputar (HU 21)."""
+
+    codigo: str
+    nombre: str
+
+
+class InscripcionDisponibleOut(BaseModel):
+    """Inscripción activa de un alumno para imputar una cobranza (HU 21)."""
+
+    id: int
+    estado: str
+    comision: ComisionDisponibleOut

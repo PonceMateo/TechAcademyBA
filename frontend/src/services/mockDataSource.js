@@ -366,10 +366,12 @@ export function createMockDataSource() {
     /** Alta de curso de ejemplo. El código se arma acá porque no hay base que lo genere. */
     async crearCurso({ nombre, descripcion }) {
       const existentes = await this.listarCursos()
-      const siguiente = existentes.reduce(
-        (mayor, curso) => Math.max(mayor, Number.parseInt(curso.codigo.replace(/\D/g, ''), 10) || 0),
-        0,
-      ) + 1
+      const siguiente =
+        existentes.reduce(
+          (mayor, curso) =>
+            Math.max(mayor, Number.parseInt(curso.codigo.replace(/\D/g, ''), 10) || 0),
+          0,
+        ) + 1
       return {
         id: siguienteId(existentes),
         codigo: `CUR${String(siguiente).padStart(3, '0')}`,
@@ -385,13 +387,23 @@ export function createMockDataSource() {
      * no por código. Buscarlo por código fue lo que escondió el contrato roto del lado de la
      * pantalla: el ejemplo aceptaba un string donde la base exige un entero.
      */
-    async crearComision({ curso_id, docente_id, dias_horarios, arancel, cupo_maximo, modalidad, sede_id }) {
+    async crearComision({
+      curso_id,
+      docente_id,
+      dias_horarios,
+      arancel,
+      cupo_maximo,
+      modalidad,
+      sede_id,
+    }) {
       const cursos = await this.listarCursos()
       const curso = cursos.find((candidato) => String(candidato.id) === String(curso_id))
       const delCurso = store.comisiones.filter(
         (comision) => normalizeCode(comision.curso.codigo) === normalizeCode(curso?.codigo),
       )
-      const docente = store.docentes.find((candidato) => String(candidato.id) === String(docente_id))
+      const docente = store.docentes.find(
+        (candidato) => String(candidato.id) === String(docente_id),
+      )
       const sede = store.sedes.find((candidato) => String(candidato.id) === String(sede_id))
       const comision = {
         id: siguienteId(store.comisiones),
@@ -433,7 +445,13 @@ export function createMockDataSource() {
       comision.vacantes = comision.cupo_maximo - comision.inscriptos
       store.inscripciones = store.inscripciones || []
       store.inscripciones.push({ alumno_id, comision_id, estado: 'ACTIVA' })
-      return { id: store.inscripciones.length, alumno_id, comision_id, categoria: 'PARTICULAR', estado: 'ACTIVA' }
+      return {
+        id: store.inscripciones.length,
+        alumno_id,
+        comision_id,
+        categoria: 'PARTICULAR',
+        estado: 'ACTIVA',
+      }
     },
 
     /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
@@ -623,8 +641,40 @@ export function createMockDataSource() {
       return copiar(store.sedes)
     },
 
-    async listarCobranzas() {
-      return copiar(store.cobranzas)
+    async listarCobranzas(q = '') {
+      const aguja = String(q ?? '')
+        .trim()
+        .toLowerCase()
+      const filas =
+        aguja === ''
+          ? store.cobranzas
+          : store.cobranzas.filter((fila) => fila.pagador.nombre.toLowerCase().includes(aguja))
+      return copiar(filas)
+    },
+
+    /**
+     * Inscripciones del alumno en el ejemplo. Cada alumno tiene una sola comisión en el
+     * maquetado; el identificador estable es el del alumno porque el mock no guarda
+     * inscripciones con id propio.
+     */
+    async listarInscripcionesDeAlumno(alumnoId) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === Number(alumnoId))
+      if (alumno === undefined) {
+        throw new Error('El alumno no existe.')
+      }
+      if (alumno.comision === null || alumno.comision === undefined) {
+        return []
+      }
+      return [
+        {
+          id: alumno.id,
+          estado: 'ACTIVA',
+          comision: {
+            codigo: alumno.comision.codigo,
+            nombre: alumno.comision.nombre,
+          },
+        },
+      ]
     },
 
     /**
@@ -674,21 +724,24 @@ export function createMockDataSource() {
      * cual vino. La imputación es de destino único (D7) y sale del alumno elegido.
      */
     async registrarCobranza(datos) {
-      const id = store.cobranzas.length + 1
+      const id = siguienteId(store.cobranzas)
+      const alumno = store.alumnos.find((candidato) => candidato.id === datos.alumno_id)
       const cobranza = {
         id,
         fecha: datos.fecha,
-        pagador: { id, nombre: datos.titular },
+        pagador: { id, nombre: datos.titular, documento: datos.cuit_titular ?? null },
         medio: datos.medio,
-        factura: datos.facturaTipo,
+        factura: datos.factura_a_solicitada ? TIPO_FACTURA.A : null,
+        factura_a_solicitada: Boolean(datos.factura_a_solicitada),
         importe: Number(datos.importe),
         estado: datos.estado,
         causa: datos.estado === 'ACREDITADO' ? null : (datos.causa ?? ''),
-        imputacion: datos.alumnoId
+        imputacion: datos.alumno_id
           ? {
               destino: DESTINO_IMPUTACION.ALUMNO,
-              id: datos.alumnoId,
-              nombre: store.alumnos.find((alumno) => alumno.id === datos.alumnoId)?.nombre ?? '',
+              id: datos.inscripcion_id ?? datos.alumno_id,
+              inscripcion_id: datos.inscripcion_id ?? null,
+              nombre: alumno?.nombre ?? '',
             }
           : null,
         _ejemplo: true,

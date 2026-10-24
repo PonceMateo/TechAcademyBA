@@ -142,8 +142,13 @@ export function listarSedes() {
   return getDataSource().listarSedes()
 }
 
-export function listarCobranzas() {
-  return getDataSource().listarCobranzas()
+export function listarCobranzas(q = '') {
+  return getDataSource().listarCobranzas(q)
+}
+
+/** Inscripciones activas de un alumno, para elegir a cuál imputar un pago (HU 21). */
+export function listarInscripcionesDeAlumno(alumnoId) {
+  return getDataSource().listarInscripcionesDeAlumno(alumnoId)
 }
 
 export function buscarHabilitacion(consulta) {
