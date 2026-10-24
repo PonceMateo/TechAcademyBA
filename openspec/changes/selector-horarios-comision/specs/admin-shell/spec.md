@@ -27,13 +27,16 @@ con los datos que la fuente informa de cada una. La pantalla SHALL NOT inventar 
 para completar el catálogo.
 
 Cuando los datos de la pantalla salen del ejemplo —el modo `mock`, que solo entra cuando un endpoint
-no existe— las filas son un subconjunto de las diez comisiones del cliente: `CUR-101` Python Inicial
-con Profe Martín, `Mar y Jue 19 a 21 hs`, cupo 30, 7 vacantes y arancel `$45.000`; `CUR-104` Diseño
-UX/UI Avanzado con Caro UX, `Miércoles 19 a 22`, cupo 20, 0 vacantes y `$52.000`; `CUR-108` Java
-Backend Spring con Ing. González, `Sábados intensivo`, cupo 30, 30 vacantes y `$58.000`; `CUR-110`
-Power BI & Dashboards con Mariana Data, `Mar y Jue 18:30`, cupo 40, 40 vacantes y `$39.000`; y
-`CUR-103` Marketing Digital & Ads con Santi Ads, `Sábados 10 a 13 hs`, cupo 40, 40 vacantes y
-`$38.000`. En el modo por omisión las filas son las que hay en la base, no las del ejemplo.
+no existe— las filas son un subconjunto de las diez comisiones del cliente, y cada comisión del
+ejemplo se arma con horarios estructurados, de modo que la columna `HORARIO` muestra el texto que
+deriva de ellos: `CUR-101` Python Inicial con Profe Martín, `Mar y Jue 19-21hs`, cupo 30, 7 vacantes
+y arancel `$45.000`; `CUR-104` Diseño UX/UI Avanzado con Caro UX, `Mié 19-22hs`, cupo 20, 0
+vacantes y `$52.000`; `CUR-108` Java Backend Spring con Ing. González, `Sáb 9-13hs`, cupo 30, 30
+vacantes y `$58.000`; `CUR-110` Power BI & Dashboards con Mariana Data, `Mar y Jue 18:30-20:30hs`,
+cupo 40, 40 vacantes y `$39.000`; y `CUR-103` Marketing Digital & Ads con Santi Ads, `Sáb 10-13hs`,
+cupo 40, 40 vacantes y `$38.000`. El modo mock SHALL NOT guardar horarios que el selector no podría
+producir: los textos del ejemplo salen de los horarios estructurados, no de escribirlos a mano. En
+el modo por omisión las filas son las que hay en la base, no las del ejemplo.
 
 La columna `VACANTES` SHALL mostrar el conteo de vacantes que la fuente informa para cada comisión, y
 cuando valga 0 la fila SHALL llevar el chip `LLENO` en rojo junto al valor. En los datos de ejemplo
@@ -42,7 +45,8 @@ por cupo`.
 
 La columna `HORARIO` SHALL usar el renderer compacto del horario: una línea con ellipsis, el texto
 completo en el tooltip y, cuando el horario tenga más de un grupo de días, el badge `+N` que abre un
-popover con la lista completa.
+popover con la lista completa. El `N` del badge SHALL ser la cantidad de grupos de días que no
+entran en la línea: con dos grupos en la celda el badge dice `+1`, y con un solo grupo no hay badge.
 
 El sistema SHALL abrir el modal `Crear Nueva Comisión` con los campos, en este orden literal:
 `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de
@@ -107,9 +111,12 @@ guardado aceptado SHALL actualizar la fila de la tabla con la comisión y las va
 fuente y SHALL mostrar una confirmación; un rechazo de la fuente SHALL dejar el modal abierto con el
 motivo. La pantalla SHALL NOT modificar inscripciones ni pagos al editar la comisión.
 
-WHEN la fuente rechaza el guardado con un choque de horario, la pantalla SHALL mostrar el motivo bajo
-el campo `Días y Horarios` del formulario de comisión, con la comisión en conflicto —código, día y
-rango—, y SHALL NOT cerrar el formulario ni confirmar el guardado.
+WHEN la fuente rechaza el guardado con un `409`, la pantalla SHALL mostrar el motivo bajo el campo
+`Días y Horarios` del formulario de comisión —con la comisión en conflicto, su día y su rango cuando
+el rechazo sea por choque de horario—, y SHALL NOT cerrar el formulario ni confirmar el guardado.
+Cualquier `409` del guardado SHALL mostrarse en ese mismo lugar, sin que la pantalla tenga que
+distinguir el motivo por el texto del mensaje: no hay otro campo del formulario que lo produzca, y el
+de numeración solo aparece ante dos altas simultáneas del mismo curso.
 
 #### Scenario: El usuario revisa el listado de comisiones
 - **WHEN** el usuario abre un curso del catálogo desde la vista de cursos
@@ -166,6 +173,10 @@ rango—, y SHALL NOT cerrar el formulario ni confirmar el guardado.
 #### Scenario: El choque de horario se muestra bajo el campo
 - **WHEN** la fuente rechaza el guardado con un choque de horario del docente
 - **THEN** el motivo aparece bajo `Días y Horarios` con la comisión en conflicto, su día y su rango, y el formulario de comisión sigue abierto
+
+#### Scenario: Otro conflicto del guardado se muestra en el mismo lugar
+- **WHEN** la fuente rechaza el guardado con un `409` que no es de horario, por ejemplo el de dos altas simultáneas del mismo curso
+- **THEN** el motivo aparece bajo el mismo campo `Días y Horarios`, y la pantalla no cierra el formulario ni confirma el guardado
 
 #### Scenario: El usuario elige modalidad virtual
 - **WHEN** el usuario selecciona modalidad `Virtual` y confirma sin elegir sede
@@ -325,4 +336,4 @@ estos valen cero —`19-22hs`— y con minutos cuando no —`18:15-21:30hs`—.
 #### Scenario: La tabla muestra el horario compacto
 
 - **WHEN** una comisión tiene más de un grupo de días con distinto rango y se la ve en la tabla de Administración
-- **THEN** la celda `HORARIO` muestra una sola línea con ellipsis, el texto completo en el tooltip y el badge `+N` que abre un popover con la lista completa
+- **THEN** la celda `HORARIO` muestra una sola línea con ellipsis, el texto completo en el tooltip y el badge `+1`, que abre un popover con la lista completa de los dos grupos
