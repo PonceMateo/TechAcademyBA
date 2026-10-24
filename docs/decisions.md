@@ -1707,3 +1707,41 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/CoursesPage.test.jsx`,
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js` y
   `frontend/src/services/mockDataSource.js`.
+
+---
+
+## Edición y acceso del docente (change `hu-11-editar-docente`)
+
+### D52 — La edición sincroniza la cuenta y el restablecimiento obliga a cambiarla
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** `PUT /docentes/{id}` actualiza nombre, apellido, DNI, email y teléfono. El CUIL
+  sigue fuera del contrato (D33): un `cuil` en el cuerpo responde `422`. En la misma transacción se
+  sincronizan `nombre` (`"Nombre Apellido"`) y `email` del `Usuario` vinculado, así que el docente
+  entra con el correo nuevo sin que queden dos verdades.
+- **Unicidad:** el DNI se compara solo contra el padrón de docentes, excluyendo al propio, que es
+  lo que dice D5 y lo que permite que una misma persona sea alumna y docente. El email se verifica
+  con `ensure_email_available` excluyendo al docente y a su propia cuenta, y sigue siendo único
+  entre los tres padrones (M1). Un `uq_usuario_email` que llegue por la carrera entre dos ediciones
+  se traduce al mismo `409` que nombra el email.
+- **Docente sin cuenta:** se edita igual y la sincronización se saltea. No se crea una cuenta
+  implícita: el alta garantiza que todo docente nuevo tenga una, así que el caso es solo de datos
+  históricos.
+- **Restablecimiento:** `POST /docentes/{id}/password` guarda el hash bcrypt de la contraseña que
+  define Administración, invalida la anterior y deja `must_change_password = true`, el mismo
+  mecanismo que el alta de alumno (D45). No se envía correo ni se devuelve la contraseña en claro.
+  No toca `is_active`: reactivar una cuenta dada de baja es otra decisión y no la pide la historia.
+  Un docente sin cuenta responde `409`.
+- **Fuera del alcance:** el alta de docente **sigue** creando la cuenta con
+  `must_change_password = false` y su comentario todavía dice que el flujo de cambio de contraseña
+  no existe, aunque sí existe. Corregirlo cambia el comportamiento de la HU 9 y sus pruebas, así
+  que queda como deuda anotada y no se toca acá.
+- **Por qué:** un DNI o un mail mal cargado obligaba a crear un docente duplicado, y un docente que
+  perdía la contraseña no tenía forma de volver a entrar: el restablecimiento administrativo solo
+  existía para alumnos.
+- **Dónde:** `backend/app/schemas/padron.py`, `backend/app/services/padron.py`,
+  `backend/app/api/padron.py`, `backend/app/tests/test_edicion_docente.py`,
+  `frontend/src/admin/TeachersPage.jsx`, `frontend/src/admin/TeachersPage.test.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js` y
+  `frontend/src/services/mockDataSource.js`.
