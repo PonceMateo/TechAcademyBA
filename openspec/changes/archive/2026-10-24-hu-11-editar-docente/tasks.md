@@ -24,4 +24,4 @@
 - [x] 4.1 Ejecutar `pytest` contra PostgreSQL real y confirmar que los tests nuevos, los del padrón de docentes y los de autenticación pasan.
 - [x] 4.2 Ejecutar `vitest run` y confirmar que los tests nuevos y los de la pantalla pasan.
 - [x] 4.3 Probar el flujo completo con `docker compose`: edición de docente, login con el email nuevo, restablecimiento de contraseña y cambio obligatorio en el ingreso.
-- [ ] 4.4 Abrir el pull request con `Refs #11`; pasar a `Closes #11` solo si se cumplen todos los criterios.
+- [x] 4.4 Abrir el pull request con `Refs #11`; pasar a `Closes #11` solo si se cumplen todos los criterios.
