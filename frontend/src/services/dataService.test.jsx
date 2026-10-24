@@ -10,12 +10,14 @@ import {
   editarAlumno,
   editarComision,
   editarCurso,
+  editarDocente,
   eliminarAlumno,
   listarAlumnos,
   listarComisiones,
   listarCursos,
   reactivarAlumno,
   restablecerPasswordAlumno,
+  restablecerPasswordDocente,
 } from './dataService'
 
 /**
@@ -158,6 +160,37 @@ describe('la implementación de ejemplo', () => {
       password_inicial: 'rocio30111222',
     })
     expect((await listarAlumnos()).map((alumno) => alumno.nombre)).toContain('Rocío Álvarez')
+  })
+
+  it('edita un docente y restablece su contraseña sin perder sus comisiones', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const editado = await editarDocente(1, {
+      nombre: 'Martín',
+      apellido: 'Pérez',
+      dni: '28.114.402',
+      email: 'martin.perez@techacademy.invalid',
+      telefono: null,
+    })
+    expect(editado).toMatchObject({
+      id: 1,
+      nombre: 'Martín Pérez',
+      nombres: 'Martín',
+      apellido: 'Pérez',
+      email: 'martin.perez@techacademy.invalid',
+    })
+    expect(editado.comisiones).toHaveLength(1)
+
+    await expect(restablecerPasswordDocente(1, 'corta')).rejects.toThrow('al menos 8')
+    await expect(
+      editarDocente(1, {
+        nombre: 'Martín',
+        apellido: 'Pérez',
+        dni: '31.902.118',
+        email: 'martin.perez@techacademy.invalid',
+        telefono: null,
+      }),
+    ).rejects.toThrow('DNI')
   })
 
   it('edita, restablece la contraseña y da de baja en el padrón de ejemplo', async () => {
@@ -342,6 +375,32 @@ describe('la edición de curso', () => {
     await expect(
       editarCurso(1, { nombre: 'Diseño UX/UI Avanzado', descripcion: null }),
     ).rejects.toThrow('Ya existe un curso con ese nombre')
+  })
+})
+
+describe('la edición de docente', () => {
+  const DATOS = {
+    nombre: 'Ada',
+    apellido: 'Lovelace',
+    dni: '30.111.222',
+    email: 'ada.lovelace@techacademy.invalid',
+    telefono: null,
+  }
+
+  it('delega en la fuente configurada', async () => {
+    const editar = vi.fn(async () => ({ id: 1 }))
+    const restablecer = vi.fn(async () => ({ id: 1 }))
+    configurarFuenteDeDatos({
+      modo: 'api',
+      editarDocente: editar,
+      restablecerPasswordDocente: restablecer,
+    })
+
+    await editarDocente(1, DATOS)
+    await restablecerPasswordDocente(1, 'NuevaClave2026')
+
+    expect(editar).toHaveBeenCalledWith(1, DATOS)
+    expect(restablecer).toHaveBeenCalledWith(1, 'NuevaClave2026')
   })
 })
 

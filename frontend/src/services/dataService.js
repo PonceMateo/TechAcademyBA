@@ -84,6 +84,23 @@ export function crearDocente(datos) {
   return getDataSource().crearDocente(datos)
 }
 
+/**
+ * Edición de los datos personales del docente (historia #11). Conserva el `id` y el CUIL; la
+ * respuesta trae la fila actualizada y la pantalla la fusiona con la que ya mostraba para no
+ * perder las comisiones asignadas.
+ */
+export function editarDocente(id, datos) {
+  return getDataSource().editarDocente(id, datos)
+}
+
+/**
+ * Restablecimiento administrativo de la contraseña del docente (historia #11). La contraseña no
+ * se devuelve en claro y la cuenta queda obligada a cambiarla en el próximo ingreso.
+ */
+export function restablecerPasswordDocente(id, newPassword) {
+  return getDataSource().restablecerPasswordDocente(id, newPassword)
+}
+
 export function listarAlumnos() {
   return getDataSource().listarAlumnos()
 }

@@ -24,6 +24,7 @@ const COLUMNAS = [
   'CÁTEDRA O ESPECIALIDAD',
   'COMISIONES ASIGNADAS',
   'ESTADO',
+  'ACCIONES',
 ]
 
 const DOCENTES = [
@@ -104,8 +105,9 @@ describe('listado de docentes', () => {
     expect(screen.getByText('+54 11 4455-1020')).toBeInTheDocument()
   })
 
-  it('no ofrece ningún control de edición de docente', () => {
-    expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument()
+  it('ofrece Editar y Restablecer contraseña en cada fila (historia #11)', () => {
+    expect(screen.getAllByRole('button', { name: 'Editar' })).toHaveLength(5)
+    expect(screen.getAllByRole('button', { name: 'Restablecer contraseña' })).toHaveLength(5)
   })
 })
 
@@ -316,6 +318,177 @@ describe('alta de docente', () => {
     expect(screen.queryByText(/dado de alta\./)).not.toBeInTheDocument()
     // Lo que el operador completó sigue ahí: reescribir el DNI a mano es el error más caro.
     expect(screen.getByLabelText(/^DNI/)).toHaveValue('30.111.222')
+  })
+})
+
+/** La fila de la tabla de un docente, para no depender del orden del listado. */
+function filaDelDocente(nombre) {
+  return within(screen.getByRole('table'))
+    .getAllByRole('row')
+    .find((fila) => fila.cells[0].textContent === nombre)
+}
+
+async function abrirEdicion(user, nombre) {
+  await user.click(within(filaDelDocente(nombre)).getByRole('button', { name: 'Editar' }))
+  await screen.findByRole('dialog', { name: 'Editar Docente' })
+}
+
+async function abrirRestablecimiento(user, nombre) {
+  await user.click(
+    within(filaDelDocente(nombre)).getByRole('button', { name: 'Restablecer contraseña' }),
+  )
+  await screen.findByRole('dialog', { name: 'Restablecer contraseña' })
+}
+
+describe('edición de docente (historia #11)', () => {
+  it('abre el modal precargado con nombre, apellido, DNI, mail y teléfono, y sin CUIL', async () => {
+    stubDataSource({
+      buscarDocentes: vi.fn(async () => [
+        {
+          id: 9,
+          nombre: 'Rita Molina',
+          nombres: 'Rita',
+          apellido: 'Molina',
+          dni: '30.111.222',
+          cuil: '27-30111222-6',
+          email: 'rita.molina@techacademy.invalid',
+          telefono: '+54 11 4000-1000',
+          catedra: null,
+          activo: true,
+          comisiones: [{ id: 7, codigo: 'CUR107-1', nombre: 'Datos' }],
+          comisiones_asignadas: 1,
+        },
+      ]),
+    })
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Buscar docente'), 'rita')
+    await waitFor(() => expect(screen.queryByText('Profe Martín')).not.toBeInTheDocument())
+
+    await abrirEdicion(user, 'Rita Molina')
+
+    // El nombre de pila y el apellido se precargan por separado: si el formulario metiera el
+    // apellido dentro del nombre, guardar sin cambios lo duplicaría.
+    expect(screen.getByLabelText(/^Nombre/)).toHaveValue('Rita')
+    expect(screen.getByLabelText(/^Apellido/)).toHaveValue('Molina')
+    expect(screen.getByLabelText(/^DNI/)).toHaveValue('30.111.222')
+    expect(screen.getByLabelText(/^Mail/)).toHaveValue('rita.molina@techacademy.invalid')
+    expect(screen.getByLabelText(/^Teléfono/)).toHaveValue('+54 11 4000-1000')
+    expect(screen.queryByLabelText(/CUIL/)).not.toBeInTheDocument()
+  })
+
+  it('guarda los cambios, actualiza la fila y conserva las comisiones asignadas', async () => {
+    const user = userEvent.setup()
+    await abrirEdicion(user, 'Profe Martín')
+
+    await user.clear(screen.getByLabelText(/^Teléfono/))
+    await user.type(screen.getByLabelText(/^Teléfono/), '+54 11 9999-0000')
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Docente' })).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByText('Docente Profe Martín actualizado.')).toBeInTheDocument()
+    expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('+54 11 9999-0000')
+    // La edición no vuelve a resolver las comisiones: la fila que ya estaba en pantalla las
+    // conserva (D52).
+    expect(filaDelDocente('Profe Martín').cells[6].textContent).toBe('CUR-101 · Python Inicial')
+  })
+
+  it('rechaza un DNI que ya pertenece a otro docente y deja el modal abierto', async () => {
+    const user = userEvent.setup()
+    await abrirEdicion(user, 'Profe Martín')
+
+    await user.clear(screen.getByLabelText(/^DNI/))
+    await user.type(screen.getByLabelText(/^DNI/), '31.902.118')
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Ya hay un docente registrado con ese DNI.',
+    )
+    expect(screen.getByRole('dialog', { name: 'Editar Docente' })).toBeInTheDocument()
+    expect(filaDelDocente('Profe Martín').cells[1].textContent).toBe('28.114.402')
+  })
+
+  it('muestra el motivo que devuelve la fuente y conserva lo que se escribió', async () => {
+    stubDataSource({
+      editarDocente: vi.fn(async () => {
+        throw new Error('El email ada@techacademy.invalid ya está registrado en el padrón de alumnos.')
+      }),
+    })
+    const user = userEvent.setup()
+    await abrirEdicion(user, 'Profe Martín')
+
+    await user.clear(screen.getByLabelText(/^Mail/))
+    await user.type(screen.getByLabelText(/^Mail/), 'ada@techacademy.invalid')
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('padrón de alumnos')
+    expect(screen.getByRole('dialog', { name: 'Editar Docente' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Mail/)).toHaveValue('ada@techacademy.invalid')
+  })
+})
+
+describe('restablecimiento de contraseña del docente (historia #11)', () => {
+  it('avisa que la contraseña se cambia en el próximo ingreso y la restablece', async () => {
+    const restablecer = vi.fn(async () => ({ id: 1 }))
+    stubDataSource({ restablecerPasswordDocente: restablecer })
+    const user = userEvent.setup()
+    await abrirRestablecimiento(user, 'Profe Martín')
+
+    expect(screen.getByRole('dialog', { name: 'Restablecer contraseña' }).textContent).toContain(
+      'deberá cambiarla en su próximo ingreso',
+    )
+
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), 'NuevaClave2026')
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), 'NuevaClave2026')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Restablecer contraseña' }),
+    )
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Restablecer contraseña' })).not.toBeInTheDocument(),
+    )
+    expect(restablecer).toHaveBeenCalledWith(1, 'NuevaClave2026')
+    expect(
+      await screen.findByText(
+        'Contraseña de Profe Martín restablecida. Deberá cambiarla en su próximo ingreso.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('no envía la operación cuando las contraseñas no coinciden', async () => {
+    const restablecer = vi.fn(async () => ({}))
+    stubDataSource({ restablecerPasswordDocente: restablecer })
+    const user = userEvent.setup()
+    await abrirRestablecimiento(user, 'Profe Martín')
+
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), 'NuevaClave2026')
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), 'OtraClave2026')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Restablecer contraseña' }),
+    )
+
+    expect(await screen.findByText('Las contraseñas no coinciden.')).toBeInTheDocument()
+    expect(restablecer).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Restablecer contraseña' })).toBeInTheDocument()
+  })
+
+  it('no envía la operación con una contraseña de menos de 8 caracteres', async () => {
+    const restablecer = vi.fn(async () => ({}))
+    stubDataSource({ restablecerPasswordDocente: restablecer })
+    const user = userEvent.setup()
+    await abrirRestablecimiento(user, 'Profe Martín')
+
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), 'corta')
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), 'corta')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Restablecer contraseña' }),
+    )
+
+    expect(
+      await screen.findByText('La contraseña debe tener al menos 8 caracteres.'),
+    ).toBeInTheDocument()
+    expect(restablecer).not.toHaveBeenCalled()
   })
 })
 
