@@ -1556,6 +1556,30 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
+## Fuente de verdad del backlog
+
+### D49 — GitHub Projects es la única fuente viva del backlog
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** el project #1 `TechAcademyBA` (owner `PonceMateo`) es la única
+  fuente viva de las historias: cuáles existen, su texto, prioridad, épica,
+  estimación y estado. `AGENTS.md` deja de tratar el CSV como respaldo y lo
+  marca histórico, congelado. Una historia está terminada con `Status = Done`,
+  no con el issue cerrado.
+- **Por qué:** el board ya decía qué estaba hecho y el CSV no, así que mantener
+  dos fuentes obligaba a sincronizarlas a mano y a decidir cuál ganaba en cada
+  caso. Las tres historias que solo existían en el CSV (45, 46 y 47) se crearon
+  como issues antes de congelarlo.
+- **Alternativa descartada:** dejar el CSV como fuente de las restricciones y el
+  board solo del estado. Duplica el mismo dato en dos lugares y vuelve a abrir
+  la pregunta de cuál manda.
+- **Costo:** leer el backlog ahora depende de `gh` autenticado con scope
+  `project`. Sin acceso, el agente pide credenciales y, si el usuario prefiere
+  seguir, trabaja con lo que haya en el repo y lo dice.
+
+---
+
 ## Pendientes
 
 Decisiones que hay que tomar y que **no** bloquean el scaffold. Se resuelven
