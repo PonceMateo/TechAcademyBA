@@ -103,6 +103,33 @@ class ComisionCreate(BaseModel):
         return valor
 
 
+class ComisionUpdate(BaseModel):
+    """Cuerpo de `PUT /comisiones/{id}`: solo los cuatro datos editables (historia #4).
+
+    El curso, el número, la modalidad y la sede **no** están en el contrato: cambiar el curso o el
+    número rompería el código derivado y las inscripciones, y la modalidad con su sede son una
+    decisión de alta que esta historia no habilita. `extra="forbid"` convierte esa ausencia en una
+    garantía: mandar cualquiera de ellos responde 422 en vez de ignorarse en silencio.
+
+    El docente es obligatorio aunque la columna admita nulo: una comisión abierta sin docente se
+    puede editar, pero para guardarla hay que asignarle uno, igual que en el alta.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    docente_id: int = Field(gt=0)
+    dias_horarios: str = Field(min_length=1, max_length=255)
+    arancel: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    cupo_maximo: int = Field(gt=0)
+
+    @field_validator("dias_horarios")
+    @classmethod
+    def _dias_horarios_no_vacio(cls, valor: str) -> str:
+        if not valor.strip():
+            raise ValueError("Los días y horarios son obligatorios.")
+        return valor
+
+
 class ComisionOut(BaseModel):
     """Fila de `GET /comisiones` y respuesta de `POST /comisiones`.
 
