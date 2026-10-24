@@ -27,11 +27,17 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import Comision, Curso, Sede
+from app.models.catalogo import Comision, ComisionHorario, Curso, Sede, resumen_de_horarios
 from app.models.enums import EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Docente
-from app.schemas.catalogo import ComisionCreate, ComisionUpdate, CursoCreate, CursoUpdate
+from app.schemas.catalogo import (
+    ComisionCreate,
+    ComisionUpdate,
+    CursoCreate,
+    CursoUpdate,
+    HorarioComision,
+)
 from app.services.normalization import normalize_name
 
 logger = logging.getLogger(__name__)
@@ -100,6 +106,23 @@ class ComisionNoEncontrada(Exception):
     def __init__(self, comision_id: int) -> None:
         self.comision_id = comision_id
         super().__init__(f"La comisión {comision_id} no existe.")
+
+
+class HorarioDelDocenteEnConflicto(Exception):
+    """El docente ya dicta otra comisión vigente que se pisa con este horario (historia #48).
+
+    Nombra la comisión en conflicto con su código, su día y su rango porque el formulario muestra
+    ese texto bajo `Días y Horarios`: quien está cargando el horario tiene que saber contra qué
+    choca, no solo que choca.
+    """
+
+    def __init__(self, comision: Comision, horario: ComisionHorario) -> None:
+        self.comision = comision
+        self.horario = horario
+        super().__init__(
+            f"Ese horario se superpone con la comisión {comision.codigo} "
+            f"({resumen_de_horarios([horario])}), que dicta el mismo docente."
+        )
 
 
 class CupoInsuficiente(Exception):
@@ -224,15 +247,21 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
     if datos.sede_id is not None and session.get(Sede, datos.sede_id) is None:
         raise SedeNoEncontrada(datos.sede_id)
 
+    conflicto = _horario_en_conflicto(session, datos.docente_id, datos.horarios)
+    if conflicto is not None:
+        raise HorarioDelDocenteEnConflicto(conflicto.comision, conflicto)
+
+    horarios = _armar_horarios(datos.horarios)
     comision = Comision(
         curso_id=curso.id,
         docente_id=datos.docente_id,
         numero=_siguiente_numero(session, curso.id),
-        dias_horarios=datos.dias_horarios,
+        dias_horarios=resumen_de_horarios(horarios),
         cupo_maximo=datos.cupo_maximo,
         arancel=datos.arancel,
         modalidad=datos.modalidad.value,
         sede_id=datos.sede_id,
+        horarios=horarios,
     )
     session.add(comision)
     try:
@@ -285,8 +314,24 @@ def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate)
     if datos.cupo_maximo < inscriptos:
         raise CupoInsuficiente(inscriptos)
 
+    # La propia comisión queda afuera del chequeo: reenviar sus horarios actuales no puede ser un
+    # conflicto consigo misma.
+    conflicto = _horario_en_conflicto(
+        session, datos.docente_id, datos.horarios, excluir_comision_id=comision.id
+    )
+    if conflicto is not None:
+        raise HorarioDelDocenteEnConflicto(conflicto.comision, conflicto)
+
+    # Las filas viejas se borran **antes** de insertar las nuevas: si se dejaran al unit of work,
+    # el `INSERT` de un día que sigue existiendo choca con `uq_comision_horario_comision_id_dia`,
+    # porque el `DELETE` llega después.
+    comision.horarios.clear()
+    session.flush()
+
+    horarios = _armar_horarios(datos.horarios)
     comision.docente_id = datos.docente_id
-    comision.dias_horarios = datos.dias_horarios
+    comision.horarios = horarios
+    comision.dias_horarios = resumen_de_horarios(horarios)
     comision.arancel = datos.arancel
     comision.cupo_maximo = datos.cupo_maximo
     session.commit()
@@ -326,6 +371,7 @@ def listar_comisiones(session: Session) -> list[Comision]:
                 selectinload(Comision.curso),
                 selectinload(Comision.docente),
                 selectinload(Comision.sede),
+                selectinload(Comision.horarios),
             )
             .order_by(Comision.id)
         )
@@ -350,6 +396,58 @@ def listar_comisiones(session: Session) -> list[Comision]:
 def listar_sedes(session: Session) -> list[Sede]:
     """Sedes activas. Es un endpoint de lectura: no hay historia que pida el alta (historia #8)."""
     return list(session.scalars(select(Sede).where(Sede.activo.is_(True)).order_by(Sede.id)))
+
+
+def _armar_horarios(datos: list[HorarioComision]) -> list[ComisionHorario]:
+    """Las filas de horario nuevas, listas para asignar a la comisión.
+
+    Las filas se arman a partir de la lista que mandó el formulario, que es el estado completo del
+    horario: al asignarlas, el `delete-orphan` de la relación borra las que ya no están.
+    """
+    return [
+        ComisionHorario(dia=dato.dia.value, inicio=dato.inicio, fin=dato.fin) for dato in datos
+    ]
+
+
+def _horario_en_conflicto(
+    session: Session,
+    docente_id: int,
+    horarios: list[HorarioComision],
+    excluir_comision_id: int | None = None,
+) -> ComisionHorario | None:
+    """La primera fila del docente que se pisa con alguno de estos horarios, o `None`.
+
+    La comparación es **estricta** (`a.inicio < b.fin and b.inicio < a.fin`), así que un rango que
+    termina a las 18:30 y otro que empieza a las 18:30 no chocan. Solo participan comisiones
+    vigentes: la baja lógica va por `activo`, y una comisión dada de baja no ocupa el horario del
+    docente. Incluye comisiones de otros cursos, porque el docente es la misma persona.
+
+    **Techo asumido:** dos altas simultáneas del mismo docente pueden pasar las dos por acá, porque
+    la comprobación es de aplicación y no un lock. A la escala del proyecto es aceptable; si
+    importara, el arreglo es un lock por docente y no cambia el contrato.
+    """
+    consulta = (
+        select(ComisionHorario)
+        .join(Comision, Comision.id == ComisionHorario.comision_id)
+        .where(
+            Comision.docente_id == docente_id,
+            Comision.activo.is_(True),
+            ComisionHorario.dia.in_([dato.dia.value for dato in horarios]),
+        )
+        .options(selectinload(ComisionHorario.comision).selectinload(Comision.curso))
+        .order_by(ComisionHorario.dia, ComisionHorario.id)
+    )
+    if excluir_comision_id is not None:
+        consulta = consulta.where(Comision.id != excluir_comision_id)
+
+    existentes = session.scalars(consulta).all()
+    for candidato in horarios:
+        for fila in existentes:
+            if fila.dia != candidato.dia.value:
+                continue
+            if candidato.inicio < fila.fin and fila.inicio < candidato.fin:
+                return fila
+    return None
 
 
 def _siguiente_numero(session: Session, curso_id: int) -> int:

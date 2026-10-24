@@ -34,6 +34,7 @@ from app.tests.factories import (
     crear_usuario_admin,
     crear_usuario_docente,
     encabezado_de_autorizacion,
+    horarios,
     token_de_prueba,
 )
 
@@ -139,7 +140,7 @@ def test_alta_de_comision_devuelve_el_codigo_derivado(
         json={
             "curso_id": curso.id,
             "docente_id": docente.id,
-            "dias_horarios": "Lunes y miércoles 18:00 a 20:00",
+            "horarios": horarios("LUN MIE"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": Modalidad.PRESENCIAL.value,
@@ -165,14 +166,21 @@ def test_las_comisiones_de_un_curso_se_numeran_consecutivas(
     cuerpo = {
         "curso_id": curso.id,
         "docente_id": docente.id,
-        "dias_horarios": "Lunes 18:00 a 20:00",
+        "horarios": horarios("LUN"),
         "arancel": "52000.00",
         "cupo_maximo": 20,
         "modalidad": Modalidad.PRESENCIAL.value,
         "sede_id": sede.id,
     }
 
-    codigos = [cliente_admin.post("/comisiones", json=cuerpo).json()["codigo"] for _ in range(3)]
+    # Un día distinto por alta: el mismo docente y el mismo horario serían un choque (historia
+    # #48), y lo que esta prueba mira es la numeración.
+    codigos = [
+        cliente_admin.post(
+            "/comisiones", json={**cuerpo, "horarios": horarios(dia)}
+        ).json()["codigo"]
+        for dia in ("LUN", "MAR", "MIE")
+    ]
 
     assert codigos == [f"{curso.codigo}-1", f"{curso.codigo}-2", f"{curso.codigo}-3"]
 
@@ -185,7 +193,7 @@ def test_comision_sin_docente_es_rechazada(cliente_admin: TestClient, db_session
         "/comisiones",
         json={
             "curso_id": curso.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -209,7 +217,7 @@ def test_cupo_invalido_es_rechazado(
         json={
             "curso_id": curso.id,
             "docente_id": docente.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": cupo,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -232,7 +240,7 @@ def test_arancel_invalido_es_rechazado(
         json={
             "curso_id": curso.id,
             "docente_id": docente.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": arancel,
             "cupo_maximo": 20,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -256,7 +264,7 @@ def test_modalidad_que_exige_sede_sin_sede_se_registra(
         json={
             "curso_id": curso.id,
             "docente_id": docente.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": modalidad,
@@ -285,7 +293,7 @@ def test_modalidad_virtual_con_sede_es_rechazada(
         json={
             "curso_id": curso.id,
             "docente_id": docente.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -306,7 +314,7 @@ def test_modalidad_virtual_no_exige_sede(cliente_admin: TestClient, db_session: 
         json={
             "curso_id": curso.id,
             "docente_id": docente.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -323,7 +331,7 @@ def test_alta_de_comision_con_curso_inexistente_es_404(cliente_admin: TestClient
         json={
             "curso_id": 99999,
             "docente_id": 1,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -591,7 +599,7 @@ def test_las_altas_exigen_rol_de_administracion(
         "/comisiones": {
             "curso_id": curso.id,
             "docente_id": docente_del_padron.id,
-            "dias_horarios": "Lunes 18:00 a 20:00",
+            "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
             "modalidad": Modalidad.VIRTUAL.value,
@@ -634,7 +642,7 @@ def test_la_carrera_de_dos_altas_del_mismo_curso_es_409(
     cuerpo = {
         "curso_id": curso.id,
         "docente_id": docente.id,
-        "dias_horarios": "Lunes 18:00 a 20:00",
+        "horarios": horarios("LUN"),
         "arancel": "52000.00",
         "cupo_maximo": 20,
         "modalidad": Modalidad.VIRTUAL.value,
@@ -643,7 +651,8 @@ def test_la_carrera_de_dos_altas_del_mismo_curso_es_409(
     assert primera.status_code == 201, primera.text
 
     monkeypatch.setattr(catalogo, "_siguiente_numero", lambda *_argumentos: 1)
-    segunda = cliente_admin.post("/comisiones", json=cuerpo)
+    # Otro día, para que el rechazo sea el de la numeración y no el del horario del docente.
+    segunda = cliente_admin.post("/comisiones", json={**cuerpo, "horarios": horarios("MAR")})
 
     assert segunda.status_code == 409, segunda.text
     assert "Probá de nuevo" in segunda.text

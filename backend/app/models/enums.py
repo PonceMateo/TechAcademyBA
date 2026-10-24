@@ -24,6 +24,22 @@ class Modalidad(StrEnum):
     HIBRIDO = "HIBRIDO"
 
 
+class DiaSemana(StrEnum):
+    """Día de la semana de un horario de cursada (historia #48).
+
+    El orden de los miembros es el orden de la semana, y es el que usan el resumen del
+    horario y los chips del formulario.
+    """
+
+    LUN = "LUN"
+    MAR = "MAR"
+    MIE = "MIE"
+    JUE = "JUE"
+    VIE = "VIE"
+    SAB = "SAB"
+    DOM = "DOM"
+
+
 class EstadoInscripcion(StrEnum):
     """Estado de una inscripción, que **no** es el estado de habilitación (D9)."""
 

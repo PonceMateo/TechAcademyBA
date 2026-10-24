@@ -129,7 +129,8 @@ def crear_comision(
     """Alta de comisión.
 
     201 con la comisión y su código derivado, 404 si el curso, el docente o la sede no existen,
-    409 si la numeración chocó con otra alta simultánea, 422 si falta un campo obligatorio, si
+    409 si la numeración chocó con otra alta simultánea o si el docente ya dicta otra comisión
+    vigente en ese día y horario, 422 si falta un campo obligatorio, si el horario no es válido, si
     el cupo o el arancel no son positivos, o si la comisión es Virtual y trae sede.
     """
     try:
@@ -141,6 +142,8 @@ def crear_comision(
     except catalogo.SedeNoEncontrada as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     except catalogo.NumeracionDeComisionEnConflicto as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except catalogo.HorarioDelDocenteEnConflicto as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except IntegrityError as error:
         raise _regla_de_alta_rota(error) from error
@@ -174,6 +177,8 @@ def editar_comision(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     except catalogo.DocenteNoEncontrado as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except catalogo.HorarioDelDocenteEnConflicto as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except catalogo.CupoInsuficiente as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
     return ComisionOut.model_validate(comision)
