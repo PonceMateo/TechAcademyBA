@@ -18,6 +18,9 @@ import {
   listarSedes,
 } from '../services/dataService'
 import { formatMoneda } from '../utils/formato'
+import { CampoHorarios } from '../components/horarios/CampoHorarios'
+import { HorarioCompacto } from '../components/horarios/HorarioCompacto'
+import { SelectorHorarios } from '../components/horarios/SelectorHorarios'
 
 /**
  * Cursos y comisiones (9.3), en dos vistas encadenadas.
@@ -66,7 +69,13 @@ const COLUMNAS = [
   },
   { clave: 'curso', titulo: 'CURSO / PROGRAMA', render: (fila) => fila.curso.nombre },
   { clave: 'docente', titulo: 'DOCENTE', render: (fila) => fila.docente_nombre },
-  { clave: 'horario', titulo: 'HORARIO', render: (fila) => fila.dias_horarios },
+  {
+    clave: 'horario',
+    titulo: 'HORARIO',
+    // El renderer compacto sale de los horarios estructurados: un día por fila, con el badge `+N`
+    // cuando hay más de un grupo (historia #48).
+    render: (fila) => <HorarioCompacto horarios={fila.horarios} texto={fila.dias_horarios} />,
+  },
   { clave: 'cupo', titulo: 'CUPO MÁX.', render: (fila) => fila.cupo_maximo },
   {
     clave: 'vacantes',
@@ -93,7 +102,7 @@ const MODALIDADES = [
 const CAMPOS_COMISION_VACIOS = {
   curso: '',
   docente: '',
-  dias_horarios: '',
+  horarios: [],
   cupo: '',
   arancel: '',
   modalidad: '',
@@ -110,7 +119,7 @@ const CAMPOS_CURSO_VACIOS = { nombre: '', descripcion: '' }
  */
 const CAMPOS_EDICION_COMISION_VACIOS = {
   docente: '',
-  dias_horarios: '',
+  horarios: [],
   cupo: '',
   arancel: '',
 }
@@ -148,6 +157,14 @@ export function CoursesPage() {
   const [camposEdicionComision, setCamposEdicionComision] = useState(
     CAMPOS_EDICION_COMISION_VACIOS,
   )
+  // El modal de horarios es uno solo y sabe sobre qué formulario trabaja: `alta`, `edicion` o nada.
+  // `apertura` cambia en cada apertura y es la `key` del selector: así el estado nace de los
+  // horarios actuales y lo que se canceló no queda.
+  const [selectorHorarios, setSelectorHorarios] = useState(null)
+
+  function abrirSelectorHorarios(destino) {
+    setSelectorHorarios((anterior) => ({ destino, apertura: (anterior?.apertura ?? 0) + 1 }))
+  }
   const [erroresEdicionComision, setErroresEdicionComision] = useState({})
   const [falloEdicionComision, setFalloEdicionComision] = useState(null)
   const [guardandoEdicionComision, setGuardandoEdicionComision] = useState(false)
@@ -343,7 +360,7 @@ export function CoursesPage() {
     setComisionEditando(comision)
     setCamposEdicionComision({
       docente: comision.docente_id === null ? '' : String(comision.docente_id),
-      dias_horarios: comision.dias_horarios,
+      horarios: comision.horarios ?? [],
       cupo: String(comision.cupo_maximo),
       arancel: String(comision.arancel),
     })
@@ -381,8 +398,8 @@ export function CoursesPage() {
     if (camposEdicionComision.docente === '') {
       encontrados.docente = 'Elegí el docente de la comisión.'
     }
-    if (camposEdicionComision.dias_horarios.trim() === '') {
-      encontrados.dias_horarios = 'Los días y horarios son obligatorios.'
+    if (camposEdicionComision.horarios.length === 0) {
+      encontrados.horarios = 'Agregá al menos un horario.'
     }
     if (
       camposEdicionComision.cupo.trim() === '' ||
@@ -422,7 +439,7 @@ export function CoursesPage() {
       // Sin curso, número, modalidad, sede ni código: el contrato no los admite (D51).
       const actualizada = await editarComision(comisionEditando.id, {
         docente_id: Number(camposEdicionComision.docente),
-        dias_horarios: camposEdicionComision.dias_horarios,
+        horarios: camposEdicionComision.horarios,
         cupo_maximo: Number(camposEdicionComision.cupo),
         arancel: Number(camposEdicionComision.arancel),
       })
@@ -434,6 +451,13 @@ export function CoursesPage() {
       cerrarEdicionComision()
       setAviso(`Comisión ${actualizada.codigo} actualizada.`)
     } catch (error) {
+      // El choque de horario con otra comisión del mismo docente llega como 409 y se muestra bajo
+      // el campo de horarios: es el dato que hay que cambiar. Cualquier 409 del guardado va ahí,
+      // porque no hay otro campo que lo produzca en la práctica (historia #48).
+      if (error?.status === 409) {
+        setErroresEdicionComision((anteriores) => ({ ...anteriores, horarios: error.message }))
+        return
+      }
       setFalloEdicionComision(error?.message ?? 'No se pudo guardar la comisión.')
     } finally {
       setGuardandoEdicionComision(false)
@@ -492,8 +516,8 @@ export function CoursesPage() {
     if (campos.docente === '') {
       encontrados.docente = 'Elegí el docente de la comisión.'
     }
-    if (campos.dias_horarios.trim() === '') {
-      encontrados.dias_horarios = 'Los días y horarios son obligatorios.'
+    if (campos.horarios.length === 0) {
+      encontrados.horarios = 'Agregá al menos un horario.'
     }
     if (campos.cupo.trim() === '' || Number(campos.cupo) <= 0) {
       encontrados.cupo = 'El cupo debe ser un entero positivo.'
@@ -533,7 +557,7 @@ export function CoursesPage() {
         // id (D34).
         curso_id: Number(campos.curso),
         docente_id: Number(campos.docente),
-        dias_horarios: campos.dias_horarios,
+        horarios: campos.horarios,
         arancel: Number(campos.arancel),
         cupo_maximo: Number(campos.cupo),
         modalidad: campos.modalidad,
@@ -547,6 +571,10 @@ export function CoursesPage() {
       cerrarModal()
       setAviso(`Comisión ${creada.codigo} creada.`)
     } catch (error) {
+      if (error?.status === 409) {
+        setErrores((anteriores) => ({ ...anteriores, horarios: error.message }))
+        return
+      }
       setFallo(error?.message ?? 'No se pudo guardar la comisión.')
     } finally {
       setGuardando(false)
@@ -763,13 +791,11 @@ export function CoursesPage() {
             </select>
           </Campo>
 
-          <Input
+          <CampoHorarios
             id="editar-comision-dias"
-            etiqueta="Días y Horarios"
-            valor={camposEdicionComision.dias_horarios}
-            onChange={cambiarEdicionComision('dias_horarios')}
-            obligatorio
-            error={erroresEdicionComision.dias_horarios ?? null}
+            horarios={camposEdicionComision.horarios}
+            onAbrir={() => abrirSelectorHorarios('edicion')}
+            error={erroresEdicionComision.horarios ?? null}
           />
 
           <Input
@@ -851,14 +877,11 @@ export function CoursesPage() {
             </select>
           </Campo>
 
-          <Input
+          <CampoHorarios
             id="dias_horarios"
-            etiqueta="Días y Horarios"
-            valor={campos.dias_horarios}
-            onChange={cambiar('dias_horarios')}
-            placeholder="Ej: Mar y Jue 19 a 21 hs"
-            obligatorio
-            error={errores.dias_horarios ?? null}
+            horarios={campos.horarios}
+            onAbrir={() => abrirSelectorHorarios('alta')}
+            error={errores.horarios ?? null}
           />
 
           <Input
@@ -913,6 +936,30 @@ export function CoursesPage() {
           lo genera el sistema a partir del curso.
         </p>
       </Modal>
+
+      {/*
+        Un solo selector para las dos formas de comisión. Se monta al final del árbol para quedar
+        por encima en el orden de lectura, y trabaja sobre una copia que solo devuelve con `Listo`:
+        cancelar descarta lo que se haya cambiado.
+      */}
+      <SelectorHorarios
+        key={selectorHorarios?.apertura ?? 0}
+        abierto={selectorHorarios !== null}
+        horarios={
+          selectorHorarios?.destino === 'edicion'
+            ? camposEdicionComision.horarios
+            : campos.horarios
+        }
+        onListo={(horarios) => {
+          if (selectorHorarios?.destino === 'edicion') {
+            setCamposEdicionComision((anteriores) => ({ ...anteriores, horarios }))
+          } else {
+            setCampos((anteriores) => ({ ...anteriores, horarios }))
+          }
+          setSelectorHorarios(null)
+        }}
+        onCancelar={() => setSelectorHorarios(null)}
+      />
 
       <Modal
         abierto={modalInscripcion}

@@ -190,6 +190,100 @@ describe('Modal', () => {
     expect(screen.getByText('Campos del alta')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guardar Comisión' })).toBeInTheDocument()
   })
+
+  it('Escape cierra solo el modal de arriba', async () => {
+    const user = userEvent.setup()
+
+    function Pantalla() {
+      const [comision, setComision] = useState(false)
+      const [horarios, setHorarios] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setComision(true)}>
+            Abrir comisión
+          </button>
+          <Modal abierto={comision} titulo="Crear Nueva Comisión" onClose={() => setComision(false)}>
+            <button type="button" onClick={() => setHorarios(true)}>
+              Agregar horarios
+            </button>
+            <Modal
+              abierto={horarios}
+              titulo="Horario de cursada"
+              onClose={() => setHorarios(false)}
+            >
+              <p>Días y horarios</p>
+            </Modal>
+          </Modal>
+        </>
+      )
+    }
+
+    render(<Pantalla />)
+
+    await user.click(screen.getByRole('button', { name: 'Abrir comisión' }))
+    await user.click(screen.getByRole('button', { name: 'Agregar horarios' }))
+    expect(screen.getByRole('dialog', { name: 'Horario de cursada' })).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog', { name: 'Horario de cursada' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Crear Nueva Comisión' })).toBeInTheDocument()
+  })
+
+  it('mantiene el foco adentro del modal mientras está abierto', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <Modal
+        abierto
+        titulo="Horario de cursada"
+        onClose={() => {}}
+        pie={<Button>Listo</Button>}
+      >
+        <button type="button">Agregar</button>
+      </Modal>,
+    )
+
+    const dialogo = screen.getByRole('dialog', { name: 'Horario de cursada' })
+    expect(dialogo).toHaveFocus()
+
+    const cerrar = screen.getByRole('button', { name: 'Cerrar' })
+    const listo = screen.getByRole('button', { name: 'Listo' })
+
+    listo.focus()
+    await user.tab()
+    expect(cerrar).toHaveFocus()
+
+    await user.tab({ shift: true })
+    expect(listo).toHaveFocus()
+  })
+
+  it('devuelve el foco al control que abrió el modal', async () => {
+    const user = userEvent.setup()
+
+    function Pantalla() {
+      const [abierto, setAbierto] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setAbierto(true)}>
+            Agregar horarios
+          </button>
+          <Modal abierto={abierto} titulo="Horario de cursada" onClose={() => setAbierto(false)}>
+            <p>Días y horarios</p>
+          </Modal>
+        </>
+      )
+    }
+
+    render(<Pantalla />)
+
+    const abridor = screen.getByRole('button', { name: 'Agregar horarios' })
+    await user.click(abridor)
+    expect(screen.getByRole('dialog', { name: 'Horario de cursada' })).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    expect(abridor).toHaveFocus()
+  })
 })
 
 describe('Input y Campo', () => {
