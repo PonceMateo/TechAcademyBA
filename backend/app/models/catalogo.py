@@ -296,6 +296,9 @@ def resumen_de_horarios(horarios: Iterable[ComisionHorario]) -> str:
     for (inicio, fin), dias in sorted(
         grupos.items(), key=lambda grupo: min(ORDEN_DIA[dia] for dia in grupo[1])
     ):
-        etiqueta = " y ".join(ROTULO_DIA[dia] for dia in sorted(dias, key=ORDEN_DIA.__getitem__))
+        # `Lun y Mié` con dos días, `Lun, Mié y Vie` con más: encadenar `y` entre siete días se lee
+        # peor que la lista.
+        nombres = [ROTULO_DIA[dia] for dia in sorted(dias, key=ORDEN_DIA.__getitem__)]
+        etiqueta = nombres[0] if len(nombres) == 1 else f"{', '.join(nombres[:-1])} y {nombres[-1]}"
         partes.append(f"{etiqueta} {_hora_del_resumen(inicio)}-{_hora_del_resumen(fin)}hs")
     return ", ".join(partes)
