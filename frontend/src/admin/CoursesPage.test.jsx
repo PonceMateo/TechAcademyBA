@@ -658,6 +658,125 @@ describe('alta de comisión desde dentro de un curso', () => {
   })
 })
 
+describe('menú de la tarjeta', () => {
+  beforeEach(abrirCatalogo)
+
+  it('despliega Editar curso sin abrir el curso', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Acciones de CUR-101' }))
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Editar curso' })).toBeInTheDocument()
+    expect(currentPath()).toBe(RUTA_CATALOGO)
+  })
+
+  it('anuncia si el menú está abierto', async () => {
+    const user = userEvent.setup()
+    const boton = screen.getByRole('button', { name: 'Acciones de CUR-101' })
+
+    expect(boton).toHaveAttribute('aria-haspopup', 'menu')
+    expect(boton).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(boton)
+
+    expect(boton).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('se cierra con Escape y devuelve el foco al botón', async () => {
+    const user = userEvent.setup()
+    const boton = screen.getByRole('button', { name: 'Acciones de CUR-101' })
+    await user.click(boton)
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(boton).toHaveFocus()
+  })
+
+  it('se cierra con un click afuera', async () => {
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Acciones de CUR-101' }))
+
+    await user.click(screen.getByRole('heading', { name: 'Cursos' }))
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
+
+describe('edición de curso', () => {
+  beforeEach(abrirCatalogo)
+
+  async function abrirEdicion(user, codigo = 'CUR-101') {
+    await user.click(screen.getByRole('button', { name: `Acciones de ${codigo}` }))
+    await user.click(screen.getByRole('menuitem', { name: 'Editar curso' }))
+    return screen.getByRole('dialog', { name: 'Editar Curso' })
+  }
+
+  async function editarNombre(user, dialogo, nombre) {
+    const campo = within(dialogo).getByLabelText(/Nombre del Curso/)
+    await user.clear(campo)
+    await user.type(campo, nombre)
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+  }
+
+  it('abre precargado, sin campo de código y con los botones del spec', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    expect(within(dialogo).getByLabelText(/Nombre del Curso/)).toHaveValue('Python Inicial')
+    expect(within(dialogo).getByLabelText(/Descripción/)).toHaveValue('')
+    expect(within(dialogo).queryByLabelText(/Código/)).not.toBeInTheDocument()
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    expect(within(dialogo).getByRole('button', { name: 'Guardar Cambios' })).toBeInTheDocument()
+  })
+
+  it('guarda, actualiza la tarjeta y confirma la edición', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await editarNombre(user, dialogo, 'Python Inicial Editado')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Curso' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Curso CUR-101 actualizado.')
+    expect(tarjetaDe('Python Inicial Editado')).toHaveTextContent('CUR-101')
+  })
+
+  it('actualiza el nombre del curso en la tabla de comisiones', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await editarNombre(user, dialogo, 'Python Inicial Editado')
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Curso' })).not.toBeInTheDocument(),
+    )
+
+    await user.click(tarjetaDe('Python Inicial Editado'))
+
+    expect(await screen.findByText('Python Inicial Editado · CUR-101')).toBeInTheDocument()
+    expect(filasDeComisiones()[0].cells[1].textContent).toBe('Python Inicial Editado')
+  })
+
+  it('deja el modal abierto con el motivo cuando el nombre ya pertenece a otro curso', async () => {
+    stubDataSource({
+      editarCurso: vi.fn(async () => {
+        throw new Error('Ya existe un curso con ese nombre: CUR-104 — Diseño UX/UI Avanzado.')
+      }),
+    })
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await editarNombre(user, dialogo, 'Diseño UX/UI Avanzado')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe un curso con ese nombre')
+    expect(screen.getByRole('dialog', { name: 'Editar Curso' })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(tarjetaDe('Python Inicial')).toHaveTextContent('CUR-101')
+  })
+})
+
 describe('alta de curso', () => {
   beforeEach(abrirCatalogo)
 

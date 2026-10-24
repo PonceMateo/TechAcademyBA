@@ -128,6 +128,11 @@ export function createApiDataSource() {
       return request(PATHS.cursos, { method: 'POST', body: datos })
     },
 
+    /** Edición de curso (historia #3). El código generado no se envía ni cambia (D32). */
+    async editarCurso(id, datos) {
+      return request(`${PATHS.cursos}/${id}`, { method: 'PUT', body: datos })
+    },
+
     async listarComisiones() {
       return request(PATHS.comisiones)
     },

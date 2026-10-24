@@ -97,6 +97,24 @@ describe('la fuente real usa las rutas del contrato', () => {
     // El `?resumen=true` viejo devolvía la lista entera y el chip mostraba `undefined`.
     expect(ultimaRuta(fetchMock)).not.toMatch(/resumen/)
   })
+
+  it('edita un curso con PUT sobre su identificador', async () => {
+    const fetchMock = responder(200, {
+      id: 7,
+      codigo: 'CUR007',
+      nombre: 'Excel Intermedio',
+      descripcion: null,
+    })
+    const datos = { nombre: 'Excel Intermedio', descripcion: null }
+
+    const actualizado = await createApiDataSource().editarCurso(7, datos)
+
+    expect(actualizado).toMatchObject({ id: 7, codigo: 'CUR007' })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/cursos\/7$/)
+    const opciones = fetchMock.mock.calls.at(-1)[1]
+    expect(opciones.method).toBe('PUT')
+    expect(JSON.parse(opciones.body)).toEqual(datos)
+  })
 })
 
 describe('toda lectura que falla se propaga', () => {

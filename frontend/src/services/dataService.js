@@ -27,6 +27,14 @@ export function crearCurso(datos) {
   return getDataSource().crearCurso(datos)
 }
 
+/**
+ * Edición de un curso (historia #3). Conserva el `id` y el código generado; la respuesta trae
+ * el curso actualizado y la pantalla reemplaza la fila que ya mostraba.
+ */
+export function editarCurso(id, datos) {
+  return getDataSource().editarCurso(id, datos)
+}
+
 /** Alta de comisión. La respuesta trae el código derivado `{codigo del curso}-{numero}` (D34). */
 export function crearComision(datos) {
   return getDataSource().crearComision(datos)

@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_MODE, configurarFuenteDeDatos, createDataSource } from './dataSourceFactory'
 import { createMockDataSource } from './mockDataSource'
 import {
@@ -8,9 +8,11 @@ import {
   buscarDocentes,
   crearAlumno,
   editarAlumno,
+  editarCurso,
   eliminarAlumno,
   listarAlumnos,
   listarComisiones,
+  listarCursos,
   reactivarAlumno,
   restablecerPasswordAlumno,
 } from './dataService'
@@ -295,5 +297,49 @@ describe('la implementación de ejemplo', () => {
     )
     expect(await fuente.buscarHabilitacion('   ')).toBeNull()
     expect(await fuente.buscarHabilitacion('nadie')).toBeNull()
+  })
+})
+
+describe('la edición de curso', () => {
+  it('delega en la fuente configurada', async () => {
+    const editar = vi.fn(async () => ({ id: 1, nombre: 'Python Inicial Editado' }))
+    configurarFuenteDeDatos({ modo: 'api', editarCurso: editar })
+
+    await editarCurso(1, { nombre: 'Python Inicial Editado', descripcion: null })
+
+    expect(editar).toHaveBeenCalledWith(1, {
+      nombre: 'Python Inicial Editado',
+      descripcion: null,
+    })
+  })
+
+  it('actualiza el curso y el nombre anidado de sus comisiones en el ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const actualizado = await editarCurso(1, {
+      nombre: 'Python Inicial Editado',
+      descripcion: 'Descripción nueva.',
+    })
+
+    expect(actualizado).toMatchObject({
+      id: 1,
+      codigo: 'CUR-101',
+      nombre: 'Python Inicial Editado',
+      descripcion: 'Descripción nueva.',
+    })
+    expect((await listarCursos()).find((curso) => curso.id === 1).nombre).toBe(
+      'Python Inicial Editado',
+    )
+    expect(
+      (await listarComisiones()).find((comision) => comision.codigo === 'CUR-101').curso.nombre,
+    ).toBe('Python Inicial Editado')
+  })
+
+  it('rechaza un nombre que ya pertenece a otro curso', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await expect(
+      editarCurso(1, { nombre: 'Diseño UX/UI Avanzado', descripcion: null }),
+    ).rejects.toThrow('Ya existe un curso con ese nombre')
   })
 })
