@@ -1,4 +1,4 @@
-"""Reglas de negocio del padrón de docentes (historia #9).
+"""Reglas de negocio del padrón de docentes (historias #9 y #11).
 
 Vive en `services` y no en el router por D1, y confirma la transacción por la misma razón que
 `app/services/catalogo.py`: `get_db` cierra la sesión sin confirmar.
@@ -27,11 +27,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.security import CONTRASEÑA_DEMO, hashear_password
+from app.core.security import CONTRASEÑA_DEMO, MAX_PASSWORD_BYTES, hashear_password
 from app.models.catalogo import Comision
 from app.models.enums import Rol
 from app.models.padron import Docente, Usuario
-from app.schemas.padron import DocenteCreate
+from app.schemas.padron import DocenteCreate, DocenteUpdate
+from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available
 from app.services.normalization import normalize_document, normalize_name
 
@@ -45,6 +46,24 @@ _DNI_CON_SEPARADORES = re.compile(r"^[0-9.\s-]+$")
 #: versiones de PostgreSQL y el nombre no.
 INDICE_DNI = "uq_docente_dni_norm"
 INDICE_EMAIL = "uq_docente_email"
+
+#: La cuenta tiene su propio índice de email (D5). En la edición es el que corta la carrera entre
+#: dos personas que guardan el mismo correo al mismo tiempo, y se traduce al mismo rechazo.
+INDICE_USUARIO_EMAIL = "uq_usuario_email"
+
+
+class DocenteNoEncontrado(Exception):
+    """El `id` pedido no corresponde a ningún docente."""
+
+    def __init__(self) -> None:
+        super().__init__("El docente no existe.")
+
+
+class DocenteSinCuenta(Exception):
+    """El docente no tiene una cuenta de acceso y no se puede restablecer su contraseña."""
+
+    def __init__(self) -> None:
+        super().__init__("El docente no tiene una cuenta de acceso.")
 
 
 class DocenteDuplicado(Exception):
@@ -101,6 +120,101 @@ def crear_docente(session: Session, datos: DocenteCreate) -> Docente:
     )
     session.commit()
     return docente
+
+
+def obtener_docente(session: Session, docente_id: int) -> Docente:
+    """El docente por identificador, o `DocenteNoEncontrado` para que la ruta responda 404."""
+    docente = session.get(Docente, docente_id)
+    if docente is None:
+        raise DocenteNoEncontrado
+    return docente
+
+
+def editar_docente(session: Session, docente: Docente, datos: DocenteUpdate) -> Docente:
+    """Actualiza los datos personales y sincroniza la cuenta, en una sola transacción (HU #11).
+
+    El `id` no cambia, así que las comisiones asignadas y su historial siguen apuntando al mismo
+    docente. El DNI se compara solo contra el padrón de docentes —excluyendo al propio— y el email
+    contra los tres padrones con `ensure_email_available`, excluyendo también la cuenta propia:
+    guardar los mismos datos no choca contra sí mismo.
+
+    Un docente sin `Usuario` se edita igual: la sincronización se saltea y **no** se crea una
+    cuenta implícita. El alta garantiza que todo docente nuevo tenga una, así que el caso es solo
+    de datos históricos.
+    """
+    dni_norm = normalize_document(datos.dni)
+    existente = session.scalar(
+        select(Docente.id).where(Docente.dni_norm == dni_norm, Docente.id != docente.id)
+    )
+    if existente is not None:
+        raise DocenteDuplicado("DNI")
+
+    usuario = _usuario_del_docente(session, docente)
+    ensure_email_available(
+        session,
+        datos.email,
+        exclude_docente_id=docente.id,
+        exclude_usuario_id=usuario.id if usuario is not None else None,
+    )
+
+    docente.nombre = datos.nombre
+    docente.apellido = datos.apellido
+    docente.dni = datos.dni
+    docente.dni_norm = dni_norm
+    docente.email = datos.email
+    docente.telefono = datos.telefono
+
+    if usuario is not None:
+        usuario.nombre = f"{datos.nombre} {datos.apellido}"
+        usuario.email = datos.email
+
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        _traducir_duplicado(error)
+        raise
+
+    # La respuesta del contrato incluye las comisiones asignadas, que la edición no vuelve a
+    # calcular: se leen después de confirmar para no mostrar una lista vieja.
+    _asignar_comisiones(session, [docente])
+    return docente
+
+
+def restablecer_password(session: Session, docente: Docente, nueva: str) -> Docente:
+    """Reemplaza la contraseña del docente y exige su cambio en el próximo ingreso (HU #11).
+
+    La contraseña anterior deja de servir porque el hash se reemplaza. La cuenta queda con
+    `must_change_password = true`, el mismo mecanismo que el alta de alumno (D45), así que el
+    docente la cambia al entrar y la contraseña que definió Administración no queda vigente.
+
+    **No se toca `is_active`:** una cuenta dada de baja sigue de baja (D52). Si el docente no tiene
+    cuenta, la ruta responde 409 en vez de crear una implícitamente.
+    """
+    usuario = _usuario_del_docente(session, docente)
+    if usuario is None:
+        raise DocenteSinCuenta
+
+    if len(nueva) < PASSWORD_MIN_LENGTH:
+        raise PasswordInvalida(
+            f"La contraseña nueva tiene que tener al menos {PASSWORD_MIN_LENGTH} caracteres."
+        )
+    if len(nueva.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise PasswordInvalida(
+            f"La contraseña nueva no puede superar los {MAX_PASSWORD_BYTES} bytes."
+        )
+
+    usuario.password_hash = hashear_password(nueva)
+    usuario.must_change_password = True
+    session.commit()
+
+    _asignar_comisiones(session, [docente])
+    return docente
+
+
+def _usuario_del_docente(session: Session, docente: Docente) -> Usuario | None:
+    """La cuenta de acceso vinculada al docente, si existe."""
+    return session.scalar(select(Usuario).where(Usuario.docente_id == docente.id))
 
 
 def listar_docentes(session: Session, consulta: str | None = None) -> list[Docente]:
@@ -242,6 +356,6 @@ def _traducir_duplicado(error: IntegrityError) -> None:
     motivo = str(getattr(getattr(error.orig, "diag", None), "constraint_name", "") or error.orig)
     if INDICE_DNI in motivo:
         raise DocenteDuplicado("DNI") from error
-    if INDICE_EMAIL in motivo:
+    if INDICE_EMAIL in motivo or INDICE_USUARIO_EMAIL in motivo:
         raise DocenteDuplicado("email") from error
     logger.warning("El alta de docente chocó con una restricción no prevista: %s", motivo)
