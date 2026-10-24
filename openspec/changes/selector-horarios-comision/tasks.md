@@ -15,7 +15,7 @@
 ## 3. Contrato y reglas de la API
 
 - [ ] 3.1 Reemplazar `dias_horarios` por `horarios: list[HorarioComision]` en `ComisionCreate` y `ComisionUpdate` con `extra="forbid"`, y sumar `horarios` a `ComisionOut`, verificando con tests que un cuerpo con `dias_horarios` responde `422` y que la respuesta trae los horarios estructurados
-- [ ] 3.2 Validar en los schemas los minutos múltiplos de 15, las horas entre 6:00 y 22:00, el `fin > inicio`, un solo rango por día y que dos rangos no se pisen, verificando con tests de pytest que cada caso responde `422`
+- [ ] 3.2 Validar en los schemas que `horarios` tenga entre 1 y 7 elementos, que los minutos sean múltiplos de 15, que las horas estén entre 6:00 y 22:00, que `fin > inicio` y que no se repita ningún día, verificando con tests de pytest que cada caso responde `422`, incluido `horarios: []`, que no debe llegar nunca a la derivación de `dias_horarios`
 - [ ] 3.3 Persistir los horarios en `crear_comision` y `editar_comision`, regenerando `dias_horarios` desde las filas con el formato del resumen, y verificar con un test que el texto devuelto es el resumen de los horarios guardados
 - [ ] 3.4 Implementar el chequeo de solapamiento por docente con comparación estricta, la excepción de servicio y su traducción a `409` en la ruta, verificando con tests el choque con otra comisión del mismo docente, el borde exacto 18:30/18:30 permitido, el mismo horario de otro docente permitido y la comisión dada de baja que no choca
 - [ ] 3.5 Excluir la propia comisión del chequeo en `PUT /comisiones/{id}`, verificando con un test que reenviar los horarios actuales o cambiar el rango de un solo día no responde `409`
