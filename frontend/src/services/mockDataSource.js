@@ -91,9 +91,19 @@ function passwordInicial(nombre, documento) {
  */
 function filaDeDocente(docente, comisiones = []) {
   const asignadas = comisiones ?? []
+  const completo = `${docente.nombre} ${docente.apellido ?? ''}`.trim()
+  // El ejemplo guarda el nombre ya junto y sin apellido; la fuente real los separa. Para que el
+  // modal de edición (historia #11) precargue lo mismo en los dos modos, se parte el nombre del
+  // ejemplo en nombre de pila y apellido por la última palabra. No se reescribe el mock: la
+  // separación vive en el borde, que es donde ya se arma la forma de la fila.
+  const partes = completo.split(' ')
+  const apellido = docente.apellido ?? (partes.length > 1 ? partes.at(-1) : '')
+  const nombres = docente.apellido ? docente.nombre : partes.slice(0, -1).join(' ') || completo
   return {
     ...docente,
-    nombre: `${docente.nombre} ${docente.apellido ?? ''}`.trim(),
+    nombre: completo,
+    nombres,
+    apellido,
     comisiones: asignadas,
     comisiones_asignadas: asignadas.length,
   }
@@ -362,6 +372,56 @@ export function createMockDataSource() {
         activo: true,
         catedra: null,
       })
+    },
+
+    /**
+     * Edición de los datos personales del docente (historia #11). Aplica las mismas reglas que el
+     * backend para que la pantalla pueda ejercitar los rechazos sin red: DNI único dentro del
+     * padrón y email único en los tres padrones. El `id` y las comisiones no se tocan.
+     */
+    async editarDocente(id, { nombre, apellido, dni, email, telefono }) {
+      const docente = store.docentes.find((candidato) => candidato.id === id)
+      if (!docente) {
+        throw new Error('El docente no existe.')
+      }
+
+      const dniNormalizado = normalizeDocumento(dni)
+      const mismoDni = store.docentes.find(
+        (candidato) =>
+          candidato.id !== id && normalizeDocumento(candidato.dni) === dniNormalizado,
+      )
+      if (mismoDni) {
+        throw new Error('Ya hay un docente registrado con ese DNI.')
+      }
+
+      const emailNormalizado = normalizeCode(email)
+      const conEseEmail = (padron) =>
+        padron.some((candidato) => normalizeCode(candidato.email) === emailNormalizado)
+      if (conEseEmail(store.docentes.filter((candidato) => candidato.id !== id))) {
+        throw new Error(`El email ${email} ya está registrado en el padrón de docentes.`)
+      }
+      if (conEseEmail(store.alumnos)) {
+        throw new Error(`El email ${email} ya está registrado en el padrón de alumnos.`)
+      }
+
+      Object.assign(docente, { nombre, apellido, dni, email, telefono })
+      return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
+    },
+
+    /**
+     * Restablecimiento de la contraseña del docente (historia #11). El ejemplo no guarda cuentas
+     * ni hashes, así que solo valida la regla de longitud y devuelve la fila; lo que se prueba de
+     * punta a punta es la pantalla y el backend.
+     */
+    async restablecerPasswordDocente(id, newPassword) {
+      const docente = store.docentes.find((candidato) => candidato.id === id)
+      if (!docente) {
+        throw new Error('El docente no existe.')
+      }
+      if (String(newPassword).length < 8) {
+        throw new Error('La contraseña nueva tiene que tener al menos 8 caracteres.')
+      }
+      return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
     },
 
     /** Cursos del ejemplo, con la misma forma que devuelve la fuente real. */

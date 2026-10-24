@@ -181,6 +181,26 @@ export function createApiDataSource() {
       return filaDeDocente(await request(PATHS.docentes, { method: 'POST', body: datos }))
     },
 
+    /** Edición de los datos personales (historia #11). El CUIL no se envía: sigue fuera del
+     * contrato (D33) y el backend lo rechaza con 422. */
+    async editarDocente(id, datos) {
+      return filaDeDocente(await request(`${PATHS.docentes}/${id}`, { method: 'PUT', body: datos }))
+    },
+
+    /**
+     * Restablecimiento administrativo de la contraseña (historia #11). No devuelve la
+     * contraseña en claro: el backend guarda solo el hash y exige el cambio en el próximo
+     * ingreso.
+     */
+    async restablecerPasswordDocente(id, newPassword) {
+      return filaDeDocente(
+        await request(`${PATHS.docentes}/${id}/password`, {
+          method: 'POST',
+          body: { new_password: newPassword },
+        }),
+      )
+    },
+
     /**
      * Padrón de alumnos (historia #13). La respuesta trae los datos personales y deja en `null`
      * comisión, categoría, porcentaje de beca y acceso mientras el alumno no tenga inscripción.
@@ -342,12 +362,18 @@ export function createApiDataSource() {
  *
  * `catedra` no existe en el modelo: se manda `null` para que la columna muestre un guion en vez de
  * inventar un dato.
+ *
+ * **`nombre` de la fila es el nombre completo y `nombres` el de pila.** La tabla muestra el primero;
+ * el modal de edición (historia #11) necesita los dos por separado, y la respuesta del backend los
+ * trae así. Sin `nombres` el formulario precargaría el apellido dentro del nombre y guardarlo sin
+ * cambios lo duplicaría.
  */
 function filaDeDocente(docente) {
   const comisiones = docente.comisiones ?? []
   return {
     ...docente,
     nombre: `${docente.nombre} ${docente.apellido}`,
+    nombres: docente.nombre,
     catedra: null,
     comisiones,
     comisiones_asignadas: docente.cantidad_comisiones ?? comisiones.length,

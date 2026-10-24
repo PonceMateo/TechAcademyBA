@@ -81,6 +81,41 @@ describe('la fuente real usa las rutas del contrato', () => {
     })
   })
 
+  it('edita un docente y restablece su contraseña con las rutas del padrón', async () => {
+    const fetchMock = responder(200, {
+      id: 2,
+      nombre: 'Rita',
+      apellido: 'Molina',
+      dni: '30111222',
+      cuil: null,
+      email: 'rita.molina@techacademy.invalid',
+      telefono: null,
+      activo: true,
+      cantidad_comisiones: 0,
+      comisiones: [],
+    })
+    const fuente = createApiDataSource()
+
+    const fila = await fuente.editarDocente(2, {
+      nombre: 'Rita',
+      apellido: 'Molina',
+      dni: '30111222',
+      email: 'rita.molina@techacademy.invalid',
+      telefono: null,
+    })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/docentes\/2$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PUT')
+    // El nombre de pila viaja aparte para que el modal pueda precargar los dos campos.
+    expect(fila).toMatchObject({ nombre: 'Rita Molina', nombres: 'Rita', apellido: 'Molina' })
+
+    await fuente.restablecerPasswordDocente(2, 'NuevaClave2026')
+    expect(ultimaRuta(fetchMock)).toMatch(/\/docentes\/2\/password$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual({
+      new_password: 'NuevaClave2026',
+    })
+  })
+
   it('manda el cuerpo del alta tal cual lo arma la pantalla', async () => {
     const fetchMock = responder(200, { id: 1, codigo: 'CUR001' })
 
