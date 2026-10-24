@@ -109,6 +109,11 @@ class Cobranza(TimestampMixin, Base):
     #: Por qué el comprobante no está acreditado. Obligatoria si `estado` no es
     #: ACREDITADO. La historia #45 la cubre; la delega es el equipo.
     causa: Mapped[str | None] = mapped_column(Text)
+    #: HU 21: la solicitud de Factura A queda guardada con la cobranza. La emisión de la
+    #: factura es la HU 25 y no se adelanta acá.
+    factura_a_solicitada: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
     pagador_id: Mapped[int | None] = mapped_column(
         ForeignKey("pagador.id", ondelete="RESTRICT"), nullable=True
     )

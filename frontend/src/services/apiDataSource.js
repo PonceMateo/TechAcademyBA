@@ -6,12 +6,13 @@ import { readStoredToken } from '../auth/tokenStorage'
  *
  * **Toda lectura que falla se propaga como `DataSourceError`; no hay datos de ejemplo en su
  * lugar.** Los endpoints que existen son los del catálogo, el padrón de docentes, el alta y la
- * consulta del padrón de alumnos y las empresas. Los de cobranzas, habilitación y clases todavía
- * no están escritos, así que las pantallas que los usan degradan a su estado vacío (D42).
+ * consulta del padrón de alumnos, las empresas, las cobranzas y las inscripciones de un alumno.
+ * Los de habilitación y clases todavía no están escritos, así que las pantallas que los usan
+ * degradan a su estado vacío (D42).
  *
  * **Un error nunca se disfraza de dato válido:** ni un 404, ni un 500, ni un error de red. Un 404
- * es solo otro fallo —el endpoint no existe— y sube tal cual, con su `status`, para que la pantalla
- * decida qué mostrar.
+ * es solo otro fallo —el endpoint o el registro pedido no existe— y sube tal cual, con su `status`,
+ * para que la pantalla decida qué mostrar.
  *
  * **Los POST fallan y lo dicen.** Un alta que no llega a la base no se guarda en ningún lado: el
  * error sube y la pantalla no confirma un alta que no existe. Es la diferencia entre una demo que
@@ -30,10 +31,11 @@ export class DataSourceError extends Error {
 }
 
 /**
- * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes`, `alumnos`, `empresas` y `sedes`
- * quedaron **confirmadas** por los endpoints reales de los changes `altas-catalogo-docentes`,
- * `hu-13-alta-alumno` y `hu-18-alta-empresa`; las demás siguen provisionales (M33) hasta que
- * exista su endpoint.
+ * Rutas por recurso. Las de `cursos`, `comisiones`, `docentes`, `alumnos`, `empresas`, `sedes`,
+ * `cobranzas` e `inscripcionesDeAlumno` quedaron **confirmadas** por los endpoints reales de los
+ * changes `altas-catalogo-docentes`, `hu-13-alta-alumno`, `hu-18-alta-empresa` y
+ * `hu-21-registrar-pago-manual`; las demás siguen provisionales (M33) hasta que exista su
+ * endpoint.
  */
 const PATHS = Object.freeze({
   cursos: '/cursos',
@@ -41,6 +43,7 @@ const PATHS = Object.freeze({
   comisiones: '/comisiones',
   docentes: '/docentes',
   alumnos: '/alumnos',
+  inscripcionesDeAlumno: '/alumnos/:alumnoId/inscripciones',
   empresas: '/empresas',
   sedes: '/sedes',
   cobranzas: '/cobranzas',
@@ -91,9 +94,10 @@ async function request(path, { method = 'GET', body, query, params } = {}) {
 
   if (!response.ok) {
     throw new DataSourceError(
-      // El `detail` del backend es texto de interfaz en es-AR y dice qué dato se repitió, así que
-      // se sube tal cual: la pantalla lo muestra y no necesita saber de dónde viene.
-      response.status >= 400 && response.status < 500 && response.status !== 404
+      // El `detail` del backend es texto de interfaz en es-AR y dice qué dato repitió o qué
+      // regla no se cumplió, así que se sube tal cual también en un 404 de dominio: la
+      // pantalla lo muestra y no necesita saber de dónde viene.
+      response.status >= 400 && response.status < 500
         ? ((await leerDetalle(response)) ??
             `La API respondió ${response.status} a ${method} ${ruta}.`)
         : `La API respondió ${response.status} a ${method} ${ruta}.`,
@@ -111,6 +115,27 @@ async function leerDetalle(response) {
     return typeof cuerpo?.detail === 'string' ? cuerpo.detail : null
   } catch {
     return null
+  }
+}
+
+/**
+ * Une la forma de la API con la que ya usa la pantalla.
+ *
+ * El backend nombra al alumno imputado `imputacion.alumno`; el maquetado y el resto de la
+ * interfaz lo llaman `nombre`. La frontera de datos es el lugar donde se resuelve esa diferencia:
+ * así la pantalla no necesita saber de dónde vinieron las filas (D13).
+ */
+function normalizarCobranza(cobranza) {
+  if (cobranza === null || cobranza === undefined || cobranza.imputacion == null) {
+    return cobranza
+  }
+
+  return {
+    ...cobranza,
+    imputacion: {
+      ...cobranza.imputacion,
+      nombre: cobranza.imputacion.nombre ?? cobranza.imputacion.alumno ?? '',
+    },
   }
 }
 
@@ -274,8 +299,14 @@ export function createApiDataSource() {
       return request(PATHS.empresas, { method: 'POST', body: datos })
     },
 
-    async listarCobranzas() {
-      return request(PATHS.cobranzas)
+    async listarCobranzas(q = '') {
+      const filas = await request(PATHS.cobranzas, { query: { q } })
+      return filas.map(normalizarCobranza)
+    },
+
+    /** Inscripciones activas del alumno, para el selector de imputación (HU 21). */
+    async listarInscripcionesDeAlumno(alumnoId) {
+      return request(PATHS.inscripcionesDeAlumno, { params: { alumnoId } })
     },
 
     async buscarHabilitacion(consulta) {
@@ -283,7 +314,7 @@ export function createApiDataSource() {
     },
 
     async registrarCobranza(datos) {
-      return request(PATHS.cobranzas, { method: 'POST', body: datos })
+      return normalizarCobranza(await request(PATHS.cobranzas, { method: 'POST', body: datos }))
     },
 
     async forzarBloqueoManual({ alumnoId, motivo, usuario, fechaOperacion }) {

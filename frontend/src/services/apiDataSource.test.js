@@ -312,3 +312,86 @@ describe('los POST nunca caen al ejemplo', () => {
     )
   })
 })
+
+describe('cobranzas manuales (HU 21)', () => {
+  const ALTA = {
+    fecha: '2026-06-01',
+    importe: 45000,
+    medio: 'EFECTIVO',
+    titular: 'Juan Ignacio Pérez',
+    estado: 'ACREDITADO',
+    alumno_id: 1,
+    inscripcion_id: 7,
+    factura_a_solicitada: false,
+    cuit_titular: null,
+  }
+
+  it('consulta el historial y busca por titular con q', async () => {
+    const fetchMock = responder(200, [])
+
+    await createApiDataSource().listarCobranzas('perez')
+
+    const consulta = new URL(ultimaRuta(fetchMock), 'http://localhost')
+    expect(consulta.pathname).toMatch(/\/cobranzas$/)
+    expect(consulta.searchParams.get('q')).toBe('perez')
+  })
+
+  it('consulta las inscripciones activas del alumno', async () => {
+    const fetchMock = responder(200, [])
+
+    await createApiDataSource().listarInscripcionesDeAlumno(7)
+
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7\/inscripciones$/)
+  })
+
+  it('traduce `imputacion.alumno` al `nombre` que ya usa la pantalla', async () => {
+    responder(200, [
+      {
+        id: 1,
+        pagador: { id: 1, nombre: 'Verificación HU 21' },
+        imputacion: {
+          id: 1,
+          inscripcion_id: 7,
+          monto: '12345.00',
+          alumno_id: 4,
+          alumno: 'Santiago Torrens',
+          comision: { codigo: 'CUR001-1', nombre: 'Python Inicial' },
+        },
+      },
+    ])
+
+    const [fila] = await createApiDataSource().listarCobranzas()
+
+    expect(fila.imputacion.nombre).toBe('Santiago Torrens')
+    expect(fila.imputacion.alumno).toBe('Santiago Torrens')
+  })
+
+  it('hace POST a /cobranzas con el cuerpo tal cual lo arma la pantalla', async () => {
+    const fetchMock = responder(201, { id: 1, ...ALTA })
+
+    const creada = await createApiDataSource().registrarCobranza(ALTA)
+
+    expect(creada).toMatchObject({ id: 1, importe: 45000 })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/cobranzas$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual(ALTA)
+  })
+
+  it('propaga el motivo del rechazo para que la pantalla lo muestre', async () => {
+    responder(422, {
+      detail: 'El alumno no tiene una inscripción activa para imputar el pago.',
+    })
+
+    await expect(createApiDataSource().registrarCobranza(ALTA)).rejects.toThrow(
+      /no tiene una inscripción activa/,
+    )
+  })
+
+  it('propaga el detalle de un 404 de dominio', async () => {
+    responder(404, { detail: 'El alumno no existe.' })
+
+    await expect(createApiDataSource().listarInscripcionesDeAlumno(99)).rejects.toThrow(
+      'El alumno no existe.',
+    )
+  })
+})

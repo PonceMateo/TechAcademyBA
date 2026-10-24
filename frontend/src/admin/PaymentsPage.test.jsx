@@ -50,8 +50,38 @@ describe('formulario de registro', () => {
     )
   })
 
-  it('explica que el pagador y el beneficiario son cosas distintas', () => {
-    expect(screen.getByText(/no se agrega al padrón de alumnos/)).toBeInTheDocument()
+  it('busca y elige al alumno en un único combobox', async () => {
+    const user = userEvent.setup()
+    const campo = screen.getByLabelText(/Alumno a Imputar Pago/)
+
+    expect(campo).toHaveAttribute('role', 'combobox')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+
+    await user.type(campo, 'Valeria')
+    const opciones = within(screen.getByRole('listbox')).getAllByRole('option')
+
+    expect(opciones).toHaveLength(1)
+    expect(opciones[0]).toHaveTextContent('Valeria Rossi')
+
+    await user.click(opciones[0])
+
+    const bloque = screen.getByRole('button', { name: 'Cambiar' }).parentElement
+    expect(within(bloque).getByText('Valeria Rossi')).toBeInTheDocument()
+    expect(within(bloque).getByText('DNI 36.778.990')).toBeInTheDocument()
+  })
+
+  it('vuelve al buscador con Cambiar sin perder el resto del formulario', async () => {
+    const user = userEvent.setup()
+    const campo = screen.getByLabelText(/Alumno a Imputar Pago/)
+
+    await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Familiar de Valeria')
+    await user.type(campo, 'Valeria')
+    await user.click(screen.getByRole('option', { name: /Valeria Rossi/ }))
+    await user.click(screen.getByRole('button', { name: 'Cambiar' }))
+
+    expect(screen.getByLabelText(/Alumno a Imputar Pago/)).toHaveFocus()
+    expect(screen.getByLabelText(/Titular del Comprobante/)).toHaveValue('Familiar de Valeria')
+    expect(screen.queryByRole('button', { name: 'Cambiar' })).not.toBeInTheDocument()
   })
 
   it('ofrece los mismos medios de pago que la columna MEDIO del historial', () => {
@@ -83,7 +113,10 @@ describe('formulario de registro', () => {
     await user.type(screen.getByLabelText(/Importe Cobrado/), '45000')
     await user.selectOptions(screen.getByLabelText(/Medio de Pago/), 'EFECTIVO')
     await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Juan Ignacio Pérez')
-    await user.selectOptions(screen.getByLabelText(/Alumno a Imputar Pago/), '1')
+    await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
+    await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
+    // La inscripción se resuelve de forma asíncrona: con una sola se selecciona sola.
+    await screen.findByText(/Se imputará a CUR-101/)
     await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
 
     await waitFor(() => expect(filas()).toHaveLength(7))
@@ -93,20 +126,51 @@ describe('formulario de registro', () => {
     expect(nueva.cells[1]).toHaveTextContent('Juan Ignacio Pérez')
     expect(nueva.cells[2]).toHaveTextContent('Juan Ignacio Pérez')
     expect(nueva.cells[3]).toHaveTextContent('Efectivo')
+    // Sin Factura A solicitada la columna muestra el guion, no una B inventada.
+    expect(nueva.cells[4].textContent).toBe('—')
     expect(nueva.cells[5]).toHaveTextContent('$45.000')
     expect(nueva.cells[6]).toHaveTextContent('ACREDITADO')
   })
 
-  it('filtra el alumno a imputar con su propio buscador', async () => {
+  it('busca por nombre, apellido, DNI o email con coincidencias parciales', async () => {
+    const user = userEvent.setup()
+    const campo = screen.getByLabelText(/Alumno a Imputar Pago/)
+
+    async function coincidencias(texto) {
+      await user.clear(campo)
+      await user.type(campo, texto)
+      return within(screen.getByRole('listbox'))
+        .getAllByRole('option')
+        .map((opcion) => opcion.textContent)
+    }
+
+    // Sin tildes: `Pérez` se encuentra escribiendo `perez`.
+    expect(await coincidencias('perez')).toEqual([expect.stringContaining('Juan Ignacio Pérez')])
+    expect(await coincidencias('Rossi')).toEqual([expect.stringContaining('Valeria Rossi')])
+    expect(await coincidencias('36.778')).toEqual([expect.stringContaining('Valeria Rossi')])
+    expect(await coincidencias('valerossi')).toEqual([expect.stringContaining('Valeria Rossi')])
+  })
+
+  it('permite elegir una coincidencia con el teclado', async () => {
+    const user = userEvent.setup()
+    const campo = screen.getByLabelText(/Alumno a Imputar Pago/)
+
+    await user.type(campo, 'Juan')
+    await user.keyboard('{ArrowDown}{Enter}')
+
+    const bloque = screen.getByRole('button', { name: 'Cambiar' }).parentElement
+    expect(within(bloque).getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(within(bloque).getByText('DNI 38.456.789')).toBeInTheDocument()
+  })
+
+  it('avisa cuando ningún alumno coincide con la búsqueda', async () => {
     const user = userEvent.setup()
 
-    await user.type(screen.getByLabelText('Buscar alumno para imputar'), 'Valeria')
+    await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'zzzz')
 
-    const opciones = within(screen.getByLabelText(/Alumno a Imputar Pago/))
-      .getAllByRole('option')
-      .map((opcion) => opcion.textContent)
-
-    expect(opciones).toEqual(['Seleccionar…', 'Valeria Rossi'])
+    expect(
+      within(screen.getByRole('listbox')).getByText('No hay alumnos que coincidan.'),
+    ).toBeInTheDocument()
   })
 })
 
@@ -228,10 +292,152 @@ describe('historial sin endpoint', () => {
     renderAppAs('ADMIN', '/admin/cobranzas')
 
     await screen.findByRole('heading', { name: 'Registrar Cobranza Manual' })
-    // El historial queda sin tabla y el selector de alumno solo con su opción vacía.
+    // El historial queda sin tabla y el combobox avisa que no hay padrón para buscar.
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+    const campo = screen.getByLabelText(/Alumno a Imputar Pago/)
+    await userEvent.type(campo, 'Juan')
     expect(
-      within(screen.getByLabelText(/Alumno a Imputar Pago/)).getAllByRole('option'),
-    ).toHaveLength(1)
+      within(screen.getByRole('listbox')).getByText('No hay alumnos que coincidan.'),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('HU 21: el alta real contra la API', () => {
+  /** Completa el formulario con un pago válido y deja lista la inscripción del alumno 1. */
+  async function completarPago(user, { fecha = '2026-06-01', importe = '45000' } = {}) {
+    await user.type(screen.getByLabelText(/Fecha Pago/), fecha)
+    await user.type(screen.getByLabelText(/Importe Cobrado/), importe)
+    await user.selectOptions(screen.getByLabelText(/Medio de Pago/), 'EFECTIVO')
+    await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Juan Ignacio Pérez')
+    await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
+    await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
+    await screen.findByText(/Se imputará a CUR-101/)
+  }
+
+  it('no envía una fecha futura y lo informa sin agregar la fila', async () => {
+    const user = userEvent.setup()
+
+    await completarPago(user, { fecha: '2099-01-01' })
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    expect(await screen.findByText(/La fecha del pago no puede ser futura/)).toBeInTheDocument()
+    expect(filas()).toHaveLength(6)
+  })
+
+  it('muestra el motivo del backend y no confirma un alta rechazada', async () => {
+    stubDataSource({
+      registrarCobranza: async () => {
+        throw new Error('La inscripción elegida no está activa.')
+      },
+    })
+    const user = userEvent.setup()
+
+    await completarPago(user)
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    expect(await screen.findByText('La inscripción elegida no está activa.')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(filas()).toHaveLength(6)
+  })
+
+  it('pide el CUIT solo al solicitar Factura A y guarda la solicitud', async () => {
+    const user = userEvent.setup()
+
+    expect(screen.queryByLabelText(/CUIT del Titular/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByLabelText(/El titular solicita Factura tipo A/))
+    expect(screen.getByLabelText(/CUIT del Titular/)).toBeInTheDocument()
+
+    await completarPago(user)
+    await user.type(screen.getByLabelText(/CUIT del Titular/), '30-12345678-1')
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    await waitFor(() => expect(filas()).toHaveLength(7))
+    expect(filas()[0].cells[4].textContent).toBe('A')
+  })
+
+  it('rechaza un CUIT inválido antes de llamar a la API', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByLabelText(/El titular solicita Factura tipo A/))
+    await completarPago(user)
+    await user.type(screen.getByLabelText(/CUIT del Titular/), '30-12345678-9')
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    expect(await screen.findByText(/Faltan datos obligatorios/)).toHaveTextContent(
+      'CUIT del Titular',
+    )
+    expect(filas()).toHaveLength(6)
+  })
+
+  it('conserva el pago después de recargar la pantalla', async () => {
+    const user = userEvent.setup()
+
+    await completarPago(user)
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    await waitFor(() => expect(filas()).toHaveLength(7))
+
+    cleanup()
+    renderAppAs('ADMIN', '/admin/cobranzas')
+    await screen.findByText('10/05/2026')
+
+    await waitFor(() => expect(filas()).toHaveLength(7))
+    expect(filas()[0].cells[0]).toHaveTextContent('01/06/2026')
+    expect(filas()[0].cells[5]).toHaveTextContent('$45.000')
+  })
+
+  it('muestra el selector de inscripción cuando el alumno tiene varias', async () => {
+    stubDataSource({
+      listarInscripcionesDeAlumno: async () => [
+        {
+          id: 11,
+          estado: 'ACTIVA',
+          comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+        },
+        {
+          id: 12,
+          estado: 'ACTIVA',
+          comision: { codigo: 'CUR-102', nombre: 'Desarrollo Web Full Stack' },
+        },
+      ],
+    })
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
+    await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
+
+    const selector = await screen.findByLabelText(/Inscripción a imputar/)
+    const opciones = within(selector)
+      .getAllByRole('option')
+      .map((opcion) => opcion.textContent)
+
+    expect(opciones).toEqual([
+      'Seleccionar…',
+      'CUR-101 — Python Inicial',
+      'CUR-102 — Desarrollo Web Full Stack',
+    ])
+  })
+
+  it('bloquea el pago imputado cuando el alumno no tiene inscripciones activas', async () => {
+    stubDataSource({ listarInscripcionesDeAlumno: async () => [] })
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText(/Fecha Pago/), '2026-06-01')
+    await user.type(screen.getByLabelText(/Importe Cobrado/), '45000')
+    await user.selectOptions(screen.getByLabelText(/Medio de Pago/), 'EFECTIVO')
+    await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
+    await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
+
+    expect(
+      (await screen.findAllByText(/no tiene una inscripción activa para imputar el pago/)).length,
+    ).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    expect(await screen.findByText(/Faltan datos obligatorios/)).toHaveTextContent(
+      'Inscripción a imputar',
+    )
+    expect(filas()).toHaveLength(6)
   })
 })

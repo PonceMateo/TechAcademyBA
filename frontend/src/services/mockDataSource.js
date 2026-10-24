@@ -387,8 +387,7 @@ export function createMockDataSource() {
 
       const dniNormalizado = normalizeDocumento(dni)
       const mismoDni = store.docentes.find(
-        (candidato) =>
-          candidato.id !== id && normalizeDocumento(candidato.dni) === dniNormalizado,
+        (candidato) => candidato.id !== id && normalizeDocumento(candidato.dni) === dniNormalizado,
       )
       if (mismoDni) {
         throw new Error('Ya hay un docente registrado con ese DNI.')
@@ -782,8 +781,40 @@ export function createMockDataSource() {
       return copiar(store.sedes)
     },
 
-    async listarCobranzas() {
-      return copiar(store.cobranzas)
+    async listarCobranzas(q = '') {
+      const aguja = String(q ?? '')
+        .trim()
+        .toLowerCase()
+      const filas =
+        aguja === ''
+          ? store.cobranzas
+          : store.cobranzas.filter((fila) => fila.pagador.nombre.toLowerCase().includes(aguja))
+      return copiar(filas)
+    },
+
+    /**
+     * Inscripciones del alumno en el ejemplo. Cada alumno tiene una sola comisión en el
+     * maquetado; el identificador estable es el del alumno porque el mock no guarda
+     * inscripciones con id propio.
+     */
+    async listarInscripcionesDeAlumno(alumnoId) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === Number(alumnoId))
+      if (alumno === undefined) {
+        throw new Error('El alumno no existe.')
+      }
+      if (alumno.comision === null || alumno.comision === undefined) {
+        return []
+      }
+      return [
+        {
+          id: alumno.id,
+          estado: 'ACTIVA',
+          comision: {
+            codigo: alumno.comision.codigo,
+            nombre: alumno.comision.nombre,
+          },
+        },
+      ]
     },
 
     /**
@@ -833,21 +864,24 @@ export function createMockDataSource() {
      * cual vino. La imputación es de destino único (D7) y sale del alumno elegido.
      */
     async registrarCobranza(datos) {
-      const id = store.cobranzas.length + 1
+      const id = siguienteId(store.cobranzas)
+      const alumno = store.alumnos.find((candidato) => candidato.id === datos.alumno_id)
       const cobranza = {
         id,
         fecha: datos.fecha,
-        pagador: { id, nombre: datos.titular },
+        pagador: { id, nombre: datos.titular, documento: datos.cuit_titular ?? null },
         medio: datos.medio,
-        factura: datos.facturaTipo,
+        factura: datos.factura_a_solicitada ? TIPO_FACTURA.A : null,
+        factura_a_solicitada: Boolean(datos.factura_a_solicitada),
         importe: Number(datos.importe),
         estado: datos.estado,
         causa: datos.estado === 'ACREDITADO' ? null : (datos.causa ?? ''),
-        imputacion: datos.alumnoId
+        imputacion: datos.alumno_id
           ? {
               destino: DESTINO_IMPUTACION.ALUMNO,
-              id: datos.alumnoId,
-              nombre: store.alumnos.find((alumno) => alumno.id === datos.alumnoId)?.nombre ?? '',
+              id: datos.inscripcion_id ?? datos.alumno_id,
+              inscripcion_id: datos.inscripcion_id ?? null,
+              nombre: alumno?.nombre ?? '',
             }
           : null,
         _ejemplo: true,

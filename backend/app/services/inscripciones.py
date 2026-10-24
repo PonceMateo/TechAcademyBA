@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import Comision
 from app.models.enums import EstadoInscripcion
@@ -27,6 +27,23 @@ class InscripcionDuplicada(Exception):
 
 class CupoLleno(Exception):
     """La comisión no tiene vacantes."""
+
+
+def listar_inscripciones_activas(session: Session, alumno_id: int) -> list[Inscripcion]:
+    """Inscripciones activas del alumno, para elegir a cuál imputar una cobranza (HU 21)."""
+    if session.get(Alumno, alumno_id) is None:
+        raise AlumnoNoEncontrado("El alumno no existe.")
+    return list(
+        session.scalars(
+            select(Inscripcion)
+            .where(
+                Inscripcion.alumno_id == alumno_id,
+                Inscripcion.estado == EstadoInscripcion.ACTIVA.value,
+            )
+            .options(selectinload(Inscripcion.comision).selectinload(Comision.curso))
+            .order_by(Inscripcion.id)
+        ).all()
+    )
 
 
 def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion:
