@@ -3,12 +3,13 @@
 ## 1. Decisiones registradas antes de tocar código
 
 - [ ] 1.1 Registrar en `docs/decisions.md`, con fecha y autor, las decisiones del change —tabla nueva `comision_horario` con `dias_horarios` conservado como texto derivado, contrato con `horarios` estructurado, `409` por solapamiento del docente, `react-datepicker` como única dependencia nueva y `Modal` con pila de modales— y verificar que la entrada quede escrita antes de cualquier cambio de código
+- [ ] 1.2 Actualizar `docs/glossary.md`: la entrada **Comisión** deja de nombrar `dias_horarios` como el dato del horario y agrega la entidad `comision_horario`, y se agrega la entrada **Horario de cursada**, verificando que el glosario refleje el modelo nuevo
 
 ## 2. Modelo y migración
 
 - [ ] 2.1 Agregar el modelo `ComisionHorario` en `backend/app/models/catalogo.py` con su relación hacia `Comision`, la restricción única por comisión y día y los CHECK de minutos, rango y `fin > inicio`, y verificar que `docker compose exec backend alembic revision --autogenerate` no proponga cambios fuera de esa tabla
 - [ ] 2.2 Escribir la migración `backend/alembic/versions/0005_comision_horario.py` con el `create_table`, su `drop_table` reversible y el parser defensivo que convierte los `dias_horarios` existentes en filas, y verificar con `docker compose exec backend alembic upgrade head` seguido de `downgrade -1` y otro `upgrade head`
-- [ ] 2.3 Cubrir el parser con tests de pytest: textos que se convierten (`Lunes y miércoles 18:00 a 20:00`, `Mar y Jue 19 a 21 hs`) y textos que quedan sin filas (`Sábados intensivo`, `Mar y Jue 18:30` sin fin), verificando que en los primeros quedan las filas esperadas y que el texto original nunca cambia
+- [ ] 2.3 Cubrir el parser con tests de pytest: textos que se convierten (`Lunes y miércoles 18:00 a 20:00`, `Mar y Jue 19 a 21 hs`) y textos que quedan sin filas (`Sábados intensivo`, `Mar y Jue 18:30` sin fin, `Lunes 19:10 a 21:00` fuera de la grilla de 15 minutos, `Lunes 23 a 24` fuera de 6:00–22:00 y `Lunes y lunes 19-21` con el día repetido), verificando que en los primeros quedan las filas esperadas, que el texto original nunca cambia y que `docker compose exec backend alembic upgrade head` termina sin errores
 - [ ] 2.4 Extender `backend/app/tests/test_migration.py` con la tabla nueva, su clave foránea, su índice único y sus CHECK, verificando que el test los liste uno por uno
 
 ## 3. Contrato y reglas de la API

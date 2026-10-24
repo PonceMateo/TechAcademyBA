@@ -77,8 +77,14 @@ El parser vive dentro de la migración y es deliberadamente acotado: acepta día
 abreviados, con o sin acento, separados por `y` o por coma, y un rango con `a`, `-` o espacio
 (`18:00 a 20:00`, `19 a 21`, `18:30-21:00`), con `hs` opcional. Un texto sin rango explícito —
 «Sábados intensivo»— o con dos rangos para el mismo día **no se convierte**: la comisión queda
-sin filas y con su texto original. El `downgrade` solo dropea la tabla, así que `dias_horarios`
-nunca se pierde.
+sin filas y con su texto original.
+
+Antes de insertar, cada fila candidata pasa por la misma guarda que sostiene la tabla —minutos en la
+grilla de 15, horas entre 6:00 y 22:00, `fin > inicio` y un solo horario por día—, y lo que no la
+pase **tampoco se convierte**. Un solo texto raro del historial —`Lunes 19:10 a 21:00` o un día
+repetido— dejaría el `upgrade head` a mitad de camino en todos los entornos, y ese es el único punto
+del change donde un dato de entrada puede tumbar un deploy. El `downgrade` solo dropea la tabla, así
+que `dias_horarios` nunca se pierde.
 
 *Alternativa descartada:* no incluir el parser porque en producción no hay filas. Se descarta
 porque el enunciado del trabajo pide la conversión como parte de la migración, y un parser con
