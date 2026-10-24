@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.security import MAX_PASSWORD_BYTES
 from app.schemas.validators import EmailConForma
 
 
@@ -31,6 +32,28 @@ class DocenteCreate(BaseModel):
     # La forma del email la valida `app.schemas.validators`, la misma que usa el alta de alumno.
     email: EmailConForma = Field(min_length=3, max_length=255)
     telefono: str | None = Field(default=None, max_length=40)
+
+
+class DocenteUpdate(DocenteCreate):
+    """Cuerpo de `PUT /docentes/{id}` (historia #11): los mismos datos del alta, sin CUIL.
+
+    Hereda las validaciones del alta a propósito: editar no admite nada que el alta no admita, y
+    un `cuil` en el cuerpo sigue siendo un 422 (D33 y D52). El `id`, sus comisiones y su historial
+    se conservan porque el formulario no los envía.
+    """
+
+
+class RestablecerPasswordRequest(BaseModel):
+    """Cuerpo de `POST /docentes/{id}/password` (historia #11).
+
+    La contraseña la define Administración y el docente la cambia en su próximo ingreso. Se guarda
+    solo su hash y no se devuelve en claro. La regla de longitud es la misma del cambio de
+    contraseña y del restablecimiento de alumnos.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    new_password: str = Field(min_length=8, max_length=MAX_PASSWORD_BYTES)
 
 
 class ComisionDeDocenteOut(BaseModel):

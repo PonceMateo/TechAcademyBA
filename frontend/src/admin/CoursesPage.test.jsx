@@ -38,6 +38,7 @@ const COLUMNAS = [
   'CUPO MÁX.',
   'VACANTES',
   'ARANCEL',
+  'ACCIONES',
 ]
 
 /** La ruta del catálogo de cursos y la de un curso del ejemplo. */
@@ -242,8 +243,11 @@ describe('vista de comisiones del curso', () => {
     expect(await screen.findByRole('heading', { name: 'Cursos' })).toBeInTheDocument()
   })
 
-  it('no ofrece ningún control de edición de comisión', () => {
-    expect(screen.queryByRole('button', { name: /editar/i })).not.toBeInTheDocument()
+  it('ofrece la acción de edición en cada fila de la tabla', () => {
+    // Historia #4: la tabla suma la columna ACCIONES con `Editar` por comisión.
+    expect(screen.getAllByRole('button', { name: 'Editar' })).toHaveLength(
+      filasDeComisiones().length,
+    )
     expect(screen.queryByRole('button', { name: /modificar/i })).not.toBeInTheDocument()
   })
 })
@@ -658,6 +662,125 @@ describe('alta de comisión desde dentro de un curso', () => {
   })
 })
 
+describe('menú de la tarjeta', () => {
+  beforeEach(abrirCatalogo)
+
+  it('despliega Editar curso sin abrir el curso', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Acciones de CUR-101' }))
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Editar curso' })).toBeInTheDocument()
+    expect(currentPath()).toBe(RUTA_CATALOGO)
+  })
+
+  it('anuncia si el menú está abierto', async () => {
+    const user = userEvent.setup()
+    const boton = screen.getByRole('button', { name: 'Acciones de CUR-101' })
+
+    expect(boton).toHaveAttribute('aria-haspopup', 'menu')
+    expect(boton).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(boton)
+
+    expect(boton).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('se cierra con Escape y devuelve el foco al botón', async () => {
+    const user = userEvent.setup()
+    const boton = screen.getByRole('button', { name: 'Acciones de CUR-101' })
+    await user.click(boton)
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(boton).toHaveFocus()
+  })
+
+  it('se cierra con un click afuera', async () => {
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Acciones de CUR-101' }))
+
+    await user.click(screen.getByRole('heading', { name: 'Cursos' }))
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
+
+describe('edición de curso', () => {
+  beforeEach(abrirCatalogo)
+
+  async function abrirEdicion(user, codigo = 'CUR-101') {
+    await user.click(screen.getByRole('button', { name: `Acciones de ${codigo}` }))
+    await user.click(screen.getByRole('menuitem', { name: 'Editar curso' }))
+    return screen.getByRole('dialog', { name: 'Editar Curso' })
+  }
+
+  async function editarNombre(user, dialogo, nombre) {
+    const campo = within(dialogo).getByLabelText(/Nombre del Curso/)
+    await user.clear(campo)
+    await user.type(campo, nombre)
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+  }
+
+  it('abre precargado, sin campo de código y con los botones del spec', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    expect(within(dialogo).getByLabelText(/Nombre del Curso/)).toHaveValue('Python Inicial')
+    expect(within(dialogo).getByLabelText(/Descripción/)).toHaveValue('')
+    expect(within(dialogo).queryByLabelText(/Código/)).not.toBeInTheDocument()
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+    expect(within(dialogo).getByRole('button', { name: 'Guardar Cambios' })).toBeInTheDocument()
+  })
+
+  it('guarda, actualiza la tarjeta y confirma la edición', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await editarNombre(user, dialogo, 'Python Inicial Editado')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Curso' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Curso CUR-101 actualizado.')
+    expect(tarjetaDe('Python Inicial Editado')).toHaveTextContent('CUR-101')
+  })
+
+  it('actualiza el nombre del curso en la tabla de comisiones', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await editarNombre(user, dialogo, 'Python Inicial Editado')
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Curso' })).not.toBeInTheDocument(),
+    )
+
+    await user.click(tarjetaDe('Python Inicial Editado'))
+
+    expect(await screen.findByText('Python Inicial Editado · CUR-101')).toBeInTheDocument()
+    expect(filasDeComisiones()[0].cells[1].textContent).toBe('Python Inicial Editado')
+  })
+
+  it('deja el modal abierto con el motivo cuando el nombre ya pertenece a otro curso', async () => {
+    stubDataSource({
+      editarCurso: vi.fn(async () => {
+        throw new Error('Ya existe un curso con ese nombre: CUR-104 — Diseño UX/UI Avanzado.')
+      }),
+    })
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await editarNombre(user, dialogo, 'Diseño UX/UI Avanzado')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe un curso con ese nombre')
+    expect(screen.getByRole('dialog', { name: 'Editar Curso' })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(tarjetaDe('Python Inicial')).toHaveTextContent('CUR-101')
+  })
+})
+
 describe('alta de curso', () => {
   beforeEach(abrirCatalogo)
 
@@ -716,5 +839,122 @@ describe('alta de curso', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe un curso con ese nombre')
     expect(screen.getByRole('dialog', { name: 'Crear Nuevo Curso' })).toBeInTheDocument()
     expect(screen.queryByText(/Curso CUR\d+ creado\./)).not.toBeInTheDocument()
+  })
+})
+
+describe('edición de comisión', () => {
+  beforeEach(() => abrirCurso())
+
+  async function abrirEdicion(user) {
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    return screen.findByRole('dialog', { name: 'Editar Comisión' })
+  }
+
+  it('abre precargada, sin curso, modalidad, sede ni código, con los inscriptos a la vista', async () => {
+    const user = userEvent.setup()
+
+    const dialogo = await abrirEdicion(user)
+
+    expect(within(dialogo).getByLabelText(/^Docente Asignado/)).toHaveValue('1')
+    expect(within(dialogo).getByLabelText(/Días y Horarios/)).toHaveValue('Mar y Jue 19 a 21 hs')
+    expect(within(dialogo).getByLabelText(/Cupo Máximo/)).toHaveValue(30)
+    expect(within(dialogo).getByLabelText(/Valor de Arancel de Comisión/)).toHaveValue(45000)
+    expect(within(dialogo).queryByLabelText(/Curso \/ Programa/)).not.toBeInTheDocument()
+    expect(within(dialogo).queryByLabelText(/^Modalidad/)).not.toBeInTheDocument()
+    expect(within(dialogo).queryByLabelText(/^Sede/)).not.toBeInTheDocument()
+    expect(within(dialogo).queryByLabelText(/Código/)).not.toBeInTheDocument()
+    // CUR-101 tiene cupo 30 y 7 vacantes: 23 inscriptos ocupan banco.
+    expect(dialogo).toHaveTextContent('23 inscriptos activos')
+  })
+
+  it('guarda, actualiza la fila con las vacantes nuevas y confirma la edición', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+    const cupo = within(dialogo).getByLabelText(/Cupo Máximo/)
+
+    await user.clear(cupo)
+    await user.type(cupo, '25')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Comisión' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Comisión CUR-101 actualizada.')
+    const fila = filasDeComisiones()[0]
+    expect(fila.cells[4].textContent).toBe('25')
+    expect(fila.cells[5].textContent).toBe('2')
+  })
+
+  it('rechaza un cupo menor que los inscriptos sin llamar a la fuente', async () => {
+    const editar = vi.fn()
+    stubDataSource({ editarComision: editar })
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+    const cupo = within(dialogo).getByLabelText(/Cupo Máximo/)
+
+    await user.clear(cupo)
+    await user.type(cupo, '10')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(
+      await within(dialogo).findByText(/La comisión tiene 23 inscriptos activos/),
+    ).toBeInTheDocument()
+    expect(editar).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Editar Comisión' })).toBeInTheDocument()
+    expect(filasDeComisiones()[0].cells[4].textContent).toBe('30')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('deja el modal abierto con el motivo cuando la fuente rechaza la edición', async () => {
+    stubDataSource({
+      editarComision: vi.fn(async () => {
+        throw new Error(
+          'La comisión tiene 23 inscriptos activos: el cupo máximo no puede ser menor que 23.',
+        )
+      }),
+    })
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+    const cupo = within(dialogo).getByLabelText(/Cupo Máximo/)
+
+    // 29 pasa la validación local: el rechazo simula una fila vieja, donde el servidor sabe más.
+    await user.clear(cupo)
+    await user.type(cupo, '29')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('23 inscriptos activos')
+    expect(screen.getByRole('dialog', { name: 'Editar Comisión' })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('exige el docente antes de guardar', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await user.selectOptions(within(dialogo).getByLabelText(/^Docente Asignado/), '')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(await screen.findByText('Elegí el docente de la comisión.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar Comisión' })).toBeInTheDocument()
+  })
+})
+
+describe('edición de comisión con un docente que ya no está en el padrón', () => {
+  it('mantiene el docente asignado en el selector, rotulado como baja', async () => {
+    // `GET /docentes` devuelve solo activos: sin esta opción el selector arrancaría vacío y no se
+    // podría guardar ni el arancel de una comisión cuyo docente quedó inactivo (D51).
+    resetDataSource()
+    stubBackend()
+    stubDataSource({ listarDocentes: vi.fn(async () => []) })
+    renderAppAs('ADMIN', RUTA_CURSO)
+    await screen.findByRole('heading', { name: 'Comisiones Activas' })
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Editar Comisión' })
+
+    const selector = within(dialogo).getByLabelText(/^Docente Asignado/)
+    expect(within(selector).getByRole('option', { name: 'Profe Martín (baja)' })).toBeInTheDocument()
+    expect(selector).toHaveValue('1')
   })
 })

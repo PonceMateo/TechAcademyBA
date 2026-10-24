@@ -91,9 +91,19 @@ function passwordInicial(nombre, documento) {
  */
 function filaDeDocente(docente, comisiones = []) {
   const asignadas = comisiones ?? []
+  const completo = `${docente.nombre} ${docente.apellido ?? ''}`.trim()
+  // El ejemplo guarda el nombre ya junto y sin apellido; la fuente real los separa. Para que el
+  // modal de edición (historia #11) precargue lo mismo en los dos modos, se parte el nombre del
+  // ejemplo en nombre de pila y apellido por la última palabra. No se reescribe el mock: la
+  // separación vive en el borde, que es donde ya se arma la forma de la fila.
+  const partes = completo.split(' ')
+  const apellido = docente.apellido ?? (partes.length > 1 ? partes.at(-1) : '')
+  const nombres = docente.apellido ? docente.nombre : partes.slice(0, -1).join(' ') || completo
   return {
     ...docente,
-    nombre: `${docente.nombre} ${docente.apellido ?? ''}`.trim(),
+    nombre: completo,
+    nombres,
+    apellido,
     comisiones: asignadas,
     comisiones_asignadas: asignadas.length,
   }
@@ -108,6 +118,29 @@ function comisionesDelDocente(store, docenteId) {
       codigo: comision.codigo,
       nombre: comision.curso.nombre,
     }))
+}
+
+/**
+ * Cursos del ejemplo derivados de las comisiones: es lo único que el catálogo trae.
+ *
+ * El identificador se asigna por orden de aparición porque el ejemplo no guarda cursos sueltos.
+ * La fuente real lo trae de la tabla, y la pantalla lo necesita para armar el alta de comisión:
+ * el contrato manda `curso_id` numérico, no el código (D34).
+ */
+function cursosDelCatalogo(comisiones) {
+  const vistos = new Map()
+  for (const comision of comisiones) {
+    const curso = comision.curso
+    if (curso && !vistos.has(curso.codigo)) {
+      vistos.set(curso.codigo, {
+        ...curso,
+        id: vistos.size + 1,
+        activo: true,
+        descripcion: null,
+      })
+    }
+  }
+  return [...vistos.values()]
 }
 
 const PREFIJO_DE_DNI = /^[0-9.\s-]+$/
@@ -219,6 +252,7 @@ function buscarPorTexto(registros, texto, campos) {
 export function createMockDataSource() {
   const store = {
     comisiones: copiar(COMISIONES),
+    cursos: cursosDelCatalogo(COMISIONES),
     docentes: copiar(DOCENTES),
     alumnos: copiar(ALUMNOS),
     empresas: copiar(EMPRESAS),
@@ -341,43 +375,108 @@ export function createMockDataSource() {
     },
 
     /**
-     * Cursos del ejemplo, derivados de las comisiones: es lo único que el catálogo tiene.
-     *
-     * El identificador se asigna por orden de aparición porque el ejemplo no guarda cursos sueltos.
-     * La fuente real lo trae de la tabla, y la pantalla lo necesita para armar el alta de comisión:
-     * el contrato manda `curso_id` numérico, no el código (D34).
+     * Edición de los datos personales del docente (historia #11). Aplica las mismas reglas que el
+     * backend para que la pantalla pueda ejercitar los rechazos sin red: DNI único dentro del
+     * padrón y email único en los tres padrones. El `id` y las comisiones no se tocan.
      */
-    async listarCursos() {
-      const vistos = new Map()
-      for (const comision of store.comisiones) {
-        const curso = comision.curso
-        if (curso && !vistos.has(curso.codigo)) {
-          vistos.set(curso.codigo, {
-            ...curso,
-            id: vistos.size + 1,
-            activo: true,
-            descripcion: null,
-          })
-        }
+    async editarDocente(id, { nombre, apellido, dni, email, telefono }) {
+      const docente = store.docentes.find((candidato) => candidato.id === id)
+      if (!docente) {
+        throw new Error('El docente no existe.')
       }
-      return [...vistos.values()]
+
+      const dniNormalizado = normalizeDocumento(dni)
+      const mismoDni = store.docentes.find(
+        (candidato) => candidato.id !== id && normalizeDocumento(candidato.dni) === dniNormalizado,
+      )
+      if (mismoDni) {
+        throw new Error('Ya hay un docente registrado con ese DNI.')
+      }
+
+      const emailNormalizado = normalizeCode(email)
+      const conEseEmail = (padron) =>
+        padron.some((candidato) => normalizeCode(candidato.email) === emailNormalizado)
+      if (conEseEmail(store.docentes.filter((candidato) => candidato.id !== id))) {
+        throw new Error(`El email ${email} ya está registrado en el padrón de docentes.`)
+      }
+      if (conEseEmail(store.alumnos)) {
+        throw new Error(`El email ${email} ya está registrado en el padrón de alumnos.`)
+      }
+
+      Object.assign(docente, { nombre, apellido, dni, email, telefono })
+      return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
+    },
+
+    /**
+     * Restablecimiento de la contraseña del docente (historia #11). El ejemplo no guarda cuentas
+     * ni hashes, así que solo valida la regla de longitud y devuelve la fila; lo que se prueba de
+     * punta a punta es la pantalla y el backend.
+     */
+    async restablecerPasswordDocente(id, newPassword) {
+      const docente = store.docentes.find((candidato) => candidato.id === id)
+      if (!docente) {
+        throw new Error('El docente no existe.')
+      }
+      if (String(newPassword).length < 8) {
+        throw new Error('La contraseña nueva tiene que tener al menos 8 caracteres.')
+      }
+      return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
+    },
+
+    /** Cursos del ejemplo, con la misma forma que devuelve la fuente real. */
+    async listarCursos() {
+      return copiar(store.cursos)
     },
 
     /** Alta de curso de ejemplo. El código se arma acá porque no hay base que lo genere. */
     async crearCurso({ nombre, descripcion }) {
-      const existentes = await this.listarCursos()
       const siguiente =
-        existentes.reduce(
+        store.cursos.reduce(
           (mayor, curso) =>
             Math.max(mayor, Number.parseInt(curso.codigo.replace(/\D/g, ''), 10) || 0),
           0,
         ) + 1
-      return {
-        id: siguienteId(existentes),
+      const curso = {
+        id: siguienteId(store.cursos),
         codigo: `CUR${String(siguiente).padStart(3, '0')}`,
         nombre,
         descripcion: descripcion ?? null,
       }
+      store.cursos.push(curso)
+      return { ...curso }
+    },
+
+    /**
+     * Edición de curso de ejemplo (historia #3): conserva el `id` y el código, y aplica el mismo
+     * criterio de unicidad que el backend (normaliza el nombre y excluye al propio curso).
+     *
+     * El nombre también se actualiza en el `curso` anidado de las comisiones para que una lectura
+     * posterior de `listarComisiones()` no devuelva el nombre viejo.
+     */
+    async editarCurso(id, { nombre, descripcion }) {
+      const curso = store.cursos.find((candidato) => candidato.id === id)
+      if (!curso) {
+        throw new Error('El curso no existe.')
+      }
+
+      const nombreNormalizado = normalizeWords(nombre).join(' ')
+      const existente = store.cursos.find(
+        (candidato) =>
+          candidato.id !== id && normalizeWords(candidato.nombre).join(' ') === nombreNormalizado,
+      )
+      if (existente) {
+        throw new Error(
+          `Ya existe un curso con ese nombre: ${existente.codigo} — ${existente.nombre}.`,
+        )
+      }
+
+      Object.assign(curso, { nombre, descripcion: descripcion ?? null })
+      for (const comision of store.comisiones) {
+        if (normalizeCode(comision.curso.codigo) === normalizeCode(curso.codigo)) {
+          comision.curso = { ...comision.curso, nombre }
+        }
+      }
+      return { ...curso }
     },
 
     /**
@@ -421,6 +520,47 @@ export function createMockDataSource() {
       }
       store.comisiones.push(comision)
       return comision
+    },
+
+    /**
+     * Edición de comisión de ejemplo (historia #4): conserva el `id`, el código, el curso y las
+     * inscripciones, y aplica el mismo criterio de cupo que el backend.
+     *
+     * Los inscriptos que ocupan banco son los que el ejemplo ya guarda; el cupo nuevo no puede
+     * quedar por debajo de ellos, que es lo que el servidor valida contra las inscripciones
+     * `ACTIVA`. Las vacantes se recalculan como en la fuente real (D10).
+     */
+    async editarComision(id, { docente_id, dias_horarios, arancel, cupo_maximo }) {
+      const comision = store.comisiones.find((candidato) => candidato.id === id)
+      if (!comision) {
+        throw new Error('La comisión no existe.')
+      }
+      const docente = store.docentes.find(
+        (candidato) => String(candidato.id) === String(docente_id),
+      )
+      if (!docente) {
+        throw new Error('El docente no existe.')
+      }
+
+      const inscriptos =
+        comision.inscriptos ?? Math.max(comision.cupo_maximo - (comision.vacantes ?? 0), 0)
+      if (Number(cupo_maximo) < inscriptos) {
+        throw new Error(
+          `La comisión tiene ${inscriptos} inscriptos activos: el cupo máximo no puede ser ` +
+            `menor que ${inscriptos}.`,
+        )
+      }
+
+      Object.assign(comision, {
+        docente_id: docente.id,
+        docente_nombre: docente.nombre,
+        dias_horarios,
+        arancel,
+        cupo_maximo: Number(cupo_maximo),
+        inscriptos,
+        vacantes: Number(cupo_maximo) - inscriptos,
+      })
+      return { ...comision }
     },
 
     async listarAlumnos() {

@@ -22,8 +22,14 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
-from app.schemas.padron import DocenteCreate, DocenteOut
+from app.schemas.padron import (
+    DocenteCreate,
+    DocenteOut,
+    DocenteUpdate,
+    RestablecerPasswordRequest,
+)
 from app.services import padron
+from app.services.auth import PasswordInvalida
 from app.services.emails import EmailAlreadyRegistered
 
 router = APIRouter(prefix="/docentes", tags=["padron"])
@@ -84,3 +90,67 @@ def crear_docente(
     docente.cantidad_comisiones = 0
     docente.comisiones = []  # type: ignore[attr-defined]
     return DocenteOut.model_validate(docente)
+
+
+@router.put("/{docente_id}", response_model=DocenteOut, summary="Editar un docente")
+def editar_docente(
+    docente_id: int,
+    cuerpo: DocenteUpdate,
+    session: Annotated[Session, Depends(get_db)],
+    _admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> DocenteOut:
+    """Edición de los datos personales del docente (HU #11).
+
+    El cuerpo admite **solo** nombre, apellido, DNI, mail y teléfono: el CUIL sigue fuera del
+    contrato (D33) y un `cuil` es un 422. Sincroniza el nombre y el email de la cuenta vinculada
+    en la misma transacción, así que el docente entra con el correo nuevo.
+
+    200 con el docente actualizado —con sus comisiones—, 404 si no existe, 409 si el DNI o el
+    email ya pertenecen a otro registro —el mensaje dice cuál— y 422 si falta un campo
+    obligatorio o el email no tiene forma.
+    """
+    try:
+        docente = padron.editar_docente(
+            session, padron.obtener_docente(session, docente_id), cuerpo
+        )
+    except padron.DocenteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except padron.DocenteDuplicado as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except EmailAlreadyRegistered as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except IntegrityError as error:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="La edición chocó con un dato ya existente."
+        ) from error
+    return DocenteOut.model_validate(docente)
+
+
+@router.post(
+    "/{docente_id}/password",
+    response_model=DocenteOut,
+    summary="Restablecer la contraseña de un docente",
+)
+def restablecer_password(
+    docente_id: int,
+    cuerpo: RestablecerPasswordRequest,
+    session: Annotated[Session, Depends(get_db)],
+    _admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> DocenteOut:
+    """Define una nueva contraseña y exige su cambio en el próximo ingreso (HU #11).
+
+    La contraseña anterior deja de ser válida; la base guarda solo el hash y la respuesta no
+    incluye la contraseña en claro. 409 si el docente no tiene cuenta de acceso, 422 si la nueva
+    no cumple la regla y 404 si el docente no existe.
+    """
+    try:
+        actualizado = padron.restablecer_password(
+            session, padron.obtener_docente(session, docente_id), cuerpo.new_password
+        )
+    except padron.DocenteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except padron.DocenteSinCuenta as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except PasswordInvalida as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    return DocenteOut.model_validate(actualizado)

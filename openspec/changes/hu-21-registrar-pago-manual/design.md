@@ -1,6 +1,6 @@
 # Design
 
-- **D49**: la HU 21 persiste `Pagador`, `Cobranza` e `Imputacion` en una transacción. El
+- **D53**: la HU 21 persiste `Pagador`, `Cobranza` e `Imputacion` en una transacción. El
   `Pagador` se crea por cobranza, sin deduplicación: el formulario no captura documento en los
   pagos normales y el cliente pidió no administrar un padrón de pagadores.
 - **Imputación**: el formulario elige un alumno, pero el modelo exige una inscripción. Se agrega

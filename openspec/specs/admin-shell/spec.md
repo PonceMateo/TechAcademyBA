@@ -126,12 +126,15 @@ tarjeta por cada curso del catálogo y las acciones `+ Nuevo Curso` y `+ Nueva C
 del total de comisiones del catálogo —`10 en el catálogo` con los datos de ejemplo—. Cada tarjeta
 SHALL mostrar el nombre del curso, su código, su descripción y la cantidad de comisiones que tiene, y
 SHALL ser activable con un click sobre la tarjeta o sobre el botón `Abrir comisiones` de esa tarjeta.
+Cada tarjeta SHALL mostrar además un botón `⋮` que despliega la acción `Editar curso`; ese botón SHALL
+NOT abrir el curso, SHALL ser accesible por teclado, SHALL anunciar si el menú está abierto y el menú
+SHALL cerrarse al elegir la acción, al pulsar `Escape` o al hacer un click afuera.
 
 La **vista de comisiones del curso**, en la ruta `/admin/cursos/:codigo`, SHALL mostrar la tabla de
 comisiones del curso de la ruta con el chip del total del catálogo, el nombre y el código del curso a
 la vista, la acción `Volver a cursos` y la acción `+ Nueva Comisión`. La tabla SHALL conservar las
 columnas, con estos rótulos literales y en este orden: `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`,
-`HORARIO`, `CUPO MÁX.`, `VACANTES` y `ARANCEL`, y SHALL contener solamente las comisiones del curso
+`HORARIO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES`, y SHALL contener solamente las comisiones del curso
 de la ruta. La vista de comisiones del curso SHALL NOT ofrecer la acción `+ Nuevo Curso`: dentro de
 un curso no tiene sentido dar de alta otro curso.
 
@@ -188,12 +191,27 @@ Esta pantalla SHALL confirmar sus altas contra la base: un alta aceptada SHALL m
 devuelve el sistema, un alta rechazada SHALL dejar el formulario abierto con el motivo tal como lo
 informa la fuente, y un alta que no llega a la base SHALL fallar sin mostrar ninguna confirmación.
 
-Este cambio no incluye edición: el sistema SHALL NOT renderizar ningún control de edición de curso
-ni de comisión.
+La pantalla SHALL abrir el modal `Editar Curso` desde la acción `Editar curso` del menú `⋮`, con los
+campos `Nombre del Curso` y `Descripción` precargados con los valores actuales y sin ningún campo de
+código, y con los botones `Cancelar` y `Guardar Cambios`. Un guardado aceptado SHALL actualizar la
+tarjeta del curso en el catálogo y mostrar una confirmación; un rechazo SHALL dejar el modal abierto
+con el motivo que informa la fuente y SHALL NOT confirmar la edición.
+
+La columna `ACCIONES` SHALL mostrar el botón `Editar` en cada fila. La pantalla SHALL abrir el modal
+`Editar Comisión` con los campos `Docente Asignado`, `Días y Horarios`, `Cupo Máximo` y `Valor de
+Arancel de Comisión (AR$)`, precargados con los valores actuales, y SHALL NOT mostrar los campos
+`Curso / Programa`, `Modalidad`, `Sede` ni ningún campo de código. El modal SHALL mostrar la cantidad
+de inscriptos activos de la comisión y SHALL usar los botones `Cancelar` y `Guardar Cambios`.
+
+WHEN el cupo máximo informado sea menor que la cantidad de inscriptos activos, la pantalla SHALL
+rechazar el guardado e informar la cantidad actual, sin cerrar el modal ni confirmar la edición. Un
+guardado aceptado SHALL actualizar la fila de la tabla con la comisión y las vacantes que devuelve la
+fuente y SHALL mostrar una confirmación; un rechazo de la fuente SHALL dejar el modal abierto con el
+motivo. La pantalla SHALL NOT modificar inscripciones ni pagos al editar la comisión.
 
 #### Scenario: El usuario revisa el listado de comisiones
 - **WHEN** el usuario abre un curso del catálogo desde la vista de cursos
-- **THEN** ve el bloque `Comisiones Activas` de ese curso con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES` y `ARANCEL` en ese orden, y las comisiones de ese curso con su arancel formateado
+- **THEN** ve el bloque `Comisiones Activas` de ese curso con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES` en ese orden, y las comisiones de ese curso con su arancel formateado
 
 #### Scenario: El usuario abre la vista de cursos
 - **WHEN** un usuario de Secretaría abre `Cursos y Comisiones`
@@ -248,18 +266,61 @@ ni de comisión.
 - **THEN** ve que el curso no existe y puede volver al catálogo, en lugar de una tabla de comisiones vacía
 
 #### Scenario: El usuario busca una acción de edición
-- **WHEN** el usuario recorre el listado y el modal
-- **THEN** no encuentra ningún control de edición de curso ni de comisión, porque esas historias quedan fuera de este cambio
 
+- **WHEN** el usuario recorre la tabla de comisiones y las tarjetas de curso
+- **THEN** encuentra el botón `Editar` en cada fila de comisión y la acción `Editar curso` en el menú `⋮` de cada tarjeta
+
+#### Scenario: El usuario edita una comisión
+
+- **WHEN** el usuario pulsa `Editar` en una comisión, cambia el docente, los días y horarios, el cupo o el arancel y guarda
+- **THEN** el modal se cierra, la fila muestra los nuevos valores y vacantes, y la pantalla confirma que la comisión se actualizó
+
+#### Scenario: El usuario reduce el cupo por debajo de los inscriptos
+
+- **WHEN** el usuario intenta guardar un cupo máximo menor que la cantidad de inscriptos activos
+- **THEN** el modal queda abierto, informa la cantidad actual de inscriptos y la fila conserva su cupo anterior
+
+#### Scenario: El modal de edición no cambia el curso ni la modalidad
+
+- **WHEN** el usuario abre `Editar Comisión`
+- **THEN** ve solo docente, días y horarios, cupo y arancel, y no ve campos para el curso, la modalidad, la sede ni el código
+
+#### Scenario: El usuario edita un curso
+
+- **WHEN** el usuario abre el menú `⋮` de una tarjeta, elige `Editar curso`, cambia el nombre o la descripción y guarda
+- **THEN** el modal se cierra, la tarjeta muestra los nuevos datos y la pantalla confirma que el curso se actualizó
+
+#### Scenario: El menú no abre el curso
+
+- **WHEN** el usuario pulsa el botón `⋮` de una tarjeta
+- **THEN** se despliega la acción `Editar curso` y la pantalla NO navega a la vista de comisiones de ese curso
+
+#### Scenario: El usuario edita con un nombre duplicado
+
+- **WHEN** el usuario intenta guardar un nombre que ya pertenece a otro curso
+- **THEN** el modal queda abierto, muestra el motivo que devuelve la fuente y la tarjeta conserva sus datos anteriores
 ### Requirement: Padrón de docentes
 
-The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS` y `ESTADO`, con un campo de búsqueda por nombre, apellido, DNI o email, y la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila válida. Las filas del maquetado son, en este orden: Profe Martín con `Programación`, 1 comisión asignada y estado `Activa`; Lic. Laura Benítez con `Desarrollo Web`, 1 comisión asignada y `Activa`; Santi Ads con `Marketing`, 2 comisiones asignadas y `Activa`; Dr. Marcelo Ríos con `Datos`, 1 comisión asignada y `Activa`; e Ing. González con `Programación`, 1 comisión asignada y `Activa`. La columna `ESTADO` SHALL renderizar `Activa` en verde. El maquetado SHALL NOT mostrar columnas de documento, correo ni teléfono de los docentes, porque los datos del cliente no registran esos datos y no deben inventarse.
+The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, con un campo de búsqueda por nombre, apellido, DNI o email, y la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila válida. Las filas del maquetado son, en este orden: Profe Martín con `Programación`, 1 comisión asignada y estado `Activa`; Lic. Laura Benítez con `Desarrollo Web`, 1 comisión asignada y `Activa`; Santi Ads con `Marketing`, 2 comisiones asignadas y `Activa`; Dr. Marcelo Ríos con `Datos`, 1 comisión asignada y `Activa`; e Ing. González con `Programación`, 1 comisión asignada y `Activa`. La columna `ESTADO` SHALL renderizar `Activa` en verde. El maquetado SHALL NOT mostrar columnas de documento, correo ni teléfono de los docentes, porque los datos del cliente no registran esos datos y no deben inventarse.
 
-Esta pantalla es una adición intencional: el prototipo no la incluye y el alta de docente está dentro del alcance mínimo. La acción `+ Nuevo Docente` SHALL abrir el modal `Nuevo Docente`, con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y `Teléfono`, y sin ningún campo de CUIL porque el contrato del alta no lo admite. El sistema SHALL NOT renderizar un formulario de edición de docente. El control de clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás.
+Esta pantalla es una adición intencional: el prototipo no la incluye y el alta de docente está dentro del alcance mínimo. La acción `+ Nuevo Docente` SHALL abrir el modal `Nuevo Docente`, con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y `Teléfono`, y sin ningún campo de CUIL porque el contrato del alta no lo admite.
+
+La columna `ACCIONES` SHALL mostrar los botones `Editar` y `Restablecer contraseña` en cada fila. El
+sistema SHALL abrir el modal `Editar Docente` con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y
+`Teléfono` precargados con los valores actuales y sin ningún campo de CUIL, con los botones `Cancelar`
+y `Guardar Cambios`. Un guardado aceptado SHALL actualizar la fila y mostrar una confirmación; un
+rechazo SHALL dejar el modal abierto con el motivo que informa la fuente.
+
+El sistema SHALL abrir además el modal `Restablecer contraseña` con los campos de contraseña nueva y
+confirmación, y SHALL avisar que el docente deberá cambiarla en su próximo ingreso. WHEN las dos
+contraseñas no coincidan o la nueva tenga menos de 8 caracteres, la pantalla SHALL rechazar el envío
+sin llamar a la fuente. Un restablecimiento aceptado SHALL cerrar el modal y confirmar la operación.
+
+El control de clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás.
 
 #### Scenario: El usuario abre el padrón de docentes
 - **WHEN** un usuario de Secretaría abre `Docentes`
-- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS` y `ESTADO`, los cinco docentes del maquetado, sus datos de contacto, sus especialidades, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
+- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, los cinco docentes del maquetado, sus datos de contacto, sus especialidades, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
 
 #### Scenario: El usuario localiza a un docente por CUIL
 - **WHEN** el usuario recorre la fila de un docente
@@ -278,9 +339,34 @@ Esta pantalla es una adición intencional: el prototipo no la incluye y el alta 
 - **THEN** el maquetado informa que no se encontraron resultados
 
 #### Scenario: El usuario busca edición o control de clases
-- **WHEN** el usuario revisa la pantalla buscando editar a un docente o controlar las clases que dicta
-- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, no hay control de edición, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
 
+- **WHEN** el usuario revisa la pantalla buscando editar a un docente o controlar las clases que dicta
+- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, la columna `ACCIONES` ofrece `Editar` y `Restablecer contraseña`, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+
+#### Scenario: El usuario edita los datos de un docente
+
+- **WHEN** el usuario pulsa `Editar`, cambia nombre, apellido, DNI, mail o teléfono y guarda
+- **THEN** el modal se cierra, la fila muestra los nuevos datos y la pantalla confirma que el docente se actualizó
+
+#### Scenario: El usuario edita con un DNI o mail duplicado
+
+- **WHEN** el usuario intenta guardar un DNI o un mail que ya pertenece a otro registro
+- **THEN** el modal queda abierto, muestra el motivo que devuelve la fuente y la fila conserva sus datos anteriores
+
+#### Scenario: El usuario restablece la contraseña de un docente
+
+- **WHEN** el usuario pulsa `Restablecer contraseña`, define una contraseña válida y confirma
+- **THEN** el modal se cierra y la pantalla informa que el docente deberá cambiarla en su próximo ingreso
+
+#### Scenario: Las contraseñas no coinciden
+
+- **WHEN** el usuario escribe dos contraseñas distintas en el modal de restablecimiento
+- **THEN** la pantalla no envía la operación y muestra que las contraseñas no coinciden
+
+#### Scenario: El modal de edición no pide CUIL
+
+- **WHEN** el usuario abre `Editar Docente`
+- **THEN** ve nombre, apellido, DNI, mail y teléfono, y no ve ningún campo de CUIL
 ### Requirement: Alumnos, categorías arancelarias y cuentas corporativas
 
 The system SHALL mostrar el bloque `Padrón de Alumnos Regulares` con un campo de búsqueda de placeholder `Buscar por DNI o Nombre…` y una tabla cuyas columnas, con estos rótulos literales y en este orden, son `DNI`, `NOMBRE`, `EMAIL`, `COMISIÓN ASIGNADA`, `CATEGORÍA ARANCELARIA` y `ACCESO PLATAFORMA`. La columna `CATEGORÍA ARANCELARIA` SHALL mostrar `PARTICULAR` en gris, `BECADO PARCIAL` en violeta acompañado del porcentaje de descuento, `BECADO TOTAL` en magenta y `CORPORATIVO` en celeste. La columna `ACCESO PLATAFORMA` SHALL mostrar `HABILITADO` en verde o `BLOQUEADO` en rojo y, cuando el acceso esté bloqueado, SHALL mostrar la causa del bloqueo junto al estado.

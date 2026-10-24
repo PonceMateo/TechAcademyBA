@@ -27,9 +27,25 @@ export function crearCurso(datos) {
   return getDataSource().crearCurso(datos)
 }
 
+/**
+ * Edición de un curso (historia #3). Conserva el `id` y el código generado; la respuesta trae
+ * el curso actualizado y la pantalla reemplaza la fila que ya mostraba.
+ */
+export function editarCurso(id, datos) {
+  return getDataSource().editarCurso(id, datos)
+}
+
 /** Alta de comisión. La respuesta trae el código derivado `{codigo del curso}-{numero}` (D34). */
 export function crearComision(datos) {
   return getDataSource().crearComision(datos)
+}
+
+/**
+ * Edición de una comisión (historia #4). Conserva el `id`, el curso y el número; la respuesta trae
+ * la comisión con sus vacantes recalculadas y la pantalla reemplaza la fila que ya mostraba.
+ */
+export function editarComision(id, datos) {
+  return getDataSource().editarComision(id, datos)
 }
 
 /**
@@ -66,6 +82,23 @@ export function buscarDocentes(texto) {
  */
 export function crearDocente(datos) {
   return getDataSource().crearDocente(datos)
+}
+
+/**
+ * Edición de los datos personales del docente (historia #11). Conserva el `id` y el CUIL; la
+ * respuesta trae la fila actualizada y la pantalla la fusiona con la que ya mostraba para no
+ * perder las comisiones asignadas.
+ */
+export function editarDocente(id, datos) {
+  return getDataSource().editarDocente(id, datos)
+}
+
+/**
+ * Restablecimiento administrativo de la contraseña del docente (historia #11). La contraseña no
+ * se devuelve en claro y la cuenta queda obligada a cambiarla en el próximo ingreso.
+ */
+export function restablecerPasswordDocente(id, newPassword) {
+  return getDataSource().restablecerPasswordDocente(id, newPassword)
 }
 
 export function listarAlumnos() {

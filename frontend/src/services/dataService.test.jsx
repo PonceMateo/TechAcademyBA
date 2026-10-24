@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_MODE, configurarFuenteDeDatos, createDataSource } from './dataSourceFactory'
 import { createMockDataSource } from './mockDataSource'
 import {
@@ -8,11 +8,16 @@ import {
   buscarDocentes,
   crearAlumno,
   editarAlumno,
+  editarComision,
+  editarCurso,
+  editarDocente,
   eliminarAlumno,
   listarAlumnos,
   listarComisiones,
+  listarCursos,
   reactivarAlumno,
   restablecerPasswordAlumno,
+  restablecerPasswordDocente,
 } from './dataService'
 
 /**
@@ -155,6 +160,37 @@ describe('la implementación de ejemplo', () => {
       password_inicial: 'rocio30111222',
     })
     expect((await listarAlumnos()).map((alumno) => alumno.nombre)).toContain('Rocío Álvarez')
+  })
+
+  it('edita un docente y restablece su contraseña sin perder sus comisiones', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const editado = await editarDocente(1, {
+      nombre: 'Martín',
+      apellido: 'Pérez',
+      dni: '28.114.402',
+      email: 'martin.perez@techacademy.invalid',
+      telefono: null,
+    })
+    expect(editado).toMatchObject({
+      id: 1,
+      nombre: 'Martín Pérez',
+      nombres: 'Martín',
+      apellido: 'Pérez',
+      email: 'martin.perez@techacademy.invalid',
+    })
+    expect(editado.comisiones).toHaveLength(1)
+
+    await expect(restablecerPasswordDocente(1, 'corta')).rejects.toThrow('al menos 8')
+    await expect(
+      editarDocente(1, {
+        nombre: 'Martín',
+        apellido: 'Pérez',
+        dni: '31.902.118',
+        email: 'martin.perez@techacademy.invalid',
+        telefono: null,
+      }),
+    ).rejects.toThrow('DNI')
   })
 
   it('edita, restablece la contraseña y da de baja en el padrón de ejemplo', async () => {
@@ -323,5 +359,115 @@ describe('la implementación de ejemplo', () => {
     )
     expect(await fuente.buscarHabilitacion('   ')).toBeNull()
     expect(await fuente.buscarHabilitacion('nadie')).toBeNull()
+  })
+})
+
+describe('la edición de curso', () => {
+  it('delega en la fuente configurada', async () => {
+    const editar = vi.fn(async () => ({ id: 1, nombre: 'Python Inicial Editado' }))
+    configurarFuenteDeDatos({ modo: 'api', editarCurso: editar })
+
+    await editarCurso(1, { nombre: 'Python Inicial Editado', descripcion: null })
+
+    expect(editar).toHaveBeenCalledWith(1, {
+      nombre: 'Python Inicial Editado',
+      descripcion: null,
+    })
+  })
+
+  it('actualiza el curso y el nombre anidado de sus comisiones en el ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const actualizado = await editarCurso(1, {
+      nombre: 'Python Inicial Editado',
+      descripcion: 'Descripción nueva.',
+    })
+
+    expect(actualizado).toMatchObject({
+      id: 1,
+      codigo: 'CUR-101',
+      nombre: 'Python Inicial Editado',
+      descripcion: 'Descripción nueva.',
+    })
+    expect((await listarCursos()).find((curso) => curso.id === 1).nombre).toBe(
+      'Python Inicial Editado',
+    )
+    expect(
+      (await listarComisiones()).find((comision) => comision.codigo === 'CUR-101').curso.nombre,
+    ).toBe('Python Inicial Editado')
+  })
+
+  it('rechaza un nombre que ya pertenece a otro curso', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await expect(
+      editarCurso(1, { nombre: 'Diseño UX/UI Avanzado', descripcion: null }),
+    ).rejects.toThrow('Ya existe un curso con ese nombre')
+  })
+})
+
+describe('la edición de docente', () => {
+  const DATOS = {
+    nombre: 'Ada',
+    apellido: 'Lovelace',
+    dni: '30.111.222',
+    email: 'ada.lovelace@techacademy.invalid',
+    telefono: null,
+  }
+
+  it('delega en la fuente configurada', async () => {
+    const editar = vi.fn(async () => ({ id: 1 }))
+    const restablecer = vi.fn(async () => ({ id: 1 }))
+    configurarFuenteDeDatos({
+      modo: 'api',
+      editarDocente: editar,
+      restablecerPasswordDocente: restablecer,
+    })
+
+    await editarDocente(1, DATOS)
+    await restablecerPasswordDocente(1, 'NuevaClave2026')
+
+    expect(editar).toHaveBeenCalledWith(1, DATOS)
+    expect(restablecer).toHaveBeenCalledWith(1, 'NuevaClave2026')
+  })
+})
+
+describe('la edición de comisión', () => {
+  const DATOS = {
+    docente_id: 1,
+    dias_horarios: 'Mar y Jue 19 a 21 hs',
+    arancel: 50000,
+    cupo_maximo: 25,
+  }
+
+  it('delega en la fuente configurada', async () => {
+    const editar = vi.fn(async () => ({ id: 4 }))
+    configurarFuenteDeDatos({ modo: 'api', editarComision: editar })
+
+    await editarComision(4, DATOS)
+
+    expect(editar).toHaveBeenCalledWith(4, DATOS)
+  })
+
+  it('actualiza la comisión en el ejemplo y recalcula las vacantes', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const actualizada = await editarComision(1, DATOS)
+
+    expect(actualizada).toMatchObject({
+      id: 1,
+      codigo: 'CUR-101',
+      cupo_maximo: 25,
+      vacantes: 2,
+    })
+    expect((await listarComisiones()).find((comision) => comision.id === 1).cupo_maximo).toBe(25)
+  })
+
+  it('rechaza un cupo por debajo de los inscriptos en el ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await expect(editarComision(1, { ...DATOS, cupo_maximo: 10 })).rejects.toThrow(
+      '23 inscriptos activos',
+    )
   })
 })

@@ -1556,45 +1556,27 @@ entradas se escriban, van en su lugar y no se renumeran las de acá.
 
 ---
 
-### D49 — La HU 21 registra la cobranza y la solicitud de Factura A, sin emitir factura
+## Fuente de verdad del backlog
+
+### D49 — GitHub Projects es la única fuente viva del backlog
 
 - **Fecha:** 2026-10-23
-- **Autor:** Equipo TechAcademy BA
-- **Decisión:** `POST /cobranzas` y `GET /cobranzas` son de Administración
-  (`require_roles(Rol.ADMIN)`) y persisten `Pagador`, `Cobranza` e `Imputacion` en una sola
-  transacción. Un alta incompleta no deja filas parciales.
-- **Pagador:** se crea uno por operación, sin deduplicación ni padrón de pagadores. El formulario
-  no captura documento en los pagos normales y el cliente pidió no administrar un maestro de
-  terceros; el nombre del titular se conserva tal como se ingresó. La HU 22 podrá agregar la
-  búsqueda o el padrón sin cambiar el contrato de esta historia.
-- **Imputación:** el formulario elige un alumno, pero el modelo exige una inscripción. Se agrega
-  `GET /alumnos/{id}/inscripciones` y `POST /cobranzas` acepta `inscripcion_id`. El backend valida
-  que la inscripción exista, pertenezca al alumno y esté `ACTIVA`. Si se omite y el alumno tiene
-  exactamente una activa, la usa; con cero o varias responde 422. No se elige la "más reciente":
-  imputar a una comisión equivocada es peor que pedir una elección.
-- **Factura A:** la HU 21 **no crea registros `Factura`**. La solicitud queda en
-  `cobranza.factura_a_solicitada` (migración aditiva `0004_cobranza_factura_a`) y el CUIT válido
-  se guarda en `Pagador.documento` y `Pagador.documento_norm`. La emisión es la HU 25. Sin
-  solicitud no se asume Factura B: el historial muestra `A` solo cuando se pidió y `—` en los
-  demás casos.
-- **Validación:** Pydantic rechaza fecha futura en `America/Argentina/Buenos_Aires`, importe
-  menor o igual a cero, medio o estado fuera del enum, causa vacía cuando el comprobante no está
-  acreditado y CUIT sin dígito verificador. Los CHECKs de la base siguen como segunda defensa.
-  Un error de integridad se traduce a 422 con un mensaje de interfaz, sin exponer SQL.
-- **Historial:** `GET /cobranzas` ordena por fecha e id descendente, devuelve pagador e imputación
-  resueltos y acepta `q` para coincidencia parcial por nombre de titular. El frontend recarga el
-  historial después de un `201` y solo confirma cuando la API respondió bien.
-- **Pantalla:** conserva los campos y la identidad visual. Al elegir alumno carga sus
-  inscripciones activas: con una la muestra seleccionada, con varias ofrece el selector
-  `Comisión a Imputar`, sin ninguna bloquea el alta imputada. El CUIT aparece solo al marcar
-  Factura A. La fecha futura se valida antes de enviar.
-- **Dónde:** `backend/app/models/cobranza.py`, `backend/alembic/versions/0004_cobranza_factura_a.py`,
-  `backend/app/schemas/cobranzas.py`, `backend/app/services/cobranzas.py`,
-  `backend/app/api/cobranzas.py`, `backend/app/api/alumnos.py`, `backend/app/api/router.py`,
-  `backend/app/services/inscripciones.py`, `backend/app/tests/test_cobranzas_api.py`,
-  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
-  `frontend/src/services/mockDataSource.js`, `frontend/src/admin/PaymentsPage.jsx`,
-  `frontend/src/admin/PaymentsPage.test.jsx` y las pruebas de la frontera de datos.
+- **Autor:** Mateo Ponce
+- **Decisión:** el project #1 `TechAcademyBA` (owner `PonceMateo`) es la única
+  fuente viva de las historias: cuáles existen, su texto, prioridad, épica,
+  estimación y estado. `AGENTS.md` deja de tratar el CSV como respaldo y lo
+  marca histórico, congelado. Una historia está terminada con `Status = Done`,
+  no con el issue cerrado.
+- **Por qué:** el board ya decía qué estaba hecho y el CSV no, así que mantener
+  dos fuentes obligaba a sincronizarlas a mano y a decidir cuál ganaba en cada
+  caso. Las tres historias que solo existían en el CSV (45, 46 y 47) se crearon
+  como issues antes de congelarlo.
+- **Alternativa descartada:** dejar el CSV como fuente de las restricciones y el
+  board solo del estado. Duplica el mismo dato en dos lugares y vuelve a abrir
+  la pregunta de cuál manda.
+- **Costo:** leer el backlog ahora depende de `gh` autenticado con scope
+  `project`. Sin acceso, el agente pide credenciales y, si el usuario prefiere
+  seguir, trabaja con lo que haya en el repo y lo dice.
 
 ---
 
@@ -1659,3 +1641,152 @@ a LF muestra el cambio de fin de línea completo.
 La solución es un `.gitattributes` con `* text=auto eol=lf`, que pisa el
 `core.autocrlf` local. No se agregó acá porque `.gitattributes` no está en el
 alcance de este change; queda a criterio del equipo agregarlo.
+
+---
+
+## Edición de curso (change `hu-3-editar-curso`)
+
+### D50 — El código del curso no se edita y la unicidad de la edición es la del nombre
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** `PUT /cursos/{id}` actualiza solo `nombre` y `descripcion`. El `codigo` no forma
+  parte del contrato de entrada: es una columna generada por la base a partir del `id` (D32) y un
+  `codigo` en el cuerpo responde `422`. La edición conserva el `id` y el código generado, así que
+  las comisiones y su historial siguen asociados al mismo curso.
+- **Unicidad:** el nombre se normaliza con `normalize_name` y se compara contra el resto del
+  catálogo **excluyendo el propio curso**. Guardar el mismo nombre no choca contra su propia fila;
+  un nombre que ya pertenece a otro curso responde `409` y nombra el curso existente. El índice
+  `uq_curso_nombre_norm` sigue cortando la carrera entre dos ediciones simultáneas, y ese caso se
+  degrada al mismo `409` sin inventar un nombre, igual que el alta.
+- **Menú `⋮`:** la acción de edición vive en un menú local a `CoursesPage`, no en un componente
+  compartido de `components/ui`. Hoy la usa una sola pantalla; si otra necesita el mismo menú, se
+  promueve entonces. El cuerpo de la tarjeta sigue abriendo el curso y el botón `⋮` es un control
+  hermano, para no anidar botones.
+- **Por qué:** el texto original de la HU 3 pedía editar el código, pero D32 lo define como un dato
+  derivado que no se carga. La desviación queda registrada acá y el issue de la historia se
+  actualizó antes de implementar.
+- **Dónde:** `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`,
+  `backend/app/api/catalogo.py`, `backend/app/tests/test_edicion_curso.py`,
+  `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/CoursesPage.test.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/services/dataService.test.jsx` y
+  `frontend/src/services/apiDataSource.test.js`.
+
+---
+
+## Edición de comisión (change `hu-4-editar-comision`)
+
+### D51 — El cupo se valida contra las inscripciones activas y la edición no toca el resto del contrato
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** `PUT /comisiones/{id}` actualiza `docente_id`, `dias_horarios`, `arancel` y
+  `cupo_maximo`. El curso, el número, la modalidad, la sede y el código quedan fuera del contrato
+  con `extra="forbid"`, así que mandarlos responde `422` y la comisión conserva esos valores. El
+  código derivado `{curso.codigo}-{numero}` (D34) tampoco cambia: no es una columna.
+- **Cupo:** la reducción se compara contra las inscripciones en estado `ACTIVA`, el mismo criterio
+  que `vacantes` (D10) y que el rechazo de la comisión llena. `EN_ESPERA`, `BAJA` y `COMPLETADA` no
+  ocupan banco. Cuando el cupo nuevo es menor, la API responde `422` —y no `409`, que queda para
+  los conflictos de unicidad— con un mensaje que dice cuántos inscriptos hay. No hay CHECK en la
+  base: la cantidad vive en otra tabla y un CHECK no puede consultarla.
+- **Techo asumido:** la cuenta de inscriptos y el `UPDATE` no están serializados contra una
+  inscripción simultánea, igual que hoy el alta de inscripción cuenta y después inserta. Cerrarlo
+  de verdad exige `SELECT ... FOR UPDATE` en los dos caminos, y el de inscripción no es de esta
+  historia; a la escala del proyecto la ventana es despreciable y una edición posterior lo corrige.
+- **Inscriptos en el modal:** la pantalla los deriva como `cupo_maximo - vacantes` de la fila, sin
+  agregar un campo al contrato. Es un dato de contexto para que la secretaría vea el piso; la
+  autoridad es el servidor y su rechazo se muestra tal cual.
+- **Docente inactivo:** el selector ofrece el docente asignado aunque no esté activo, rotulado
+  `(baja)`, porque `GET /docentes` devuelve solo activos y sin esa opción una comisión con un
+  docente dado de baja no se podría guardar ni para corregir el arancel.
+- **Por qué:** el texto de la HU 4 pide corregir la oferta sin tocar inscripciones ni pagos, y el
+  cupo es el único dato nuevo del que hay que impedir un estado incoherente.
+- **Dónde:** `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`,
+  `backend/app/api/catalogo.py`, `backend/app/tests/test_edicion_comision.py`,
+  `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/CoursesPage.test.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js` y
+  `frontend/src/services/mockDataSource.js`.
+
+---
+
+## Edición y acceso del docente (change `hu-11-editar-docente`)
+
+### D52 — La edición sincroniza la cuenta y el restablecimiento obliga a cambiarla
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** `PUT /docentes/{id}` actualiza nombre, apellido, DNI, email y teléfono. El CUIL
+  sigue fuera del contrato (D33): un `cuil` en el cuerpo responde `422`. En la misma transacción se
+  sincronizan `nombre` (`"Nombre Apellido"`) y `email` del `Usuario` vinculado, así que el docente
+  entra con el correo nuevo sin que queden dos verdades.
+- **Unicidad:** el DNI se compara solo contra el padrón de docentes, excluyendo al propio, que es
+  lo que dice D5 y lo que permite que una misma persona sea alumna y docente. El email se verifica
+  con `ensure_email_available` excluyendo al docente y a su propia cuenta, y sigue siendo único
+  entre los tres padrones (M1). Un `uq_usuario_email` que llegue por la carrera entre dos ediciones
+  se traduce al mismo `409` que nombra el email.
+- **Docente sin cuenta:** se edita igual y la sincronización se saltea. No se crea una cuenta
+  implícita: el alta garantiza que todo docente nuevo tenga una, así que el caso es solo de datos
+  históricos.
+- **Restablecimiento:** `POST /docentes/{id}/password` guarda el hash bcrypt de la contraseña que
+  define Administración, invalida la anterior y deja `must_change_password = true`, el mismo
+  mecanismo que el alta de alumno (D45). No se envía correo ni se devuelve la contraseña en claro.
+  No toca `is_active`: reactivar una cuenta dada de baja es otra decisión y no la pide la historia.
+  Un docente sin cuenta responde `409`.
+- **Fuera del alcance:** el alta de docente **sigue** creando la cuenta con
+  `must_change_password = false` y su comentario todavía dice que el flujo de cambio de contraseña
+  no existe, aunque sí existe. Corregirlo cambia el comportamiento de la HU 9 y sus pruebas, así
+  que queda como deuda anotada y no se toca acá.
+- **Por qué:** un DNI o un mail mal cargado obligaba a crear un docente duplicado, y un docente que
+  perdía la contraseña no tenía forma de volver a entrar: el restablecimiento administrativo solo
+  existía para alumnos.
+- **Dónde:** `backend/app/schemas/padron.py`, `backend/app/services/padron.py`,
+  `backend/app/api/padron.py`, `backend/app/tests/test_edicion_docente.py`,
+  `frontend/src/admin/TeachersPage.jsx`, `frontend/src/admin/TeachersPage.test.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js` y
+  `frontend/src/services/mockDataSource.js`.
+
+---
+
+## Registro manual de cobranzas (change `hu-21-registrar-pago-manual`)
+
+### D53 — La HU 21 registra la cobranza y la solicitud de Factura A, sin emitir factura
+
+- **Fecha:** 2026-10-23
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** `POST /cobranzas` y `GET /cobranzas` son de Administración
+  (`require_roles(Rol.ADMIN)`) y persisten `Pagador`, `Cobranza` e `Imputacion` en una sola
+  transacción. Un alta incompleta no deja filas parciales.
+- **Pagador:** se crea uno por operación, sin deduplicación ni padrón de pagadores. El formulario
+  no captura documento en los pagos normales y el cliente pidió no administrar un maestro de
+  terceros; el nombre del titular se conserva tal como se ingresó. La HU 22 podrá agregar la
+  búsqueda o el padrón sin cambiar el contrato de esta historia.
+- **Imputación:** el formulario elige un alumno, pero el modelo exige una inscripción. Se agrega
+  `GET /alumnos/{id}/inscripciones` y `POST /cobranzas` acepta `inscripcion_id`. El backend valida
+  que la inscripción exista, pertenezca al alumno y esté `ACTIVA`. Si se omite y el alumno tiene
+  exactamente una activa, la usa; con cero o varias responde 422. No se elige la "más reciente":
+  imputar a una comisión equivocada es peor que pedir una elección.
+- **Factura A:** la HU 21 **no crea registros `Factura`**. La solicitud queda en
+  `cobranza.factura_a_solicitada` (migración aditiva `0004_cobranza_factura_a`) y el CUIT válido
+  se guarda en `Pagador.documento` y `Pagador.documento_norm`. La emisión es la HU 25. Sin
+  solicitud no se asume Factura B: el historial muestra `A` solo cuando se pidió y `—` en los
+  demás casos.
+- **Validación:** Pydantic rechaza fecha futura en `America/Argentina/Buenos_Aires`, importe
+  menor o igual a cero, medio o estado fuera del enum, causa vacía cuando el comprobante no está
+  acreditado y CUIT sin dígito verificador. Los CHECKs de la base siguen como segunda defensa.
+  Un error de integridad se traduce a 422 con un mensaje de interfaz, sin exponer SQL.
+- **Historial:** `GET /cobranzas` ordena por fecha e id descendente, devuelve pagador e imputación
+  resueltos y acepta `q` para coincidencia parcial por nombre de titular. El frontend recarga el
+  historial después de un `201` y solo confirma cuando la API respondió bien.
+- **Pantalla:** conserva los campos y la identidad visual. El alumno se elige con un combobox que
+  busca por nombre, apellido, DNI o email; al elegirlo se muestran su nombre y DNI con la opción
+  de cambiarlo. Con una sola inscripción activa se selecciona sola, con varias se ofrece el
+  selector `Inscripción a imputar` y sin ninguna se bloquea el alta imputada. El CUIT aparece solo
+  al marcar Factura A. La fecha futura se valida antes de enviar.
+- **Dónde:** `backend/app/models/cobranza.py`, `backend/alembic/versions/0004_cobranza_factura_a.py`,
+  `backend/app/schemas/cobranzas.py`, `backend/app/services/cobranzas.py`,
+  `backend/app/api/cobranzas.py`, `backend/app/api/alumnos.py`, `backend/app/api/router.py`,
+  `backend/app/services/inscripciones.py`, `backend/app/tests/test_cobranzas_api.py`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/admin/PaymentsPage.jsx`,
+  `frontend/src/admin/PaymentsPage.test.jsx` y las pruebas de la frontera de datos.

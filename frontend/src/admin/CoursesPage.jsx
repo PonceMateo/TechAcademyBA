@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
@@ -9,6 +9,8 @@ import {
   crearComision,
   crearCurso,
   crearInscripcion,
+  editarComision,
+  editarCurso,
   listarAlumnos,
   listarComisiones,
   listarCursos,
@@ -35,7 +37,11 @@ import { formatMoneda } from '../utils/formato'
  * que confirme algo que ya está decidido. Desde el catálogo el selector viene vacío, porque ahí no
  * hay ningún curso elegido todavía.
  *
- * **Sin edición.** El spec deja la edición de curso y de comisión para las historias #3 y #4.
+ * **Edición de curso y de comisión.** La HU 3 agregó el menú `⋮` de la tarjeta y el modal
+ * `Editar Curso`; la HU 4 agrega la columna `ACCIONES` de la tabla de comisiones con el botón
+ * `Editar` y el modal `Editar Comisión`, que no ofrece curso, modalidad, sede ni código (D51). El
+ * cupo se valida contra los inscriptos activos en la pantalla y otra vez en la fuente, que es la
+ * autoridad.
  *
  * **`Modalidad` y `Sede` no están en el prototipo y sí van** (historia #8). La `Sede` es
  * **opcional en toda modalidad**: se renderiza solo cuando la modalidad elegida es `Presencial` o
@@ -97,6 +103,19 @@ const CAMPOS_COMISION_VACIOS = {
 const CAMPOS_CURSO_VACIOS = { nombre: '', descripcion: '' }
 
 /**
+ * El formulario de edición de comisión: solo los cuatro datos que la historia #4 habilita.
+ *
+ * Curso, número, modalidad, sede y código **no** están, porque el contrato de la edición no los
+ * admite (D51): no son un olvido de la pantalla.
+ */
+const CAMPOS_EDICION_COMISION_VACIOS = {
+  docente: '',
+  dias_horarios: '',
+  cupo: '',
+  arancel: '',
+}
+
+/**
  * Lo que dice el buscador de que todavía no filtra.
  *
  * El campo se ve deshabilitado y no hay estado atrás: la búsqueda de cursos es la historia que
@@ -120,6 +139,18 @@ export function CoursesPage() {
   const [catalogoListo, setCatalogoListo] = useState(false)
   const [modalComision, setModalComision] = useState(false)
   const [modalCurso, setModalCurso] = useState(false)
+  const [cursoEditando, setCursoEditando] = useState(null)
+  const [camposEdicionCurso, setCamposEdicionCurso] = useState(CAMPOS_CURSO_VACIOS)
+  const [erroresEdicionCurso, setErroresEdicionCurso] = useState({})
+  const [falloEdicionCurso, setFalloEdicionCurso] = useState(null)
+  const [guardandoEdicionCurso, setGuardandoEdicionCurso] = useState(false)
+  const [comisionEditando, setComisionEditando] = useState(null)
+  const [camposEdicionComision, setCamposEdicionComision] = useState(
+    CAMPOS_EDICION_COMISION_VACIOS,
+  )
+  const [erroresEdicionComision, setErroresEdicionComision] = useState({})
+  const [falloEdicionComision, setFalloEdicionComision] = useState(null)
+  const [guardandoEdicionComision, setGuardandoEdicionComision] = useState(false)
   const [modalInscripcion, setModalInscripcion] = useState(false)
   const [alumnos, setAlumnos] = useState([])
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState('')
@@ -186,6 +217,30 @@ export function CoursesPage() {
   const mostrarSede =
     campos.modalidad === MODALIDAD.PRESENCIAL || campos.modalidad === MODALIDAD.HIBRIDO
 
+  /**
+   * Docentes que ofrece el selector de la edición de comisión.
+   *
+   * `GET /docentes` devuelve solo activos. Si la comisión tiene asignado un docente que ya no lo
+   * está, sin esta opción el `select` arrancaría vacío y la secretaría no podría guardar ni un
+   * cambio de arancel sin reasignarle el docente (D51).
+   */
+  const docentesDelSelector =
+    comisionEditando !== null &&
+    comisionEditando.docente_id !== null &&
+    !docentes.some((docente) => docente.id === comisionEditando.docente_id)
+      ? [
+          ...docentes,
+          {
+            id: comisionEditando.docente_id,
+            nombre: `${comisionEditando.docente_nombre ?? 'Docente'} (baja)`,
+          },
+        ]
+      : docentes
+
+  /** Inscriptos que la fila que se está editando informa como ocupantes del cupo. */
+  const inscriptosDeLaEdicion =
+    comisionEditando === null ? 0 : inscriptosActivos(comisionEditando)
+
   function cambiar(campo) {
     return (evento) => setCampos((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
   }
@@ -220,6 +275,169 @@ export function CoursesPage() {
     setCamposCurso(CAMPOS_CURSO_VACIOS)
     setErroresCurso({})
     setFallo(null)
+  }
+
+  function abrirEdicionCurso(curso) {
+    setCursoEditando(curso)
+    setCamposEdicionCurso({
+      nombre: curso.nombre,
+      descripcion: curso.descripcion ?? '',
+    })
+    setErroresEdicionCurso({})
+    setFalloEdicionCurso(null)
+  }
+
+  function cerrarEdicionCurso() {
+    setCursoEditando(null)
+    setCamposEdicionCurso(CAMPOS_CURSO_VACIOS)
+    setErroresEdicionCurso({})
+    setFalloEdicionCurso(null)
+  }
+
+  function cambiarEdicionCurso(campo) {
+    return (evento) =>
+      setCamposEdicionCurso((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  /**
+   * Guarda la edición y actualiza las **dos** vistas con la misma respuesta (D-D del change).
+   *
+   * No se vuelve a pedir el catálogo: una recarga extra dejaría la tarjeta y la tabla mostrando
+   * nombres distintos mientras una de las respuestas está en vuelo. Un rechazo deja el modal
+   * abierto con el motivo que devolvió la fuente.
+   */
+  async function guardarEdicionCurso() {
+    if (camposEdicionCurso.nombre.trim() === '') {
+      setErroresEdicionCurso({ nombre: 'El nombre del curso es obligatorio.' })
+      return
+    }
+
+    setGuardandoEdicionCurso(true)
+    setFalloEdicionCurso(null)
+    try {
+      // Sin `codigo`: el contrato no lo admite y el sistema lo genera (D32).
+      const actualizado = await editarCurso(cursoEditando.id, {
+        nombre: camposEdicionCurso.nombre,
+        descripcion: camposEdicionCurso.descripcion === '' ? null : camposEdicionCurso.descripcion,
+      })
+      setCursos((anteriores) =>
+        anteriores.map((curso) => (curso.id === actualizado.id ? actualizado : curso)),
+      )
+      setComisiones((anteriores) =>
+        anteriores.map((comision) =>
+          normalizeCode(comision.curso.codigo) === normalizeCode(actualizado.codigo)
+            ? { ...comision, curso: { ...comision.curso, nombre: actualizado.nombre } }
+            : comision,
+        ),
+      )
+      cerrarEdicionCurso()
+      setAviso(`Curso ${actualizado.codigo} actualizado.`)
+    } catch (error) {
+      setFalloEdicionCurso(error?.message ?? 'No se pudo guardar el curso.')
+    } finally {
+      setGuardandoEdicionCurso(false)
+    }
+  }
+
+  function abrirEdicionComision(comision) {
+    setComisionEditando(comision)
+    setCamposEdicionComision({
+      docente: comision.docente_id === null ? '' : String(comision.docente_id),
+      dias_horarios: comision.dias_horarios,
+      cupo: String(comision.cupo_maximo),
+      arancel: String(comision.arancel),
+    })
+    setErroresEdicionComision({})
+    setFalloEdicionComision(null)
+  }
+
+  function cerrarEdicionComision() {
+    setComisionEditando(null)
+    setCamposEdicionComision(CAMPOS_EDICION_COMISION_VACIOS)
+    setErroresEdicionComision({})
+    setFalloEdicionComision(null)
+  }
+
+  function cambiarEdicionComision(campo) {
+    return (evento) =>
+      setCamposEdicionComision((anteriores) => ({
+        ...anteriores,
+        [campo]: evento.target.value,
+      }))
+  }
+
+  /**
+   * Validación local del formulario de comisión.
+   *
+   * La reducción de cupo se compara contra los inscriptos que la fila informa, para no mandar una
+   * edición que la fuente va a rechazar igual. **No reemplaza al servidor:** si la fila quedó
+   * vieja, la respuesta de la fuente trae la cantidad real y se muestra tal cual.
+   */
+  function validarEdicionComision() {
+    const encontrados = {}
+    const inscriptos = inscriptosActivos(comisionEditando)
+    const cupo = Number(camposEdicionComision.cupo)
+
+    if (camposEdicionComision.docente === '') {
+      encontrados.docente = 'Elegí el docente de la comisión.'
+    }
+    if (camposEdicionComision.dias_horarios.trim() === '') {
+      encontrados.dias_horarios = 'Los días y horarios son obligatorios.'
+    }
+    if (
+      camposEdicionComision.cupo.trim() === '' ||
+      !Number.isInteger(cupo) ||
+      cupo <= 0
+    ) {
+      encontrados.cupo = 'El cupo debe ser un entero positivo.'
+    } else if (cupo < inscriptos) {
+      encontrados.cupo =
+        `La comisión tiene ${inscriptos} inscriptos activos: el cupo máximo no puede ser ` +
+        `menor que ${inscriptos}.`
+    }
+    if (camposEdicionComision.arancel.trim() === '' || Number(camposEdicionComision.arancel) <= 0) {
+      encontrados.arancel = 'El arancel debe ser un valor positivo.'
+    }
+
+    return encontrados
+  }
+
+  /**
+   * Guarda la edición de comisión y reemplaza la fila con lo que devuelve la fuente.
+   *
+   * La respuesta trae las vacantes recalculadas, así que la tabla no necesita volver a pedir el
+   * listado. Un rechazo deja el modal abierto con el motivo, igual que en las demás ediciones.
+   */
+  async function guardarEdicionComision() {
+    const encontrados = validarEdicionComision()
+    setErroresEdicionComision(encontrados)
+
+    if (Object.keys(encontrados).length > 0) {
+      return
+    }
+
+    setGuardandoEdicionComision(true)
+    setFalloEdicionComision(null)
+    try {
+      // Sin curso, número, modalidad, sede ni código: el contrato no los admite (D51).
+      const actualizada = await editarComision(comisionEditando.id, {
+        docente_id: Number(camposEdicionComision.docente),
+        dias_horarios: camposEdicionComision.dias_horarios,
+        cupo_maximo: Number(camposEdicionComision.cupo),
+        arancel: Number(camposEdicionComision.arancel),
+      })
+      setComisiones((anteriores) =>
+        anteriores.map((comision) =>
+          comision.id === actualizada.id ? actualizada : comision,
+        ),
+      )
+      cerrarEdicionComision()
+      setAviso(`Comisión ${actualizada.codigo} actualizada.`)
+    } catch (error) {
+      setFalloEdicionComision(error?.message ?? 'No se pudo guardar la comisión.')
+    } finally {
+      setGuardandoEdicionComision(false)
+    }
   }
 
   function abrirModalInscripcion(comisionId = '') {
@@ -363,6 +581,30 @@ export function CoursesPage() {
     navegar(`/admin/cursos/${curso.codigo}`)
   }
 
+  /**
+   * La tabla de comisiones con la columna de acciones al final, como en el padrón de alumnos.
+   *
+   * La columna vive acá y no en `COLUMNAS` porque necesita el handler de la pantalla; el resto de
+   * las columnas son del dato y no tienen estado.
+   */
+  const columnasComisiones = [
+    ...COLUMNAS,
+    {
+      clave: 'acciones',
+      titulo: 'ACCIONES',
+      render: (fila) => (
+        <Button
+          variante="secundario"
+          tamano="chico"
+          className="whitespace-nowrap"
+          onClick={() => abrirEdicionComision(fila)}
+        >
+          Editar
+        </Button>
+      ),
+    },
+  ]
+
   let contenido = null
 
   if (catalogoListo) {
@@ -376,6 +618,7 @@ export function CoursesPage() {
           onNuevaComision={abrirModalComision}
           onInscribir={() => abrirModalInscripcion()}
           onAbrir={abrirCurso}
+          onEditar={abrirEdicionCurso}
         />
       )
     } else if (cursoDeRuta === null) {
@@ -387,6 +630,7 @@ export function CoursesPage() {
         <VistaComisiones
           curso={cursoDeRuta}
           comisiones={comisionesDelCurso}
+          columnas={columnasComisiones}
           resumen={resumen}
           onVolver={() => navegar('/admin/cursos')}
           onNuevaComision={abrirModalComision}
@@ -446,6 +690,115 @@ export function CoursesPage() {
           </p>
           {fallo !== null && <MensajeFallo>{fallo}</MensajeFallo>}
         </div>
+      </Modal>
+
+      <Modal
+        abierto={cursoEditando !== null}
+        titulo="Editar Curso"
+        onClose={cerrarEdicionCurso}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarEdicionCurso}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarEdicionCurso} disabled={guardandoEdicionCurso}>
+              {guardandoEdicionCurso ? 'Guardando…' : 'Guardar Cambios'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Input
+            id="editar-curso-nombre"
+            etiqueta="Nombre del Curso"
+            valor={camposEdicionCurso.nombre}
+            onChange={cambiarEdicionCurso('nombre')}
+            obligatorio
+            error={erroresEdicionCurso.nombre ?? null}
+          />
+          <Input
+            id="editar-curso-descripcion"
+            etiqueta="Descripción"
+            valor={camposEdicionCurso.descripcion}
+            onChange={cambiarEdicionCurso('descripcion')}
+            placeholder="Opcional."
+          />
+          {falloEdicionCurso !== null && <MensajeFallo>{falloEdicionCurso}</MensajeFallo>}
+        </div>
+      </Modal>
+
+      <Modal
+        abierto={comisionEditando !== null}
+        titulo="Editar Comisión"
+        onClose={cerrarEdicionComision}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarEdicionComision}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarEdicionComision} disabled={guardandoEdicionComision}>
+              {guardandoEdicionComision ? 'Guardando…' : 'Guardar Cambios'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo
+            id="editar-comision-docente"
+            etiqueta="Docente Asignado"
+            obligatorio
+            error={erroresEdicionComision.docente ?? null}
+          >
+            <select
+              id="editar-comision-docente"
+              value={camposEdicionComision.docente}
+              onChange={cambiarEdicionComision('docente')}
+            >
+              <option value="">Seleccionar…</option>
+              {docentesDelSelector.map((docente) => (
+                <option key={docente.id} value={String(docente.id)}>
+                  {docente.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
+
+          <Input
+            id="editar-comision-dias"
+            etiqueta="Días y Horarios"
+            valor={camposEdicionComision.dias_horarios}
+            onChange={cambiarEdicionComision('dias_horarios')}
+            obligatorio
+            error={erroresEdicionComision.dias_horarios ?? null}
+          />
+
+          <Input
+            id="editar-comision-cupo"
+            etiqueta="Cupo Máximo"
+            type="number"
+            valor={camposEdicionComision.cupo}
+            onChange={cambiarEdicionComision('cupo')}
+            obligatorio
+            error={erroresEdicionComision.cupo ?? null}
+          />
+
+          <Input
+            id="editar-comision-arancel"
+            etiqueta="Valor de Arancel de Comisión (AR$)"
+            type="number"
+            valor={camposEdicionComision.arancel}
+            onChange={cambiarEdicionComision('arancel')}
+            obligatorio
+            error={erroresEdicionComision.arancel ?? null}
+          />
+        </div>
+
+        {falloEdicionComision !== null && <MensajeFallo>{falloEdicionComision}</MensajeFallo>}
+
+        <p className="mt-4 text-xs text-slate-500">
+          {inscriptosDeLaEdicion} {inscriptosDeLaEdicion === 1 ? 'inscripto activo ocupa' : 'inscriptos activos ocupan'}{' '}
+          el cupo. El curso, la modalidad y la sede no se editan en esta pantalla.
+        </p>
       </Modal>
 
       <Modal
@@ -614,6 +967,16 @@ export function CoursesPage() {
   )
 }
 
+/**
+ * Inscriptos activos de una comisión, derivados de la fila.
+ *
+ * `vacantes` es el cupo menos las inscripciones activas (D10), así que la resta devuelve los
+ * inscriptos sin agregar un campo al contrato (D51). Es el piso al que se puede reducir el cupo.
+ */
+function inscriptosActivos(comision) {
+  return Math.max((comision.cupo_maximo ?? 0) - (comision.vacantes ?? 0), 0)
+}
+
 /** El chip del catálogo, que las dos vistas muestran igual. */
 function ChipCatalogo({ total }) {
   return <Badge tono={TONO.CELESTE}>{`${total} en el catálogo`}</Badge>
@@ -628,6 +991,7 @@ function VistaCursos({
   onNuevaComision,
   onInscribir,
   onAbrir,
+  onEditar,
 }) {
   return (
     <Card
@@ -661,6 +1025,7 @@ function VistaCursos({
               curso={curso}
               total={comisionesPorCurso.get(normalizeCode(curso.codigo)) ?? 0}
               onAbrir={() => onAbrir(curso)}
+              onEditar={onEditar}
             />
           ))}
         </div>
@@ -670,32 +1035,112 @@ function VistaCursos({
 }
 
 /**
- * La tarjeta de un curso.
+ * La tarjeta de un curso: el cuerpo abre el curso y el botón `⋮` despliega su acción.
  *
- * **Es un botón y no una `Card` con un botón adentro.** Un botón dentro de otro botón es HTML
- * inválido y rompe la navegación por teclado, y el pedido era que se pueda abrir el curso con un
- * click en cualquier punto de la tarjeta.
+ * **Son dos controles hermanos y no un botón dentro de otro.** Un botón dentro de otro botón es
+ * HTML inválido y rompe la navegación por teclado. El cuerpo conserva el click en cualquier punto
+ * de la tarjeta y el `⋮` detiene la propagación porque es un hermano, no un hijo.
+ *
+ * El menú es local a la pantalla y no un componente compartido (D-C del change): hoy lo usa una
+ * sola vista. Se cierra al elegir la acción, con `Escape` y con un click afuera, y al cerrarlo con
+ * `Escape` o con la acción el foco vuelve al botón que lo abrió.
  */
-function TarjetaCurso({ curso, total, onAbrir }) {
+function TarjetaCurso({ curso, total, onAbrir, onEditar }) {
+  const [menuAbierto, setMenuAbierto] = useState(false)
+  const contenedorRef = useRef(null)
+  const botonRef = useRef(null)
+
+  useEffect(() => {
+    if (!menuAbierto) {
+      return undefined
+    }
+
+    function alHacerClickAfuera(evento) {
+      if (contenedorRef.current !== null && !contenedorRef.current.contains(evento.target)) {
+        setMenuAbierto(false)
+      }
+    }
+
+    function alPresionarEscape(evento) {
+      if (evento.key === 'Escape') {
+        setMenuAbierto(false)
+        botonRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('mousedown', alHacerClickAfuera)
+    document.addEventListener('keydown', alPresionarEscape)
+    return () => {
+      document.removeEventListener('mousedown', alHacerClickAfuera)
+      document.removeEventListener('keydown', alPresionarEscape)
+    }
+  }, [menuAbierto])
+
+  function elegirEdicion() {
+    setMenuAbierto(false)
+    botonRef.current?.focus()
+    onEditar(curso)
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onAbrir}
-      className="foco-acento flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-300 hover:shadow"
-    >
-      <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
-      <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
-      <span className="text-sm text-slate-500">{curso.descripcion ?? '—'}</span>
-      <span className="text-xs text-slate-600">
-        {total} {total === 1 ? 'comisión' : 'comisiones'}
-      </span>
-      <span className="texto-acento text-sm font-medium">Abrir comisiones</span>
-    </button>
+    <div ref={contenedorRef} className="relative">
+      <button
+        type="button"
+        onClick={onAbrir}
+        className="foco-acento flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 pr-10 text-left shadow-sm hover:border-slate-300 hover:shadow"
+      >
+        <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
+        <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
+        <span className="text-sm text-slate-500">{curso.descripcion ?? '—'}</span>
+        <span className="text-xs text-slate-600">
+          {total} {total === 1 ? 'comisión' : 'comisiones'}
+        </span>
+        <span className="texto-acento text-sm font-medium">Abrir comisiones</span>
+      </button>
+
+      <div className="absolute right-3 top-3">
+        <button
+          ref={botonRef}
+          type="button"
+          aria-label={`Acciones de ${curso.codigo}`}
+          aria-haspopup="menu"
+          aria-expanded={menuAbierto}
+          onClick={() => setMenuAbierto((abierto) => !abierto)}
+          className="foco-acento rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+        >
+          ⋮
+        </button>
+
+        {menuAbierto && (
+          <div
+            role="menu"
+            className="absolute right-0 z-10 mt-1 min-w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={elegirEdicion}
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Editar curso
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
 /** Vista de comisiones: la tabla del curso de la ruta, con el mismo formato de siempre. */
-function VistaComisiones({ curso, comisiones, resumen, onVolver, onNuevaComision, onInscribir }) {
+function VistaComisiones({
+  curso,
+  comisiones,
+  columnas,
+  resumen,
+  onVolver,
+  onNuevaComision,
+  onInscribir,
+}) {
   return (
     <Card
       titulo="Comisiones Activas"
@@ -720,7 +1165,7 @@ function VistaComisiones({ curso, comisiones, resumen, onVolver, onNuevaComision
       />
 
       <Table
-        columnas={COLUMNAS}
+        columnas={columnas}
         filas={comisiones}
         vacio={<p className="text-sm text-slate-500">Este curso todavía no tiene comisiones.</p>}
       />

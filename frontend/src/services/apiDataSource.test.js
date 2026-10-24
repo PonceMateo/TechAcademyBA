@@ -30,7 +30,7 @@ function ultimaRuta(fetchMock) {
 }
 
 describe('la fuente real usa las rutas del contrato', () => {
-  it('consulta y escribe en los cuatro endpoints del catálogo', async () => {
+  it('consulta y escribe en los endpoints del catálogo', async () => {
     const fetchMock = responder(200, [])
     const fuente = createApiDataSource()
 
@@ -43,6 +43,10 @@ describe('la fuente real usa las rutas del contrato', () => {
 
     await fuente.crearComision({ curso_id: 1 })
     expect(ultimaRuta(fetchMock)).toMatch(/\/comisiones$/)
+
+    await fuente.editarComision(4, { docente_id: 2, cupo_maximo: 25 })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/comisiones\/4$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PUT')
 
     await fuente.crearDocente({ nombre: 'Ada' })
     expect(ultimaRuta(fetchMock)).toMatch(/\/docentes$/)
@@ -77,6 +81,41 @@ describe('la fuente real usa las rutas del contrato', () => {
     })
   })
 
+  it('edita un docente y restablece su contraseña con las rutas del padrón', async () => {
+    const fetchMock = responder(200, {
+      id: 2,
+      nombre: 'Rita',
+      apellido: 'Molina',
+      dni: '30111222',
+      cuil: null,
+      email: 'rita.molina@techacademy.invalid',
+      telefono: null,
+      activo: true,
+      cantidad_comisiones: 0,
+      comisiones: [],
+    })
+    const fuente = createApiDataSource()
+
+    const fila = await fuente.editarDocente(2, {
+      nombre: 'Rita',
+      apellido: 'Molina',
+      dni: '30111222',
+      email: 'rita.molina@techacademy.invalid',
+      telefono: null,
+    })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/docentes\/2$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PUT')
+    // El nombre de pila viaja aparte para que el modal pueda precargar los dos campos.
+    expect(fila).toMatchObject({ nombre: 'Rita Molina', nombres: 'Rita', apellido: 'Molina' })
+
+    await fuente.restablecerPasswordDocente(2, 'NuevaClave2026')
+    expect(ultimaRuta(fetchMock)).toMatch(/\/docentes\/2\/password$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual({
+      new_password: 'NuevaClave2026',
+    })
+  })
+
   it('manda el cuerpo del alta tal cual lo arma la pantalla', async () => {
     const fetchMock = responder(200, { id: 1, codigo: 'CUR001' })
 
@@ -96,6 +135,24 @@ describe('la fuente real usa las rutas del contrato', () => {
     expect(resumen).toEqual({ total_comisiones: 2 })
     // El `?resumen=true` viejo devolvía la lista entera y el chip mostraba `undefined`.
     expect(ultimaRuta(fetchMock)).not.toMatch(/resumen/)
+  })
+
+  it('edita un curso con PUT sobre su identificador', async () => {
+    const fetchMock = responder(200, {
+      id: 7,
+      codigo: 'CUR007',
+      nombre: 'Excel Intermedio',
+      descripcion: null,
+    })
+    const datos = { nombre: 'Excel Intermedio', descripcion: null }
+
+    const actualizado = await createApiDataSource().editarCurso(7, datos)
+
+    expect(actualizado).toMatchObject({ id: 7, codigo: 'CUR007' })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/cursos\/7$/)
+    const opciones = fetchMock.mock.calls.at(-1)[1]
+    expect(opciones.method).toBe('PUT')
+    expect(JSON.parse(opciones.body)).toEqual(datos)
   })
 })
 

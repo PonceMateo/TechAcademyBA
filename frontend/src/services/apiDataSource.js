@@ -153,6 +153,16 @@ export function createApiDataSource() {
       return request(PATHS.cursos, { method: 'POST', body: datos })
     },
 
+    /** Edición de curso (historia #3). El código generado no se envía ni cambia (D32). */
+    async editarCurso(id, datos) {
+      return request(`${PATHS.cursos}/${id}`, { method: 'PUT', body: datos })
+    },
+
+    /** Edición de comisión (historia #4). El curso, el número y la modalidad no se envían (D51). */
+    async editarComision(id, datos) {
+      return request(`${PATHS.comisiones}/${id}`, { method: 'PUT', body: datos })
+    },
+
     async listarComisiones() {
       return request(PATHS.comisiones)
     },
@@ -194,6 +204,26 @@ export function createApiDataSource() {
 
     async crearDocente(datos) {
       return filaDeDocente(await request(PATHS.docentes, { method: 'POST', body: datos }))
+    },
+
+    /** Edición de los datos personales (historia #11). El CUIL no se envía: sigue fuera del
+     * contrato (D33) y el backend lo rechaza con 422. */
+    async editarDocente(id, datos) {
+      return filaDeDocente(await request(`${PATHS.docentes}/${id}`, { method: 'PUT', body: datos }))
+    },
+
+    /**
+     * Restablecimiento administrativo de la contraseña (historia #11). No devuelve la
+     * contraseña en claro: el backend guarda solo el hash y exige el cambio en el próximo
+     * ingreso.
+     */
+    async restablecerPasswordDocente(id, newPassword) {
+      return filaDeDocente(
+        await request(`${PATHS.docentes}/${id}/password`, {
+          method: 'POST',
+          body: { new_password: newPassword },
+        }),
+      )
     },
 
     /**
@@ -363,12 +393,18 @@ export function createApiDataSource() {
  *
  * `catedra` no existe en el modelo: se manda `null` para que la columna muestre un guion en vez de
  * inventar un dato.
+ *
+ * **`nombre` de la fila es el nombre completo y `nombres` el de pila.** La tabla muestra el primero;
+ * el modal de edición (historia #11) necesita los dos por separado, y la respuesta del backend los
+ * trae así. Sin `nombres` el formulario precargaría el apellido dentro del nombre y guardarlo sin
+ * cambios lo duplicaría.
  */
 function filaDeDocente(docente) {
   const comisiones = docente.comisiones ?? []
   return {
     ...docente,
     nombre: `${docente.nombre} ${docente.apellido}`,
+    nombres: docente.nombre,
     catedra: null,
     comisiones,
     comisiones_asignadas: docente.cantidad_comisiones ?? comisiones.length,
