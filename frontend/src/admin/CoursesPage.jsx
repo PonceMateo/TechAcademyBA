@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
@@ -9,6 +9,7 @@ import {
   crearComision,
   crearCurso,
   crearInscripcion,
+  editarCurso,
   listarAlumnos,
   listarComisiones,
   listarCursos,
@@ -35,7 +36,8 @@ import { formatMoneda } from '../utils/formato'
  * que confirme algo que ya está decidido. Desde el catálogo el selector viene vacío, porque ahí no
  * hay ningún curso elegido todavía.
  *
- * **Sin edición.** El spec deja la edición de curso y de comisión para las historias #3 y #4.
+ * **Edición de curso, sí; de comisión, no.** La HU 3 agrega el menú `⋮` de la tarjeta y el modal
+ * `Editar Curso`; la edición de comisiones queda para la HU 4 y esta pantalla no la ofrece.
  *
  * **`Modalidad` y `Sede` no están en el prototipo y sí van** (historia #8). La `Sede` es
  * **opcional en toda modalidad**: se renderiza solo cuando la modalidad elegida es `Presencial` o
@@ -120,6 +122,11 @@ export function CoursesPage() {
   const [catalogoListo, setCatalogoListo] = useState(false)
   const [modalComision, setModalComision] = useState(false)
   const [modalCurso, setModalCurso] = useState(false)
+  const [cursoEditando, setCursoEditando] = useState(null)
+  const [camposEdicionCurso, setCamposEdicionCurso] = useState(CAMPOS_CURSO_VACIOS)
+  const [erroresEdicionCurso, setErroresEdicionCurso] = useState({})
+  const [falloEdicionCurso, setFalloEdicionCurso] = useState(null)
+  const [guardandoEdicionCurso, setGuardandoEdicionCurso] = useState(false)
   const [modalInscripcion, setModalInscripcion] = useState(false)
   const [alumnos, setAlumnos] = useState([])
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState('')
@@ -220,6 +227,68 @@ export function CoursesPage() {
     setCamposCurso(CAMPOS_CURSO_VACIOS)
     setErroresCurso({})
     setFallo(null)
+  }
+
+  function abrirEdicionCurso(curso) {
+    setCursoEditando(curso)
+    setCamposEdicionCurso({
+      nombre: curso.nombre,
+      descripcion: curso.descripcion ?? '',
+    })
+    setErroresEdicionCurso({})
+    setFalloEdicionCurso(null)
+  }
+
+  function cerrarEdicionCurso() {
+    setCursoEditando(null)
+    setCamposEdicionCurso(CAMPOS_CURSO_VACIOS)
+    setErroresEdicionCurso({})
+    setFalloEdicionCurso(null)
+  }
+
+  function cambiarEdicionCurso(campo) {
+    return (evento) =>
+      setCamposEdicionCurso((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
+  }
+
+  /**
+   * Guarda la edición y actualiza las **dos** vistas con la misma respuesta (D-D del change).
+   *
+   * No se vuelve a pedir el catálogo: una recarga extra dejaría la tarjeta y la tabla mostrando
+   * nombres distintos mientras una de las respuestas está en vuelo. Un rechazo deja el modal
+   * abierto con el motivo que devolvió la fuente.
+   */
+  async function guardarEdicionCurso() {
+    if (camposEdicionCurso.nombre.trim() === '') {
+      setErroresEdicionCurso({ nombre: 'El nombre del curso es obligatorio.' })
+      return
+    }
+
+    setGuardandoEdicionCurso(true)
+    setFalloEdicionCurso(null)
+    try {
+      // Sin `codigo`: el contrato no lo admite y el sistema lo genera (D32).
+      const actualizado = await editarCurso(cursoEditando.id, {
+        nombre: camposEdicionCurso.nombre,
+        descripcion: camposEdicionCurso.descripcion === '' ? null : camposEdicionCurso.descripcion,
+      })
+      setCursos((anteriores) =>
+        anteriores.map((curso) => (curso.id === actualizado.id ? actualizado : curso)),
+      )
+      setComisiones((anteriores) =>
+        anteriores.map((comision) =>
+          normalizeCode(comision.curso.codigo) === normalizeCode(actualizado.codigo)
+            ? { ...comision, curso: { ...comision.curso, nombre: actualizado.nombre } }
+            : comision,
+        ),
+      )
+      cerrarEdicionCurso()
+      setAviso(`Curso ${actualizado.codigo} actualizado.`)
+    } catch (error) {
+      setFalloEdicionCurso(error?.message ?? 'No se pudo guardar el curso.')
+    } finally {
+      setGuardandoEdicionCurso(false)
+    }
   }
 
   function abrirModalInscripcion(comisionId = '') {
@@ -376,6 +445,7 @@ export function CoursesPage() {
           onNuevaComision={abrirModalComision}
           onInscribir={() => abrirModalInscripcion()}
           onAbrir={abrirCurso}
+          onEditar={abrirEdicionCurso}
         />
       )
     } else if (cursoDeRuta === null) {
@@ -445,6 +515,41 @@ export function CoursesPage() {
             El código lo genera el sistema y se muestra apenas se guarde.
           </p>
           {fallo !== null && <MensajeFallo>{fallo}</MensajeFallo>}
+        </div>
+      </Modal>
+
+      <Modal
+        abierto={cursoEditando !== null}
+        titulo="Editar Curso"
+        onClose={cerrarEdicionCurso}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarEdicionCurso}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarEdicionCurso} disabled={guardandoEdicionCurso}>
+              {guardandoEdicionCurso ? 'Guardando…' : 'Guardar Cambios'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Input
+            id="editar-curso-nombre"
+            etiqueta="Nombre del Curso"
+            valor={camposEdicionCurso.nombre}
+            onChange={cambiarEdicionCurso('nombre')}
+            obligatorio
+            error={erroresEdicionCurso.nombre ?? null}
+          />
+          <Input
+            id="editar-curso-descripcion"
+            etiqueta="Descripción"
+            valor={camposEdicionCurso.descripcion}
+            onChange={cambiarEdicionCurso('descripcion')}
+            placeholder="Opcional."
+          />
+          {falloEdicionCurso !== null && <MensajeFallo>{falloEdicionCurso}</MensajeFallo>}
         </div>
       </Modal>
 
@@ -628,6 +733,7 @@ function VistaCursos({
   onNuevaComision,
   onInscribir,
   onAbrir,
+  onEditar,
 }) {
   return (
     <Card
@@ -661,6 +767,7 @@ function VistaCursos({
               curso={curso}
               total={comisionesPorCurso.get(normalizeCode(curso.codigo)) ?? 0}
               onAbrir={() => onAbrir(curso)}
+              onEditar={onEditar}
             />
           ))}
         </div>
@@ -670,27 +777,99 @@ function VistaCursos({
 }
 
 /**
- * La tarjeta de un curso.
+ * La tarjeta de un curso: el cuerpo abre el curso y el botón `⋮` despliega su acción.
  *
- * **Es un botón y no una `Card` con un botón adentro.** Un botón dentro de otro botón es HTML
- * inválido y rompe la navegación por teclado, y el pedido era que se pueda abrir el curso con un
- * click en cualquier punto de la tarjeta.
+ * **Son dos controles hermanos y no un botón dentro de otro.** Un botón dentro de otro botón es
+ * HTML inválido y rompe la navegación por teclado. El cuerpo conserva el click en cualquier punto
+ * de la tarjeta y el `⋮` detiene la propagación porque es un hermano, no un hijo.
+ *
+ * El menú es local a la pantalla y no un componente compartido (D-C del change): hoy lo usa una
+ * sola vista. Se cierra al elegir la acción, con `Escape` y con un click afuera, y al cerrarlo con
+ * `Escape` o con la acción el foco vuelve al botón que lo abrió.
  */
-function TarjetaCurso({ curso, total, onAbrir }) {
+function TarjetaCurso({ curso, total, onAbrir, onEditar }) {
+  const [menuAbierto, setMenuAbierto] = useState(false)
+  const contenedorRef = useRef(null)
+  const botonRef = useRef(null)
+
+  useEffect(() => {
+    if (!menuAbierto) {
+      return undefined
+    }
+
+    function alHacerClickAfuera(evento) {
+      if (contenedorRef.current !== null && !contenedorRef.current.contains(evento.target)) {
+        setMenuAbierto(false)
+      }
+    }
+
+    function alPresionarEscape(evento) {
+      if (evento.key === 'Escape') {
+        setMenuAbierto(false)
+        botonRef.current?.focus()
+      }
+    }
+
+    document.addEventListener('mousedown', alHacerClickAfuera)
+    document.addEventListener('keydown', alPresionarEscape)
+    return () => {
+      document.removeEventListener('mousedown', alHacerClickAfuera)
+      document.removeEventListener('keydown', alPresionarEscape)
+    }
+  }, [menuAbierto])
+
+  function elegirEdicion() {
+    setMenuAbierto(false)
+    botonRef.current?.focus()
+    onEditar(curso)
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onAbrir}
-      className="foco-acento flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-slate-300 hover:shadow"
-    >
-      <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
-      <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
-      <span className="text-sm text-slate-500">{curso.descripcion ?? '—'}</span>
-      <span className="text-xs text-slate-600">
-        {total} {total === 1 ? 'comisión' : 'comisiones'}
-      </span>
-      <span className="texto-acento text-sm font-medium">Abrir comisiones</span>
-    </button>
+    <div ref={contenedorRef} className="relative">
+      <button
+        type="button"
+        onClick={onAbrir}
+        className="foco-acento flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 pr-10 text-left shadow-sm hover:border-slate-300 hover:shadow"
+      >
+        <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
+        <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
+        <span className="text-sm text-slate-500">{curso.descripcion ?? '—'}</span>
+        <span className="text-xs text-slate-600">
+          {total} {total === 1 ? 'comisión' : 'comisiones'}
+        </span>
+        <span className="texto-acento text-sm font-medium">Abrir comisiones</span>
+      </button>
+
+      <div className="absolute right-3 top-3">
+        <button
+          ref={botonRef}
+          type="button"
+          aria-label={`Acciones de ${curso.codigo}`}
+          aria-haspopup="menu"
+          aria-expanded={menuAbierto}
+          onClick={() => setMenuAbierto((abierto) => !abierto)}
+          className="foco-acento rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+        >
+          ⋮
+        </button>
+
+        {menuAbierto && (
+          <div
+            role="menu"
+            className="absolute right-0 z-10 mt-1 min-w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={elegirEdicion}
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Editar curso
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -48,6 +48,15 @@ class CursoCreate(BaseModel):
         return valor
 
 
+class CursoUpdate(CursoCreate):
+    """Cuerpo de `PUT /cursos/{id}`: los mismos datos que el alta, sin `codigo`.
+
+    Hereda las validaciones del alta a propósito: editar no admite nada que el alta no
+    admita, y un `codigo` en el cuerpo sigue siendo un 422 (D32). El `id` y el código del
+    curso se conservan porque el formulario no los envía.
+    """
+
+
 class CursoOut(BaseModel):
     """Fila de `GET /cursos` y respuesta de `POST /cursos`.
 

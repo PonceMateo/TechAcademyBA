@@ -110,6 +110,29 @@ function comisionesDelDocente(store, docenteId) {
     }))
 }
 
+/**
+ * Cursos del ejemplo derivados de las comisiones: es lo único que el catálogo trae.
+ *
+ * El identificador se asigna por orden de aparición porque el ejemplo no guarda cursos sueltos.
+ * La fuente real lo trae de la tabla, y la pantalla lo necesita para armar el alta de comisión:
+ * el contrato manda `curso_id` numérico, no el código (D34).
+ */
+function cursosDelCatalogo(comisiones) {
+  const vistos = new Map()
+  for (const comision of comisiones) {
+    const curso = comision.curso
+    if (curso && !vistos.has(curso.codigo)) {
+      vistos.set(curso.codigo, {
+        ...curso,
+        id: vistos.size + 1,
+        activo: true,
+        descripcion: null,
+      })
+    }
+  }
+  return [...vistos.values()]
+}
+
 const PREFIJO_DE_DNI = /^[0-9.\s-]+$/
 
 /** Posición de la primera palabra del nombre que coincide, respetando el orden de la consulta. */
@@ -219,6 +242,7 @@ function buscarPorTexto(registros, texto, campos) {
 export function createMockDataSource() {
   const store = {
     comisiones: copiar(COMISIONES),
+    cursos: cursosDelCatalogo(COMISIONES),
     docentes: copiar(DOCENTES),
     alumnos: copiar(ALUMNOS),
     empresas: copiar(EMPRESAS),
@@ -340,42 +364,60 @@ export function createMockDataSource() {
       })
     },
 
-    /**
-     * Cursos del ejemplo, derivados de las comisiones: es lo único que el catálogo tiene.
-     *
-     * El identificador se asigna por orden de aparición porque el ejemplo no guarda cursos sueltos.
-     * La fuente real lo trae de la tabla, y la pantalla lo necesita para armar el alta de comisión:
-     * el contrato manda `curso_id` numérico, no el código (D34).
-     */
+    /** Cursos del ejemplo, con la misma forma que devuelve la fuente real. */
     async listarCursos() {
-      const vistos = new Map()
-      for (const comision of store.comisiones) {
-        const curso = comision.curso
-        if (curso && !vistos.has(curso.codigo)) {
-          vistos.set(curso.codigo, {
-            ...curso,
-            id: vistos.size + 1,
-            activo: true,
-            descripcion: null,
-          })
-        }
-      }
-      return [...vistos.values()]
+      return copiar(store.cursos)
     },
 
     /** Alta de curso de ejemplo. El código se arma acá porque no hay base que lo genere. */
     async crearCurso({ nombre, descripcion }) {
-      const existentes = await this.listarCursos()
-      const siguiente = existentes.reduce(
-        (mayor, curso) => Math.max(mayor, Number.parseInt(curso.codigo.replace(/\D/g, ''), 10) || 0),
-        0,
-      ) + 1
-      return {
-        id: siguienteId(existentes),
+      const siguiente =
+        store.cursos.reduce(
+          (mayor, curso) =>
+            Math.max(mayor, Number.parseInt(curso.codigo.replace(/\D/g, ''), 10) || 0),
+          0,
+        ) + 1
+      const curso = {
+        id: siguienteId(store.cursos),
         codigo: `CUR${String(siguiente).padStart(3, '0')}`,
         nombre,
         descripcion: descripcion ?? null,
       }
+      store.cursos.push(curso)
+      return { ...curso }
+    },
+
+    /**
+     * Edición de curso de ejemplo (historia #3): conserva el `id` y el código, y aplica el mismo
+     * criterio de unicidad que el backend (normaliza el nombre y excluye al propio curso).
+     *
+     * El nombre también se actualiza en el `curso` anidado de las comisiones para que una lectura
+     * posterior de `listarComisiones()` no devuelva el nombre viejo.
+     */
+    async editarCurso(id, { nombre, descripcion }) {
+      const curso = store.cursos.find((candidato) => candidato.id === id)
+      if (!curso) {
+        throw new Error('El curso no existe.')
+      }
+
+      const nombreNormalizado = normalizeWords(nombre).join(' ')
+      const existente = store.cursos.find(
+        (candidato) =>
+          candidato.id !== id && normalizeWords(candidato.nombre).join(' ') === nombreNormalizado,
+      )
+      if (existente) {
+        throw new Error(
+          `Ya existe un curso con ese nombre: ${existente.codigo} — ${existente.nombre}.`,
+        )
+      }
+
+      Object.assign(curso, { nombre, descripcion: descripcion ?? null })
+      for (const comision of store.comisiones) {
+        if (normalizeCode(comision.curso.codigo) === normalizeCode(curso.codigo)) {
+          comision.curso = { ...comision.curso, nombre }
+        }
+      }
+      return { ...curso }
     },
 
     /**
@@ -385,13 +427,23 @@ export function createMockDataSource() {
      * no por código. Buscarlo por código fue lo que escondió el contrato roto del lado de la
      * pantalla: el ejemplo aceptaba un string donde la base exige un entero.
      */
-    async crearComision({ curso_id, docente_id, dias_horarios, arancel, cupo_maximo, modalidad, sede_id }) {
+    async crearComision({
+      curso_id,
+      docente_id,
+      dias_horarios,
+      arancel,
+      cupo_maximo,
+      modalidad,
+      sede_id,
+    }) {
       const cursos = await this.listarCursos()
       const curso = cursos.find((candidato) => String(candidato.id) === String(curso_id))
       const delCurso = store.comisiones.filter(
         (comision) => normalizeCode(comision.curso.codigo) === normalizeCode(curso?.codigo),
       )
-      const docente = store.docentes.find((candidato) => String(candidato.id) === String(docente_id))
+      const docente = store.docentes.find(
+        (candidato) => String(candidato.id) === String(docente_id),
+      )
       const sede = store.sedes.find((candidato) => String(candidato.id) === String(sede_id))
       const comision = {
         id: siguienteId(store.comisiones),
@@ -433,7 +485,13 @@ export function createMockDataSource() {
       comision.vacantes = comision.cupo_maximo - comision.inscriptos
       store.inscripciones = store.inscripciones || []
       store.inscripciones.push({ alumno_id, comision_id, estado: 'ACTIVA' })
-      return { id: store.inscripciones.length, alumno_id, comision_id, categoria: 'PARTICULAR', estado: 'ACTIVA' }
+      return {
+        id: store.inscripciones.length,
+        alumno_id,
+        comision_id,
+        categoria: 'PARTICULAR',
+        estado: 'ACTIVA',
+      }
     },
 
     /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */

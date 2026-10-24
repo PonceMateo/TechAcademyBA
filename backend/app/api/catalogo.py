@@ -27,7 +27,14 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
-from app.schemas.catalogo import ComisionCreate, ComisionOut, CursoCreate, CursoOut, SedeOut
+from app.schemas.catalogo import (
+    ComisionCreate,
+    ComisionOut,
+    CursoCreate,
+    CursoOut,
+    CursoUpdate,
+    SedeOut,
+)
 from app.services import catalogo
 
 router = APIRouter(tags=["catalogo"])
@@ -67,6 +74,33 @@ def crear_curso(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except IntegrityError as error:
         raise _conflicto_de_restriccion(error) from error
+    return CursoOut.model_validate(curso)
+
+
+@router.put(
+    "/cursos/{curso_id}",
+    response_model=CursoOut,
+    summary="Editar un curso",
+)
+def editar_curso(
+    curso_id: int,
+    cuerpo: CursoUpdate,
+    session: Annotated[Session, Depends(get_db)],
+    _admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> CursoOut:
+    """Edición de curso. El cuerpo admite **solo** nombre y descripción: un `codigo` es un 422
+    y el código generado no cambia (D32).
+
+    200 con el curso actualizado, 404 si el curso no existe, 409 si el nombre ya pertenece a
+    otro curso, 422 si falta el nombre o llega vacío.
+    """
+    try:
+        curso = catalogo.obtener_curso(session, curso_id)
+        curso = catalogo.editar_curso(session, curso, cuerpo)
+    except catalogo.CursoNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except catalogo.CursoDuplicado as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     return CursoOut.model_validate(curso)
 
 

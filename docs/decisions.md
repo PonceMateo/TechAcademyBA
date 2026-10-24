@@ -1641,3 +1641,34 @@ a LF muestra el cambio de fin de línea completo.
 La solución es un `.gitattributes` con `* text=auto eol=lf`, que pisa el
 `core.autocrlf` local. No se agregó acá porque `.gitattributes` no está en el
 alcance de este change; queda a criterio del equipo agregarlo.
+
+---
+
+## Edición de curso (change `hu-3-editar-curso`)
+
+### D50 — El código del curso no se edita y la unicidad de la edición es la del nombre
+
+- **Fecha:** 2026-10-23
+- **Autor:** Mateo Ponce
+- **Decisión:** `PUT /cursos/{id}` actualiza solo `nombre` y `descripcion`. El `codigo` no forma
+  parte del contrato de entrada: es una columna generada por la base a partir del `id` (D32) y un
+  `codigo` en el cuerpo responde `422`. La edición conserva el `id` y el código generado, así que
+  las comisiones y su historial siguen asociados al mismo curso.
+- **Unicidad:** el nombre se normaliza con `normalize_name` y se compara contra el resto del
+  catálogo **excluyendo el propio curso**. Guardar el mismo nombre no choca contra su propia fila;
+  un nombre que ya pertenece a otro curso responde `409` y nombra el curso existente. El índice
+  `uq_curso_nombre_norm` sigue cortando la carrera entre dos ediciones simultáneas, y ese caso se
+  degrada al mismo `409` sin inventar un nombre, igual que el alta.
+- **Menú `⋮`:** la acción de edición vive en un menú local a `CoursesPage`, no en un componente
+  compartido de `components/ui`. Hoy la usa una sola pantalla; si otra necesita el mismo menú, se
+  promueve entonces. El cuerpo de la tarjeta sigue abriendo el curso y el botón `⋮` es un control
+  hermano, para no anidar botones.
+- **Por qué:** el texto original de la HU 3 pedía editar el código, pero D32 lo define como un dato
+  derivado que no se carga. La desviación queda registrada acá y el issue de la historia se
+  actualizó antes de implementar.
+- **Dónde:** `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`,
+  `backend/app/api/catalogo.py`, `backend/app/tests/test_edicion_curso.py`,
+  `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/CoursesPage.test.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/services/dataService.test.jsx` y
+  `frontend/src/services/apiDataSource.test.js`.

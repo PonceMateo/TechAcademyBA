@@ -1,7 +1,7 @@
-"""Reglas de negocio del catálogo: alta y consulta de cursos, comisiones y sedes.
+"""Reglas de negocio del catálogo: alta, edición y consulta de cursos, comisiones y sedes.
 
-Historias #1, #2, #5 y #8. Vive en `services` y no en el router porque son reglas de negocio,
-no detalles de transporte (D1): la ruta solo traduce una excepción a un código HTTP.
+Historias #1, #2, #3, #5 y #8. Vive en `services` y no en el router porque son reglas de
+negocio, no detalles de transporte (D1): la ruta solo traduce una excepción a un código HTTP.
 
 **Este módulo confirma la transacción.** `get_db` cierra la sesión sin confirmar, así que la
 primera ruta que escribe tiene que confirmar por su cuenta. Se confirma acá y no en la ruta
@@ -31,7 +31,7 @@ from app.models.catalogo import Comision, Curso, Sede
 from app.models.enums import EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Docente
-from app.schemas.catalogo import ComisionCreate, CursoCreate
+from app.schemas.catalogo import ComisionCreate, CursoCreate, CursoUpdate
 from app.services.normalization import normalize_name
 
 logger = logging.getLogger(__name__)
@@ -125,6 +125,50 @@ def crear_curso(session: Session, datos: CursoCreate) -> Curso:
     session.commit()
     # El `refresh` posterior al `commit` no es opcional: el `INSERT` no devuelve el valor de
     # una columna generada, así que sin esto la respuesta devolvería `codigo = None`.
+    session.refresh(curso)
+    return curso
+
+
+def obtener_curso(session: Session, curso_id: int) -> Curso:
+    """El curso por identificador, o `CursoNoEncontrado` para que la ruta responda 404.
+
+    La edición lo resuelve antes de tocar el nombre: un `id` inexistente no puede chocar con
+    la unicidad ni dejar una fila a medio actualizar.
+    """
+    curso = session.get(Curso, curso_id)
+    if curso is None:
+        raise CursoNoEncontrado(curso_id)
+    return curso
+
+
+def editar_curso(session: Session, curso: Curso, datos: CursoUpdate) -> Curso:
+    """Actualiza nombre y descripción conservando el `id`, el código y las comisiones (HU #3).
+
+    La unicidad se compara contra el resto del catálogo **excluyendo el propio curso**: guardar
+    el mismo nombre no choca contra su propia fila. El índice `uq_curso_nombre_norm` sigue
+    cortando la carrera entre dos ediciones simultáneas, y ahí el mensaje se degrada porque el
+    curso que chocó todavía no es visible (mismo criterio que el alta).
+    """
+    nombre_norm = normalize_name(datos.nombre)
+
+    existente = session.scalar(
+        select(Curso).where(Curso.nombre_norm == nombre_norm, Curso.id != curso.id)
+    )
+    if existente is not None:
+        raise CursoDuplicado(existente)
+
+    curso.nombre = datos.nombre
+    curso.nombre_norm = nombre_norm
+    curso.descripcion = datos.descripcion
+    try:
+        session.flush()
+    except IntegrityError as error:
+        session.rollback()
+        if INDICE_NOMBRE_CURSO not in _motivo(error):
+            raise
+        raise CursoDuplicado(None) from error
+
+    session.commit()
     session.refresh(curso)
     return curso
 
