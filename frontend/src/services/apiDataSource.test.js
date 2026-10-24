@@ -30,7 +30,7 @@ function ultimaRuta(fetchMock) {
 }
 
 describe('la fuente real usa las rutas del contrato', () => {
-  it('consulta y escribe en los cuatro endpoints del catálogo', async () => {
+  it('consulta y escribe en los endpoints del catálogo', async () => {
     const fetchMock = responder(200, [])
     const fuente = createApiDataSource()
 
@@ -43,6 +43,10 @@ describe('la fuente real usa las rutas del contrato', () => {
 
     await fuente.crearComision({ curso_id: 1 })
     expect(ultimaRuta(fetchMock)).toMatch(/\/comisiones$/)
+
+    await fuente.editarComision(4, { docente_id: 2, cupo_maximo: 25 })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/comisiones\/4$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PUT')
 
     await fuente.crearDocente({ nombre: 'Ada' })
     expect(ultimaRuta(fetchMock)).toMatch(/\/docentes$/)

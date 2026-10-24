@@ -463,6 +463,47 @@ export function createMockDataSource() {
       return comision
     },
 
+    /**
+     * Edición de comisión de ejemplo (historia #4): conserva el `id`, el código, el curso y las
+     * inscripciones, y aplica el mismo criterio de cupo que el backend.
+     *
+     * Los inscriptos que ocupan banco son los que el ejemplo ya guarda; el cupo nuevo no puede
+     * quedar por debajo de ellos, que es lo que el servidor valida contra las inscripciones
+     * `ACTIVA`. Las vacantes se recalculan como en la fuente real (D10).
+     */
+    async editarComision(id, { docente_id, dias_horarios, arancel, cupo_maximo }) {
+      const comision = store.comisiones.find((candidato) => candidato.id === id)
+      if (!comision) {
+        throw new Error('La comisión no existe.')
+      }
+      const docente = store.docentes.find(
+        (candidato) => String(candidato.id) === String(docente_id),
+      )
+      if (!docente) {
+        throw new Error('El docente no existe.')
+      }
+
+      const inscriptos =
+        comision.inscriptos ?? Math.max(comision.cupo_maximo - (comision.vacantes ?? 0), 0)
+      if (Number(cupo_maximo) < inscriptos) {
+        throw new Error(
+          `La comisión tiene ${inscriptos} inscriptos activos: el cupo máximo no puede ser ` +
+            `menor que ${inscriptos}.`,
+        )
+      }
+
+      Object.assign(comision, {
+        docente_id: docente.id,
+        docente_nombre: docente.nombre,
+        dias_horarios,
+        arancel,
+        cupo_maximo: Number(cupo_maximo),
+        inscriptos,
+        vacantes: Number(cupo_maximo) - inscriptos,
+      })
+      return { ...comision }
+    },
+
     async listarAlumnos() {
       return copiar(store.alumnos.filter((alumno) => alumno.activo !== false))
     },

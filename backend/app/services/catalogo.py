@@ -1,6 +1,6 @@
 """Reglas de negocio del catálogo: alta, edición y consulta de cursos, comisiones y sedes.
 
-Historias #1, #2, #3, #5 y #8. Vive en `services` y no en el router porque son reglas de
+Historias #1, #2, #3, #4, #5 y #8. Vive en `services` y no en el router porque son reglas de
 negocio, no detalles de transporte (D1): la ruta solo traduce una excepción a un código HTTP.
 
 **Este módulo confirma la transacción.** `get_db` cierra la sesión sin confirmar, así que la
@@ -31,7 +31,7 @@ from app.models.catalogo import Comision, Curso, Sede
 from app.models.enums import EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Docente
-from app.schemas.catalogo import ComisionCreate, CursoCreate, CursoUpdate
+from app.schemas.catalogo import ComisionCreate, ComisionUpdate, CursoCreate, CursoUpdate
 from app.services.normalization import normalize_name
 
 logger = logging.getLogger(__name__)
@@ -94,6 +94,27 @@ class SedeNoEncontrada(Exception):
     def __init__(self, sede_id: int) -> None:
         self.sede_id = sede_id
         super().__init__(f"La sede {sede_id} no existe.")
+
+
+class ComisionNoEncontrada(Exception):
+    def __init__(self, comision_id: int) -> None:
+        self.comision_id = comision_id
+        super().__init__(f"La comisión {comision_id} no existe.")
+
+
+class CupoInsuficiente(Exception):
+    """El cupo nuevo dejaría a la comisión con más inscriptos que lugares (HU #4).
+
+    `inscriptos` viaja en la excepción para que el mensaje diga el número actual y no una
+    vaguedad: la secretaría necesita saber hasta cuánto puede reducir.
+    """
+
+    def __init__(self, inscriptos: int) -> None:
+        self.inscriptos = inscriptos
+        super().__init__(
+            f"La comisión tiene {inscriptos} inscriptos activos: el cupo máximo no puede ser "
+            f"menor que {inscriptos}."
+        )
 
 
 def crear_curso(session: Session, datos: CursoCreate) -> Curso:
@@ -232,6 +253,62 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
     # quien escribe la fila, y no quien la traduce.
     comision.vacantes = comision.cupo_maximo
     return comision
+
+
+def obtener_comision(session: Session, comision_id: int) -> Comision:
+    """La comisión por identificador, o `ComisionNoEncontrada` para que la ruta responda 404.
+
+    La edición la resuelve antes de validar el docente o el cupo: un `id` inexistente no puede
+    terminar en un `404` del docente que confunda a quien está corrigiendo el formulario.
+    """
+    comision = session.get(Comision, comision_id)
+    if comision is None:
+        raise ComisionNoEncontrada(comision_id)
+    return comision
+
+
+def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate) -> Comision:
+    """Actualiza docente, días y horarios, arancel y cupo (historia #4).
+
+    El curso, el número, la modalidad y la sede no se tocan: no forman parte del contrato.
+    Las inscripciones y los pagos siguen asociados a la misma comisión porque el `id` no cambia.
+
+    El cupo se compara contra las inscripciones **ACTIVA**, el mismo criterio que `vacantes` (D10)
+    y que el rechazo de la comisión llena: `EN_ESPERA`, `BAJA` y `COMPLETADA` no ocupan banco. La
+    cuenta y el `UPDATE` no están serializados contra una inscripción simultánea, igual que el
+    alta de inscripción (D51).
+    """
+    if session.get(Docente, datos.docente_id) is None:
+        raise DocenteNoEncontrado(datos.docente_id)
+
+    inscriptos = _inscriptos_activos(session, comision.id)
+    if datos.cupo_maximo < inscriptos:
+        raise CupoInsuficiente(inscriptos)
+
+    comision.docente_id = datos.docente_id
+    comision.dias_horarios = datos.dias_horarios
+    comision.arancel = datos.arancel
+    comision.cupo_maximo = datos.cupo_maximo
+    session.commit()
+    session.refresh(comision)
+
+    # Las vacantes no son una columna (D10): se recalculan con la misma cuenta que acaba de
+    # validar el cupo, para que la respuesta no tenga que volver a pedir el listado entero.
+    comision.vacantes = max(comision.cupo_maximo - inscriptos, 0)
+    return comision
+
+
+def _inscriptos_activos(session: Session, comision_id: int) -> int:
+    """Cantidad de inscripciones `ACTIVA` de la comisión, que es lo que ocupa el cupo."""
+    return (
+        session.scalar(
+            select(func.count(Inscripcion.id)).where(
+                Inscripcion.comision_id == comision_id,
+                Inscripcion.estado == EstadoInscripcion.ACTIVA.value,
+            )
+        )
+        or 0
+    )
 
 
 def listar_comisiones(session: Session) -> list[Comision]:

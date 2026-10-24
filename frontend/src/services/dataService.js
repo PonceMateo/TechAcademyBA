@@ -41,6 +41,14 @@ export function crearComision(datos) {
 }
 
 /**
+ * Edición de una comisión (historia #4). Conserva el `id`, el curso y el número; la respuesta trae
+ * la comisión con sus vacantes recalculadas y la pantalla reemplaza la fila que ya mostraba.
+ */
+export function editarComision(id, datos) {
+  return getDataSource().editarComision(id, datos)
+}
+
+/**
  * Catálogo de cursos, para el selector del alta de comisión.
  *
  * **No se puede armar con `listarComisiones()`:** el selector se llenaba con

@@ -30,6 +30,7 @@ from app.models.padron import Usuario
 from app.schemas.catalogo import (
     ComisionCreate,
     ComisionOut,
+    ComisionUpdate,
     CursoCreate,
     CursoOut,
     CursoUpdate,
@@ -143,6 +144,38 @@ def crear_comision(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except IntegrityError as error:
         raise _regla_de_alta_rota(error) from error
+    return ComisionOut.model_validate(comision)
+
+
+@router.put(
+    "/comisiones/{comision_id}",
+    response_model=ComisionOut,
+    summary="Editar una comisión",
+)
+def editar_comision(
+    comision_id: int,
+    cuerpo: ComisionUpdate,
+    session: Annotated[Session, Depends(get_db)],
+    _admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> ComisionOut:
+    """Edición de comisión. El cuerpo admite **solo** docente, días y horarios, arancel y cupo:
+    un `curso_id`, `numero`, `modalidad`, `sede_id` o `codigo` es un 422 (D51).
+
+    El cupo no puede quedar por debajo de las inscripciones activas; en ese caso el 422 dice
+    cuántos inscriptos hay. La respuesta trae la comisión con sus vacantes recalculadas.
+
+    200 con la comisión actualizada, 404 si la comisión o el docente no existen, 422 si un dato
+    no es válido o si el cupo no alcanza para los inscriptos.
+    """
+    try:
+        comision = catalogo.obtener_comision(session, comision_id)
+        comision = catalogo.editar_comision(session, comision, cuerpo)
+    except catalogo.ComisionNoEncontrada as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except catalogo.DocenteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except catalogo.CupoInsuficiente as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
     return ComisionOut.model_validate(comision)
 
 

@@ -133,6 +133,11 @@ export function createApiDataSource() {
       return request(`${PATHS.cursos}/${id}`, { method: 'PUT', body: datos })
     },
 
+    /** Edición de comisión (historia #4). El curso, el número y la modalidad no se envían (D51). */
+    async editarComision(id, datos) {
+      return request(`${PATHS.comisiones}/${id}`, { method: 'PUT', body: datos })
+    },
+
     async listarComisiones() {
       return request(PATHS.comisiones)
     },
