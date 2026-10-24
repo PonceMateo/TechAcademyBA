@@ -8,6 +8,7 @@ import {
   buscarDocentes,
   crearAlumno,
   editarAlumno,
+  editarComision,
   editarCurso,
   eliminarAlumno,
   listarAlumnos,
@@ -341,5 +342,45 @@ describe('la edición de curso', () => {
     await expect(
       editarCurso(1, { nombre: 'Diseño UX/UI Avanzado', descripcion: null }),
     ).rejects.toThrow('Ya existe un curso con ese nombre')
+  })
+})
+
+describe('la edición de comisión', () => {
+  const DATOS = {
+    docente_id: 1,
+    dias_horarios: 'Mar y Jue 19 a 21 hs',
+    arancel: 50000,
+    cupo_maximo: 25,
+  }
+
+  it('delega en la fuente configurada', async () => {
+    const editar = vi.fn(async () => ({ id: 4 }))
+    configurarFuenteDeDatos({ modo: 'api', editarComision: editar })
+
+    await editarComision(4, DATOS)
+
+    expect(editar).toHaveBeenCalledWith(4, DATOS)
+  })
+
+  it('actualiza la comisión en el ejemplo y recalcula las vacantes', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const actualizada = await editarComision(1, DATOS)
+
+    expect(actualizada).toMatchObject({
+      id: 1,
+      codigo: 'CUR-101',
+      cupo_maximo: 25,
+      vacantes: 2,
+    })
+    expect((await listarComisiones()).find((comision) => comision.id === 1).cupo_maximo).toBe(25)
+  })
+
+  it('rechaza un cupo por debajo de los inscriptos en el ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await expect(editarComision(1, { ...DATOS, cupo_maximo: 10 })).rejects.toThrow(
+      '23 inscriptos activos',
+    )
   })
 })
