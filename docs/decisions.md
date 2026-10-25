@@ -1790,3 +1790,34 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/mockDataSource.js`, `frontend/src/admin/PaymentsPage.jsx`,
   `frontend/src/admin/PaymentsPage.test.jsx` y las pruebas de la frontera de datos.
+
+### D54 — El horario de cursada de la comisión se guarda estructurado (change `selector-horarios-comision`)
+
+- **Fecha:** 2026-10-24
+- **Autor:** Equipo TechAcademy BA
+- **Decisión:** el horario de una comisión deja de ser texto libre y pasa a ser una fila por día
+  en la tabla nueva `comision_horario` (`comision_id`, `dia` `LUN`..`DOM`, `inicio` y `fin`
+  `TIME`), con `UNIQUE(comision_id, dia)` y CHECK de minutos en la grilla de 15, horas entre 6:00
+  y 22:00 y `fin > inicio`.
+- **`dias_horarios` no se dropea:** sigue siendo la columna de texto que leen los listados, pero
+  desde este change la escribe el backend a partir de las filas, con el formato del resumen
+  (`Lun y Mié 19-21hs`). Si el front mandara también el texto, serían dos fuentes de verdad. La
+  migración `0005` es reversible y, al revertirse, deja el texto intacto.
+- **Contrato:** `POST` y `PUT` de comisión reciben `horarios: [{dia, inicio, fin}]` con strings
+  `"HH:MM"` y siguen con `extra="forbid"`, así que `dias_horarios` en el cuerpo es un `422`. La
+  lista no puede estar vacía ni repetir día; con un solo rango por día, un día repetido ya cubre
+  el caso de dos rangos que se pisan.
+- **Choque de horario:** el servicio compara los rangos del mismo docente con `a.inicio < b.fin AND
+  b.inicio < a.fin` sobre comisiones vigentes del mismo día, excluyendo la propia en la edición, y
+  la ruta lo traduce a `409` con la comisión en conflicto. La comparación es estricta: 18:30/18:30
+  se permite. La API es la autoridad y el front no pre-validá.
+- **Dependencia:** `react-datepicker` en modo solo hora (`showTimeSelect` + `showTimeSelectOnly`,
+  `timeIntervals={15}`) es la única dependencia nueva, porque el proyecto ya usa React 19 y el
+  selector necesita tipeo con popover dentro de un modal. Se descartan el `<select>` nativo de 65
+  opciones y una librería de UI completa.
+- **`Modal` compartido:** gana pila de modales y foco atrapado, para que el selector se abra sobre
+  el formulario de comisión sin que `Escape` cierre los dos y sin que el foco se escape al fondo.
+- **Dónde:** `backend/app/models/catalogo.py`, `backend/alembic/versions/0005_comision_horario.py`,
+  `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`, `backend/app/api/catalogo.py`,
+  `frontend/src/domain/horarios.js`, `frontend/src/components/ui/Modal.jsx`,
+  `frontend/src/admin/CoursesPage.jsx` y sus tests.

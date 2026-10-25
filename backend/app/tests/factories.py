@@ -18,13 +18,14 @@ de AFIP (pesos 5, 4, 3, 2, 7, 6, 5, 4, 3, 2; `dv = 11 - (suma mod 11)`, con 11 �
 
 from __future__ import annotations
 
+from datetime import time
 from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import crear_token_acceso, hashear_password
-from app.models.catalogo import Comision, Curso, Sede
+from app.models.catalogo import Comision, ComisionHorario, Curso, Sede, resumen_de_horarios
 from app.models.clases import Asistencia, Clase, OverrideHabilitacion
 from app.models.cobranza import Cobranza, Factura, Imputacion, Pagador
 from app.models.enums import (
@@ -98,6 +99,18 @@ def crear_curso(
     )
 
 
+def horarios(
+    dias: str = "LUN", *, inicio: str = "18:00", fin: str = "20:00"
+) -> list[dict[str, str]]:
+    """Cuerpo de `horarios` del contrato de comisión (historia #48).
+
+    `horarios("LUN MIE")` es «lunes y miércoles de 18:00 a 20:00», que es el horario que usan los
+    tests por defecto. Existe para que un cambio de forma del contrato no obligue a reescribir la
+    lista a mano en cada cuerpo de prueba.
+    """
+    return [{"dia": dia, "inicio": inicio, "fin": fin} for dia in dias.split()]
+
+
 def crear_comision(
     session: Session,
     *,
@@ -108,6 +121,8 @@ def crear_comision(
     cupo_maximo: int = 20,
     arancel: Decimal | str = "52000.00",
     modalidad: str = Modalidad.PRESENCIAL.value,
+    docente: Docente | None = None,
+    horarios_semana: list[tuple[str, str, str]] | None = None,
 ) -> Comision:
     """Comisión válida por defecto.
 
@@ -127,16 +142,23 @@ def crear_comision(
             select(func.max(Comision.numero)).where(Comision.curso_id == curso_efectivo.id)
         )
         numero = (mayor or 0) + 1
+    filas = horarios_semana or [("LUN", "18:00", "20:00"), ("MIE", "18:00", "20:00")]
+    horas = [
+        ComisionHorario(dia=dia, inicio=time.fromisoformat(inicio), fin=time.fromisoformat(fin))
+        for dia, inicio, fin in filas
+    ]
     return _persistir(
         session,
         Comision(
             curso_id=curso_efectivo.id,
+            docente_id=docente.id if docente else None,
             numero=numero,
-            dias_horarios="Lunes y miércoles 18:00 a 20:00",
+            dias_horarios=resumen_de_horarios(horas),
             cupo_maximo=cupo_maximo,
             arancel=Decimal(arancel),
             modalidad=modalidad,
             sede_id=sede_efectiva.id if sede_efectiva else None,
+            horarios=horas,
         ),
     )
 

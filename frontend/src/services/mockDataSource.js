@@ -12,6 +12,7 @@ import {
   SEDES,
 } from '../mocks'
 import { TIPO_FACTURA } from '../domain/enums'
+import { textoHorarios } from '../domain/horarios'
 import {
   normalizeCode,
   normalizeCuit,
@@ -489,7 +490,7 @@ export function createMockDataSource() {
     async crearComision({
       curso_id,
       docente_id,
-      dias_horarios,
+      horarios,
       arancel,
       cupo_maximo,
       modalidad,
@@ -510,7 +511,10 @@ export function createMockDataSource() {
         curso: { codigo: curso?.codigo ?? curso_id, nombre: curso?.nombre ?? 'Curso' },
         docente_id: docente?.id ?? null,
         docente_nombre: docente?.nombre ?? null,
-        dias_horarios,
+        horarios,
+        // El texto es derivado, igual que en el backend (historia #48): el ejemplo no guarda una
+        // segunda verdad que pueda desincronizarse de los horarios.
+        dias_horarios: textoHorarios(horarios),
         cupo_maximo: Number(cupo_maximo),
         arancel,
         vacantes: Number(cupo_maximo),
@@ -530,7 +534,7 @@ export function createMockDataSource() {
      * quedar por debajo de ellos, que es lo que el servidor valida contra las inscripciones
      * `ACTIVA`. Las vacantes se recalculan como en la fuente real (D10).
      */
-    async editarComision(id, { docente_id, dias_horarios, arancel, cupo_maximo }) {
+    async editarComision(id, { docente_id, horarios, arancel, cupo_maximo }) {
       const comision = store.comisiones.find((candidato) => candidato.id === id)
       if (!comision) {
         throw new Error('La comisión no existe.')
@@ -554,7 +558,8 @@ export function createMockDataSource() {
       Object.assign(comision, {
         docente_id: docente.id,
         docente_nombre: docente.nombre,
-        dias_horarios,
+        horarios,
+        dias_horarios: textoHorarios(horarios),
         arancel,
         cupo_maximo: Number(cupo_maximo),
         inscriptos,

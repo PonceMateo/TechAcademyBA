@@ -14,11 +14,20 @@ distribución de D19.
 
 from __future__ import annotations
 
+from datetime import time
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
-from app.models.enums import Modalidad
+from app.models.catalogo import ORDEN_DIA
+from app.models.enums import DiaSemana, Modalidad
 
 
 class CursoCreate(BaseModel):
@@ -72,6 +81,62 @@ class CursoOut(BaseModel):
     descripcion: str | None
 
 
+class HorarioComision(BaseModel):
+    """Un día de cursada con su rango, tal como viaja en el contrato de comisión (historia #48).
+
+    El cliente manda `{"dia": "MAR", "inicio": "19:00", "fin": "21:00"}` y recibe lo mismo. El
+    valor interno es `time` y se serializa a `HH:MM`, que es el formato que el formulario del
+    frontend ya usa en su estado: enteros de minutos desde medianoche serían más compactos y
+    ilegibles en un mensaje de rechazo.
+
+    **Las reglas estáticas se validan acá y también en la base.** El validador pone el mensaje en
+    es-AR y nombra el dato; los CHECK de `comision_horario` son la red de seguridad. Una lista vacía
+    o con un día repetido no llega a la derivación del texto.
+    """
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    dia: DiaSemana
+    inicio: time
+    fin: time
+
+    @field_validator("inicio", "fin")
+    @classmethod
+    def _en_la_grilla_y_en_el_rango(cls, valor: time) -> time:
+        if valor.second or valor.microsecond or valor.minute not in (0, 15, 30, 45):
+            raise ValueError("Los horarios van en pasos de 15 minutos.")
+        if valor < time(6, 0) or valor > time(22, 0):
+            raise ValueError("El horario de cursada va de 6:00 a 22:00.")
+        return valor
+
+    @model_validator(mode="after")
+    def _fin_despues_del_inicio(self) -> HorarioComision:
+        if self.fin <= self.inicio:
+            raise ValueError("La hora de fin tiene que ser posterior a la de inicio.")
+        return self
+
+    @field_serializer("inicio", "fin")
+    def _hora_del_contrato(self, valor: time) -> str:
+        """`19:00` y no `19:00:00`: el formato que espera el formulario y el que se guarda."""
+        return valor.strftime("%H:%M")
+
+
+def _horarios_sin_repetir(horarios: list[HorarioComision]) -> list[HorarioComision]:
+    """Valida la lista completa: no puede estar vacía y no puede repetir día.
+
+    Un solo rango por día es lo que hace que «dos rangos que se pisan» sea imposible dentro de la
+    comisión: el segundo día ya es un rechazo, sin comparar intervalos.
+    """
+    if not horarios:
+        raise ValueError("Falta el horario de cursada: agregá al menos un horario.")
+    if len(horarios) > 7:
+        raise ValueError("Una comisión no puede tener más de siete horarios de cursada.")
+    dias = [horario.dia for horario in horarios]
+    if len(set(dias)) != len(dias):
+        raise ValueError("Ya hay un horario cargado para ese día.")
+    return horarios
+
+
 class ComisionCreate(BaseModel):
     """Cuerpo de `POST /comisiones`.
 
@@ -89,18 +154,18 @@ class ComisionCreate(BaseModel):
 
     curso_id: int = Field(gt=0)
     docente_id: int = Field(gt=0)
-    dias_horarios: str = Field(min_length=1, max_length=255)
+    horarios: list[HorarioComision]
     arancel: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     cupo_maximo: int = Field(gt=0)
     modalidad: Modalidad
     sede_id: int | None = Field(default=None, gt=0)
 
-    @field_validator("dias_horarios")
+    @field_validator("horarios")
     @classmethod
-    def _dias_horarios_no_vacio(cls, valor: str) -> str:
-        if not valor.strip():
-            raise ValueError("Los días y horarios son obligatorios.")
-        return valor
+    def _horarios_validos(
+        cls, valor: list[HorarioComision]
+    ) -> list[HorarioComision]:
+        return _horarios_sin_repetir(valor)
 
 
 class ComisionUpdate(BaseModel):
@@ -118,16 +183,16 @@ class ComisionUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     docente_id: int = Field(gt=0)
-    dias_horarios: str = Field(min_length=1, max_length=255)
+    horarios: list[HorarioComision]
     arancel: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     cupo_maximo: int = Field(gt=0)
 
-    @field_validator("dias_horarios")
+    @field_validator("horarios")
     @classmethod
-    def _dias_horarios_no_vacio(cls, valor: str) -> str:
-        if not valor.strip():
-            raise ValueError("Los días y horarios son obligatorios.")
-        return valor
+    def _horarios_validos(
+        cls, valor: list[HorarioComision]
+    ) -> list[HorarioComision]:
+        return _horarios_sin_repetir(valor)
 
 
 class ComisionOut(BaseModel):
@@ -150,6 +215,7 @@ class ComisionOut(BaseModel):
     curso: CursoOut
     docente_id: int | None
     docente_nombre: str | None
+    horarios: list[HorarioComision]
     dias_horarios: str
     cupo_maximo: int
     arancel: Decimal
@@ -157,6 +223,12 @@ class ComisionOut(BaseModel):
     sede_id: int | None
     sede_nombre: str | None
     vacantes: int
+
+    @field_validator("horarios", mode="after")
+    @classmethod
+    def _en_orden_de_semana(cls, valor: list[HorarioComision]) -> list[HorarioComision]:
+        """Lunes primero. El orden de la lista es el que dibujan los chips del formulario."""
+        return sorted(valor, key=lambda horario: ORDEN_DIA[horario.dia])
 
 
 class SedeOut(BaseModel):

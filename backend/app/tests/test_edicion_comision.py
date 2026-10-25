@@ -36,6 +36,7 @@ from app.tests.factories import (
     crear_usuario_alumno,
     crear_usuario_docente,
     encabezado_de_autorizacion,
+    horarios,
     token_de_prueba,
 )
 
@@ -71,7 +72,7 @@ def _datos(docente: Docente, **cambios: object) -> dict:
     """Cuerpo válido de la edición, con los cuatro datos que admite el contrato."""
     datos = {
         "docente_id": docente.id,
-        "dias_horarios": "Martes y jueves 19 a 21 hs",
+        "horarios": horarios("MAR JUE", inicio="19:00", fin="21:00"),
         "arancel": "48000.00",
         "cupo_maximo": 25,
     }
@@ -123,7 +124,7 @@ def test_editar_comision_actualiza_los_cuatro_datos_y_conserva_el_resto(
     assert actualizada.codigo == codigo
     assert actualizada.curso_id == curso.id
     assert actualizada.docente_id == docente.id
-    assert actualizada.dias_horarios == "Martes y jueves 19 a 21 hs"
+    assert actualizada.dias_horarios == "Mar y Jue 19-21hs"
     assert actualizada.arancel == Decimal("48000.00")
     assert actualizada.cupo_maximo == 25
     assert db_session.get(Inscripcion, inscripcion.id).comision_id == comision.id
@@ -206,7 +207,7 @@ def _datos_nuevo(docente_id: int, **cambios: object) -> dict:
     """Cuerpo válido con un `docente_id` explícito, para el caso del docente inexistente."""
     datos = {
         "docente_id": docente_id,
-        "dias_horarios": "Sábados 9 a 12 hs",
+        "horarios": horarios("SAB", inicio="09:00", fin="12:00"),
         "arancel": "35000.00",
         "cupo_maximo": 20,
     }
@@ -236,7 +237,7 @@ def test_edicion_exitosa_devuelve_la_comision_actualizada(
     assert cuerpo["codigo"] == codigo
     assert cuerpo["docente_id"] == docente.id
     assert cuerpo["docente_nombre"] == f"{docente.nombre} {docente.apellido}"
-    assert cuerpo["dias_horarios"] == "Martes y jueves 19 a 21 hs"
+    assert cuerpo["dias_horarios"] == "Mar y Jue 19-21hs"
     assert cuerpo["arancel"] == "48000.00"
     assert cuerpo["cupo_maximo"] == 12
     assert cuerpo["vacantes"] == 9
@@ -312,8 +313,8 @@ def test_los_campos_fuera_del_contrato_dan_422_y_no_cambian_nada(
         {"cupo_maximo": -3},
         {"arancel": "0.00"},
         {"arancel": "-10.00"},
-        {"dias_horarios": ""},
-        {"dias_horarios": "   "},
+        {"horarios": []},
+        {"horarios": horarios("LUN", inicio="19:00", fin="19:00")},
     ],
 )
 def test_datos_invalidos_dan_422(

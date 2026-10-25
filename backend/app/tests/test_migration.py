@@ -27,6 +27,7 @@ TABLAS_ESPERADAS = {
     "clase",
     "cobranza",
     "comision",
+    "comision_horario",
     "contrato_corporativo",
     "curso",
     "docente",
@@ -50,6 +51,10 @@ CHECKS_ESPERADOS = {
     "ck_comision_arancel_positivo",
     "ck_comision_modalidad_virtual_sin_sede",
     "ck_comision_modalidad_valida",
+    "ck_comision_horario_dia_valido",
+    "ck_comision_horario_minutos_en_paso",
+    "ck_comision_horario_en_rango_horario",
+    "ck_comision_horario_fin_despues_del_inicio",
     # Padrón
     "ck_usuario_rol_vinculo_coherente",
     "ck_usuario_rol_valido",
@@ -109,6 +114,7 @@ INDICES_ESPERADOS = {
     "uq_usuario_email",
     "uq_empresa_cuit_norm",
     "uq_comision_curso_numero",
+    "uq_comision_horario_comision_id_dia",
     "uq_inscripcion_alumno_comision",
     "uq_asistencia_clase_alumno",
 }
@@ -142,7 +148,7 @@ def test_la_migracion_inicial_deja_el_esquema_completo(db_session) -> None:
 
 def test_la_version_de_alembic_queda_registrada(db_session) -> None:
     versiones = db_session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    assert versiones == ["0004_cobranza_factura_a"]
+    assert versiones == ["0005_comision_horario"]
 
 
 def test_la_migracion_escrita_a_mano_cuadra_con_los_modelos(

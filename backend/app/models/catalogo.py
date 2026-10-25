@@ -6,7 +6,8 @@ tolerante a formato sobre columnas normalizadas).
 
 from __future__ import annotations
 
-from datetime import date
+from collections.abc import Iterable
+from datetime import date, time
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -21,12 +22,13 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, no_vacio
-from app.models.enums import Modalidad, enum_check
+from app.models.enums import DiaSemana, Modalidad, enum_check
 
 if TYPE_CHECKING:
     # Solo para que el linter resuelva las anotaciones de `relationship`. Importarlo en
@@ -42,6 +44,16 @@ MONEY = Numeric(14, 2)
 #: `alembic check` no compara columnas generadas: si divergen, nadie se entera hasta que
 #: un curso con identificador de cuatro dígitos falle su alta.
 EXPRESION_CODIGO_CURSO = "'CUR' || lpad(id::text, greatest(3, length(id::text)), '0')"
+
+#: Los horarios de cursada van en la grilla de 15 minutos (historia #48). La base es la red de
+#: seguridad del validador de Pydantic, igual que `cupo_maximo` y `arancel`.
+EXPRESION_MINUTOS_EN_PASO = (
+    "EXTRACT(minute FROM inicio)::integer IN (0, 15, 30, 45) "
+    "AND EXTRACT(minute FROM fin)::integer IN (0, 15, 30, 45)"
+)
+
+#: La cursada va de 6:00 a 22:00, y las 22:00 se pueden usar como fin (no como inicio).
+EXPRESION_HORARIO_EN_RANGO = "inicio >= TIME '06:00' AND fin <= TIME '22:00'"
 
 
 class Sede(TimestampMixin, Base):
@@ -165,6 +177,11 @@ class Comision(TimestampMixin, Base):
     curso: Mapped[Curso] = relationship(back_populates="comisiones")
     sede: Mapped[Sede] = relationship()
     docente: Mapped[Docente] = relationship()
+    # `delete-orphan` para que reemplazar los horarios en la edición borre las filas viejas: la
+    # lista que manda el formulario es el estado completo del horario, no un agregado.
+    horarios: Mapped[list[ComisionHorario]] = relationship(
+        back_populates="comision", cascade="all, delete-orphan"
+    )
 
     @property
     def codigo(self) -> str:
@@ -187,6 +204,18 @@ class Comision(TimestampMixin, Base):
         return f"{self.docente.nombre} {self.docente.apellido}"
 
     @property
+    def resumen_horarios(self) -> str:
+        """El texto `dias_horarios` derivado de las filas, con el formato del resumen (D2).
+
+        Vive acá y no en el servicio para que el valor que se guarda y el que se devuelve salgan
+        de la misma función. Cuando la comisión no tiene filas —una migración que no pudo
+        interpretar el texto—, el resumen es el texto original, que es lo que se sigue mostrando.
+        """
+        if not self.horarios:
+            return self.dias_horarios
+        return resumen_de_horarios(self.horarios)
+
+    @property
     def sede_nombre(self) -> str | None:
         """Nombre de la sede de la comisión, o `None` si no tiene ninguna asignada.
 
@@ -196,3 +225,80 @@ class Comision(TimestampMixin, Base):
         sea `None`, porque es la única combinación que la base prohíbe.
         """
         return self.sede.nombre if self.sede is not None else None
+
+
+#: Rótulo de cada día tal como se ve en el resumen del horario y en los chips del formulario.
+ROTULO_DIA = {
+    DiaSemana.LUN: "Lun",
+    DiaSemana.MAR: "Mar",
+    DiaSemana.MIE: "Mié",
+    DiaSemana.JUE: "Jue",
+    DiaSemana.VIE: "Vie",
+    DiaSemana.SAB: "Sáb",
+    DiaSemana.DOM: "Dom",
+}
+
+#: El orden de la semana, que es el de los miembros de `DiaSemana`. Se usa para ordenar los
+#: grupos del resumen y las filas que devuelve la API.
+ORDEN_DIA = {dia: posicion for posicion, dia in enumerate(DiaSemana)}
+
+
+class ComisionHorario(TimestampMixin, Base):
+    """Un día de cursada de una comisión, con su rango horario (historia #48).
+
+    **Una fila por día y por comisión**: dos rangos del mismo día no se modelan porque el
+    formulario carga uno solo, y porque sin esa unicidad dos rangos del mismo día podrían pisarse
+    y nadie lo notaría hasta que un alumno tuviera dos clases al mismo tiempo.
+
+    `dias_horarios`, en `Comision`, sobrevive como texto **derivado** de estas filas (D2): lo
+    escribe el servicio cada vez que guarda horarios, y es lo que siguen leyendo los listados.
+    """
+
+    __tablename__ = "comision_horario"
+    __table_args__ = (
+        UniqueConstraint("comision_id", "dia", name="uq_comision_horario_comision_id_dia"),
+        enum_check("dia", DiaSemana, "dia_valido"),
+        CheckConstraint(EXPRESION_MINUTOS_EN_PASO, name="minutos_en_paso"),
+        CheckConstraint(EXPRESION_HORARIO_EN_RANGO, name="en_rango_horario"),
+        CheckConstraint("fin > inicio", name="fin_despues_del_inicio"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    comision_id: Mapped[int] = mapped_column(
+        ForeignKey("comision.id", ondelete="CASCADE"), nullable=False
+    )
+    dia: Mapped[str] = mapped_column(String(3), nullable=False)
+    inicio: Mapped[time] = mapped_column(Time, nullable=False)
+    fin: Mapped[time] = mapped_column(Time, nullable=False)
+
+    comision: Mapped[Comision] = relationship(back_populates="horarios")
+
+
+def _hora_del_resumen(valor: time) -> str:
+    """La hora sin minutos cuando valen cero: `19` y no `19:00`, `18:15` cuando no."""
+    if valor.minute == 0:
+        return f"{valor.hour}"
+    return f"{valor.hour}:{valor.minute:02d}"
+
+
+def resumen_de_horarios(horarios: Iterable[ComisionHorario]) -> str:
+    """El texto del horario: días con igual rango agrupados, en orden de semana.
+
+    Es la misma función que usan la columna `HORARIO` de la tabla y los chips del formulario, así
+    que el texto guardado no puede decir algo distinto de lo que se ve. Ejemplos:
+    `Lun y Mié 19-21hs`, `Mar 18:15-21:30hs`, `Lun 19-21hs, Mié 18:15-21:30hs`.
+    """
+    grupos: dict[tuple[time, time], list[DiaSemana]] = {}
+    for horario in horarios:
+        grupos.setdefault((horario.inicio, horario.fin), []).append(DiaSemana(horario.dia))
+
+    partes = []
+    for (inicio, fin), dias in sorted(
+        grupos.items(), key=lambda grupo: min(ORDEN_DIA[dia] for dia in grupo[1])
+    ):
+        # `Lun y Mié` con dos días, `Lun, Mié y Vie` con más: encadenar `y` entre siete días se lee
+        # peor que la lista.
+        nombres = [ROTULO_DIA[dia] for dia in sorted(dias, key=ORDEN_DIA.__getitem__)]
+        etiqueta = nombres[0] if len(nombres) == 1 else f"{', '.join(nombres[:-1])} y {nombres[-1]}"
+        partes.append(f"{etiqueta} {_hora_del_resumen(inicio)}-{_hora_del_resumen(fin)}hs")
+    return ", ".join(partes)

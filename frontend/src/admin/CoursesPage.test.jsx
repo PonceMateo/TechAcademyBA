@@ -62,6 +62,33 @@ async function abrirCurso(ruta = RUTA_CURSO) {
   await screen.findByRole('heading', { name: 'Comisiones Activas' })
 }
 
+/**
+ * Los horarios con los que se completa el selector: los siete días con el rango por defecto.
+ *
+ * El selector abre sin días activos, así que `cargarHorarios` los prende uno por uno antes de
+ * confirmar; el resto de los tests comparte ese resultado y no tiene que repetir siete objetos.
+ */
+const DIAS_DE_LA_SEMANA = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM']
+const HORARIOS_POR_DEFECTO = DIAS_DE_LA_SEMANA.map((dia) => ({
+  dia,
+  inicio: '19:00',
+  fin: '21:00',
+}))
+const TEXTO_POR_DEFECTO = 'Lun, Mar, Mié, Jue, Vie, Sáb y Dom 19-21hs'
+
+/** Carga el horario por el selector, que es la única forma de cargarlo (historia #48). */
+async function cargarHorarios(user) {
+  await user.click(screen.getByRole('button', { name: /Agregar horarios|Modificar horarios/ }))
+  await screen.findByRole('dialog', { name: 'Horario de cursada' })
+  for (const nombre of ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']) {
+    await user.click(screen.getByRole('button', { name: nombre }))
+  }
+  await user.click(screen.getByRole('button', { name: 'Listo' }))
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog', { name: 'Horario de cursada' })).not.toBeInTheDocument(),
+  )
+}
+
 async function abrirModal(user) {
   await user.click(screen.getByRole('button', { name: '+ Nueva Comisión' }))
   await screen.findByRole('dialog', { name: 'Crear Nueva Comisión' })
@@ -97,7 +124,7 @@ async function completarComision(
     await user.selectOptions(cursos, within(cursos).getByRole('option', { name: 'Python Inicial' }))
   }
   await user.selectOptions(screen.getByLabelText(/^Docente Asignado/), '1')
-  await user.type(screen.getByLabelText(/Días y Horarios/), 'Mar y Jue 19 a 21 hs')
+  await cargarHorarios(user)
   await user.type(screen.getByLabelText(/Cupo Máximo/), '20')
   await user.type(screen.getByLabelText(/Valor de Arancel de Comisión/), '52000')
   if (sede) {
@@ -338,11 +365,40 @@ describe('modal de alta', () => {
     expect(screen.getByText(/El código de la comisión/)).toBeInTheDocument()
   })
 
-  it('muestra los placeholders del prototipo', async () => {
+  it('abre con el horario vacío y ofrece agregarlo', async () => {
     const user = userEvent.setup()
     await abrirModal(user)
 
-    expect(screen.getByPlaceholderText('Ej: Mar y Jue 19 a 21 hs')).toBeInTheDocument()
+    expect(screen.getByText('Sin horarios definidos')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Agregar horarios' })).toBeInTheDocument()
+  })
+
+  it('muestra el horario cargado como chips y cambia el botón a modificarlo', async () => {
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await cargarHorarios(user)
+
+    expect(screen.getByText(TEXTO_POR_DEFECTO)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Modificar horarios' })).toBeInTheDocument()
+  })
+
+  it('no guarda sin horarios y muestra el error bajo el campo', async () => {
+    const crear = vi.fn()
+    stubDataSource({ crearComision: crear })
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await user.selectOptions(screen.getByLabelText(/^Modalidad/), 'VIRTUAL')
+    const cursos = screen.getByLabelText(/^Curso \/ Programa/)
+    await user.selectOptions(cursos, within(cursos).getByRole('option', { name: 'Python Inicial' }))
+    await user.selectOptions(screen.getByLabelText(/^Docente Asignado/), '1')
+    await user.type(screen.getByLabelText(/Cupo Máximo/), '20')
+    await user.type(screen.getByLabelText(/Valor de Arancel de Comisión/), '52000')
+    await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+    expect(await screen.findByText('Agregá al menos un horario.')).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
   })
 
   it('ofrece las tres modalidades del dominio', async () => {
@@ -405,7 +461,8 @@ describe('modal de alta', () => {
       curso: { codigo: 'CUR-101', nombre: 'Python Inicial' },
       docente_id: 1,
       docente_nombre: 'Profe Martín',
-      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      horarios: HORARIOS_POR_DEFECTO,
+      dias_horarios: TEXTO_POR_DEFECTO,
       cupo_maximo: 20,
       arancel: 52000,
       vacantes: 20,
@@ -426,7 +483,7 @@ describe('modal de alta', () => {
     expect(crear.mock.calls[0][0]).toEqual({
       curso_id: 1,
       docente_id: 1,
-      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      horarios: HORARIOS_POR_DEFECTO,
       arancel: 52000,
       cupo_maximo: 20,
       modalidad: 'VIRTUAL',
@@ -474,7 +531,8 @@ describe('modal de alta', () => {
       curso: { codigo: 'CUR-101', nombre: 'Python Inicial' },
       docente_id: 1,
       docente_nombre: 'Profe Martín',
-      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      horarios: HORARIOS_POR_DEFECTO,
+      dias_horarios: TEXTO_POR_DEFECTO,
       cupo_maximo: 20,
       arancel: 52000,
       vacantes: 20,
@@ -493,7 +551,7 @@ describe('modal de alta', () => {
     expect(crear.mock.calls[0][0]).toEqual({
       curso_id: 1,
       docente_id: 1,
-      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      horarios: HORARIOS_POR_DEFECTO,
       arancel: 52000,
       cupo_maximo: 20,
       modalidad: 'VIRTUAL',
@@ -508,7 +566,7 @@ describe('modal de alta', () => {
     await user.selectOptions(screen.getByLabelText(/^Modalidad/), 'VIRTUAL')
     const cursos = screen.getByLabelText(/^Curso \/ Programa/)
     await user.selectOptions(cursos, within(cursos).getByRole('option', { name: 'Python Inicial' }))
-    await user.type(screen.getByLabelText(/Días y Horarios/), 'Mar y Jue 19 a 21 hs')
+    await cargarHorarios(user)
     await user.type(screen.getByLabelText(/Cupo Máximo/), '20')
     await user.type(screen.getByLabelText(/Valor de Arancel de Comisión/), '52000')
     await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
@@ -524,7 +582,7 @@ describe('modal de alta', () => {
     const cursos = screen.getByLabelText(/^Curso \/ Programa/)
     await user.selectOptions(cursos, within(cursos).getByRole('option', { name: 'Python Inicial' }))
     await user.selectOptions(screen.getByLabelText(/^Docente Asignado/), '1')
-    await user.type(screen.getByLabelText(/Días y Horarios/), 'Mar y Jue 19 a 21 hs')
+    await cargarHorarios(user)
     await user.type(screen.getByLabelText(/Cupo Máximo/), '0')
     await user.type(screen.getByLabelText(/Valor de Arancel de Comisión/), '0')
     await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
@@ -555,6 +613,24 @@ describe('modal de alta', () => {
     expect(screen.queryByText(/Comisión CUR\d+-\d+ creada\./)).not.toBeInTheDocument()
   })
 
+  it('muestra el 409 de choque de horario bajo el campo de horarios', async () => {
+    stubDataSource({
+      crearComision: vi.fn(async () => {
+        throw Object.assign(new Error('Ese horario se superpone con la comisión CUR-101-1 (Mar 19-21hs), que dicta el mismo docente.'), { status: 409 })
+      }),
+    })
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await completarComision(user, { modalidad: 'VIRTUAL' })
+    await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+    expect(
+      await screen.findByText(/se superpone con la comisión CUR-101-1 \(Mar 19-21hs\)/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Crear Nueva Comisión' })).toBeInTheDocument()
+  })
+
   it('mantiene lo que el operador completó cuando el alta se rechaza', async () => {
     stubDataSource({
       crearComision: vi.fn(async () => {
@@ -568,7 +644,7 @@ describe('modal de alta', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
     await screen.findByRole('alert')
 
-    expect(screen.getByLabelText(/Días y Horarios/)).toHaveValue('Mar y Jue 19 a 21 hs')
+    expect(screen.getByText(TEXTO_POR_DEFECTO)).toBeInTheDocument()
     expect(screen.getByLabelText(/^Modalidad/)).toHaveValue('VIRTUAL')
   })
 
@@ -609,7 +685,8 @@ describe('alta de comisión desde dentro de un curso', () => {
       curso: { codigo: 'CUR-101', nombre: 'Python Inicial' },
       docente_id: 1,
       docente_nombre: 'Profe Martín',
-      dias_horarios: 'Mar y Jue 19 a 21 hs',
+      horarios: HORARIOS_POR_DEFECTO,
+      dias_horarios: TEXTO_POR_DEFECTO,
       cupo_maximo: 20,
       arancel: 52000,
       vacantes: 20,
@@ -856,7 +933,7 @@ describe('edición de comisión', () => {
     const dialogo = await abrirEdicion(user)
 
     expect(within(dialogo).getByLabelText(/^Docente Asignado/)).toHaveValue('1')
-    expect(within(dialogo).getByLabelText(/Días y Horarios/)).toHaveValue('Mar y Jue 19 a 21 hs')
+    expect(within(dialogo).getByText('Mar y Jue 19-21hs')).toBeInTheDocument()
     expect(within(dialogo).getByLabelText(/Cupo Máximo/)).toHaveValue(30)
     expect(within(dialogo).getByLabelText(/Valor de Arancel de Comisión/)).toHaveValue(45000)
     expect(within(dialogo).queryByLabelText(/Curso \/ Programa/)).not.toBeInTheDocument()

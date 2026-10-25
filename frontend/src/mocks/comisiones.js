@@ -1,4 +1,5 @@
 import { MODALIDAD } from '../domain/enums'
+import { textoHorarios } from '../domain/horarios'
 import { markAsExample } from './placeholderNotice'
 
 /**
@@ -33,7 +34,12 @@ const RAW_COMISIONES = [
     curso: { codigo: 'CUR-101', nombre: 'Python Inicial' },
     docente_id: 1,
     docente_nombre: 'Profe Martín',
-    dias_horarios: 'Mar y Jue 19 a 21 hs',
+    // Los horarios estructurados son el dato; el texto sale de ellos (historia #48). Escrito a
+    // mano, el ejemplo podría guardar un horario que el selector no puede producir.
+    horarios: [
+      { dia: 'MAR', inicio: '19:00', fin: '21:00' },
+      { dia: 'JUE', inicio: '19:00', fin: '21:00' },
+    ],
     // Las dos formas del mismo horario. `dias_horarios` es la columna corta del catálogo de
     // Administración; `horario_legible` es la que muestran los shells de docente y de alumno, con
     // el punto medio. No se deriva del corto con operaciones de texto porque un horario no se
@@ -61,7 +67,7 @@ const RAW_COMISIONES = [
     // El cliente la registra con estado `Cerrada por cupo`: 20 inscriptos sobre un cupo de 20.
     docente_id: null,
     docente_nombre: 'Caro UX',
-    dias_horarios: 'Miércoles 19 a 22',
+    horarios: [{ dia: 'MIE', inicio: '19:00', fin: '22:00' }],
     cupo_maximo: 20,
     inscriptos: 20,
     arancel: 52000,
@@ -74,7 +80,7 @@ const RAW_COMISIONES = [
     curso: { codigo: 'CUR-108', nombre: 'Java Backend Spring' },
     docente_id: 5,
     docente_nombre: 'Ing. González',
-    dias_horarios: 'Sábados intensivo',
+    horarios: [{ dia: 'SAB', inicio: '09:00', fin: '13:00' }],
     cupo_maximo: 30,
     inscriptos: 0,
     arancel: 58000,
@@ -87,7 +93,10 @@ const RAW_COMISIONES = [
     curso: { codigo: 'CUR-110', nombre: 'Power BI & Dashboards' },
     docente_id: null,
     docente_nombre: 'Mariana Data',
-    dias_horarios: 'Mar y Jue 18:30',
+    horarios: [
+      { dia: 'MAR', inicio: '18:30', fin: '20:30' },
+      { dia: 'JUE', inicio: '18:30', fin: '20:30' },
+    ],
     cupo_maximo: 40,
     inscriptos: 0,
     arancel: 39000,
@@ -100,7 +109,7 @@ const RAW_COMISIONES = [
     curso: { codigo: 'CUR-103', nombre: 'Marketing Digital & Ads' },
     docente_id: 3,
     docente_nombre: 'Santi Ads',
-    dias_horarios: 'Sábados 10 a 13 hs',
+    horarios: [{ dia: 'SAB', inicio: '10:00', fin: '13:00' }],
     cupo_maximo: 40,
     inscriptos: 0,
     arancel: 38000,
@@ -122,6 +131,7 @@ const RAW_COMISIONES = [
 export const COMISIONES = markAsExample(
   RAW_COMISIONES.map((comision) => ({
     ...comision,
+    dias_horarios: textoHorarios(comision.horarios),
     sede_nombre: SEDES.find((sede) => sede.id === comision.sede_id)?.nombre ?? null,
     vacantes: comision.cupo_maximo - comision.inscriptos,
     // Estado que la planilla del cliente registra para la comisión, no el `estado` del modelo:
