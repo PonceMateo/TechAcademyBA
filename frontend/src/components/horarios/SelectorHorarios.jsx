@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DatePicker from 'react-datepicker'
 import { Button, Modal } from '../ui'
 import {
@@ -53,6 +53,32 @@ function horaDeFecha(fecha) {
 }
 
 /**
+ * **`true` cuando la pantalla no da para desplegar el popover al lado del campo.**
+ *
+ * En PC la lista de horas se abre pegada al campo, como cualquier desplegable: es el mismo objeto
+ * visual, no una ventana aparte. En móvil el modal ocupa casi toda la pantalla y el popover no
+ * tiene dónde quedarse, así que va al portal centrado, que es como se venía usando.
+ */
+function usePantallaChica() {
+  const consulta = '(max-width: 767px)'
+  const [chica, setChica] = useState(
+    () => typeof window.matchMedia === 'function' && window.matchMedia(consulta).matches,
+  )
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return undefined
+    }
+    const media = window.matchMedia(consulta)
+    const alCambiar = (evento) => setChica(evento.matches)
+    media.addEventListener('change', alCambiar)
+    return () => media.removeEventListener('change', alCambiar)
+  }, [])
+
+  return chica
+}
+
+/**
  * Un campo de hora del selector.
  *
  * **Se puede tipear, y lo tipeado se normaliza al confirmar.** El valor vive como string `"HH:MM"`
@@ -67,6 +93,7 @@ function horaDeFecha(fecha) {
  */
 function SelectorHora({ id, etiqueta, valor, minimo, maximo, onCambiar }) {
   const [textoTipeado, setTextoTipeado] = useState(null)
+  const enPantallaChica = usePantallaChica()
 
   function aplicar(hora) {
     if (hora !== null && hora !== valor) {
@@ -115,10 +142,12 @@ function SelectorHora({ id, etiqueta, valor, minimo, maximo, onCambiar }) {
         dateFormat="HH:mm"
         minTime={fechaDeHora(minimo)}
         maxTime={fechaDeHora(maximo)}
-        // El popover se dibuja en un portal: dentro del modal lo taparían su `overflow` y su
-        // `z-index`, y el portal vive en `document.body`.
-        withPortal
-        portalId="selector-hora"
+        // En pantalla ancha el popover se queda adentro del modal, pegado al campo; en chica se
+        // va al portal de `document.body`. El `portalId` tiene que viajar solo con el portal:
+        // react-datepicker lo usa en los dos caminos, y con el popover adentro del modal el
+        // contenedor del portal —que va al body sin `z-index`— lo dejaba detrás del modal.
+        withPortal={enPantallaChica}
+        portalId={enPantallaChica ? 'selector-hora' : undefined}
         popperClassName="z-[70]"
         className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm text-slate-800"
         ariaLabelClose="Cerrar el selector de hora"
@@ -133,12 +162,15 @@ function SelectorHora({ id, etiqueta, valor, minimo, maximo, onCambiar }) {
  * **El estado nace acá y no en un efecto que lo reinicie al abrir.** El padre remonta el componente
  * con una `key` distinta en cada apertura, así que lo que el operador canceló no se conserva y el
  * estado inicial se calcula una sola vez por apertura, sin renders en cascada.
+ *
+ * **Sin horarios guardados no arranca ningún día activo.** Prender los siete por defecto le hace
+ * creer al operador que la comisión se dicta todos los días; los días son dato, no valor inicial.
+ * Con horarios guardados sí se prenden los que ya tienen fila: editar no puede desmarcar nada.
  */
 function estadoInicial(horarios) {
   const grupos = agruparHorarios(horarios ?? [])
   const primero = grupos[0] ?? RANGO_POR_DEFECTO
-  const activos =
-    (horarios ?? []).length === 0 ? DIAS.map((dia) => dia.valor) : horarios.map((dato) => dato.dia)
+  const activos = (horarios ?? []).map((dato) => dato.dia)
 
   return {
     modo: grupos.length <= 1 ? 'mismo' : 'distinto',

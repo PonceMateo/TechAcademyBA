@@ -119,8 +119,10 @@ declara aparte, y hay que importar su CSS.
 recorrer la lista para llegar a las 21:00; y una librería de UI completa, que agregaría un
 segundo sistema de componentes junto a `src/components/ui/`.
 
-Dos detalles de integración: el popover del picker queda tapado por el `overflow` del modal, así
-que se renderiza con portal hacia `document.body` y con un `z-index` por encima del modal; y hay
+Dos detalles de integración: el popover del picker se dibuja adentro del modal, pegado al campo,
+para que se lea como un desplegable y no como una ventana aparte —solo en pantallas chicas (menos
+de 768 px), donde el modal ocupa casi toda la pantalla, se renderiza con portal hacia
+`document.body` y con un `z-index` por encima del modal—; y hay
 verificar que las 22:00 se puedan elegir, porque `maxTime` es inclusivo pero el borde del paso
 final es fácil de perder.
 

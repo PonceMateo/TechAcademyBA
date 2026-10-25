@@ -19,6 +19,18 @@ function montar({ horarios = [], onListo = vi.fn(), onCancelar = vi.fn() } = {})
   return { onListo, onCancelar }
 }
 
+/** El selector abre sin ningún día activo, así que los casos que necesitan días los prenden. */
+async function activarTodosLosDias(user) {
+  for (const nombre of ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']) {
+    await user.click(screen.getByRole('button', { name: nombre }))
+  }
+}
+
+/** Prende solo el lunes: alcanza para los casos que miran el primer día. */
+async function activarLunes(user) {
+  await user.click(screen.getByRole('button', { name: 'Lunes' }))
+}
+
 describe('modo mismo horario', () => {
   it('abre con el switch activado y un único rango para los siete días', () => {
     montar()
@@ -32,6 +44,7 @@ describe('modo mismo horario', () => {
   it('devuelve un horario por día activo cuando se confirma', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarTodosLosDias(user)
 
     await user.click(screen.getByRole('button', { name: 'Listo' }))
 
@@ -43,6 +56,7 @@ describe('modo mismo horario', () => {
   it('saca el día que se apaga', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarTodosLosDias(user)
 
     const domingo = screen.getByRole('button', { name: 'Domingo' })
     expect(domingo).toHaveAttribute('aria-pressed', 'true')
@@ -54,13 +68,8 @@ describe('modo mismo horario', () => {
     expect(onListo.mock.calls[0][0].map((horario) => horario.dia)).not.toContain('DOM')
   })
 
-  it('deshabilita Listo cuando no queda ningún día activo', async () => {
-    const user = userEvent.setup()
+  it('deshabilita Listo cuando no queda ningún día activo', () => {
     montar()
-
-    for (const nombre of ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']) {
-      await user.click(screen.getByRole('button', { name: nombre }))
-    }
 
     expect(screen.getByRole('button', { name: 'Listo' })).toBeDisabled()
     expect(screen.getByRole('alert')).toHaveTextContent('Elegí al menos un día')
@@ -68,7 +77,9 @@ describe('modo mismo horario', () => {
 
   it('se opera con el teclado, no solo con el mouse', async () => {
     const user = userEvent.setup()
+
     const { onListo } = montar()
+    await activarTodosLosDias(user)
 
     const martes = screen.getByRole('button', { name: 'Martes' })
     martes.focus()
@@ -81,6 +92,7 @@ describe('modo mismo horario', () => {
   it('propone dos horas de fin al cambiar el inicio', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarLunes(user)
 
     const inicio = screen.getByLabelText('Hora de inicio')
     await user.clear(inicio)
@@ -94,6 +106,7 @@ describe('modo mismo horario', () => {
   it('topea el fin propuesto en las 22:00', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarLunes(user)
 
     const inicio = screen.getByLabelText('Hora de inicio')
     await user.clear(inicio)
@@ -107,6 +120,7 @@ describe('modo mismo horario', () => {
   it('redondea lo que se tipea al múltiplo de 15 más cercano', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarLunes(user)
 
     const inicio = screen.getByLabelText('Hora de inicio')
     await user.clear(inicio)
@@ -135,6 +149,7 @@ describe('modo distinto por día', () => {
   it('al apagar el switch copia el rango a los días activos y abre una fila por día', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarTodosLosDias(user)
 
     await user.click(screen.getByRole('switch', { name: 'Mismo horario todos los días' }))
 
@@ -152,11 +167,10 @@ describe('modo distinto por día', () => {
   it('carga un rango por día y los devuelve todos', async () => {
     const user = userEvent.setup()
     const { onListo } = montar()
+    await activarLunes(user)
+    await user.click(screen.getByRole('button', { name: 'Martes' }))
 
     await user.click(screen.getByRole('switch', { name: 'Mismo horario todos los días' }))
-    for (const nombre of ['Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']) {
-      await user.click(screen.getByRole('button', { name: nombre }))
-    }
 
     const inicio = screen.getByLabelText('Hora de inicio del Martes')
     await user.clear(inicio)

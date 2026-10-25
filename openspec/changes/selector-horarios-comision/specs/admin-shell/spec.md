@@ -247,6 +247,10 @@ SHALL mostrar una fila por día: cada día activo SHALL mostrar su propio select
 días apagados SHALL NOT mostrar selector ni enviar su horario. Cada día SHALL admitir a lo sumo un
 rango.
 
+Al abrir, el selector SHALL arrancar sin ningún día activo WHEN todavía no haya horarios
+guardados, y SHALL arrancar con activos solo los días que ya tienen horario WHEN se edite uno
+existente.
+
 SHALL ser obligatorio tener al menos un día activo: sin días activos, el botón `Listo` SHALL quedar
 deshabilitado y el selector SHALL NOT devolver horarios vacíos.
 

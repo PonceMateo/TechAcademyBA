@@ -63,10 +63,10 @@ async function abrirCurso(ruta = RUTA_CURSO) {
 }
 
 /**
- * Los horarios con los que abre el selector: los siete días con el rango por defecto.
+ * Los horarios con los que se completa el selector: los siete días con el rango por defecto.
  *
- * Es el estado inicial del modal, así que completar el alta sin tocar el selector los deja tal
- * cual. Se declara una vez para que una expectativa no tenga que repetir siete objetos.
+ * El selector abre sin días activos, así que `cargarHorarios` los prende uno por uno antes de
+ * confirmar; el resto de los tests comparte ese resultado y no tiene que repetir siete objetos.
  */
 const DIAS_DE_LA_SEMANA = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM']
 const HORARIOS_POR_DEFECTO = DIAS_DE_LA_SEMANA.map((dia) => ({
@@ -80,6 +80,9 @@ const TEXTO_POR_DEFECTO = 'Lun, Mar, Mié, Jue, Vie, Sáb y Dom 19-21hs'
 async function cargarHorarios(user) {
   await user.click(screen.getByRole('button', { name: /Agregar horarios|Modificar horarios/ }))
   await screen.findByRole('dialog', { name: 'Horario de cursada' })
+  for (const nombre of ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']) {
+    await user.click(screen.getByRole('button', { name: nombre }))
+  }
   await user.click(screen.getByRole('button', { name: 'Listo' }))
   await waitFor(() =>
     expect(screen.queryByRole('dialog', { name: 'Horario de cursada' })).not.toBeInTheDocument(),
