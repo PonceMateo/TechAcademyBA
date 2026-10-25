@@ -7,16 +7,20 @@ de pagadores (decisión acordada con el equipo).
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import Comision
+from app.models.clases import AuditLog
 from app.models.cobranza import Cobranza, Imputacion, Pagador
-from app.models.enums import EstadoInscripcion, OrigenCobranza
+from app.models.enums import EstadoCobranza, EstadoInscripcion, OrigenCobranza
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Alumno
-from app.schemas.cobranzas import CobranzaCreate
+from app.schemas.cobranzas import ZONA_ACADEMIA, CobranzaCreate, CobranzaEstadoUpdate
 from app.services.normalization import normalize_document
 
 
@@ -46,6 +50,29 @@ class InscripcionAmbigua(Exception):
 
 class CobranzaInvalida(Exception):
     """La base rechazó la cobranza por una regla de integridad."""
+
+
+class CobranzaNoEncontrada(Exception):
+    """La cobranza que se quiere modificar no existe."""
+
+
+class CambioEstadoInvalido(Exception):
+    """La transición de estado pedida no está permitida."""
+
+
+#: Transiciones válidas (HU 21, ampliación). Corregir un pago acreditado por error también cuenta:
+#: un comprobante acreditado puede volver a revisión o quedar rechazado.
+TRANSICIONES_ESTADO = {
+    EstadoCobranza.ACREDITADO.value: (
+        EstadoCobranza.OBSERVADO.value,
+        EstadoCobranza.RECHAZADO.value,
+    ),
+    EstadoCobranza.OBSERVADO.value: (
+        EstadoCobranza.ACREDITADO.value,
+        EstadoCobranza.RECHAZADO.value,
+    ),
+    EstadoCobranza.RECHAZADO.value: (EstadoCobranza.ACREDITADO.value,),
+}
 
 
 def _cargar_inscripcion(
@@ -139,6 +166,69 @@ def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
         session.rollback()
         raise CobranzaInvalida(
             "No pudimos registrar el cobro con los datos informados."
+        ) from error
+
+    session.refresh(cobranza)
+    return cobranza
+
+
+def cambiar_estado_cobranza(
+    session: Session,
+    cobranza_id: int,
+    datos: CobranzaEstadoUpdate,
+    usuario_id: int,
+) -> Cobranza:
+    """Cambia el estado de una cobranza y deja el cambio en `audit_log`.
+
+    Actualiza la fila original: no crea cobranza, pagador ni imputación, y no toca el importe, el
+    titular, la fecha ni la inscripción. El estado y su entrada de auditoría van en la misma
+    transacción, con la fila bloqueada para que dos cambios simultáneos no dejen dos entradas.
+    """
+    cobranza = session.scalar(
+        select(Cobranza).where(Cobranza.id == cobranza_id).with_for_update()
+    )
+    if cobranza is None:
+        raise CobranzaNoEncontrada("La cobranza no existe.")
+    if datos.estado.value == cobranza.estado:
+        raise CambioEstadoInvalido("La cobranza ya está en ese estado.")
+    if datos.estado.value not in TRANSICIONES_ESTADO[cobranza.estado]:
+        raise CambioEstadoInvalido(
+            f"No se puede pasar una cobranza de {cobranza.estado} a {datos.estado.value}."
+        )
+
+    anterior = cobranza.estado
+    ahora = datetime.now(ZONA_ACADEMIA)
+    cobranza.estado = datos.estado.value
+    # El modelo exige causa mientras la cobranza no está acreditada, y es el motivo que muestra el
+    # historial: la justificación del cambio es esa causa. Al acreditar se conserva la anterior.
+    if datos.estado != EstadoCobranza.ACREDITADO:
+        cobranza.causa = datos.justificacion
+    cobranza.estado_cambiado_por = usuario_id
+    cobranza.estado_cambiado_at = ahora
+    session.add(
+        AuditLog(
+            usuario_id=usuario_id,
+            accion="cobranza.estado_cambiado",
+            entidad="cobranza",
+            entidad_id=cobranza.id,
+            detalle=json.dumps(
+                {
+                    "estado_anterior": anterior,
+                    "estado_nuevo": datos.estado.value,
+                    "justificacion": datos.justificacion,
+                    "fecha": ahora.isoformat(),
+                },
+                ensure_ascii=False,
+            ),
+        )
+    )
+
+    try:
+        session.commit()
+    except (IntegrityError, DataError) as error:
+        session.rollback()
+        raise CobranzaInvalida(
+            "No pudimos actualizar el estado de la cobranza."
         ) from error
 
     session.refresh(cobranza)

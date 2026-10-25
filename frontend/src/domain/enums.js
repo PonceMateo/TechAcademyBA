@@ -38,6 +38,24 @@ export const ESTADO_COBRANZA = Object.freeze({
   RECHAZADO: 'RECHAZADO',
 })
 
+/**
+ * Destinos válidos de un cambio de estado de cobranza (HU 21, ampliación).
+ *
+ * Es la misma matriz que valida el backend (`TRANSICIONES_ESTADO`). Vive acá para que el selector
+ * del modal no ofrezca un cambio que la API vaya a rechazar; la API sigue siendo la autoridad.
+ */
+export const TRANSICIONES_ESTADO_COBRANZA = Object.freeze({
+  [ESTADO_COBRANZA.ACREDITADO]: Object.freeze([
+    ESTADO_COBRANZA.OBSERVADO,
+    ESTADO_COBRANZA.RECHAZADO,
+  ]),
+  [ESTADO_COBRANZA.OBSERVADO]: Object.freeze([
+    ESTADO_COBRANZA.ACREDITADO,
+    ESTADO_COBRANZA.RECHAZADO,
+  ]),
+  [ESTADO_COBRANZA.RECHAZADO]: Object.freeze([ESTADO_COBRANZA.ACREDITADO]),
+})
+
 export const MEDIO_PAGO = Object.freeze({
   TRANSFERENCIA: 'TRANSFERENCIA',
   EFECTIVO: 'EFECTIVO',

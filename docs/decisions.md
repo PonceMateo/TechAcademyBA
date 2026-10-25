@@ -1821,3 +1821,46 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`, `backend/app/api/catalogo.py`,
   `frontend/src/domain/horarios.js`, `frontend/src/components/ui/Modal.jsx`,
   `frontend/src/admin/CoursesPage.jsx` y sus tests.
+
+### D55 — La corrección del estado de una cobranza actualiza la fila y se audita en `audit_log` (change `hu-21-editar-estado-cobranza`)
+
+- **Fecha:** 2026-10-25
+- **Autor:** Santiago Torrens
+- **Decisión:** la ampliación de la HU 21 expone `PATCH /cobranzas/{id}/estado` (rol `ADMIN`) con
+  `estado` y `justificacion`. La matriz de transiciones es `ACREDITADO → OBSERVADO | RECHAZADO`,
+  `OBSERVADO → ACREDITADO | RECHAZADO` y `RECHAZADO → ACREDITADO`; las dos primeras permiten
+  corregir un pago acreditado por error. Cualquier otra combinación, incluido el cambio al mismo
+  estado, responde 422; una cobranza inexistente, 404.
+- **Por qué una actualización y no un alta:** el comprobante existe y su importe, titular, fecha e
+  imputación ya están registrados. Crear una cobranza nueva duplicaría el ingreso y la imputación,
+  así que se actualiza la fila original y no se toca nada más que el estado, su causa cuando
+  corresponde y su registro de auditoría.
+- **Causa:** el modelo exige `causa` mientras la cobranza no está acreditada, así que al pasar a
+  `OBSERVADO` o `RECHAZADO` se guarda la justificación como causa, que es el motivo que muestra el
+  historial. Al acreditar se conserva la causa anterior como registro de por qué se había
+  observado, y la tabla deja de mostrarla mientras el estado sea `ACREDITADO`.
+- **Indicadores:** el último pago imputado de la ficha de habilitación se deriva de
+  `GET /cobranzas` filtrando `ACREDITADO`, así que una cobranza observada o rechazada deja de
+  contarse sin cambios de código y queda cubierto por prueba.
+- **Auditoría:** se reutiliza `audit_log`, que ya es de solo agregado e inmutable por trigger, con
+  `accion = "cobranza.estado_cambiado"`, `entidad = "cobranza"`, `entidad_id` y un `detalle` JSON
+  con `estado_anterior`, `estado_nuevo`, `justificacion` y `fecha`. El autor y la fecha quedan
+  además en `cobranza.estado_cambiado_por` y `cobranza.estado_cambiado_at`, columnas que el modelo
+  ya tenía para la HU 24. **No hace falta migración Alembic.** Estado y auditoría se escriben en
+  la misma transacción, con la fila tomada con `FOR UPDATE` para que dos cambios simultáneos no
+  dejen dos entradas.
+- **La causa:** `cobranza.causa` se reemplaza por la justificación cuando el estado nuevo no está
+  acreditado, porque el CHECK del modelo la exige y es el motivo que la fila muestra. Al acreditar
+  no se borra: queda como registro de por qué se había observado, y la tabla no la muestra bajo un
+  badge `ACREDITADO`.
+- **Pantalla:** la columna `ACCIONES` ofrece `Editar estado` en todas las filas y el selector de
+  destino sale de la misma matriz de transiciones, así que solo ofrece cambios que la API acepta.
+  El modal reutiliza el componente compartido, muestra titular, alumno imputado, importe, fecha y
+  estado actual, pide la justificación, confirma antes de enviar y reemplaza la fila con la
+  respuesta del backend. Si el backend falla, el error se muestra en el modal y la fila no cambia.
+- **Dónde:** `backend/app/schemas/cobranzas.py`, `backend/app/services/cobranzas.py`,
+  `backend/app/api/cobranzas.py`, `backend/app/tests/test_cobranzas_estado_api.py`,
+  `frontend/src/domain/enums.js`, `frontend/src/services/dataService.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/admin/PaymentsPage.jsx`, `frontend/src/admin/PaymentsPage.test.jsx`,
+  `frontend/src/admin/AccessPage.test.jsx` y `frontend/src/services/apiDataSource.test.js`.

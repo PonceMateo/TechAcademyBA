@@ -20,6 +20,7 @@ const COLUMNAS = [
   'FACTURA A',
   'IMPORTE',
   'ESTADO GESTIÓN',
+  'ACCIONES',
 ]
 
 const MEDIOS = ['Transferencia', 'Efectivo', 'Cheque', 'Tarjeta', 'Billetera', 'Otro']
@@ -439,5 +440,159 @@ describe('HU 21: el alta real contra la API', () => {
       'Inscripción a imputar',
     )
     expect(filas()).toHaveLength(6)
+  })
+})
+
+describe('edición del estado de una cobranza', () => {
+  /** Abre el modal de la fila de esa fecha y devuelve el diálogo. */
+  async function abrirEdicion(user, fecha) {
+    const fila = filas().find((candidata) => candidata.cells[0].textContent === fecha)
+    await user.click(within(fila).getByRole('button', { name: 'Editar estado' }))
+    return screen.getByRole('dialog', { name: 'Editar estado de la cobranza' })
+  }
+
+  async function completarJustificacion(user) {
+    await user.selectOptions(screen.getByLabelText(/Nuevo estado/), 'ACREDITADO')
+    await user.type(
+      screen.getByLabelText(/Justificación del cambio/),
+      'El banco confirmó la acreditación.',
+    )
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+  }
+
+  it('ofrece Editar estado en todas las filas del historial', () => {
+    const tabla = within(screen.getByRole('table'))
+
+    expect(tabla.getAllByRole('button', { name: 'Editar estado' })).toHaveLength(6)
+  })
+
+  it('ofrece solo los destinos válidos según el estado actual', async () => {
+    const user = userEvent.setup()
+
+    const observada = await abrirEdicion(user, '21/05/2026')
+    expect(
+      within(observada)
+        .getAllByRole('option')
+        .map((opcion) => opcion.textContent),
+    ).toEqual(['Seleccionar…', 'ACREDITADO', 'RECHAZADO'])
+
+    await user.click(within(observada).getByRole('button', { name: 'Cancelar' }))
+
+    const acreditada = await abrirEdicion(user, '10/05/2026')
+    expect(
+      within(acreditada)
+        .getAllByRole('option')
+        .map((opcion) => opcion.textContent),
+    ).toEqual(['Seleccionar…', 'OBSERVADO', 'RECHAZADO'])
+  })
+
+  it('abre un modal con el titular, el alumno imputado, el importe, la fecha y el estado', async () => {
+    const user = userEvent.setup()
+
+    const dialogo = await abrirEdicion(user, '16/05/2026')
+
+    expect(within(dialogo).getByText('Banco Federal')).toBeInTheDocument()
+    expect(within(dialogo).getByText('Sin imputar')).toBeInTheDocument()
+    expect(within(dialogo).getByText('$390.000')).toBeInTheDocument()
+    expect(within(dialogo).getByText('16/05/2026')).toBeInTheDocument()
+    expect(within(dialogo).getAllByText('OBSERVADO').length).toBeGreaterThan(0)
+  })
+
+  it('exige la justificación y pide confirmación antes de guardar', async () => {
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user, '21/05/2026')
+    const continuar = within(dialogo).getByRole('button', { name: 'Continuar' })
+
+    expect(continuar).toBeDisabled()
+
+    await user.selectOptions(screen.getByLabelText(/Nuevo estado/), 'ACREDITADO')
+    expect(continuar).toBeDisabled()
+
+    await user.type(screen.getByLabelText(/Justificación del cambio/), 'Se acreditó el cheque.')
+    expect(continuar).toBeEnabled()
+
+    await user.click(continuar)
+
+    expect(within(dialogo).getByText(/Vas a pasar la cobranza de/)).toBeInTheDocument()
+    expect(within(dialogo).getByText('Se acreditó el cheque.')).toBeInTheDocument()
+
+    const sinCambios = filas().find((fila) => fila.cells[0].textContent === '21/05/2026')
+    expect(sinCambios.cells[6]).toHaveTextContent('OBSERVADO')
+  })
+
+  it('actualiza la fila del historial con la respuesta del backend', async () => {
+    const user = userEvent.setup()
+
+    await abrirEdicion(user, '16/05/2026')
+    await completarJustificacion(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar y guardar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const actualizada = filas().find((fila) => fila.cells[0].textContent === '16/05/2026')
+    expect(actualizada.cells[6]).toHaveTextContent('ACREDITADO')
+    expect(within(actualizada).getByRole('button', { name: 'Editar estado' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Se acreditó la cobranza del 16/05/2026.')
+  })
+
+  it('corrige una cobranza acreditada por error y muestra la causa del rechazo', async () => {
+    const user = userEvent.setup()
+
+    await abrirEdicion(user, '10/05/2026')
+    await user.selectOptions(screen.getByLabelText(/Nuevo estado/), 'RECHAZADO')
+    await user.type(
+      screen.getByLabelText(/Justificación del cambio/),
+      'El banco devolvió la transferencia.',
+    )
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar y guardar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const actualizada = filas().find((fila) => fila.cells[0].textContent === '10/05/2026')
+    expect(actualizada.cells[6]).toHaveTextContent('RECHAZADO')
+    expect(actualizada.cells[6]).toHaveTextContent('El banco devolvió la transferencia.')
+
+    cleanup()
+    renderAppAs('ADMIN', '/admin/cobranzas')
+    await screen.findByText('10/05/2026')
+
+    const recargada = filas().find((fila) => fila.cells[0].textContent === '10/05/2026')
+    expect(recargada.cells[6]).toHaveTextContent('RECHAZADO')
+  })
+
+  it('conserva el estado nuevo después de recargar la pantalla', async () => {
+    const user = userEvent.setup()
+
+    await abrirEdicion(user, '21/05/2026')
+    await completarJustificacion(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar y guardar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    cleanup()
+    renderAppAs('ADMIN', '/admin/cobranzas')
+    await screen.findByText('10/05/2026')
+
+    const recargada = filas().find((fila) => fila.cells[0].textContent === '21/05/2026')
+    expect(recargada.cells[6]).toHaveTextContent('ACREDITADO')
+  })
+
+  it('muestra el error del backend y no cambia la fila', async () => {
+    stubDataSource({
+      actualizarEstadoCobranza: async () => {
+        throw new Error('La cobranza ya está acreditada.')
+      },
+    })
+    const user = userEvent.setup()
+
+    await abrirEdicion(user, '19/05/2026')
+    await completarJustificacion(user)
+    await user.click(screen.getByRole('button', { name: 'Confirmar y guardar' }))
+
+    expect(await screen.findByText('La cobranza ya está acreditada.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    const sinCambios = filas().find((fila) => fila.cells[0].textContent === '19/05/2026')
+    expect(sinCambios.cells[6]).toHaveTextContent('OBSERVADO')
   })
 })

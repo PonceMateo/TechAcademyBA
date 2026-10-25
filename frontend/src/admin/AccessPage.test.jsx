@@ -231,3 +231,52 @@ describe('consulta sin endpoint', () => {
     expect(screen.getByText(/Todavía no consultaste a nadie/)).toBeInTheDocument()
   })
 })
+
+describe('último pago imputado', () => {
+  it('no cuenta como acreditado un pago observado o rechazado', async () => {
+    stubDataSource({
+      listarCobranzas: async () => [
+        {
+          id: 9,
+          fecha: '2026-06-01',
+          importe: 45000,
+          estado: 'OBSERVADO',
+          imputacion: { nombre: 'Agustina Benítez' },
+        },
+      ],
+    })
+    const user = userEvent.setup()
+
+    await consultar(user, '41.332.114')
+    await screen.findByText('Agustina Benítez')
+
+    expect(await screen.findByText('Sin pagos acreditados')).toBeInTheDocument()
+  })
+
+  it('muestra el pago acreditado más reciente y saltea los que no lo están', async () => {
+    stubDataSource({
+      listarCobranzas: async () => [
+        {
+          id: 9,
+          fecha: '2026-06-01',
+          importe: 45000,
+          estado: 'RECHAZADO',
+          imputacion: { nombre: 'Agustina Benítez' },
+        },
+        {
+          id: 8,
+          fecha: '2026-05-10',
+          importe: 31000,
+          estado: 'ACREDITADO',
+          imputacion: { nombre: 'Agustina Benítez' },
+        },
+      ],
+    })
+    const user = userEvent.setup()
+
+    await consultar(user, '41.332.114')
+    await screen.findByText('Agustina Benítez')
+
+    expect(await screen.findByText('10/05/2026 · $31.000')).toBeInTheDocument()
+  })
+})
