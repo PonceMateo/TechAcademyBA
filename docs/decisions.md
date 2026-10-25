@@ -1864,3 +1864,29 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`,
   `frontend/src/admin/PaymentsPage.jsx`, `frontend/src/admin/PaymentsPage.test.jsx`,
   `frontend/src/admin/AccessPage.test.jsx` y `frontend/src/services/apiDataSource.test.js`.
+
+### D56 — Las migraciones de producción se aplican solas, con expand/contract
+
+- **Fecha:** 2026-10-25
+- **Autor:** Mateo Ponce
+- **Decisión:** el job `migrations` de `.github/workflows/ci.yml` corre `alembic upgrade head`
+  contra Supabase producción en cada push a `main`, después de que pasen `backend` y `frontend`.
+  Usa el environment `db-migrations`, restringido a `main` y con revisores obligatorios, así que
+  cada corrida espera aprobación manual antes de tocar la base. Antes se aplicaban a mano y la
+  base quedó atrás (`0004` se mergeó sin aplicar), que es exactamente el fallo que esto evita.
+- **Por qué un job y no la integración de Supabase:** Supabase solo aplica su propio formato
+  `supabase/migrations/*.sql`; Alembic es Python y `0005` lee filas para convertir textos, así
+  que no se puede emitir como SQL estático.
+- **Expand/contract, no negociable:** toda migración nueva agrega primero (columna nula o con
+  default, tabla, índice); el código deja de usar lo viejo en un deploy posterior; lo viejo se
+  borra recién cuando nada lo lee. Vercel deploya en paralelo al workflow, así que el esquema
+  nuevo tiene que servir al backend viejo y al nuevo durante esa ventana.
+- **Salvaguardas:** el job depende de las dos suites; `concurrency` deja de cancelar runs en
+  `main` para no interrumpir una migración; el environment `db-migrations` exige aprobación
+  manual; la URL vive en el secret `SUPABASE_DATABASE_URL` de ese environment (driver
+  `postgresql+psycopg://`, pooler de sesión en el puerto 5432). Un fallo del job deja el run en
+  rojo.
+- **Límite:** nada impide mergear una migración destructiva. La regla es de revisión, y el
+  environment con revisores es la única barrera automática disponible. El respaldo de la base
+  sigue siendo el límite real del rollback.
+- **Dónde:** `.github/workflows/ci.yml`, `README.md`, `AGENTS.md`.

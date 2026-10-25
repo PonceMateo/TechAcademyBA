@@ -219,12 +219,34 @@ esos dos tipos de restricción están escritos a mano en el archivo de migració
 
 ## Despliegue
 
-La migración `0002_altas_catalogo` cambia el esquema y **elimina columnas**
-(`curso.codigo_norm`, `comision.codigo`), así que el orden de los pasos importa. Antes de tocar
-un entorno con datos, hacé un respaldo de la base: **el respaldo es el límite real del
-rollback.**
+### Migraciones automáticas en producción (D56)
 
-En este orden, y en este orden:
+El job `migrations` de `.github/workflows/ci.yml` aplica `alembic upgrade head` contra Supabase
+en cada push a `main`, después de que pasen las dos suites. El job usa el environment
+`db-migrations`, restringido a `main` y con revisores obligatorios: cada corrida queda esperando
+aprobación manual antes de migrar. Es idempotente: sin migraciones pendientes no hace nada, y
+también detecta una base que quedó atrás.
+
+Configuración, una sola vez:
+
+- Secret `SUPABASE_DATABASE_URL` cargado en el environment `db-migrations`, con el driver
+  `postgresql+psycopg://` y el pooler de sesión de Supabase (puerto 5432). Nunca en el repo.
+- Environment `db-migrations`: restringido a `main` y con revisores obligatorios.
+
+**Regla expand/contract.** Vercel deploya en paralelo al workflow, así que una migración nueva
+tiene que ser compatible con el backend viejo y el nuevo:
+
+1. agregar (columna nula o con default, tabla, índice) en el mismo deploy;
+2. cambiar el código para dejar de usar lo viejo en un deploy posterior;
+3. borrar o renombrar lo viejo recién cuando nada lo lee.
+
+Una migración que borra o renombra en el mismo deploy que cambia el código que la usa rompe
+producción durante la ventana de deploy y no se mergea.
+
+La migración `0002_altas_catalogo` es el ejemplo histórico de por qué importa el orden: cambia
+el esquema y **elimina columnas** (`curso.codigo_norm`, `comision.codigo`). Antes de D56 se
+aplicaba a mano, en este orden, y antes de tocar un entorno con datos había que hacer un
+respaldo: **el respaldo es el límite real del rollback.**
 
 1. **Aplicar la migración**: `alembic upgrade head`.
 2. **Desplegar o reiniciar el backend nuevo.**

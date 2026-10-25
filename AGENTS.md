@@ -126,8 +126,10 @@ todos sus criterios y queda `Done`. El PR pide el issue o `ninguno, cambio menor
 ## Migraciones
 
 Si la rama toca `backend/alembic/`, avisale al usuario antes de pushear a
-`main`: el deploy de Vercel no corre `alembic upgrade head`; la migración de
-Supabase en producción se aplica a mano.
+`main`: el job `migrations` de CI aplica `alembic upgrade head` en Supabase
+producción después de que pasen las suites y de que se apruebe el environment
+`db-migrations` (D56). Toda migración nueva debe ser expand/contract: nunca
+borres o renombres en el mismo deploy que cambia el código que lo usa.
 
 ## Decisiones
 
