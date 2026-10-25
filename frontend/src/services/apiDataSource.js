@@ -317,6 +317,13 @@ export function createApiDataSource() {
       return normalizarCobranza(await request(PATHS.cobranzas, { method: 'POST', body: datos }))
     },
 
+    /** Acredita una cobranza observada o rechazada sin crear otro cobro (HU 21). */
+    async actualizarEstadoCobranza(id, datos) {
+      return normalizarCobranza(
+        await request(`${PATHS.cobranzas}/${id}/estado`, { method: 'PATCH', body: datos }),
+      )
+    },
+
     async forzarBloqueoManual({ alumnoId, motivo, usuario, fechaOperacion }) {
       return request(`${PATHS.override}/${alumnoId}`, {
         method: 'POST',

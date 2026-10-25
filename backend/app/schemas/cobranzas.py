@@ -71,6 +71,20 @@ class CobranzaCreate(BaseModel):
         return self
 
 
+class CobranzaEstadoUpdate(BaseModel):
+    """Cuerpo de `PATCH /cobranzas/{id}/estado` (HU 21, ampliación).
+
+    El estado nuevo no se restringe acá porque la validez depende del estado actual de la
+    cobranza: la matriz de transiciones se valida en el servicio. La justificación es obligatoria
+    porque el cambio de estado es una corrección de un dato ya registrado.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    estado: EstadoCobranza
+    justificacion: str = Field(min_length=1, max_length=500)
+
+
 class PagadorCobranzaOut(BaseModel):
     """Titular del comprobante tal como quedó guardado."""
 

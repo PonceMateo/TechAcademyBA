@@ -394,4 +394,35 @@ describe('cobranzas manuales (HU 21)', () => {
       'El alumno no existe.',
     )
   })
+
+  it('hace PATCH a /cobranzas/{id}/estado con el estado y la justificación', async () => {
+    const fetchMock = responder(200, {
+      id: 7,
+      estado: 'ACREDITADO',
+      pagador: { id: 1, nombre: 'Banco Federal' },
+      imputacion: null,
+    })
+    const CAMBIO = {
+      estado: 'ACREDITADO',
+      justificacion: 'El banco confirmó la acreditación del cheque.',
+    }
+
+    const actualizada = await createApiDataSource().actualizarEstadoCobranza(7, CAMBIO)
+
+    expect(actualizada).toMatchObject({ id: 7, estado: 'ACREDITADO' })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/cobranzas\/7\/estado$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PATCH')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual(CAMBIO)
+  })
+
+  it('propaga el motivo cuando el cambio de estado es rechazado', async () => {
+    responder(422, { detail: 'La cobranza ya está acreditada.' })
+
+    await expect(
+      createApiDataSource().actualizarEstadoCobranza(7, {
+        estado: 'ACREDITADO',
+        justificacion: 'El banco confirmó la acreditación del cheque.',
+      }),
+    ).rejects.toThrow(/ya está acreditada/)
+  })
 })

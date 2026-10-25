@@ -11,7 +11,7 @@ import {
   LINKS_DE_CLASE,
   SEDES,
 } from '../mocks'
-import { TIPO_FACTURA } from '../domain/enums'
+import { ESTADO_COBRANZA, TIPO_FACTURA, TRANSICIONES_ESTADO_COBRANZA } from '../domain/enums'
 import { textoHorarios } from '../domain/horarios'
 import {
   normalizeCode,
@@ -892,6 +892,29 @@ export function createMockDataSource() {
         _ejemplo: true,
       }
       store.cobranzas.unshift(cobranza)
+      return { ...cobranza }
+    },
+
+    /**
+     * Cambio de estado de una cobranza registrada (ampliación de la HU 21). Solo se permiten las
+     * transiciones del dominio y se modifica la fila existente: el ejemplo no agrega un cobro ni
+     * una imputación.
+     */
+    async actualizarEstadoCobranza(id, datos) {
+      const cobranza = store.cobranzas.find((fila) => fila.id === Number(id))
+      if (cobranza === undefined) {
+        throw new Error('La cobranza no existe.')
+      }
+      if (datos.estado === cobranza.estado) {
+        throw new Error('La cobranza ya está en ese estado.')
+      }
+      if (!TRANSICIONES_ESTADO_COBRANZA[cobranza.estado].includes(datos.estado)) {
+        throw new Error(`No se puede pasar una cobranza de ${cobranza.estado} a ${datos.estado}.`)
+      }
+      cobranza.estado = datos.estado
+      if (datos.estado !== ESTADO_COBRANZA.ACREDITADO) {
+        cobranza.causa = datos.justificacion
+      }
       return { ...cobranza }
     },
 

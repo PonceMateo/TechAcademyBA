@@ -192,6 +192,11 @@ export function registrarCobranza(datos) {
   return getDataSource().registrarCobranza(datos)
 }
 
+/** Acredita una cobranza observada o rechazada (ampliación de la HU 21). */
+export function actualizarEstadoCobranza(id, datos) {
+  return getDataSource().actualizarEstadoCobranza(id, datos)
+}
+
 export function forzarBloqueoManual(datos) {
   return getDataSource().forzarBloqueoManual(datos)
 }

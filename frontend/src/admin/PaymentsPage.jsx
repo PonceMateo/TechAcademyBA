@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Button, Campo, Card, Input, Table } from '../components/ui'
+import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { ESTADO_COBRANZA, MEDIO_PAGO_LABELS, TIPO_FACTURA } from '../domain/enums'
+import {
+  ESTADO_COBRANZA,
+  MEDIO_PAGO_LABELS,
+  TIPO_FACTURA,
+  TRANSICIONES_ESTADO_COBRANZA,
+} from '../domain/enums'
 import { normalizeDocumento, normalizeWords } from '../domain/normalize'
 import {
+  actualizarEstadoCobranza,
   listarAlumnos,
   listarCobranzas,
   listarInscripcionesDeAlumno,
@@ -32,6 +38,11 @@ import { formatFechaCorta, formatMoneda } from '../utils/formato'
  * **Hu 21:** el botón habla con `POST /cobranzas` y el historial con `GET /cobranzas`. Si el
  * backend rechaza el alta, la pantalla lo dice y no confirma nada: una fila de mentira sería peor
  * que un error visible.
+ *
+ * **Edición del estado:** cualquier cobranza se corrige desde la columna `ACCIONES`, con un modal
+ * que muestra los datos del cobro, ofrece solo los destinos válidos, pide la justificación y
+ * confirma antes de guardar. Se actualiza la fila, no se crea otro cobro: el pago y su imputación
+ * ya existen.
  */
 
 const ESTADOS_GESTION = new Map([
@@ -77,13 +88,23 @@ const COLUMNAS = [
     render: (fila) => (
       <span className="inline-flex flex-col items-start gap-1">
         <Badge tono={ESTADOS_GESTION.get(fila.estado)?.tono ?? TONO.GRIS}>{fila.estado}</Badge>
-        {fila.causa !== null && fila.causa !== '' && (
+        {fila.estado !== ESTADO_COBRANZA.ACREDITADO && fila.causa !== null && fila.causa !== '' && (
           <span className="text-xs text-amber-800">{fila.causa}</span>
         )}
       </span>
     ),
   },
 ]
+
+/** Un dato de solo lectura del modal de edición: rótulo arriba, valor abajo. */
+function Dato({ etiqueta, valor }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">{etiqueta}</dt>
+      <dd className="text-slate-900">{valor}</dd>
+    </div>
+  )
+}
 
 const FORMULARIO_VACIO = {
   fecha: '',
@@ -161,6 +182,12 @@ export function PaymentsPage() {
   const [aviso, setAviso] = useState(null)
   const [errorApi, setErrorApi] = useState(null)
   const [enviando, setEnviando] = useState(false)
+  const [cobranzaEnEdicion, setCobranzaEnEdicion] = useState(null)
+  const [estadoNuevo, setEstadoNuevo] = useState('')
+  const [justificacion, setJustificacion] = useState('')
+  const [confirmandoCambio, setConfirmandoCambio] = useState(false)
+  const [errorEstado, setErrorEstado] = useState(null)
+  const [guardandoEstado, setGuardandoEstado] = useState(false)
   const inputAlumnoRef = useRef(null)
   const volverAlBuscador = useRef(false)
 
@@ -365,6 +392,61 @@ export function PaymentsPage() {
     formulario.facturaA &&
     formulario.cuitFactura.trim() !== '' &&
     !cuitValido(formulario.cuitFactura)
+
+  /** Toda cobranza se puede corregir: los destinos válidos dependen del estado actual. */
+  const columnas = [
+    ...COLUMNAS,
+    {
+      clave: 'acciones',
+      titulo: 'ACCIONES',
+      render: (fila) => (
+        <Button variante="secundario" tamano="chico" onClick={() => abrirEdicionDeEstado(fila)}>
+          Editar estado
+        </Button>
+      ),
+    },
+  ]
+
+  function abrirEdicionDeEstado(fila) {
+    setCobranzaEnEdicion(fila)
+    setEstadoNuevo('')
+    setJustificacion('')
+    setConfirmandoCambio(false)
+    setErrorEstado(null)
+  }
+
+  function cerrarEdicionDeEstado() {
+    if (guardandoEstado) {
+      return
+    }
+    setCobranzaEnEdicion(null)
+    setErrorEstado(null)
+  }
+
+  /**
+   * Guarda el cambio y reemplaza la fila con la respuesta del backend. No se recarga el historial:
+   * la respuesta ya trae la cobranza actualizada, y si falla no se toca la tabla.
+   */
+  async function guardarCambioDeEstado() {
+    setGuardandoEstado(true)
+    setErrorEstado(null)
+
+    try {
+      const actualizada = await actualizarEstadoCobranza(cobranzaEnEdicion.id, {
+        estado: estadoNuevo,
+        justificacion: justificacion.trim(),
+      })
+      setCobranzas((anteriores) =>
+        anteriores.map((fila) => (fila.id === actualizada.id ? actualizada : fila)),
+      )
+      setAviso(`Se acreditó la cobranza del ${formatFechaCorta(actualizada.fecha)}.`)
+      setCobranzaEnEdicion(null)
+    } catch (error) {
+      setErrorEstado(error?.message ?? 'No pudimos actualizar el estado de la cobranza.')
+    } finally {
+      setGuardandoEstado(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -624,8 +706,103 @@ export function PaymentsPage() {
             placeholder="Nombre del titular…"
           />
         </div>
-        <Table columnas={COLUMNAS} filas={cobranzasVisibles} />
+        <Table columnas={columnas} filas={cobranzasVisibles} />
       </Card>
+
+      <Modal
+        abierto={cobranzaEnEdicion !== null}
+        titulo="Editar estado de la cobranza"
+        onClose={cerrarEdicionDeEstado}
+        pie={
+          cobranzaEnEdicion === null ? null : confirmandoCambio ? (
+            <>
+              <Button
+                variante="secundario"
+                onClick={() => setConfirmandoCambio(false)}
+                disabled={guardandoEstado}
+              >
+                Volver
+              </Button>
+              <Button onClick={guardarCambioDeEstado} disabled={guardandoEstado}>
+                {guardandoEstado ? 'Guardando…' : 'Confirmar y guardar'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variante="secundario" onClick={cerrarEdicionDeEstado}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => setConfirmandoCambio(true)}
+                disabled={estadoNuevo === '' || justificacion.trim() === ''}
+              >
+                Continuar
+              </Button>
+            </>
+          )
+        }
+      >
+        {cobranzaEnEdicion !== null && (
+          <div className="space-y-4">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <Dato etiqueta="Titular del pago" valor={cobranzaEnEdicion.pagador.nombre} />
+              <Dato
+                etiqueta="Alumno imputado"
+                valor={cobranzaEnEdicion.imputacion?.nombre ?? 'Sin imputar'}
+              />
+              <Dato etiqueta="Importe" valor={formatMoneda(cobranzaEnEdicion.importe)} />
+              <Dato etiqueta="Fecha" valor={formatFechaCorta(cobranzaEnEdicion.fecha)} />
+              <Dato etiqueta="Estado actual" valor={cobranzaEnEdicion.estado} />
+            </dl>
+
+            {confirmandoCambio ? (
+              <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <p>
+                  Vas a pasar la cobranza de <strong>{cobranzaEnEdicion.estado}</strong> a{' '}
+                  <strong>{estadoNuevo}</strong>.
+                </p>
+                <p className="mt-2">
+                  <span className="font-medium">Justificación:</span> {justificacion.trim()}
+                </p>
+              </div>
+            ) : (
+              <>
+                <Campo id="estado-nuevo" etiqueta="Nuevo estado" obligatorio>
+                  <select
+                    id="estado-nuevo"
+                    value={estadoNuevo}
+                    onChange={(evento) => setEstadoNuevo(evento.target.value)}
+                  >
+                    <option value="">Seleccionar…</option>
+                    {TRANSICIONES_ESTADO_COBRANZA[cobranzaEnEdicion.estado].map((destino) => (
+                      <option key={destino} value={destino}>
+                        {destino}
+                      </option>
+                    ))}
+                  </select>
+                </Campo>
+
+                <Campo id="justificacion" etiqueta="Justificación del cambio" obligatorio>
+                  <textarea
+                    id="justificacion"
+                    rows={3}
+                    value={justificacion}
+                    onChange={(evento) => setJustificacion(evento.target.value)}
+                    placeholder="Por qué se acredita el comprobante…"
+                    className="foco-acento w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+                  />
+                </Campo>
+              </>
+            )}
+
+            {errorEstado !== null && (
+              <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorEstado}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Card titulo="Acreditamiento Automático de Pagos">
         {/* Fuera del alcance mínimo: se muestra el hueco, sin pantalla detrás (D20). */}

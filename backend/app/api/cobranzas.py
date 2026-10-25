@@ -16,7 +16,7 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
-from app.schemas.cobranzas import CobranzaCreate, CobranzaOut
+from app.schemas.cobranzas import CobranzaCreate, CobranzaEstadoUpdate, CobranzaOut
 from app.services import cobranzas
 
 router = APIRouter(prefix="/cobranzas", tags=["cobranzas"])
@@ -71,6 +71,33 @@ def registrar_cobranza(
         cobranzas.InscripcionAmbigua,
         cobranzas.CobranzaInvalida,
     ) as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+    return CobranzaOut.model_validate(cobranzas.serializar_cobranza(cobranza))
+
+
+@router.patch(
+    "/{cobranza_id}/estado",
+    response_model=CobranzaOut,
+    summary="Cambiar el estado de una cobranza",
+)
+def cambiar_estado_cobranza(
+    cobranza_id: int,
+    cuerpo: CobranzaEstadoUpdate,
+    session: Annotated[Session, Depends(get_db)],
+    admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> CobranzaOut:
+    """Cambia el estado de la cobranza sin crear otro cobro.
+
+    200 con la cobranza actualizada. 404 si no existe; 422 si la transición no está permitida, si
+    el estado nuevo es el mismo o si falta la justificación. El importe, el titular, la fecha y la
+    imputación quedan como estaban, y el cambio queda auditado en `audit_log`.
+    """
+    try:
+        cobranza = cobranzas.cambiar_estado_cobranza(session, cobranza_id, cuerpo, admin.id)
+    except cobranzas.CobranzaNoEncontrada as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except (cobranzas.CambioEstadoInvalido, cobranzas.CobranzaInvalida) as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
 
     return CobranzaOut.model_validate(cobranzas.serializar_cobranza(cobranza))
