@@ -23,10 +23,11 @@ on:
   pull_request:
 
 # Un push nuevo deja obsoleto el run anterior de la misma rama. Cancelarlo ahorra minutos
-# sin perder información: el run cancelado queda en el historial con su estado.
+# sin perder información. En `main` no se cancela: interrumpir `alembic upgrade head`
+# dejaría la base migrada a medias.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   backend:
@@ -123,3 +124,45 @@ jobs:
 
       - name: Build de producción
         run: npm run build
+
+  migrations:
+    name: Migraciones (Supabase producción)
+    runs-on: ubuntu-latest
+    # D56: se aplica al integrar en `main` y solo si las dos suites pasaron.
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Restringido a `main` y con revisores obligatorios: cada corrida espera aprobación manual.
+    environment: db-migrations
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Falla con un mensaje claro en vez de un error de conexión de SQLAlchemy.
+      - name: Verificar el secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Falta el secret SUPABASE_DATABASE_URL"
+            exit 1
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+
+      - name: Instalar dependencias
+        run: pip install -e .
+
+      # Idempotente: sin migraciones pendientes no hace nada. Corre en cada push a `main` a
+      # propósito, para detectar también una base que quedó atrás.
+      - name: Aplicar migraciones
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          # `app.core.config` no arranca sin secreto de firma; migrar no firma nada.
+          JWT_SECRET_KEY: migraciones-automaticas-no-es-un-secreto-real
