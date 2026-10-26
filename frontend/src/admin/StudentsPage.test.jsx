@@ -17,6 +17,7 @@ const COLUMNAS_ALUMNOS = [
   'DNI',
   'NOMBRE',
   'EMAIL',
+  'TELÉFONO',
   'COMISIÓN ASIGNADA',
   'CATEGORÍA ARANCELARIA',
   'ACCESO PLATAFORMA',
@@ -122,22 +123,22 @@ describe('padrón de alumnos', () => {
   })
 
   it('muestra la categoría con su color', () => {
-    expect(filaDe('Juan Ignacio Pérez').cells[4].textContent).toContain('PARTICULAR')
-    expect(filaDe('Juan Ignacio Pérez').cells[4].querySelector('.text-slate-700')).not.toBeNull()
-    expect(filaDe('Agustina Benítez').cells[4].textContent).toContain('BECADO PARCIAL')
-    expect(filaDe('Agustina Benítez').cells[4].querySelector('.text-violet-800')).not.toBeNull()
+    expect(filaDe('Juan Ignacio Pérez').cells[5].textContent).toContain('PARTICULAR')
+    expect(filaDe('Juan Ignacio Pérez').cells[5].querySelector('.text-slate-700')).not.toBeNull()
+    expect(filaDe('Agustina Benítez').cells[5].textContent).toContain('BECADO PARCIAL')
+    expect(filaDe('Agustina Benítez').cells[5].querySelector('.text-violet-800')).not.toBeNull()
   })
 
   it('muestra el porcentaje de descuento del becado parcial', () => {
-    expect(filaDe('Camila Rodríguez').cells[4]).toHaveTextContent('50% de descuento')
-    expect(filaDe('Agustina Benítez').cells[4]).toHaveTextContent('50% de descuento')
+    expect(filaDe('Camila Rodríguez').cells[5]).toHaveTextContent('50% de descuento')
+    expect(filaDe('Agustina Benítez').cells[5]).toHaveTextContent('50% de descuento')
   })
 
   it('deja las categorías con colores distintos entre sí', () => {
     // BECADO TOTAL y CORPORATIVO son del enum y del spec, pero el padrón del maquetado no tiene
     // filas de esas dos. Lo verificable acá es que las dos que aparecen no comparten color.
     const colorDe = (nombre) => {
-      const insignia = filaDe(nombre).cells[4].querySelector('[data-ui="badge"]')
+      const insignia = filaDe(nombre).cells[5].querySelector('[data-ui="badge"]')
       return insignia.className
     }
 
@@ -174,8 +175,8 @@ describe('padrón de alumnos', () => {
       expect(bloqueo.className).toContain('text-red-800')
     }
 
-    expect(filaDe('Agustina Benítez').cells[5]).toHaveTextContent('comprobante ilegible')
-    expect(filaDe('Valeria Rossi').cells[5]).toHaveTextContent('debe saldo')
+    expect(filaDe('Agustina Benítez').cells[6]).toHaveTextContent('comprobante ilegible')
+    expect(filaDe('Valeria Rossi').cells[6]).toHaveTextContent('debe saldo')
   })
 
   it('informa que la búsqueda no arrojó resultados', async () => {
@@ -219,9 +220,37 @@ describe('padrón de alumnos', () => {
     await screen.findByText('Nuevo Alumno')
 
     const fila = filaDe('Nuevo Alumno')
-    expect(fila.cells[3]).toHaveTextContent('Sin comisión')
-    expect(fila.cells[4]).toHaveTextContent('—')
+    expect(fila.cells[3]).toHaveTextContent('—')
+    expect(fila.cells[4]).toHaveTextContent('Sin comisión')
     expect(fila.cells[5]).toHaveTextContent('—')
+    expect(fila.cells[6]).toHaveTextContent('—')
+  })
+
+  it('muestra el teléfono del alumno en formato nacional', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 10,
+          nombre: 'Alumna Con Teléfono',
+          documento: '30.111.223',
+          tipo_documento: 'DNI',
+          email: 'con.telefono@techacademy.invalid',
+          telefono: '+5491140000005',
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ],
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+
+    await screen.findByText('Alumna Con Teléfono')
+
+    // El padrón guarda E.164; la tabla muestra el número como lo lee la secretaría.
+    expect(filaDe('Alumna Con Teléfono').cells[3]).toHaveTextContent('011 15-4000-0005')
   })
 })
 

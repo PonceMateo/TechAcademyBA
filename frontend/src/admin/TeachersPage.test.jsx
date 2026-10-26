@@ -121,7 +121,7 @@ describe('listado de docentes', () => {
     const correo = 'profe.martin@techacademy.invalid'
 
     expect(screen.getByText(correo)).toBeInTheDocument()
-    expect(screen.getByText('+54 11 4455-1020')).toBeInTheDocument()
+    expect(screen.getByText('011 4455-1020')).toBeInTheDocument()
   })
 
   it('ofrece Editar y Restablecer contraseña en cada fila (historia #11)', () => {
@@ -535,7 +535,7 @@ describe('edición de docente (historia #11)', () => {
       expect(screen.queryByRole('dialog', { name: 'Editar Docente' })).not.toBeInTheDocument(),
     )
     expect(await screen.findByText('Docente Profe Martín actualizado.')).toBeInTheDocument()
-    expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('+5491199990000')
+    expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('011 15-9999-0000')
     // La edición no vuelve a resolver las comisiones: la fila que ya estaba en pantalla las
     // conserva (D52).
     expect(filaDelDocente('Profe Martín').cells[6].textContent).toBe('CUR-101 · Python Inicial')

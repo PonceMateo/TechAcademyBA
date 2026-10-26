@@ -10,6 +10,7 @@ import {
   StatusIndicator,
   Table,
 } from '../components/ui'
+import { formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
 import { dniConForma, emailConForma } from '../domain/validacion'
@@ -99,6 +100,11 @@ const COLUMNAS_ALUMNOS = [
     render: (fila) => <span className="font-medium">{fila.nombre}</span>,
   },
   { clave: 'email', titulo: 'EMAIL', render: (fila) => fila.email },
+  {
+    clave: 'telefono',
+    titulo: 'TELÉFONO',
+    render: (fila) => (fila.telefono ? formatTelefono(fila.telefono) : SIN_DATO),
+  },
   {
     clave: 'comision',
     titulo: 'COMISIÓN ASIGNADA',

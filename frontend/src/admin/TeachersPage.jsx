@@ -17,6 +17,7 @@ import {
   editarDocente,
   restablecerPasswordDocente,
 } from '../services/dataService'
+import { formatTelefono } from '../utils/formato'
 
 /**
  * Padrón de docentes (9.4).
@@ -66,7 +67,11 @@ const COLUMNAS = [
     render: (fila) => (fila.cuil ? formatearCuil(fila.cuil) : '—'),
   },
   { clave: 'email', titulo: 'EMAIL', render: (fila) => fila.email },
-  { clave: 'telefono', titulo: 'TELÉFONO', render: (fila) => fila.telefono ?? '—' },
+  {
+    clave: 'telefono',
+    titulo: 'TELÉFONO',
+    render: (fila) => (fila.telefono ? formatTelefono(fila.telefono) : '—'),
+  },
   { clave: 'catedra', titulo: 'CÁTEDRA O ESPECIALIDAD', render: (fila) => fila.catedra ?? '—' },
   {
     clave: 'comisiones',
