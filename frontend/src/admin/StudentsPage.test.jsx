@@ -29,7 +29,7 @@ const ALTA = {
   documento: '30.111.222',
   nombre: 'Rocío Álvarez',
   email: 'rocio.alvarez@techacademy.invalid',
-  telefono: '011 4000-0005',
+  telefono: '+5491140000005',
 }
 
 /** La contraseña inicial que genera el alta: `<primer nombre><DNI>` (D45). */
@@ -80,7 +80,10 @@ async function completarAlta(user, datos = ALTA) {
   await user.type(screen.getByLabelText(/^DNI/), datos.documento)
   await user.type(screen.getByLabelText(/^Nombre/), datos.nombre)
   await user.type(screen.getByLabelText(/^Email/), datos.email)
-  await user.type(screen.getByLabelText(/^Teléfono/), datos.telefono)
+  // El control de teléfono reacomoda el cursor mientras se escribe: se pega el número entero, que
+  // es además lo que entrega el selector de país (D57).
+  await user.click(screen.getByLabelText(/^Teléfono/))
+  await user.paste(datos.telefono)
 }
 
 describe('padrón de alumnos', () => {
@@ -268,6 +271,26 @@ describe('alta de alumno', () => {
     expect(crearAlumno).not.toHaveBeenCalled()
   })
 
+  it('manda el DNI como se escribió y el teléfono en E.164', async () => {
+    const crearAlumno = vi.fn(async (datos) => filaCreada(datos))
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    await waitFor(() => expect(crearAlumno).toHaveBeenCalledTimes(1))
+    expect(crearAlumno.mock.calls[0][0]).toEqual({
+      documento: '30.111.222',
+      nombre: 'Rocío Álvarez',
+      email: 'rocio.alvarez@techacademy.invalid',
+      telefono: '+5491140000005',
+    })
+  })
+
   it('da de alta, cierra el formulario, incorpora la fila y muestra las credenciales en un modal', async () => {
     const crearAlumno = vi.fn(async (datos) => filaCreada(datos))
     cleanup()
@@ -363,6 +386,44 @@ describe('edición y baja de alumnos', () => {
       telefono: null,
     })
     expect(screen.queryByRole('dialog', { name: 'Editar Alumno' })).not.toBeInTheDocument()
+  })
+
+  it('rechaza un teléfono legacy que no se puede interpretar', async () => {
+    const editarAlumno = vi.fn()
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: vi.fn(async () => [
+        {
+          id: 5,
+          nombre: 'Alumno Legacy',
+          documento: '30.111.222',
+          tipo_documento: 'DNI',
+          email: 'legacy@techacademy.invalid',
+          telefono: 'particular',
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ]),
+      editarAlumno,
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Alumno Legacy')
+    const user = userEvent.setup()
+
+    await user.click(within(filaDe('Alumno Legacy')).getByRole('button', { name: 'Editar' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Editar Alumno' })
+
+    // El valor crudo se conserva y no hay aviso al cargar; el rechazo aparece al guardar (D57).
+    expect(within(dialogo).getByLabelText(/^Teléfono/)).toHaveValue('particular')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(
+      await screen.findByText('El teléfono no es válido: elegí el país y escribí el número.'),
+    ).toBeInTheDocument()
+    expect(editarAlumno).not.toHaveBeenCalled()
   })
 
   it('deja el modal abierto cuando la edición choca con un dato duplicado', async () => {

@@ -13,6 +13,7 @@
 export { Avatar } from './Avatar'
 export { Badge } from './Badge'
 export { Button } from './Button'
+export { CampoTelefono } from './CampoTelefono'
 export { Card } from './Card'
 export { Campo, Input } from './Input'
 export { Modal } from './Modal'

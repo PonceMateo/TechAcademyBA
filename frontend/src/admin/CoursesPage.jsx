@@ -519,7 +519,13 @@ export function CoursesPage() {
     if (campos.horarios.length === 0) {
       encontrados.horarios = 'Agregá al menos un horario.'
     }
-    if (campos.cupo.trim() === '' || Number(campos.cupo) <= 0) {
+    // La edición ya exige un entero positivo; el alta aceptaba `1.1` y lo mandaba a la API, que
+    // respondía 422 sin decir qué campo corregir (D57).
+    if (
+      campos.cupo.trim() === '' ||
+      !Number.isInteger(Number(campos.cupo)) ||
+      Number(campos.cupo) <= 0
+    ) {
       encontrados.cupo = 'El cupo debe ser un entero positivo.'
     }
     if (campos.arancel.trim() === '' || Number(campos.arancel) <= 0) {

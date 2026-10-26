@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { Badge, Button, Card, Input, Modal, Table } from '../components/ui'
+import { isValidPhoneNumber } from 'react-phone-number-input'
+import { Badge, Button, Campo, CampoTelefono, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
+import {
+  componerCuil,
+  dniConForma,
+  dniDigitos,
+  emailConForma,
+  formatearCuil,
+  partirCuil,
+  PREFIJOS_CUIL,
+} from '../domain/validacion'
 import {
   buscarDocentes,
   crearDocente,
@@ -14,10 +24,16 @@ import {
  * **Las columnas son las del dato, no las del modelo.** La fuente de datos ya devuelve el nombre
  * unido y el conte de comisiones, así que la pantalla no sabe de dónde viene la fila.
  *
- * **El alta pide nombre, apellido, DNI, mail y teléfono. No pide CUIL** (D33): en esta fase los
- * docentes no son personas reales, y un CUIL inventado es peor que ninguno. La columna CUIL sigue
- * en la tabla porque la base la tiene, y muestra un guion cuando el docente todavía no la
- * completó.
+ * **El alta pide nombre, apellido, DNI, mail, teléfono y un CUIL opcional** (D57). El CUIL se
+ * arma con tres controles —prefijo `20/23/24/27`, el DNI de solo lectura y un verificador de un
+ * dígito— y viaja en 11 dígitos o `null`; un CUIL parcial no se envía. La columna CUIL de la
+ * tabla lo muestra con guiones y un guion cuando el docente todavía no lo completó.
+ *
+ * **El dígito verificador lo escribe la secretaría.** No se calcula por módulo 11 (D57), así que
+ * un CUIL completo se manda tal cual y la API lo guarda sin revisar ese dígito.
+ *
+ * **El teléfono se carga con selector de país y viaja en E.164 o `null`** (D57): la API dejó de
+ * aceptar texto libre, así que el formulario valida antes de enviar.
  *
  * **La columna CÁTEDRA no la puede llenar nadie.** El modelo no tiene ese campo, así que la fuente
  * real devuelve `null` y la pantalla muestra un guion. Se mantiene porque es una columna del
@@ -29,7 +45,10 @@ import {
  * **La edición conserva las comisiones.** La respuesta trae la fila actualizada y la pantalla la
  * fusiona con la que mostraba, porque el conte de comisiones ya estaba calculado y la edición no
  * lo vuelve a resolver: sin la fusión, la columna `COMISIONES ASIGNADAS` se vaciaría al corregir un
- * teléfono (D52). El CUIL tampoco se edita: sigue fuera del contrato, igual que en el alta (D33).
+ * teléfono (D52). Al abrir la edición, el CUIL guardado se parte en prefijo y verificador y los 8
+ * dígitos del medio se arman con el DNI actual, así que un CUIL que no coincidía se corrige al
+ * guardar (D57). Omitir el CUIL en el `PUT` conserva el actual, así que el formulario siempre lo
+ * manda: en 11 dígitos o en `null`.
  *
  * El control de clases dictadas se muestra deshabilitado con `Próximamente` para que el cliente vea
  * el hueco (D20).
@@ -41,7 +60,11 @@ const COLUMNAS = [
     render: (fila) => <span className="font-medium">{fila.nombre}</span>,
   },
   { clave: 'dni', titulo: 'DNI', render: (fila) => fila.dni },
-  { clave: 'cuil', titulo: 'CUIL', render: (fila) => fila.cuil ?? '—' },
+  {
+    clave: 'cuil',
+    titulo: 'CUIL',
+    render: (fila) => (fila.cuil ? formatearCuil(fila.cuil) : '—'),
+  },
   { clave: 'email', titulo: 'EMAIL', render: (fila) => fila.email },
   { clave: 'telefono', titulo: 'TELÉFONO', render: (fila) => fila.telefono ?? '—' },
   { clave: 'catedra', titulo: 'CÁTEDRA O ESPECIALIDAD', render: (fila) => fila.catedra ?? '—' },
@@ -73,9 +96,83 @@ const COLUMNAS = [
   },
 ]
 
-const CAMPOS_VACIOS = { nombre: '', apellido: '', dni: '', email: '', telefono: '' }
+const CAMPOS_VACIOS = {
+  nombre: '',
+  apellido: '',
+  dni: '',
+  email: '',
+  telefono: '',
+  cuilPrefijo: '',
+  cuilVerificador: '',
+}
 
 const LARGO_MINIMO_PASSWORD = 8
+
+/**
+ * Los tres controles del CUIL: prefijo, DNI de solo lectura y verificador (D57).
+ *
+ * Vive fuera de la página porque el alta y la edición dibujan el mismo grupo y una copia por modal
+ * termina con dos comportamientos. El prefijo arranca vacío —sin él, el CUIL es opcional— y el DNI
+ * se completa con ceros a la izquierda hasta 8 dígitos, que es la comparación de la API.
+ */
+function CampoCuil({ id, dni, prefijo, verificador, onPrefijo, onVerificador, error = null }) {
+  const digitosDni = dniDigitos(dni)
+
+  return (
+    <Campo etiqueta="CUIL" id={`${id}-prefijo`} error={error}>
+      <div className="flex items-center gap-2">
+        <select
+          id={`${id}-prefijo`}
+          aria-label="Prefijo del CUIL"
+          value={prefijo}
+          onChange={onPrefijo}
+          className="foco-acento rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900"
+        >
+          <option value="">Sin prefijo</option>
+          {PREFIJOS_CUIL.map((opcion) => (
+            <option key={opcion} value={opcion}>
+              {opcion}
+            </option>
+          ))}
+        </select>
+        <span className="text-slate-400">-</span>
+        <input
+          aria-label="Parte del DNI en el CUIL"
+          readOnly
+          value={digitosDni === '' ? '' : digitosDni.padStart(8, '0')}
+          placeholder="00000000"
+          className="w-24 rounded-lg border border-slate-300 bg-slate-100 px-2 py-2 text-sm text-slate-500"
+        />
+        <span className="text-slate-400">-</span>
+        <input
+          aria-label="Dígito verificador del CUIL"
+          inputMode="numeric"
+          maxLength={1}
+          value={verificador}
+          onChange={onVerificador}
+          className="foco-acento w-10 rounded-lg border border-slate-300 bg-white px-2 py-2 text-center text-sm text-slate-900"
+        />
+      </div>
+    </Campo>
+  )
+}
+
+/** Lo que se escribe en el campo cuando el CUIL está a medio completar (D57). */
+const CUIL_INCOMPLETO = 'El CUIL está incompleto: elegí el prefijo y escribí el verificador.'
+
+/**
+ * El CUIL que hay que enviar: 11 dígitos, o `null` cuando no se cargó ninguno.
+ *
+ * El prefijo y el verificador van en el estado separados del DNI, así que el CUIL se compone recién
+ * acá. Un CUIL a medio completar devuelve `null` y la validación es la que frena el envío: no se
+ * manda un número que la API va a rechazar.
+ */
+function cuilParaEnviar(datos) {
+  if (datos.cuilPrefijo === '' && datos.cuilVerificador === '') {
+    return null
+  }
+  return componerCuil(datos.cuilPrefijo, datos.dni, datos.cuilVerificador)
+}
 
 export function TeachersPage() {
   const [docentes, setDocentes] = useState([])
@@ -124,6 +221,40 @@ export function TeachersPage() {
     return (evento) => setCampos((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
   }
 
+  /**
+   * Los cuatro manejadores que no son un `value` directo: el teléfono entrega el valor ya armado y
+   * el CUIL limpia su verificador cuando cambia el DNI o el prefijo (D57).
+   */
+  function cambiarTelefono(setter) {
+    return (valor) => setter((anteriores) => ({ ...anteriores, telefono: valor }))
+  }
+
+  function cambiarDni(setter) {
+    return (evento) =>
+      setter((anteriores) => ({
+        ...anteriores,
+        dni: evento.target.value,
+        cuilVerificador: '',
+      }))
+  }
+
+  function cambiarPrefijoCuil(setter) {
+    return (evento) =>
+      setter((anteriores) => ({
+        ...anteriores,
+        cuilPrefijo: evento.target.value,
+        cuilVerificador: '',
+      }))
+  }
+
+  function cambiarVerificadorCuil(setter) {
+    return (evento) =>
+      setter((anteriores) => ({
+        ...anteriores,
+        cuilVerificador: evento.target.value.replace(/\D/g, '').slice(0, 1),
+      }))
+  }
+
   function cerrarModal() {
     setModalAbierto(false)
     setCampos(CAMPOS_VACIOS)
@@ -142,9 +273,21 @@ export function TeachersPage() {
     }
     if (datos.dni.trim() === '') {
       encontrados.dni = 'El DNI es obligatorio.'
+    } else if (!dniConForma(datos.dni)) {
+      encontrados.dni = 'El DNI debe tener 7 u 8 dígitos.'
     }
     if (datos.email.trim() === '') {
       encontrados.email = 'El mail es obligatorio.'
+    } else if (!emailConForma(datos.email)) {
+      encontrados.email = 'El mail no tiene un formato válido.'
+    }
+    if (datos.telefono !== '' && !isValidPhoneNumber(datos.telefono)) {
+      encontrados.telefono = 'El teléfono no es válido: elegí el país y escribí el número.'
+    }
+    // El CUIL es opcional, pero a medio completar no se envía: la API lo rechaza con 422 (D57).
+    const cuilCargado = datos.cuilPrefijo !== '' || datos.cuilVerificador !== ''
+    if (cuilCargado && cuilParaEnviar(datos) === null) {
+      encontrados.cuil = CUIL_INCOMPLETO
     }
 
     return encontrados
@@ -161,13 +304,13 @@ export function TeachersPage() {
     setGuardando(true)
     setFallo(null)
     try {
-      // Sin `cuil`: el contrato no lo admite (D33).
       const creado = await crearDocente({
         nombre: campos.nombre,
         apellido: campos.apellido,
         dni: campos.dni,
         email: campos.email,
         telefono: campos.telefono === '' ? null : campos.telefono,
+        cuil: cuilParaEnviar(campos),
       })
       setDocentes((anteriores) => [...anteriores, creado])
       cerrarModal()
@@ -181,12 +324,17 @@ export function TeachersPage() {
 
   function abrirEdicion(docente) {
     setDocenteEditando(docente)
+    const { prefijo, verificador } = partirCuil(docente.cuil)
     setCamposEdicion({
       nombre: docente.nombres ?? docente.nombre,
       apellido: docente.apellido ?? '',
       dni: docente.dni,
       email: docente.email,
+      // El valor guardado puede ser legacy: el control lo normaliza al abrirlo y conserva el crudo
+      // si no se puede interpretar (D57).
       telefono: docente.telefono ?? '',
+      cuilPrefijo: prefijo,
+      cuilVerificador: verificador,
     })
     setErroresEdicion({})
     setFalloEdicion(null)
@@ -203,6 +351,7 @@ export function TeachersPage() {
     return (evento) =>
       setCamposEdicion((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
   }
+
 
   async function guardarEdicion() {
     const encontrados = validar(camposEdicion)
@@ -221,6 +370,9 @@ export function TeachersPage() {
         dni: camposEdicion.dni,
         email: camposEdicion.email,
         telefono: camposEdicion.telefono === '' ? null : camposEdicion.telefono,
+        // Se manda siempre: el formulario ya armó el CUIL o `null`, y el `PUT` sin el campo
+        // conservaría el viejo, que es lo contrario de lo que el operador ve en pantalla (D57).
+        cuil: cuilParaEnviar(camposEdicion),
       })
       // Las comisiones ya estaban resueltas en la fila y la edición no las recalcula (D52).
       setDocentes((anteriores) =>
@@ -387,7 +539,7 @@ export function TeachersPage() {
             id="docente-dni"
             etiqueta="DNI"
             valor={campos.dni}
-            onChange={cambiar('dni')}
+            onChange={cambiarDni(setCampos)}
             obligatorio
             error={errores.dni ?? null}
           />
@@ -400,11 +552,21 @@ export function TeachersPage() {
             obligatorio
             error={errores.email ?? null}
           />
-          <Input
+          <CampoTelefono
             id="docente-telefono"
             etiqueta="Teléfono"
             valor={campos.telefono}
-            onChange={cambiar('telefono')}
+            onChange={cambiarTelefono(setCampos)}
+            error={errores.telefono ?? null}
+          />
+          <CampoCuil
+            id="docente-cuil"
+            dni={campos.dni}
+            prefijo={campos.cuilPrefijo}
+            verificador={campos.cuilVerificador}
+            onPrefijo={cambiarPrefijoCuil(setCampos)}
+            onVerificador={cambiarVerificadorCuil(setCampos)}
+            error={errores.cuil ?? null}
           />
         </div>
 
@@ -460,7 +622,7 @@ export function TeachersPage() {
                 id="editar-docente-dni"
                 etiqueta="DNI"
                 valor={camposEdicion.dni}
-                onChange={cambiarEdicion('dni')}
+                onChange={cambiarDni(setCamposEdicion)}
                 obligatorio
                 error={erroresEdicion.dni ?? null}
               />
@@ -473,11 +635,21 @@ export function TeachersPage() {
                 obligatorio
                 error={erroresEdicion.email ?? null}
               />
-              <Input
+              <CampoTelefono
                 id="editar-docente-telefono"
                 etiqueta="Teléfono"
                 valor={camposEdicion.telefono}
-                onChange={cambiarEdicion('telefono')}
+                onChange={cambiarTelefono(setCamposEdicion)}
+                error={erroresEdicion.telefono ?? null}
+              />
+              <CampoCuil
+                id="editar-docente-cuil"
+                dni={camposEdicion.dni}
+                prefijo={camposEdicion.cuilPrefijo}
+                verificador={camposEdicion.cuilVerificador}
+                onPrefijo={cambiarPrefijoCuil(setCamposEdicion)}
+                onVerificador={cambiarVerificadorCuil(setCamposEdicion)}
+                error={erroresEdicion.cuil ?? null}
               />
             </div>
 

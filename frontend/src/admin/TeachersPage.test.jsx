@@ -11,8 +11,9 @@ import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../te
  * comprueba con `disabled`, porque un ítem que "no navega" por no tener onclick y un ítem
  * deshabilitado son cosas distintas y el spec pide la segunda.
  *
- * El CUIL se muestra en la columna y **no se pide en el alta**: pasó a ser opcional en el modelo
- * (D33), así que el formulario solo junta los datos que el alta necesita.
+ * El CUIL se muestra en la columna con guiones y **se pide en el alta de forma opcional** (D57):
+ * el formulario lo arma con prefijo, el DNI de solo lectura y un verificador de un dígito, y envía
+ * 11 dígitos o `null`. El teléfono viaja en E.164 y reemplaza al input de texto libre.
  */
 
 const COLUMNAS = [
@@ -34,6 +35,24 @@ const DOCENTES = [
   ['Dr. Marcelo Ríos', '26.771.905', 'Sin comisión'],
   ['Ing. González', '30.665.330', 'CUR-108 · Java Backend Spring'],
 ]
+
+/** La fila que devuelve la fuente después de un alta, con la forma que espera la tabla. */
+function docenteCreado(datos, extra = {}) {
+  return {
+    id: 99,
+    nombre: `${datos.nombre} ${datos.apellido}`,
+    apellido: datos.apellido,
+    dni: datos.dni,
+    cuil: datos.cuil ?? null,
+    email: datos.email,
+    telefono: datos.telefono ?? null,
+    catedra: null,
+    activo: true,
+    comisiones: [],
+    comisiones_asignadas: 0,
+    ...extra,
+  }
+}
 
 /** Una fila mínima con la forma que devuelve la fuente, para los casos que el ejemplo no tiene. */
 function docenteDePrueba(id, nombre) {
@@ -268,20 +287,142 @@ describe('alta de docente', () => {
     await user.type(screen.getByLabelText(/^Mail/), 'ada.lovelace@techacademy.invalid')
   }
 
-  it('pide nombre, apellido, DNI y mail, y no pide CUIL', async () => {
+  it('pide nombre, apellido, DNI, mail, teléfono y un CUIL opcional', async () => {
     const user = userEvent.setup()
     await abrir(user)
 
-    // El CUIL pasó a ser opcional en el modelo (D33) y el contrato del alta no lo admite: si el
-    // formulario lo pidiera, la pantalla estaría pidiendo un dato que la base no usa.
-    expect(screen.queryByLabelText(/CUIL/)).not.toBeInTheDocument()
+    // El CUIL es opcional: el prefijo arranca vacío y el DNI de la parte del medio todavía no
+    // tiene dígitos (D57).
+    expect(screen.getByLabelText('CUIL')).toHaveValue('')
+    expect(screen.getByLabelText('Parte del DNI en el CUIL')).toHaveValue('')
+    expect(screen.getByLabelText('Dígito verificador del CUIL')).toHaveValue('')
 
     await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
 
     expect(await screen.findByText('El nombre es obligatorio.')).toBeInTheDocument()
     expect(await screen.findByText('El apellido es obligatorio.')).toBeInTheDocument()
     expect(await screen.findByText('El DNI es obligatorio.')).toBeInTheDocument()
+    expect(await screen.findByText('El mail es obligatorio.')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Nuevo Docente' })).toBeInTheDocument()
+  })
+
+  it('envía el CUIL completo en 11 dígitos', async () => {
+    const crear = vi.fn(async (datos) => docenteCreado(datos))
+    stubDataSource({ crearDocente: crear })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.selectOptions(screen.getByLabelText('CUIL'), '27')
+    // Los 8 del medio salen del DNI del formulario y no se pueden editar por separado.
+    expect(screen.getByLabelText('Parte del DNI en el CUIL')).toHaveValue('30111222')
+    await user.type(screen.getByLabelText('Dígito verificador del CUIL'), '5')
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    await waitFor(() => expect(crear).toHaveBeenCalled())
+    expect(crear.mock.calls[0][0].cuil).toBe('27301112225')
+  })
+
+  it('manda el CUIL en null cuando no se carga', async () => {
+    const crear = vi.fn(async (datos) => docenteCreado(datos))
+    stubDataSource({ crearDocente: crear })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    await waitFor(() => expect(crear).toHaveBeenCalled())
+    expect(crear.mock.calls[0][0].cuil).toBeNull()
+  })
+
+  it('no envía un CUIL parcial', async () => {
+    const crear = vi.fn(async (datos) => docenteCreado(datos))
+    stubDataSource({ crearDocente: crear })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.selectOptions(screen.getByLabelText('CUIL'), '20')
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    expect(
+      await screen.findByText(
+        'El CUIL está incompleto: elegí el prefijo y escribí el verificador.',
+      ),
+    ).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Nuevo Docente' })).toBeInTheDocument()
+  })
+
+  it('limpia el verificador al cambiar el DNI', async () => {
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.selectOptions(screen.getByLabelText('CUIL'), '20')
+    await user.type(screen.getByLabelText('Dígito verificador del CUIL'), '5')
+    expect(screen.getByLabelText('Dígito verificador del CUIL')).toHaveValue('5')
+
+    await user.clear(screen.getByLabelText(/^DNI/))
+
+    expect(screen.getByLabelText('Dígito verificador del CUIL')).toHaveValue('')
+  })
+
+  it('completa con un cero el DNI de 7 dígitos en el CUIL', async () => {
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.clear(screen.getByLabelText(/^DNI/))
+    await user.type(screen.getByLabelText(/^DNI/), '3011122')
+
+    expect(screen.getByLabelText('Parte del DNI en el CUIL')).toHaveValue('03011122')
+  })
+
+  it('rechaza un DNI que no tiene la forma del padrón', async () => {
+    const crear = vi.fn(async (datos) => docenteCreado(datos))
+    stubDataSource({ crearDocente: crear })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.clear(screen.getByLabelText(/^DNI/))
+    await user.type(screen.getByLabelText(/^DNI/), '30.ABC.222')
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    expect(await screen.findByText('El DNI debe tener 7 u 8 dígitos.')).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
+  })
+
+  it('rechaza un mail que no tiene forma', async () => {
+    const crear = vi.fn(async (datos) => docenteCreado(datos))
+    stubDataSource({ crearDocente: crear })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.clear(screen.getByLabelText(/^Mail/))
+    await user.type(screen.getByLabelText(/^Mail/), 'ada@')
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    expect(await screen.findByText('El mail no tiene un formato válido.')).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
+  })
+
+  it('envía el teléfono en E.164', async () => {
+    const crear = vi.fn(async (datos) => docenteCreado(datos))
+    stubDataSource({ crearDocente: crear })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+
+    await user.click(screen.getByLabelText('Teléfono'))
+    await user.paste('+54 9 11 1234-5678')
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    await waitFor(() => expect(crear).toHaveBeenCalled())
+    expect(crear.mock.calls[0][0].telefono).toBe('+5491112345678')
   })
 
   it('da de alta el docente y lo agrega al padrón con el nombre junto', async () => {
@@ -341,7 +482,7 @@ async function abrirRestablecimiento(user, nombre) {
 }
 
 describe('edición de docente (historia #11)', () => {
-  it('abre el modal precargado con nombre, apellido, DNI, mail y teléfono, y sin CUIL', async () => {
+  it('abre el modal precargado, normaliza el teléfono y arma el CUIL con el DNI actual', async () => {
     stubDataSource({
       buscarDocentes: vi.fn(async () => [
         {
@@ -372,8 +513,12 @@ describe('edición de docente (historia #11)', () => {
     expect(screen.getByLabelText(/^Apellido/)).toHaveValue('Molina')
     expect(screen.getByLabelText(/^DNI/)).toHaveValue('30.111.222')
     expect(screen.getByLabelText(/^Mail/)).toHaveValue('rita.molina@techacademy.invalid')
-    expect(screen.getByLabelText(/^Teléfono/)).toHaveValue('+54 11 4000-1000')
-    expect(screen.queryByLabelText(/CUIL/)).not.toBeInTheDocument()
+    // El valor guardado se puede interpretar, así que el control lo muestra normalizado (D57).
+    expect(screen.getByLabelText(/^Teléfono/)).toHaveValue('+54 11 4000 1000')
+    // El prefijo y el verificador salen del CUIL guardado; los 8 del medio, del DNI actual.
+    expect(screen.getByLabelText('CUIL')).toHaveValue('27')
+    expect(screen.getByLabelText('Parte del DNI en el CUIL')).toHaveValue('30111222')
+    expect(screen.getByLabelText('Dígito verificador del CUIL')).toHaveValue('6')
   })
 
   it('guarda los cambios, actualiza la fila y conserva las comisiones asignadas', async () => {
@@ -381,17 +526,78 @@ describe('edición de docente (historia #11)', () => {
     await abrirEdicion(user, 'Profe Martín')
 
     await user.clear(screen.getByLabelText(/^Teléfono/))
-    await user.type(screen.getByLabelText(/^Teléfono/), '+54 11 9999-0000')
+    await user.click(screen.getByLabelText(/^Teléfono/))
+    await user.paste('+54 9 11 9999-0000')
     await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
 
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Editar Docente' })).not.toBeInTheDocument(),
     )
     expect(await screen.findByText('Docente Profe Martín actualizado.')).toBeInTheDocument()
-    expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('+54 11 9999-0000')
+    expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('+5491199990000')
     // La edición no vuelve a resolver las comisiones: la fila que ya estaba en pantalla las
     // conserva (D52).
     expect(filaDelDocente('Profe Martín').cells[6].textContent).toBe('CUR-101 · Python Inicial')
+  })
+
+  it('guarda el teléfono en E.164 y el CUIL del docente sin tocarlos', async () => {
+    const editar = vi.fn(async (id, datos) => docenteCreado(datos, { id }))
+    stubDataSource({ editarDocente: editar })
+    const user = userEvent.setup()
+    await abrirEdicion(user, 'Profe Martín')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() => expect(editar).toHaveBeenCalled())
+    const [, datos] = editar.mock.calls[0]
+    // El valor legacy se normalizó al abrir y el CUIL se recompuso con el DNI actual.
+    expect(datos.telefono).toBe('+541144551020')
+    expect(datos.cuil).toBe('20281144024')
+  })
+
+  it('abre sin CUIL los docentes que no lo tienen y manda null al guardar', async () => {
+    const editar = vi.fn(async (id, datos) => docenteCreado(datos, { id }))
+    stubDataSource({
+      buscarDocentes: vi.fn(async () => [
+        { ...docenteDePrueba(8, 'Sofi Sin Cuil'), nombres: 'Sofi', apellido: 'Suárez' },
+      ]),
+      editarDocente: editar,
+    })
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Buscar docente'), 'sofi')
+    await screen.findByText('Sofi Sin Cuil')
+    await abrirEdicion(user, 'Sofi Sin Cuil')
+
+    expect(screen.getByLabelText('CUIL')).toHaveValue('')
+    expect(screen.getByLabelText('Dígito verificador del CUIL')).toHaveValue('')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() => expect(editar).toHaveBeenCalled())
+    expect(editar.mock.calls[0][1].cuil).toBeNull()
+  })
+
+  it('rechaza un teléfono legacy que no se puede interpretar', async () => {
+    const editar = vi.fn(async (id, datos) => docenteCreado(datos, { id }))
+    stubDataSource({
+      buscarDocentes: vi.fn(async () => [
+        { ...docenteDePrueba(7, 'Nora Legacy'), telefono: 'particular' },
+      ]),
+      editarDocente: editar,
+    })
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Buscar docente'), 'nora')
+    await screen.findByText('Nora Legacy')
+    await abrirEdicion(user, 'Nora Legacy')
+
+    // El valor crudo se conserva y no hay aviso al cargar; el rechazo aparece al intentar guardar.
+    expect(screen.getByLabelText(/^Teléfono/)).toHaveValue('particular')
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(
+      await screen.findByText('El teléfono no es válido: elegí el país y escribí el número.'),
+    ).toBeInTheDocument()
+    expect(editar).not.toHaveBeenCalled()
   })
 
   it('rechaza un DNI que ya pertenece a otro docente y deja el modal abierto', async () => {
@@ -400,6 +606,9 @@ describe('edición de docente (historia #11)', () => {
 
     await user.clear(screen.getByLabelText(/^DNI/))
     await user.type(screen.getByLabelText(/^DNI/), '31.902.118')
+    // Cambiar el DNI limpia el verificador, así que se vuelve a escribir para que el CUIL quede
+    // completo y el formulario llegue a la fuente (D57).
+    await user.type(screen.getByLabelText('Dígito verificador del CUIL'), '4')
     await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

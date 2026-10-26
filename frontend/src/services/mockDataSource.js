@@ -358,16 +358,16 @@ export function createMockDataSource() {
      * Alta de docente de ejemplo: agrega la fila al store y la devuelve con la misma forma que la
      * fuente real.
      *
-     * El CUIL queda en `null` a propósito (D33): en esta fase los docentes no son personas reales
-     * y un CUIL inventado es peor que ninguno.
+     * El CUIL es opcional (D57): si la pantalla no lo manda, la fila queda en `null`. El ejemplo
+     * guarda lo que recibe, no un CUIL inventado.
      */
-    async crearDocente({ nombre, apellido, dni, email, telefono }) {
+    async crearDocente({ nombre, apellido, dni, email, telefono, cuil = null }) {
       return filaDeDocente({
         id: siguienteId(store.docentes),
         nombre,
         apellido,
         dni,
-        cuil: null,
+        cuil,
         email,
         telefono,
         activo: true,
@@ -380,7 +380,7 @@ export function createMockDataSource() {
      * backend para que la pantalla pueda ejercitar los rechazos sin red: DNI único dentro del
      * padrón y email único en los tres padrones. El `id` y las comisiones no se tocan.
      */
-    async editarDocente(id, { nombre, apellido, dni, email, telefono }) {
+    async editarDocente(id, { nombre, apellido, dni, email, telefono, cuil }) {
       const docente = store.docentes.find((candidato) => candidato.id === id)
       if (!docente) {
         throw new Error('El docente no existe.')
@@ -405,6 +405,10 @@ export function createMockDataSource() {
       }
 
       Object.assign(docente, { nombre, apellido, dni, email, telefono })
+      // Omitir `cuil` conserva el que la fila tenía y `null` lo borra, como el `PUT` real (D57).
+      if (cuil !== undefined) {
+        docente.cuil = cuil
+      }
       return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
     },
 

@@ -2,9 +2,9 @@
 
 ## 1. Base compartida del frontend
 
-- [ ] 1.1 Agregar `react-phone-number-input` a `frontend/package.json`, instalarlo en el contenedor y verificar que `npm run build` resuelve el import y actualiza el lockfile
-- [ ] 1.2 Crear `frontend/src/domain/validacion.js` con `emailConForma`, `dniConForma`, `dniDigitos`, `componerCuil` y `partirCuil`, y cubrir válidos, inválidos y bordes en `validacion.test.js`
-- [ ] 1.3 Crear `frontend/src/components/ui/CampoTelefono.jsx` con `defaultCountry="AR"`, selector de todos los países, entrega E.164, modo legacy para valores no parseables y el estilo de error del `Input` existente; cubrirlo en `CampoTelefono.test.jsx` con válido, vacío, legacy y país inicial
+- [x] 1.1 Agregar `react-phone-number-input` a `frontend/package.json`, instalarlo en el contenedor y verificar que `npm run build` resuelve el import y actualiza el lockfile
+- [x] 1.2 Crear `frontend/src/domain/validacion.js` con `emailConForma`, `dniConForma`, `dniDigitos`, `componerCuil` y `partirCuil`, y cubrir válidos, inválidos y bordes en `validacion.test.js`
+- [x] 1.3 Crear `frontend/src/components/ui/CampoTelefono.jsx` con `defaultCountry="AR"`, selector de todos los países, entrega E.164, modo legacy para valores no parseables y el estilo de error del `Input` existente; cubrirlo en `CampoTelefono.test.jsx` con válido, vacío, legacy y país inicial
 
 ## 2. Validadores y contrato del backend
 
@@ -18,11 +18,11 @@
 
 ## 3. Formularios del frontend
 
-- [ ] 3.1 En `TeachersPage.jsx`, reemplazar la validación local de email y DNI por las funciones compartidas y el `Input` de teléfono por `CampoTelefono`; verificar con `TeachersPage.test.jsx` email inválido, DNI inválido, teléfono inválido y teléfono válido en alta y edición
-- [ ] 3.2 En `TeachersPage.jsx`, agregar los controles de CUIL, la composición prefijo + DNI + verificador, el envío de 11 dígitos o `null`, el limpiado del verificador al cambiar DNI o prefijo, la recomposición al editar y el formato `XX-XXXXXXXX-X` en la tabla; verificar con `TeachersPage.test.jsx` CUIL completo, parcial, sin CUIL, edición con CUIL y cambio de DNI
-- [ ] 3.3 En `StudentsPage.jsx`, quitar `emailConForma` local, usar las funciones compartidas de email y DNI y reemplazar el `Input` de teléfono por `CampoTelefono` en alta y edición; verificar con `StudentsPage.test.jsx` los mismos casos de email, DNI y teléfono
-- [ ] 3.4 En `CoursesPage.jsx`, agregar `Number.isInteger(Number(campos.cupo))` a la validación del alta y verificar con `CoursesPage.test.jsx` que `1.1`, `5.3`, cero, negativo y vacío muestran «El cupo debe ser un entero positivo» y que un entero válido se envía
-- [ ] 3.5 Actualizar los comentarios de `frontend/src/services/dataService.js` y de `TeachersPage.jsx` que dicen que el contrato no lleva CUIL, y verificar con una búsqueda de “sin CUIL” y “D33” que no queden referencias falsas
+- [x] 3.1 En `TeachersPage.jsx`, reemplazar la validación local de email y DNI por las funciones compartidas y el `Input` de teléfono por `CampoTelefono`; verificar con `TeachersPage.test.jsx` email inválido, DNI inválido, teléfono inválido y teléfono válido en alta y edición
+- [x] 3.2 En `TeachersPage.jsx`, agregar los controles de CUIL, la composición prefijo + DNI + verificador, el envío de 11 dígitos o `null`, el limpiado del verificador al cambiar DNI o prefijo, la recomposición al editar y el formato `XX-XXXXXXXX-X` en la tabla; verificar con `TeachersPage.test.jsx` CUIL completo, parcial, sin CUIL, edición con CUIL y cambio de DNI
+- [x] 3.3 En `StudentsPage.jsx`, quitar `emailConForma` local, usar las funciones compartidas de email y DNI y reemplazar el `Input` de teléfono por `CampoTelefono` en alta y edición; verificar con `StudentsPage.test.jsx` los mismos casos de email, DNI y teléfono
+- [x] 3.4 En `CoursesPage.jsx`, agregar `Number.isInteger(Number(campos.cupo))` a la validación del alta y verificar con `CoursesPage.test.jsx` que `1.1`, `5.3`, cero, negativo y vacío muestran «El cupo debe ser un entero positivo» y que un entero válido se envía
+- [x] 3.5 Actualizar los comentarios de `frontend/src/services/dataService.js` y de `TeachersPage.jsx` que dicen que el contrato no lleva CUIL, y verificar con una búsqueda de “sin CUIL” y “D33” que no queden referencias falsas
 
 ## 4. Decisiones
 

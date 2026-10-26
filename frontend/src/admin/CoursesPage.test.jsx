@@ -116,7 +116,7 @@ function filasDeComisiones() {
  */
 async function completarComision(
   user,
-  { modalidad = 'VIRTUAL', sede = null, conCurso = true } = {},
+  { modalidad = 'VIRTUAL', sede = null, conCurso = true, cupo = '20' } = {},
 ) {
   await user.selectOptions(screen.getByLabelText(/^Modalidad/), modalidad)
   if (conCurso) {
@@ -125,7 +125,9 @@ async function completarComision(
   }
   await user.selectOptions(screen.getByLabelText(/^Docente Asignado/), '1')
   await cargarHorarios(user)
-  await user.type(screen.getByLabelText(/Cupo Máximo/), '20')
+  if (cupo !== '') {
+    await user.type(screen.getByLabelText(/Cupo Máximo/), cupo)
+  }
   await user.type(screen.getByLabelText(/Valor de Arancel de Comisión/), '52000')
   if (sede) {
     await user.selectOptions(screen.getByLabelText(/^Sede/), sede)
@@ -572,6 +574,52 @@ describe('modal de alta', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
 
     expect(await screen.findByText('Elegí el docente de la comisión.')).toBeInTheDocument()
+  })
+
+  it.each([['1.1'], ['5.3'], ['2.5'], ['']])(
+    'rechaza el cupo %s del alta sin llamar a la fuente',
+    async (cupo) => {
+      // El alta aceptaba `1.1` y lo mandaba a la API, que respondía 422 sin decir qué campo
+      // corregir. La edición ya exigía el entero; ahora el alta también (D57).
+      const crear = vi.fn()
+      stubDataSource({ crearComision: crear })
+      const user = userEvent.setup()
+      await abrirModal(user)
+
+      await completarComision(user, { cupo })
+      await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+      expect(await screen.findByText('El cupo debe ser un entero positivo.')).toBeInTheDocument()
+      expect(crear).not.toHaveBeenCalled()
+      expect(screen.getByRole('dialog', { name: 'Crear Nueva Comisión' })).toBeInTheDocument()
+    },
+  )
+
+  it('acepta un cupo entero y lo envía como número', async () => {
+    const crear = vi.fn(async () => ({
+      id: 99,
+      codigo: 'CUR-101-2',
+      curso: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+      docente_id: 1,
+      docente_nombre: 'Profe Martín',
+      horarios: HORARIOS_POR_DEFECTO,
+      dias_horarios: TEXTO_POR_DEFECTO,
+      cupo_maximo: 12,
+      arancel: 52000,
+      vacantes: 12,
+      modalidad: 'VIRTUAL',
+      sede_id: null,
+      sede_nombre: null,
+    }))
+    stubDataSource({ crearComision: crear })
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await completarComision(user, { cupo: '12' })
+    await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+    await waitFor(() => expect(crear).toHaveBeenCalledTimes(1))
+    expect(crear.mock.calls[0][0].cupo_maximo).toBe(12)
   })
 
   it('exige un cupo y un arancel positivos', async () => {

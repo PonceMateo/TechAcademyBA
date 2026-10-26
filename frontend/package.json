@@ -23,6 +23,7 @@
     "react": "^19.3.0",
     "react-datepicker": "^9.1.0",
     "react-dom": "^19.3.0",
+    "react-phone-number-input": "^3.4.18",
     "react-router": "^8.4.0"
   },
   "devDependencies": {
