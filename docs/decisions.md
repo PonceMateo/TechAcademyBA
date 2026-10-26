@@ -1914,6 +1914,14 @@ alcance de este change; queda a criterio del equipo agregarlo.
   parcial tal cual. Se agrega `displayInitialValueAsLocalNumber` para que un número guardado se vea
   sin el `+54` (el prefijo lo aporta el selector de país). El valor que sale sigue siendo E.164 o
   vacío.
+- **Corrección — CUIL guardado y CUIL repetido (2026-10-26):** dos casos que la revisión encontró.
+  (1) `partirCuil` deja los controles vacíos cuando el prefijo guardado no es `20/23/24/27` —una
+  fila de antes de D57, cuando la columna era obligatoria y el CHECK solo pedía "no vacío"—, así
+  que editar el teléfono mandaba `cuil: null` y borraba el CUIL sin que nadie lo pidiera: ahora ese
+  caso **omite** el campo del `PUT` y el servicio conserva el guardado; vaciar los controles de un
+  CUIL que sí se pudo mostrar sigue mandando `null`. (2) el índice `uq_docente_cuil` no estaba en
+  `_traducir_duplicado`, así que dos docentes con DNI `1112222` y `01112222` —distintos, pero el
+  mismo CUIL— recibían un 409 genérico: ahora dice "CUIL", como el DNI y el email.
 - **Decisión — validadores compartidos:** las reglas puras del front viven en
   `frontend/src/domain/validacion.js` (`emailConForma`, `dniConForma`, `dniDigitos`, `componerCuil`,
   `partirCuil`) y las del back en `backend/app/schemas/validators.py` (`EmailConForma`,
