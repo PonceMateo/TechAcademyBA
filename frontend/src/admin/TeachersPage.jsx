@@ -166,15 +166,21 @@ function CampoCuil({ id, dni, prefijo, verificador, onPrefijo, onVerificador, er
 const CUIL_INCOMPLETO = 'El CUIL está incompleto: elegí el prefijo y escribí el verificador.'
 
 /**
- * El CUIL que hay que enviar: 11 dígitos, o `null` cuando no se cargó ninguno.
+ * El CUIL que viaja en el cuerpo: 11 dígitos, `null` para borrarlo, o `undefined` para no mandarlo.
  *
  * El prefijo y el verificador van en el estado separados del DNI, así que el CUIL se compone recién
  * acá. Un CUIL a medio completar devuelve `null` y la validación es la que frena el envío: no se
  * manda un número que la API va a rechazar.
+ *
+ * **Un CUIL guardado que los controles no pueden mostrar no se borra.** Si la fila trae un prefijo
+ * fuera de `20/23/24/27` —un dato de antes de D57, cuando la columna era obligatoria y el CHECK solo
+ * pedía "no vacío"—, `partirCuil` deja los controles vacíos y mandar `null` borraría el CUIL cuando
+ * alguien solo viene a corregir un teléfono. En ese caso el campo se omite y el `PUT` conserva el
+ * que había (D57).
  */
-function cuilParaEnviar(datos) {
+function cuilParaEnviar(datos, cuilOriginal = null) {
   if (datos.cuilPrefijo === '' && datos.cuilVerificador === '') {
-    return null
+    return cuilOriginal !== null && partirCuil(cuilOriginal).prefijo === '' ? undefined : null
   }
   return componerCuil(datos.cuilPrefijo, datos.dni, datos.cuilVerificador)
 }
@@ -369,15 +375,17 @@ export function TeachersPage() {
     setGuardandoEdicion(true)
     setFalloEdicion(null)
     try {
+      const cuil = cuilParaEnviar(camposEdicion, docenteEditando.cuil)
       const actualizado = await editarDocente(docenteEditando.id, {
         nombre: camposEdicion.nombre,
         apellido: camposEdicion.apellido,
         dni: camposEdicion.dni,
         email: camposEdicion.email,
         telefono: camposEdicion.telefono === '' ? null : camposEdicion.telefono,
-        // Se manda siempre: el formulario ya armó el CUIL o `null`, y el `PUT` sin el campo
-        // conservaría el viejo, que es lo contrario de lo que el operador ve en pantalla (D57).
-        cuil: cuilParaEnviar(camposEdicion),
+        // Lo que muestran los controles viaja siempre: `null` cuando se vaciaron y 11 dígitos
+        // cuando se completaron. Solo se omite el CUIL guardado que los controles no pueden
+        // representar, para no borrarlo sin que nadie lo haya pedido (D57).
+        ...(cuil !== undefined && { cuil }),
       })
       // Las comisiones ya estaban resueltas en la fila y la edición no las recalcula (D52).
       setDocentes((anteriores) =>

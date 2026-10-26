@@ -556,6 +556,51 @@ describe('edición de docente (historia #11)', () => {
     expect(datos.cuil).toBe('20281144024')
   })
 
+  it('no borra un CUIL guardado que los controles no pueden mostrar', async () => {
+    // Prefijo 30: la columna era obligatoria antes de D57 y el CHECK solo pedía "no vacío", así
+    // que una fila vieja puede tener un CUIL que el select no ofrece.
+    const editar = vi.fn(async (id, datos) => docenteCreado(datos, { id }))
+    stubDataSource({
+      buscarDocentes: vi.fn(async () => [
+        {
+          ...docenteDePrueba(9, 'Nora Antigua'),
+          nombres: 'Nora',
+          apellido: 'Antigua',
+          cuil: '30301112226',
+        },
+      ]),
+      editarDocente: editar,
+    })
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Buscar docente'), 'nora')
+    await screen.findByText('Nora Antigua')
+    await abrirEdicion(user, 'Nora Antigua')
+
+    expect(screen.getByLabelText('CUIL')).toHaveValue('')
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() => expect(editar).toHaveBeenCalled())
+    // El `PUT` sin `cuil` conserva el guardado; mandar `null` lo borraría por venir a corregir otro
+    // campo.
+    expect('cuil' in editar.mock.calls[0][1]).toBe(false)
+  })
+
+  it('borra el CUIL cuando se vacían los controles', async () => {
+    const editar = vi.fn(async (id, datos) => docenteCreado(datos, { id }))
+    stubDataSource({ editarDocente: editar })
+    const user = userEvent.setup()
+    await abrirEdicion(user, 'Profe Martín')
+
+    await user.selectOptions(screen.getByLabelText('CUIL'), '')
+    await user.clear(screen.getByLabelText('Dígito verificador del CUIL'))
+    await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() => expect(editar).toHaveBeenCalled())
+    // Vaciar los controles sí es pedir que se borre: un CUIL que el formulario pudo mostrar se
+    // manda en `null` (D57).
+    expect(editar.mock.calls[0][1]).toHaveProperty('cuil', null)
+  })
+
   it('abre sin CUIL los docentes que no lo tienen y manda null al guardar', async () => {
     const editar = vi.fn(async (id, datos) => docenteCreado(datos, { id }))
     stubDataSource({
