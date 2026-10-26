@@ -26,11 +26,10 @@ from app.models.enums import Rol, TipoDocumento, enum_check
 class Docente(TimestampMixin, Base):
     """Docente del padrón (historias #9, #10 y #11).
 
-    D33, que **revierte D27**: `cuil` dejó de ser obligatorio. En esta fase los docentes no
-    son personas reales, así que un CUIL inventado es peor que ningún CUIL: un `27-34567890-7`
-    fabricado no identifica a nadie para liquidar y después hay que ir a corregirlo. La
-    columna y el índice se quedan porque el instituto liquida con el CUIL y va a hacer falta
-    apenas haya docentes reales; lo que se revierte es la obligatoriedad, no el dato.
+    D33, que **revierte D27**: `cuil` dejó de ser obligatorio. Desde D57 vuelve a estar en el
+    contrato como dato opcional —el formulario lo arma con prefijo, DNI y verificador manual—,
+    pero sigue sin ser obligatorio: un docente puede existir sin CUIL y la columna admite nulos.
+    El valor se guarda en 11 dígitos, sin guiones, y el dígito verificador no se calcula.
 
     `uq_docente_cuil` **sobrevive a los nulos**: PostgreSQL admite varios nulos en un índice
     único, así que el índice no estorba mientras los docentes no tengan CUIL y sigue

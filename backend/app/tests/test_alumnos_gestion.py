@@ -40,7 +40,7 @@ EDICION = {
     "documento": "39.999.111",
     "nombre": "Agustina Benítez Corregida",
     "email": "agustina.corregida@techacademy.invalid",
-    "telefono": "+54 11 4000-9999",
+    "telefono": "+5491140009999",
 }
 
 
@@ -350,7 +350,8 @@ def test_reactivar_conserva_el_registro_y_renueva_el_acceso(
             "documento": "38.111.222",
             "nombre": alumno.nombre,
             "email": alumno.email,
-            "telefono": alumno.telefono,
+            # El alumno de la fábrica trae un teléfono legacy, que el contrato ya no acepta (D57).
+            "telefono": "+5491140000002",
         },
     )
 

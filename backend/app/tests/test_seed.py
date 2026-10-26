@@ -53,6 +53,24 @@ def test_la_primera_carga_deja_las_tres_cuentas(db_session: Session) -> None:
     assert _contar(db_session, Usuario) == 3
 
 
+def test_el_cuil_de_rita_es_coherente_con_su_dni_y_estable(db_session: Session) -> None:
+    """D57: el CUIL del ejemplo coincide con el DNI y la segunda corrida no lo cambia.
+
+    Se parte de la fila con el CUIL viejo —el que la base de demo ya tenía— para comprobar que el
+    upsert converge también en la rama de la fila existente. Sin eso, correr el seed de nuevo no
+    corregiría nada.
+    """
+    cargar_datos_iniciales(db_session)
+    docente = db_session.scalar(select(Docente))
+    docente.cuil = "27345678907"
+    db_session.flush()
+
+    cargar_datos_iniciales(db_session)
+
+    db_session.expire_all()
+    assert db_session.scalar(select(Docente)).cuil == "27301112225"
+
+
 def test_cada_cuenta_queda_vinculada_con_su_registro_de_padron(db_session: Session) -> None:
     """D4: la cuenta `DOCENTE` con su docente, la `ALUMNO` con su alumno, y la `ADMIN` con
     ninguno. Lo exige el CHECK de la base; la carga tiene que respetarlo."""

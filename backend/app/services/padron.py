@@ -93,8 +93,8 @@ def crear_docente(session: Session, datos: DocenteCreate) -> Docente:
         apellido=datos.apellido,
         dni=datos.dni,
         dni_norm=normalize_document(datos.dni),
-        # D33: el CUIL no se pide. Un CUIL inventado es peor que ninguno.
-        cuil=None,
+        # Ya viene con 11 dígitos o `None`: el esquema validó que coincida con el DNI (D57).
+        cuil=datos.cuil,
         email=datos.email,
         telefono=datos.telefono,
     )
@@ -141,6 +141,9 @@ def editar_docente(session: Session, docente: Docente, datos: DocenteUpdate) -> 
     Un docente sin `Usuario` se edita igual: la sincronización se saltea y **no** se crea una
     cuenta implícita. El alta garantiza que todo docente nuevo tenga una, así que el caso es solo
     de datos históricos.
+
+    El CUIL se actualiza solo cuando viene en el cuerpo (D57): el formulario lo manda siempre y un
+    cliente que no lo manda no lo pierde.
     """
     dni_norm = normalize_document(datos.dni)
     existente = session.scalar(
@@ -163,6 +166,11 @@ def editar_docente(session: Session, docente: Docente, datos: DocenteUpdate) -> 
     docente.dni_norm = dni_norm
     docente.email = datos.email
     docente.telefono = datos.telefono
+    # El CUIL solo se toca si vino en el cuerpo: omitirlo conserva el actual y un `null` explícito
+    # lo borra. `DocenteUpdate` hereda el campo del alta, así que `model_fields_set` es lo único
+    # que distingue "no vino" de "vino en null" (D57).
+    if "cuil" in datos.model_fields_set:
+        docente.cuil = datos.cuil
 
     if usuario is not None:
         usuario.nombre = f"{datos.nombre} {datos.apellido}"

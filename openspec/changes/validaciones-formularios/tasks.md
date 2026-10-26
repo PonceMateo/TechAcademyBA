@@ -8,13 +8,13 @@
 
 ## 2. Validadores y contrato del backend
 
-- [ ] 2.1 Agregar `DniConForma`, `TelefonoE164` y `validar_cuil` a `backend/app/schemas/validators.py`, y cubrir 7/8 dígitos, separadores, letras, E.164, prefijo de CUIL, DNI coincidente y DNI de 7 dígitos en `backend/app/tests/test_validators.py`
-- [ ] 2.2 Usar `DniConForma` en `AlumnoCreate.documento` y `DocenteCreate.dni`, retirar el validador local de `alumnos.py` y verificar con `pytest` que el alta y la edición de ambos padrones aceptan y rechazan los mismos DNI
-- [ ] 2.3 Usar `TelefonoE164` en `DocenteCreate.telefono` y `AlumnoCreate.telefono` (y sus `Update`), y verificar con `pytest` que E.164 y `null` se aceptan y un texto libre da `422`
-- [ ] 2.4 Agregar `cuil` opcional a `DocenteCreate`/`DocenteUpdate` con un validador que lea el DNI, y verificar con `pytest` alta sin CUIL, alta con CUIL válido, CUIL parcial, prefijo inválido, DNI que no coincide, DNI de 7 dígitos y verificador incorrecto aceptado
-- [ ] 2.5 Actualizar `crear_docente` para guardar `datos.cuil` y `editar_docente` para tocar el CUIL solo si `"cuil" in datos.model_fields_set`; verificar con `pytest` que omitirlo conserva, `null` borra y un valor nuevo reemplaza
-- [ ] 2.6 Corregir el CUIL de Rita en `backend/app/services/seed.py` a `27301112225` y hacer que `_upsert_docente` asigne `cuil` también en la fila existente; verificar corriendo el seed dos veces y comprobando que el CUIL no cambia en la segunda
-- [ ] 2.7 Actualizar los docstrings de `backend/app/api/padron.py`, `backend/app/schemas/padron.py` y `backend/app/models/padron.py` que todavía dicen que el CUIL está fuera del contrato o usan el CUIL viejo como ejemplo, y verificar con una búsqueda de “CUIL fuera del contrato”, “sin CUIL” y `27345678907` que no queden referencias falsas
+- [x] 2.1 Agregar `DniConForma`, `TelefonoE164` y `validar_cuil` a `backend/app/schemas/validators.py`, y cubrir 7/8 dígitos, separadores, letras, E.164, prefijo de CUIL, DNI coincidente y DNI de 7 dígitos en `backend/app/tests/test_validators.py`
+- [x] 2.2 Usar `DniConForma` en `AlumnoCreate.documento` y `DocenteCreate.dni`, retirar el validador local de `alumnos.py` y verificar con `pytest` que el alta y la edición de ambos padrones aceptan y rechazan los mismos DNI
+- [x] 2.3 Usar `TelefonoE164` en `DocenteCreate.telefono` y `AlumnoCreate.telefono` (y sus `Update`), y verificar con `pytest` que E.164 y `null` se aceptan y un texto libre da `422`
+- [x] 2.4 Agregar `cuil` opcional a `DocenteCreate`/`DocenteUpdate` con un validador que lea el DNI, y verificar con `pytest` alta sin CUIL, alta con CUIL válido, CUIL parcial, prefijo inválido, DNI que no coincide, DNI de 7 dígitos y verificador incorrecto aceptado
+- [x] 2.5 Actualizar `crear_docente` para guardar `datos.cuil` y `editar_docente` para tocar el CUIL solo si `"cuil" in datos.model_fields_set`; verificar con `pytest` que omitirlo conserva, `null` borra y un valor nuevo reemplaza
+- [x] 2.6 Corregir el CUIL de Rita en `backend/app/services/seed.py` a `27301112225` y hacer que `_upsert_docente` asigne `cuil` también en la fila existente; verificar corriendo el seed dos veces y comprobando que el CUIL no cambia en la segunda
+- [x] 2.7 Actualizar los docstrings de `backend/app/api/padron.py`, `backend/app/schemas/padron.py` y `backend/app/models/padron.py` que todavía dicen que el CUIL está fuera del contrato o usan el CUIL viejo como ejemplo, y verificar con una búsqueda de “CUIL fuera del contrato”, “sin CUIL” y `27345678907` que no queden referencias falsas
 
 ## 3. Formularios del frontend
 

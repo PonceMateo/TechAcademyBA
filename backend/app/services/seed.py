@@ -91,7 +91,10 @@ CUENTAS_DEMO: tuple[CuentaDemo, ...] = (
             "nombre": "Rita",
             "apellido": "Molina",
             "dni": "30111222",
-            "cuil": "27345678907",
+            # Coherente con el DNI del ejemplo (27-30111222-5), no un número fabricado: el
+            # contrato del docente rechaza un CUIL cuyos 8 dígitos del medio no sean el DNI
+            # (D57), así que un seed incoherente no se podría editar desde la pantalla.
+            "cuil": "27301112225",
             "telefono": "+54 11 4000-0001",
         },
     ),
@@ -267,6 +270,9 @@ def _upsert_docente(session: Session, cuenta: CuentaDemo) -> Docente:
     docente.email = cuenta.email
     docente.activo = True
     docente.telefono = datos.get("telefono")
+    # Se asigna también en la fila existente: sin esto, una base que ya tiene el CUIL viejo no se
+    # corrige al volver a correr el seed y la segunda corrida no converge (D57).
+    docente.cuil = datos.get("cuil")
     return docente
 
 

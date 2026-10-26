@@ -49,7 +49,7 @@ ALTA = {
     "documento": "38.456.789",
     "nombre": "Juan Ignacio Pérez",
     "email": "juan.perez@techacademy.invalid",
-    "telefono": "+54 11 4000-0003",
+    "telefono": "+5491140000003",
 }
 
 

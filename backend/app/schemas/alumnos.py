@@ -7,7 +7,8 @@ así que un `POST /alumnos` que lo informe se rechaza con 422: el servicio guard
 
 El DNI se acepta con puntos, espacios o guiones y se guarda tal como lo escribió la secretaría;
 la forma normalizada —solo dígitos— la calcula el servicio para el índice único (D-B del change
-`hu-13-alta-alumno`).
+`hu-13-alta-alumno`). La regla del DNI y la del teléfono son compartidas con el padrón de docentes
+(D57), y el teléfono se guarda en E.164 o nulo.
 
 Los nombres de los campos van en inglés y el texto de cara al usuario en es-AR: es la
 distribución de D19.
@@ -15,20 +16,12 @@ distribución de D19.
 
 from __future__ import annotations
 
-import re
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.security import MAX_PASSWORD_BYTES
-from app.schemas.validators import EmailConForma
-
-#: Lo único que puede aparecer en un DNI además de sus dígitos: puntos, espacios y guiones.
-_SOLO_DIGITOS_Y_SEPARADORES = re.compile(r"[0-9.\s-]+")
-_SOLO_DIGITOS = re.compile(r"\D+")
-
-#: Cantidad de dígitos de un DNI argentino.
-_DIGITOS_DNI = (7, 8)
+from app.schemas.validators import DniConForma, EmailConForma, TelefonoE164
 
 
 class AlumnoCreate(BaseModel):
@@ -39,25 +32,11 @@ class AlumnoCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    documento: str = Field(min_length=1, max_length=20)
+    # La regla del DNI es la misma del docente: `app.schemas.validators.DniConForma` (D57).
+    documento: DniConForma = Field(min_length=1, max_length=20)
     nombre: str = Field(min_length=1, max_length=160)
     email: EmailConForma = Field(min_length=3, max_length=255)
-    telefono: str | None = Field(default=None, max_length=40)
-
-    @field_validator("documento")
-    @classmethod
-    def _documento_es_dni(cls, valor: str) -> str:
-        """Acepta un DNI de 7 u 8 dígitos, escrito con puntos, espacios o guiones o sin ellos.
-
-        El rechazo de letras es explícito y no se deja a la base: un documento con letras
-        terminaría en `documento_norm` nulo y el CHECK `documento_y_tipo_juntos` lo rechazaría
-        con un error crudo, sin mensaje útil para el formulario.
-        """
-        if _SOLO_DIGITOS_Y_SEPARADORES.fullmatch(valor) is None:
-            raise ValueError("El DNI debe tener 7 u 8 dígitos.")
-        if len(_SOLO_DIGITOS.sub("", valor)) not in _DIGITOS_DNI:
-            raise ValueError("El DNI debe tener 7 u 8 dígitos.")
-        return valor
+    telefono: TelefonoE164 | None = Field(default=None, max_length=40)
 
 
 class AlumnoUpdate(AlumnoCreate):
