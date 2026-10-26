@@ -23,7 +23,18 @@ import { MARCA_UI } from './paleta'
  * **Un valor legacy que sí se puede interpretar se normaliza al abrirlo.** El efecto de abajo
  * reemplaza `+54 11 4000-0001` por `+541140000001` en el estado del formulario, así guardar sin
  * tocar el campo manda E.164 en vez del texto viejo.
+ *
+ * **El `+54` no aparece como texto del campo.** Lo aporta el selector de país, y al abrir un
+ * número guardado se muestra en formato nacional (`displayInitialValueAsLocalNumber`): sin eso la
+ * librería escribiría `+54 11 4000 0001` dentro del input.
+ *
+ * **El modo legacy se decide por la forma del texto, no por si el número ya es válido.** Mientras
+ * se escribe, el selector entrega `+54`, `+541`… y `parsePhoneNumber` todavía no los reconoce:
+ * si eso abriera el input de texto, el campo se reemplazaría a mitad del tipeo, se perdería el
+ * foco y el `+54` aparecería como texto editable. Por eso solo el texto que no puede ser un
+ * teléfono internacional abre el modo legacy, y al selector se le pasa el valor tal cual está.
  */
+const PARCIAL_INTERNACIONAL = /^\+\d[\d\s().-]*$/
 export function CampoTelefono({
   id,
   etiqueta,
@@ -33,9 +44,11 @@ export function CampoTelefono({
   obligatorio = false,
 }) {
   const crudo = valor ?? ''
-  const numero = parsePhoneNumber(crudo)
-  const normalizado = numero?.number ?? null
-  const enModoLegacy = crudo !== '' && normalizado === null
+  const normalizado = parsePhoneNumber(crudo)?.number ?? null
+  const enModoLegacy = crudo !== '' && !PARCIAL_INTERNACIONAL.test(crudo)
+  // Al selector se le pasa E.164 ya normalizado, o el parcial que se está escribiendo. Un valor que
+  // sí se puede interpretar va normalizado para no repetir el aviso de la librería sobre el formato.
+  const valorSelector = normalizado ?? (PARCIAL_INTERNACIONAL.test(crudo) ? crudo : undefined)
 
   useEffect(() => {
     if (normalizado !== null && normalizado !== crudo) {
@@ -75,10 +88,11 @@ export function CampoTelefono({
       ) : (
         <PhoneInput
           id={id}
-          value={normalizado ?? undefined}
+          value={valorSelector}
           onChange={(nuevo) => onChange(nuevo ?? '')}
           defaultCountry="AR"
           labels={etiquetas}
+          displayInitialValueAsLocalNumber
           placeholder="+54 9 11 1234-5678"
           aria-describedby={describedBy}
           aria-invalid={error ? 'true' : undefined}

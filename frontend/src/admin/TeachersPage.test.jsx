@@ -513,8 +513,9 @@ describe('edición de docente (historia #11)', () => {
     expect(screen.getByLabelText(/^Apellido/)).toHaveValue('Molina')
     expect(screen.getByLabelText(/^DNI/)).toHaveValue('30.111.222')
     expect(screen.getByLabelText(/^Mail/)).toHaveValue('rita.molina@techacademy.invalid')
-    // El valor guardado se puede interpretar, así que el control lo muestra normalizado (D57).
-    expect(screen.getByLabelText(/^Teléfono/)).toHaveValue('+54 11 4000 1000')
+    // El valor guardado se puede interpretar, así que el control lo muestra normalizado y sin el
+    // `+54`, que lo aporta el selector de país (D57).
+    expect(screen.getByLabelText(/^Teléfono/)).toHaveValue('011 4000-1000')
     // El prefijo y el verificador salen del CUIL guardado; los 8 del medio, del DNI actual.
     expect(screen.getByLabelText('CUIL')).toHaveValue('27')
     expect(screen.getByLabelText('Parte del DNI en el CUIL')).toHaveValue('30111222')
