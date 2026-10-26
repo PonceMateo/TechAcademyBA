@@ -30,9 +30,9 @@
 
 ## 5. Integración
 
-- [ ] 5.1 Ejecutar `docker compose run --rm backend pytest` y `docker compose run --rm backend ruff check .`; verificar que pasan sin errores
-- [ ] 5.2 Ejecutar `docker compose run --rm frontend npm run test`, `npm run lint` y `npm run build`; verificar que pasan sin errores
-- [ ] 5.3 Correr `docker compose run --rm backend python -m app.services.seed` dos veces y verificar en la base que Rita queda con `27301112225` y que la segunda corrida no cambia nada
-- [ ] 5.4 Consultar en la base las filas de `docente` con `cuil` no nulo y comparar los 8 dígitos del medio con `dni_norm`; documentar las diferencias antes de desplegar
-- [ ] 5.5 Probar en el navegador el alta y la edición de un docente con teléfono y CUIL, el alta de un alumno con teléfono y el alta de una comisión con cupo `1.1`; verificar los mensajes y que el formulario no cierre ante el rechazo
-- [ ] 5.6 Ejecutar `openspec validate "validaciones-formularios"` y `openspec status --change "validaciones-formularios"`; verificar que el change queda válido y con todos los artefactos listos
+- [x] 5.1 Ejecutar `docker compose run --rm backend pytest` y `docker compose run --rm backend ruff check .`; verificar que pasan sin errores
+- [x] 5.2 Ejecutar `docker compose run --rm frontend npm run test`, `npm run lint` y `npm run build`; verificar que pasan sin errores
+- [x] 5.3 Correr `docker compose run --rm backend python -m app.services.seed` dos veces y verificar en la base que Rita queda con `27301112225` y que la segunda corrida no cambia nada
+- [x] 5.4 Consultar en la base las filas de `docente` con `cuil` no nulo y comparar los 8 dígitos del medio con `dni_norm`; documentar las diferencias antes de desplegar
+- [x] 5.5 Probar en el navegador el alta y la edición de un docente con teléfono y CUIL, el alta de un alumno con teléfono y el alta de una comisión con cupo `1.1`; verificar los mensajes y que el formulario no cierre ante el rechazo
+- [x] 5.6 Ejecutar `openspec validate "validaciones-formularios"` y `openspec status --change "validaciones-formularios"`; verificar que el change queda válido y con todos los artefactos listos
