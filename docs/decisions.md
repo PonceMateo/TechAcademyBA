@@ -1906,6 +1906,14 @@ alcance de este change; queda a criterio del equipo agregarlo.
   con los que no parsean en el camino de lectura. Se resolvió en el control: el valor que se puede
   interpretar se muestra ya normalizado, el que no se puede interpretar se conserva tal cual **sin
   aviso** al cargar y hay que reingresarlo para guardar. No se migran los teléfonos guardados.
+- **Corrección — formato visible del teléfono (2026-10-26):** el control mostraba `+54` como texto y
+  perdía el foco a mitad del tipeo. La causa raíz era que el modo de texto libre se decidía con
+  `parsePhoneNumber`, y mientras se escribe el valor es un parcial (`+54`, `+541`) que la librería
+  todavía no reconoce; eso reemplazaba el control por un input de texto, que además acepta letras.
+  Ahora el modo se decide por la forma del valor (`^\+\d[\d\s().-]*$`) y al selector se le pasa el
+  parcial tal cual. Se agrega `displayInitialValueAsLocalNumber` para que un número guardado se vea
+  sin el `+54` (el prefijo lo aporta el selector de país). El valor que sale sigue siendo E.164 o
+  vacío.
 - **Decisión — validadores compartidos:** las reglas puras del front viven en
   `frontend/src/domain/validacion.js` (`emailConForma`, `dniConForma`, `dniDigitos`, `componerCuil`,
   `partirCuil`) y las del back en `backend/app/schemas/validators.py` (`EmailConForma`,
