@@ -47,6 +47,10 @@ _DNI_CON_SEPARADORES = re.compile(r"^[0-9.\s-]+$")
 INDICE_DNI = "uq_docente_dni_norm"
 INDICE_EMAIL = "uq_docente_email"
 
+#: El CUIL es único (D57). Un DNI de 7 dígitos y el mismo con un cero adelante —`1112222` y
+#: `01112222`— son DNIs distintos y el mismo CUIL, así que el choque existe y hay que nombrarlo.
+INDICE_CUIL = "uq_docente_cuil"
+
 #: La cuenta tiene su propio índice de email (D5). En la edición es el que corta la carrera entre
 #: dos personas que guardan el mismo correo al mismo tiempo, y se traduce al mismo rechazo.
 INDICE_USUARIO_EMAIL = "uq_usuario_email"
@@ -67,10 +71,10 @@ class DocenteSinCuenta(Exception):
 
 
 class DocenteDuplicado(Exception):
-    """El DNI o el email ya están registrados.
+    """El DNI, el email o el CUIL ya están registrados.
 
-    `campo` dice **cuál de los dos** se repitió, porque el criterio de la historia #9 pide saber
-    qué colisionó y "el docente ya existe" no alcanza para corregir el formulario.
+    `campo` dice **cuál** se repitió, porque el criterio de la historia #9 pide saber qué colisionó
+    y "el docente ya existe" no alcanza para corregir el formulario.
     """
 
     def __init__(self, campo: str) -> None:
@@ -366,4 +370,6 @@ def _traducir_duplicado(error: IntegrityError) -> None:
         raise DocenteDuplicado("DNI") from error
     if INDICE_EMAIL in motivo or INDICE_USUARIO_EMAIL in motivo:
         raise DocenteDuplicado("email") from error
+    if INDICE_CUIL in motivo:
+        raise DocenteDuplicado("CUIL") from error
     logger.warning("El alta de docente chocó con una restricción no prevista: %s", motivo)

@@ -172,10 +172,9 @@ def crear_docente(
     cuil: str | None = None,
     email: str = "rita.molina@techacademy.invalid",
 ) -> Docente:
-    """Docente válido. El CUIL es opcional (D33), así que el valor por defecto es `None`.
+    """Docente válido. El CUIL es opcional (D57), así que el valor por defecto es `None`.
 
-    El caso de D33 en persona: en esta fase los docentes no son personas reales y no hay
-    CUIL que completar.
+    Un docente sin CUIL es una fila válida: el dato sirve para liquidar, pero el alta no lo exige.
     """
     return _persistir(
         session,

@@ -527,6 +527,32 @@ def test_dni_repetido_se_rechaza_diciendo_dni(
     assert "DNI" in respuesta.json()["detail"]
 
 
+def test_cuil_repetido_se_rechaza_diciendo_cuil(
+    api_client: TestClient, admin: Usuario, db_session: Session
+) -> None:
+    """D57: el CUIL es único y el rechazo lo nombra, aunque el DNI sea otro.
+
+    `3011122` y `03011122` son DNIs distintos —el segundo tiene un cero adelante— y el mismo CUIL,
+    porque la comparación del CUIL usa el DNI completado con ceros a la izquierda.
+    """
+    crear_docente(db_session, dni="3011122", cuil="24030111225")
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(admin)))
+
+    respuesta = api_client.post(
+        "/docentes",
+        json={
+            "nombre": "Otro",
+            "apellido": "Docente",
+            "dni": "03011122",
+            "email": "otro.cuil@techacademy.invalid",
+            "cuil": "24-03011122-5",
+        },
+    )
+
+    assert respuesta.status_code == 409, respuesta.text
+    assert "CUIL" in respuesta.json()["detail"]
+
+
 def test_email_repetido_se_rechaza_diciendo_email(
     api_client: TestClient, admin: Usuario, db_session: Session
 ) -> None:
