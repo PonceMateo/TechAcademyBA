@@ -170,24 +170,38 @@ del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 
 
 El sistema SHALL exponer la consulta del padrón de docentes y su alta. La consulta
 `GET /docentes` SHALL devolver los docentes con sus datos personales y la cantidad de
-comisiones asignadas. El alta `POST /docentes` SHALL aceptar nombre, apellido, DNI, email
-y teléfono opcional, y **SHALL NOT incluir el CUIL en el contrato**: el CUIL no es
-información que el alta exija y la columna queda para completarla cuando haya docentes
-reales. WHEN el DNI o el email informados ya estén registrados, el sistema SHALL rechazar
-el alta e informar **cuál de los dos datos se repitió**, porque el criterio de la historia
-pide saber qué colisionó. WHEN el alta es exitosa, el sistema SHALL crear en **una sola
-transacción** el docente y su cuenta de acceso con rol de docente, de modo que el docente
-quede creado y accesible por su email o no quede ninguno de los dos. La cuenta creada
-SHALL quedar sin cambio de contraseña pendiente, de manera coherente con las cuentas
-de demostración, porque el flujo de cambio de contraseña todavía no existe (historia #9).
+comisiones asignadas. El alta `POST /docentes` SHALL aceptar nombre, apellido, DNI, email,
+teléfono opcional y `cuil` opcional. El CUIL SHALL tener 11 dígitos después de quitar guiones,
+SHALL usar el prefijo `20`, `23`, `24` o `27` y SHALL tener los 8 dígitos del medio iguales al DNI
+del docente, completado con ceros a la izquierda cuando el DNI tenga 7 dígitos. La API SHALL NOT
+calcular ni validar el dígito verificador. Un CUIL parcial o con una estructura inválida SHALL
+responder `422`. WHEN el DNI o el email informados ya estén registrados, el sistema SHALL rechazar
+el alta e informar **cuál de los dos datos se repitió**, porque el criterio de la historia pide saber
+qué colisionó. WHEN el alta es exitosa, el sistema SHALL crear en **una sola transacción** el docente
+y su cuenta de acceso con rol de docente, de modo que el docente quede creado y accesible por su
+email o no quede ninguno de los dos. La cuenta creada SHALL quedar sin cambio de contraseña
+pendiente, de manera coherente con las cuentas de demostración, porque el flujo de cambio de
+contraseña todavía no existe (historia #9).
 
 #### Scenario: Alta de docente correcta
+
 - **WHEN** se envían nombre, apellido, DNI, email y teléfono de un docente no registrado
 - **THEN** el sistema responde con el docente creado y su acceso por ese email, y el docente queda disponible para asignar a una comisión
 
 #### Scenario: El contrato de alta de docente no lleva CUIL
+
 - **WHEN** se inspecciona lo que el alta de docente admite
-- **THEN** admite nombre, apellido, DNI, email y teléfono opcional, y ningún campo de CUIL
+- **THEN** el contrato ya no excluye el CUIL: admite nombre, apellido, DNI, email, teléfono opcional y `cuil` opcional, y sin `cuil` el docente se guarda con ese dato en `null`. El nombre del escenario es histórico
+
+#### Scenario: Alta de docente con CUIL válido
+
+- **WHEN** se envía un alta con un CUIL de 11 dígitos, con o sin guiones, cuyo prefijo es válido y cuyos 8 dígitos del medio coinciden con el DNI
+- **THEN** el sistema crea el docente, guarda el CUIL en 11 dígitos y lo devuelve en ese formato
+
+#### Scenario: Alta de docente con CUIL inválido
+
+- **WHEN** se envía un alta con un CUIL parcial, con un prefijo no permitido o con 8 dígitos del medio que no coinciden con el DNI
+- **THEN** el sistema rechaza el alta con `422` y no crea el docente
 
 #### Scenario: DNI de docente repetido
 - **WHEN** se envía un DNI que ya está registrado
@@ -251,7 +265,7 @@ muestra la acción sin formulario detrás, y SHALL dejar de hacerlo.
 
 #### Scenario: La pantalla de docente ofrece el formulario
 - **WHEN** se abre la pantalla de docentes
-- **THEN** la acción de alta abre un formulario que pide nombre, apellido, DNI, email y teléfono, sin campo de CUIL
+- **THEN** la acción de alta abre un formulario que pide nombre, apellido, DNI, email, teléfono y un CUIL opcional, con el control de teléfono y los tres controles del CUIL
 
 #### Scenario: Aviso de que el maquetado no guarda nada
 - **WHEN** se revisan las tres pantallas de alta
