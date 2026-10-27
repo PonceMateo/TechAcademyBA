@@ -5,8 +5,7 @@ Historias #1, #2, #5 y #8.
 **El alta de un curso no tiene campo de código, a propósito.** No es que esté commented out:
 `CursoCreate` no lo declara y los esquemas son `extra="forbid"`, así que un `POST /cursos` que
 informe `codigo` se rechaza con 422. El código lo genera la base (D32) y un cliente que lo
-informe está usando un contrato viejo. Lo mismo con el CUIL del docente, en
-`app/schemas/padron.py`.
+informe está usando un contrato viejo.
 
 Los nombres de los campos van en inglés y el texto de cara al usuario en es-AR: es la
 distribución de D19.

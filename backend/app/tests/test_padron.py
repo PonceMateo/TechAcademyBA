@@ -18,10 +18,10 @@ from app.tests.factories import (
 
 
 def test_alta_de_docente_sin_cuil(db_session: Session) -> None:
-    """Historia #9 y D33: el docente se crea con acceso por su email, y el CUIL no se pide.
+    """Historia #9 y D57: el docente se crea con acceso por su email y el CUIL es opcional.
 
-    El valor por defecto de la fábrica es `None`: en esta fase los docentes no son personas
-    reales y un CUIL inventado sería peor que ninguno.
+    El valor por defecto de la fábrica es `None`: un docente sin CUIL es un estado válido del
+    modelo, y el alta sin ese dato lo guarda así.
     """
     docente = crear_docente(db_session)
     assert docente.cuil is None
@@ -29,13 +29,13 @@ def test_alta_de_docente_sin_cuil(db_session: Session) -> None:
 
 
 def test_alta_de_docente_con_cuil(db_session: Session) -> None:
-    """D33: la columna no se borró, sigue aceptando el dato cuando hay docente real."""
+    """D57: la columna sigue aceptando el dato cuando el docente lo tiene."""
     docente = crear_docente(db_session, cuil="27345678907")
     assert docente.cuil == "27345678907"
 
 
 def test_varios_docentes_sin_cuil_conviven(db_session: Session) -> None:
-    """D33: el índice único sobre `cuil` sobrevive a los nulos.
+    """D57: el índice único sobre `cuil` sobrevive a los nulos.
 
     PostgreSQL admite varios nulos en un índice único, así que la obligatoriedad que se
     revirtió no dejó el índice pidiendo un valor inventado.
@@ -47,7 +47,7 @@ def test_varios_docentes_sin_cuil_conviven(db_session: Session) -> None:
 
 
 def test_cuil_duplicado_es_rechazado(db_session: Session) -> None:
-    """D33: el CUIL sigue siendo único cuando está cargado."""
+    """D57: el CUIL sigue siendo único cuando está cargado."""
     crear_docente(db_session, cuil="27345678907")
     motivo = assert_rechazado(
         crear_docente,

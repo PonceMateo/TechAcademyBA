@@ -6,7 +6,8 @@ Corre contra PostgreSQL real (D15). Lo que se afirma:
   cuenta de acceso en la misma transacción;
 - el DNI se compara solo dentro del padrón de docentes y el email contra los tres padrones,
   excluyendo al propio docente y a su cuenta;
-- el CUIL sigue fuera del contrato: mandarlo responde `422`;
+- el CUIL es opcional: omitirlo conserva el actual, `null` lo borra, un valor nuevo lo reemplaza
+  y uno inválido responde `422` sin tocar el anterior (D57);
 - el restablecimiento guarda solo el hash, invalida la contraseña anterior y deja la cuenta con
   cambio obligatorio;
 - un docente sin cuenta se edita igual y el restablecimiento responde `409`;
@@ -82,7 +83,8 @@ def _datos(docente: Docente, **cambios: object) -> dict:
         "apellido": docente.apellido,
         "dni": docente.dni,
         "email": docente.email,
-        "telefono": docente.telefono,
+        # E.164 y no el teléfono de la fábrica, que es legacy a propósito (D57).
+        "telefono": "+5491140000001",
     }
     datos.update(cambios)
     return datos
@@ -109,7 +111,7 @@ def test_editar_docente_actualiza_los_datos_y_conserva_las_comisiones(
             apellido="Molina Gómez",
             dni="31.111.222",
             email="rita.gomez@techacademy.invalid",
-            telefono="+54 11 5555-0000",
+            telefono="+5491155550000",
         ),
     )
 
@@ -118,7 +120,7 @@ def test_editar_docente_actualiza_los_datos_y_conserva_las_comisiones(
     assert actualizado.dni == "31.111.222"
     assert actualizado.dni_norm == "31111222"
     assert actualizado.email == "rita.gomez@techacademy.invalid"
-    assert actualizado.telefono == "+54 11 5555-0000"
+    assert actualizado.telefono == "+5491155550000"
     assert db_session.get(Comision, comision.id).docente_id == docente.id
     db_session.refresh(usuario)
     assert usuario.nombre == "Rita Molina Gómez"
@@ -178,10 +180,10 @@ def test_editar_un_docente_sin_cuenta_no_crea_una(db_session: Session) -> None:
     docente = _docente(db_session)
 
     actualizado = padron.editar_docente(
-        db_session, docente, DocenteUpdate(**_datos(docente, telefono="+54 11 4444-1111"))
+        db_session, docente, DocenteUpdate(**_datos(docente, telefono="+5491144441111"))
     )
 
-    assert actualizado.telefono == "+54 11 4444-1111"
+    assert actualizado.telefono == "+5491144441111"
     assert db_session.scalar(select(Usuario).where(Usuario.docente_id == docente.id)) is None
 
 
@@ -242,14 +244,14 @@ def test_edicion_exitosa_devuelve_el_docente_con_sus_comisiones(
             "apellido": "Molina",
             "dni": docente.dni,
             "email": usuario.email,
-            "telefono": "+54 11 4321-0000",
+            "telefono": "+5491143210000",
         },
     )
 
     assert respuesta.status_code == 200, respuesta.text
     cuerpo = respuesta.json()
     assert cuerpo["id"] == docente.id
-    assert cuerpo["telefono"] == "+54 11 4321-0000"
+    assert cuerpo["telefono"] == "+5491143210000"
     assert cuerpo["cantidad_comisiones"] == 1
     assert cuerpo["comisiones"][0]["codigo"] == comision.codigo
 
@@ -279,26 +281,94 @@ def test_el_email_nuevo_sirve_para_entrar(
         auth.autenticar(db_session, email_viejo, PASSWORD_DE_PRUEBA)
 
 
-def test_el_cuil_no_se_edita_y_mandarlo_da_422(
+def _cuerpo_edicion(docente: Docente, usuario: Usuario, **cambios: object) -> dict:
+    cuerpo = {
+        "nombre": docente.nombre,
+        "apellido": docente.apellido,
+        "dni": docente.dni,
+        "email": usuario.email,
+    }
+    cuerpo.update(cambios)
+    return cuerpo
+
+
+def test_la_edicion_guarda_un_cuil_valido_en_11_digitos(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
-    """D33 y D52: el CUIL es opcional y no forma parte del contrato."""
-    docente, usuario = _docente_con_cuenta(db_session)
+    """D57: el CUIL forma parte del contrato de la edición y se devuelve sin guiones."""
+    docente, usuario = _docente_con_cuenta(db_session, dni="30111222")
 
     respuesta = cliente_admin.put(
         f"/docentes/{docente.id}",
-        json={
-            "nombre": docente.nombre,
-            "apellido": docente.apellido,
-            "dni": docente.dni,
-            "email": usuario.email,
-            "cuil": "20-12345678-6",
-        },
+        json=_cuerpo_edicion(docente, usuario, cuil="27-30111222-5"),
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["cuil"] == "27301112225"
+    db_session.expire_all()
+    assert db_session.get(Docente, docente.id).cuil == "27301112225"
+
+
+def test_la_edicion_sin_cuil_conserva_el_actual(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """D57: omitir `cuil` en el `PUT` no borra el que el docente ya tenía."""
+    docente, usuario = _docente_con_cuenta(db_session, dni="30111222", cuil="27301112225")
+
+    respuesta = cliente_admin.put(
+        f"/docentes/{docente.id}", json=_cuerpo_edicion(docente, usuario, nombre="Rita")
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["cuil"] == "27301112225"
+    db_session.expire_all()
+    assert db_session.get(Docente, docente.id).cuil == "27301112225"
+
+
+def test_la_edicion_con_cuil_en_null_lo_borra(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """D57: `null` explícito es la única forma de vaciar el CUIL desde la edición."""
+    docente, usuario = _docente_con_cuenta(db_session, dni="30111222", cuil="27301112225")
+
+    respuesta = cliente_admin.put(
+        f"/docentes/{docente.id}", json=_cuerpo_edicion(docente, usuario, cuil=None)
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["cuil"] is None
+    db_session.expire_all()
+    assert db_session.get(Docente, docente.id).cuil is None
+
+
+def test_la_edicion_reemplaza_el_cuil_anterior(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    docente, usuario = _docente_con_cuenta(db_session, dni="30111222", cuil="27301112225")
+
+    respuesta = cliente_admin.put(
+        f"/docentes/{docente.id}",
+        json=_cuerpo_edicion(docente, usuario, cuil="20301112229"),
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["cuil"] == "20301112229"
+
+
+@pytest.mark.parametrize("cuil", ["2730111222", "30301112225", "27999888776"])
+def test_un_cuil_invalido_en_la_edicion_da_422_y_no_cambia_el_anterior(
+    cliente_admin: TestClient, db_session: Session, cuil: str
+) -> None:
+    """D57: la edición rechaza lo mismo que el alta y el CUIL guardado queda intacto."""
+    docente, usuario = _docente_con_cuenta(db_session, dni="30111222", cuil="27301112225")
+
+    respuesta = cliente_admin.put(
+        f"/docentes/{docente.id}", json=_cuerpo_edicion(docente, usuario, cuil=cuil)
     )
 
     assert respuesta.status_code == 422, respuesta.text
     db_session.expire_all()
-    assert db_session.get(Docente, docente.id).cuil is None
+    assert db_session.get(Docente, docente.id).cuil == "27301112225"
 
 
 def test_dni_duplicado_da_409_y_dice_cual(

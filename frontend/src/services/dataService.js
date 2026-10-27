@@ -77,15 +77,16 @@ export function buscarDocentes(texto) {
 }
 
 /**
- * Alta de docente. **El contrato no lleva CUIL** (D33) y la promesa **nunca cae al ejemplo**: un
- * alta que no llega a la base tiene que fallar y decirlo (D36).
+ * Alta de docente. El `cuil` es opcional y viaja en 11 dígitos o `null` (D57); la promesa **nunca
+ * cae al ejemplo**: un alta que no llega a la base tiene que fallar y decirlo (D36).
  */
 export function crearDocente(datos) {
   return getDataSource().crearDocente(datos)
 }
 
 /**
- * Edición de los datos personales del docente (historia #11). Conserva el `id` y el CUIL; la
+ * Edición de los datos personales del docente (historia #11). Conserva el `id`, sus comisiones y
+ * el CUIL que no se envíe: omitirlo en el cuerpo mantiene el actual y `null` lo borra (D57). La
  * respuesta trae la fila actualizada y la pantalla la fusiona con la que ya mostraba para no
  * perder las comisiones asignadas.
  */

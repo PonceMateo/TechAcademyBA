@@ -64,8 +64,9 @@ def crear_docente(
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
 ) -> DocenteOut:
-    """Alta de docente. El cuerpo admite nombre, apellido, DNI, email y teléfono: **ningún
-    campo de CUIL**, porque el CUIL es opcional (D33) y un `cuil` en el JSON es un 422.
+    """Alta de docente. El cuerpo admite nombre, apellido, DNI, email, teléfono opcional y
+    `cuil` opcional, que se valida contra el DNI del mismo cuerpo (D57): 11 dígitos, prefijo
+    permitido y los 8 del medio iguales al DNI. El dígito verificador no se calcula.
 
     Crea el docente y su cuenta de acceso en una sola transacción, con la contraseña de
     demostración y sin cambio pendiente.
@@ -101,8 +102,9 @@ def editar_docente(
 ) -> DocenteOut:
     """Edición de los datos personales del docente (HU #11).
 
-    El cuerpo admite **solo** nombre, apellido, DNI, mail y teléfono: el CUIL sigue fuera del
-    contrato (D33) y un `cuil` es un 422. Sincroniza el nombre y el email de la cuenta vinculada
+    El cuerpo admite nombre, apellido, DNI, mail, teléfono opcional y `cuil` opcional con las
+    mismas validaciones del alta. Omitir `cuil` conserva el que el docente ya tenía y un `null`
+    explícito lo borra (D57). Sincroniza el nombre y el email de la cuenta vinculada
     en la misma transacción, así que el docente entra con el correo nuevo.
 
     200 con el docente actualizado —con sus comisiones—, 404 si no existe, 409 si el DNI o el

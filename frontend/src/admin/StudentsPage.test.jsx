@@ -17,6 +17,7 @@ const COLUMNAS_ALUMNOS = [
   'DNI',
   'NOMBRE',
   'EMAIL',
+  'TELÉFONO',
   'COMISIÓN ASIGNADA',
   'CATEGORÍA ARANCELARIA',
   'ACCESO PLATAFORMA',
@@ -29,7 +30,7 @@ const ALTA = {
   documento: '30.111.222',
   nombre: 'Rocío Álvarez',
   email: 'rocio.alvarez@techacademy.invalid',
-  telefono: '011 4000-0005',
+  telefono: '+5491140000005',
 }
 
 /** La contraseña inicial que genera el alta: `<primer nombre><DNI>` (D45). */
@@ -80,7 +81,10 @@ async function completarAlta(user, datos = ALTA) {
   await user.type(screen.getByLabelText(/^DNI/), datos.documento)
   await user.type(screen.getByLabelText(/^Nombre/), datos.nombre)
   await user.type(screen.getByLabelText(/^Email/), datos.email)
-  await user.type(screen.getByLabelText(/^Teléfono/), datos.telefono)
+  // El control de teléfono reacomoda el cursor mientras se escribe: se pega el número entero, que
+  // es además lo que entrega el selector de país (D57).
+  await user.click(screen.getByLabelText(/^Teléfono/))
+  await user.paste(datos.telefono)
 }
 
 describe('padrón de alumnos', () => {
@@ -118,23 +122,49 @@ describe('padrón de alumnos', () => {
     expect(filaDe('Nicolás Castro').cells[0]).toHaveTextContent('Sin DNI (alumno exterior)')
   })
 
+  it('muestra con puntos el documento que la fuente devuelve normalizado', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 11,
+          nombre: 'Alumno Normalizado',
+          documento: '30111222',
+          tipo_documento: 'DNI',
+          email: 'normalizado@techacademy.invalid',
+          telefono: null,
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ],
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+
+    await screen.findByText('Alumno Normalizado')
+
+    expect(filaDe('Alumno Normalizado').cells[0]).toHaveTextContent('30.111.222')
+  })
+
   it('muestra la categoría con su color', () => {
-    expect(filaDe('Juan Ignacio Pérez').cells[4].textContent).toContain('PARTICULAR')
-    expect(filaDe('Juan Ignacio Pérez').cells[4].querySelector('.text-slate-700')).not.toBeNull()
-    expect(filaDe('Agustina Benítez').cells[4].textContent).toContain('BECADO PARCIAL')
-    expect(filaDe('Agustina Benítez').cells[4].querySelector('.text-violet-800')).not.toBeNull()
+    expect(filaDe('Juan Ignacio Pérez').cells[5].textContent).toContain('PARTICULAR')
+    expect(filaDe('Juan Ignacio Pérez').cells[5].querySelector('.text-slate-700')).not.toBeNull()
+    expect(filaDe('Agustina Benítez').cells[5].textContent).toContain('BECADO PARCIAL')
+    expect(filaDe('Agustina Benítez').cells[5].querySelector('.text-violet-800')).not.toBeNull()
   })
 
   it('muestra el porcentaje de descuento del becado parcial', () => {
-    expect(filaDe('Camila Rodríguez').cells[4]).toHaveTextContent('50% de descuento')
-    expect(filaDe('Agustina Benítez').cells[4]).toHaveTextContent('50% de descuento')
+    expect(filaDe('Camila Rodríguez').cells[5]).toHaveTextContent('50% de descuento')
+    expect(filaDe('Agustina Benítez').cells[5]).toHaveTextContent('50% de descuento')
   })
 
   it('deja las categorías con colores distintos entre sí', () => {
     // BECADO TOTAL y CORPORATIVO son del enum y del spec, pero el padrón del maquetado no tiene
     // filas de esas dos. Lo verificable acá es que las dos que aparecen no comparten color.
     const colorDe = (nombre) => {
-      const insignia = filaDe(nombre).cells[4].querySelector('[data-ui="badge"]')
+      const insignia = filaDe(nombre).cells[5].querySelector('[data-ui="badge"]')
       return insignia.className
     }
 
@@ -171,8 +201,8 @@ describe('padrón de alumnos', () => {
       expect(bloqueo.className).toContain('text-red-800')
     }
 
-    expect(filaDe('Agustina Benítez').cells[5]).toHaveTextContent('comprobante ilegible')
-    expect(filaDe('Valeria Rossi').cells[5]).toHaveTextContent('debe saldo')
+    expect(filaDe('Agustina Benítez').cells[6]).toHaveTextContent('comprobante ilegible')
+    expect(filaDe('Valeria Rossi').cells[6]).toHaveTextContent('debe saldo')
   })
 
   it('informa que la búsqueda no arrojó resultados', async () => {
@@ -216,9 +246,37 @@ describe('padrón de alumnos', () => {
     await screen.findByText('Nuevo Alumno')
 
     const fila = filaDe('Nuevo Alumno')
-    expect(fila.cells[3]).toHaveTextContent('Sin comisión')
-    expect(fila.cells[4]).toHaveTextContent('—')
+    expect(fila.cells[3]).toHaveTextContent('—')
+    expect(fila.cells[4]).toHaveTextContent('Sin comisión')
     expect(fila.cells[5]).toHaveTextContent('—')
+    expect(fila.cells[6]).toHaveTextContent('—')
+  })
+
+  it('muestra el teléfono del alumno en formato nacional', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 10,
+          nombre: 'Alumna Con Teléfono',
+          documento: '30.111.223',
+          tipo_documento: 'DNI',
+          email: 'con.telefono@techacademy.invalid',
+          telefono: '+5491140000005',
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ],
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+
+    await screen.findByText('Alumna Con Teléfono')
+
+    // El padrón guarda E.164; la tabla muestra el número como lo lee la secretaría.
+    expect(filaDe('Alumna Con Teléfono').cells[3]).toHaveTextContent('011 15-4000-0005')
   })
 })
 
@@ -266,6 +324,26 @@ describe('alta de alumno', () => {
     expect(await screen.findByText('El DNI debe tener 7 u 8 dígitos.')).toBeInTheDocument()
     expect(screen.getByText('El email no tiene un formato válido.')).toBeInTheDocument()
     expect(crearAlumno).not.toHaveBeenCalled()
+  })
+
+  it('manda el DNI como se escribió y el teléfono en E.164', async () => {
+    const crearAlumno = vi.fn(async (datos) => filaCreada(datos))
+    cleanup()
+    stubDataSource({ crearAlumno })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+    const user = await abrirModal()
+
+    await completarAlta(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Alumno' }))
+
+    await waitFor(() => expect(crearAlumno).toHaveBeenCalledTimes(1))
+    expect(crearAlumno.mock.calls[0][0]).toEqual({
+      documento: '30.111.222',
+      nombre: 'Rocío Álvarez',
+      email: 'rocio.alvarez@techacademy.invalid',
+      telefono: '+5491140000005',
+    })
   })
 
   it('da de alta, cierra el formulario, incorpora la fila y muestra las credenciales en un modal', async () => {
@@ -363,6 +441,44 @@ describe('edición y baja de alumnos', () => {
       telefono: null,
     })
     expect(screen.queryByRole('dialog', { name: 'Editar Alumno' })).not.toBeInTheDocument()
+  })
+
+  it('rechaza un teléfono legacy que no se puede interpretar', async () => {
+    const editarAlumno = vi.fn()
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: vi.fn(async () => [
+        {
+          id: 5,
+          nombre: 'Alumno Legacy',
+          documento: '30.111.222',
+          tipo_documento: 'DNI',
+          email: 'legacy@techacademy.invalid',
+          telefono: 'particular',
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ]),
+      editarAlumno,
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Alumno Legacy')
+    const user = userEvent.setup()
+
+    await user.click(within(filaDe('Alumno Legacy')).getByRole('button', { name: 'Editar' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Editar Alumno' })
+
+    // El valor crudo se conserva y no hay aviso al cargar; el rechazo aparece al guardar (D57).
+    expect(within(dialogo).getByLabelText(/^Teléfono/)).toHaveValue('particular')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(
+      await screen.findByText('El teléfono no es válido: elegí el país y escribí el número.'),
+    ).toBeInTheDocument()
+    expect(editarAlumno).not.toHaveBeenCalled()
   })
 
   it('deja el modal abierto cuando la edición choca con un dato duplicado', async () => {

@@ -10,6 +10,7 @@
  * encabezado (`formatFechaLarga`) es genuinamente el instante actual, y es el único lugar del
  * módulo que usa `Date`.
  */
+import { formatPhoneNumber, parsePhoneNumber } from 'react-phone-number-input'
 
 /**
  * Miles y pesos sin decimales.
@@ -56,6 +57,45 @@ const FECHA_LARGA = new Intl.DateTimeFormat('es-AR', {
 export function formatFechaLarga(fecha = new Date()) {
   const texto = FECHA_LARGA.format(fecha).replace(',', '')
   return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+/**
+ * `+541140000001` → `011 4000-0001`: el teléfono como lo lee la secretaría en la tabla.
+ *
+ * El valor guardado es E.164 porque es lo que viaja y lo que valida la API; el `+54` y el `0` del
+ * prefijo nacional son de la vista. Un texto que la librería no puede interpretar —`particular`,
+ * `000`— se devuelve tal cual, igual que `formatearCuil`: un formato inventado es peor que el dato
+ * crudo que hay guardado.
+ */
+export function formatTelefono(valor) {
+  if (!valor) {
+    return ''
+  }
+
+  const numero = parsePhoneNumber(String(valor))
+  return numero ? formatPhoneNumber(numero.number) : String(valor)
+}
+
+/**
+ * `30111222` → `30.111.222`: el documento se guarda solo con dígitos (D6) y se lee con puntos.
+ * Un texto que no sea un DNI de 7 u 8 dígitos —el alumno del exterior— se devuelve tal cual.
+ */
+export function formatDocumento(valor) {
+  if (!valor) {
+    return ''
+  }
+
+  const texto = String(valor).trim()
+  if (!/^[\d.\s-]+$/.test(texto)) {
+    return texto
+  }
+
+  const digitos = texto.replace(/\D/g, '')
+  if (digitos.length < 7 || digitos.length > 8) {
+    return texto
+  }
+
+  return digitos.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
 /** Iniciales de la cuenta para el avatar: dos palabras, dos letras. */

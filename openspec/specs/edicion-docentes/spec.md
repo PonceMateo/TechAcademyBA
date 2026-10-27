@@ -9,8 +9,12 @@ contraseña, conservando sus comisiones y sincronizando su cuenta de acceso.
 ### Requirement: Edición de los datos del docente
 
 El sistema SHALL exponer `PUT /docentes/{id}` solo para Administración. La edición SHALL aceptar
-nombre, apellido, DNI, email y teléfono opcional, con las mismas validaciones del alta, y SHALL NOT
-aceptar CUIL: un `cuil` en el cuerpo SHALL responder `422`.
+nombre, apellido, DNI, email, teléfono opcional y `cuil` opcional, con las mismas validaciones del
+alta. El CUIL SHALL tener 11 dígitos después de quitar guiones, SHALL usar el prefijo `20`, `23`,
+`24` o `27` y SHALL tener los 8 dígitos del medio iguales al DNI del docente, completado con ceros a
+la izquierda cuando el DNI tenga 7 dígitos. La API SHALL NOT calcular ni validar el dígito
+verificador. En `PUT`, omitir `cuil` SHALL conservar el CUIL actual, un `null` explícito SHALL
+borrarlo y un CUIL parcial o con estructura inválida SHALL responder `422`.
 
 El sistema SHALL conservar el `id` del docente y SHALL NOT modificar sus comisiones asignadas ni su
 historial. SHALL sincronizar `nombre` y `email` del `Usuario` vinculado en la misma transacción, de modo
@@ -24,7 +28,7 @@ responder `404`; WHEN falte un campo obligatorio o el email no tenga forma, SHAL
 
 #### Scenario: Edición exitosa
 
-- **WHEN** se modifican el nombre, apellido, DNI, email o teléfono de un docente con valores válidos y no duplicados
+- **WHEN** se modifican el nombre, apellido, DNI, email, teléfono o CUIL de un docente con valores válidos y no duplicados
 - **THEN** los cambios quedan persistidos, el docente conserva sus comisiones asignadas y la respuesta trae la fila actualizada
 
 #### Scenario: La cuenta de acceso queda sincronizada
@@ -52,10 +56,25 @@ responder `404`; WHEN falte un campo obligatorio o el email no tenga forma, SHAL
 - **WHEN** se guarda un docente sin cambiar su DNI ni su email
 - **THEN** el sistema acepta la edición, porque la comparación excluye al propio docente y a su cuenta
 
+#### Scenario: Edición con CUIL válido
+
+- **WHEN** se envía un `PUT /docentes/{id}` con un CUIL completo, con prefijo permitido y con los 8 dígitos del medio iguales al DNI
+- **THEN** el sistema guarda el CUIL en 11 dígitos y la respuesta lo devuelve en ese formato
+
+#### Scenario: Edición sin CUIL conserva el actual
+
+- **WHEN** se envía un `PUT /docentes/{id}` sin el campo `cuil`
+- **THEN** el sistema conserva el CUIL que el docente ya tenía
+
+#### Scenario: Edición con CUIL en null lo borra
+
+- **WHEN** se envía un `PUT /docentes/{id}` con `cuil` en `null`
+- **THEN** el sistema borra el CUIL del docente y la respuesta lo devuelve en `null`
+
 #### Scenario: CUIL fuera del contrato
 
-- **WHEN** se envía un `PUT /docentes/{id}` con un campo `cuil`
-- **THEN** el sistema rechaza la edición con `422` y el CUIL del docente no cambia
+- **WHEN** se envía un `PUT /docentes/{id}` con un CUIL parcial, con un prefijo no permitido o con 8 dígitos del medio que no coinciden con el DNI
+- **THEN** el sistema rechaza la edición con `422` y el CUIL anterior no cambia. El nombre del escenario es histórico: desde este change el CUIL forma parte del contrato
 
 #### Scenario: Docente inexistente
 

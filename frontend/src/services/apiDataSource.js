@@ -206,8 +206,8 @@ export function createApiDataSource() {
       return filaDeDocente(await request(PATHS.docentes, { method: 'POST', body: datos }))
     },
 
-    /** Edición de los datos personales (historia #11). El CUIL no se envía: sigue fuera del
-     * contrato (D33) y el backend lo rechaza con 422. */
+    /** Edición de los datos personales (historia #11). El cuerpo es el que arma la pantalla:
+     * el CUIL viaja en 11 dígitos o `null` y, si no viaja, el backend conserva el actual (D57). */
     async editarDocente(id, datos) {
       return filaDeDocente(await request(`${PATHS.docentes}/${id}`, { method: 'PUT', body: datos }))
     },

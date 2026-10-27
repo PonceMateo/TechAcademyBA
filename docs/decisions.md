@@ -1720,6 +1720,8 @@ alcance de este change; queda a criterio del equipo agregarlo.
   sigue fuera del contrato (D33): un `cuil` en el cuerpo responde `422`. En la misma transacción se
   sincronizan `nombre` (`"Nombre Apellido"`) y `email` del `Usuario` vinculado, así que el docente
   entra con el correo nuevo sin que queden dos verdades.
+- **Vigencia:** D57 reemplaza esta parte: desde `validaciones-formularios`, el `PUT` acepta `cuil`
+  opcional (omitido conserva, `null` borra).
 - **Unicidad:** el DNI se compara solo contra el padrón de docentes, excluyendo al propio, que es
   lo que dice D5 y lo que permite que una misma persona sea alumna y docente. El email se verifica
   con `ensure_email_available` excluyendo al docente y a su propia cuenta, y sigue siendo único
@@ -1890,3 +1892,73 @@ alcance de este change; queda a criterio del equipo agregarlo.
   environment con revisores es la única barrera automática disponible. El respaldo de la base
   sigue siendo el límite real del rollback.
 - **Dónde:** `.github/workflows/ci.yml`, `README.md`, `AGENTS.md`.
+
+### D57 — Validaciones compartidas de los formularios y CUIL opcional del docente (change `validaciones-formularios`)
+
+- **Fecha:** 2026-10-25
+- **Autor:** Mateo Ponce
+- **Decisión — teléfono:** el teléfono de docentes y alumnos se carga con un control de país
+  (`react-phone-number-input`, `defaultCountry="AR"`, todos los países) y se envía siempre en
+  E.164 o `null`. La API revalida la forma con `TelefonoE164` (`+`, primer dígito distinto de cero
+  y 7 a 15 dígitos) y **deja de aceptar texto libre**: es un cambio breaking del contrato, y por
+  eso el front y el back se despliegan juntos. El regex no agrega `phonenumbers` al backend: el
+  front valida con la librería y la API solo garantiza la forma de transporte.
+- **Por qué no parsear el teléfono guardado en la API:** hay datos legacy
+  (`+54 11 4000-0001` en el seed) y una normalización en el servidor obligaría a decidir qué hacer
+  con los que no parsean en el camino de lectura. Se resolvió en el control: el valor que se puede
+  interpretar se muestra ya normalizado, el que no se puede interpretar se conserva tal cual **sin
+  aviso** al cargar y hay que reingresarlo para guardar. No se migran los teléfonos guardados.
+- **Corrección — formato visible del teléfono (2026-10-26):** el control mostraba `+54` como texto y
+  perdía el foco a mitad del tipeo. La causa raíz era que el modo de texto libre se decidía con
+  `parsePhoneNumber`, y mientras se escribe el valor es un parcial (`+54`, `+541`) que la librería
+  todavía no reconoce; eso reemplazaba el control por un input de texto, que además acepta letras.
+  Ahora el modo se decide por la forma del valor (`^\+\d[\d\s().-]*$`) y al selector se le pasa el
+  parcial tal cual. Se agrega `displayInitialValueAsLocalNumber` para que un número guardado se vea
+  sin el `+54` (el prefijo lo aporta el selector de país). El valor que sale sigue siendo E.164 o
+  vacío.
+- **Corrección — CUIL guardado y CUIL repetido (2026-10-26):** dos casos que la revisión encontró.
+  (1) `partirCuil` deja los controles vacíos cuando el prefijo guardado no es `20/23/24/27` —una
+  fila de antes de D57, cuando la columna era obligatoria y el CHECK solo pedía "no vacío"—, así
+  que editar el teléfono mandaba `cuil: null` y borraba el CUIL sin que nadie lo pidiera: ahora ese
+  caso **omite** el campo del `PUT` y el servicio conserva el guardado; vaciar los controles de un
+  CUIL que sí se pudo mostrar sigue mandando `null`. (2) el índice `uq_docente_cuil` no estaba en
+  `_traducir_duplicado`, así que dos docentes con DNI `1112222` y `01112222` —distintos, pero el
+  mismo CUIL— recibían un 409 genérico: ahora dice "CUIL", como el DNI y el email.
+- **Decisión — validadores compartidos:** las reglas puras del front viven en
+  `frontend/src/domain/validacion.js` (`emailConForma`, `dniConForma`, `dniDigitos`, `componerCuil`,
+  `partirCuil`) y las del back en `backend/app/schemas/validators.py` (`EmailConForma`,
+  `DniConForma`, `TelefonoE164`, `validar_cuil`). El DNI del docente pasa a usar la misma regla que
+  el del alumno (7 u 8 dígitos con puntos, espacios o guiones) y se retira el validador local de
+  `schemas/alumnos.py`. La alternativa era una copia por pantalla y por esquema, que es justamente
+  lo que este change elimina.
+- **Decisión — CUIL opcional:** `DocenteCreate`/`DocenteUpdate` aceptan `cuil` opcional. Se valida
+  en el contrato de entrada —11 dígitos después de quitar guiones, prefijo `20/23/24/27` y los 8
+  del medio iguales al DNI con `zfill(8)`— porque el formulario y la API tienen que rechazar lo
+  mismo; validarlo solo en el servicio dejaría el `422` fuera del contrato. **No se calcula ni se
+  valida el dígito verificador** (decisión explícita del alcance: el verificador se escribe a mano
+  y se guarda como vino, así que el caso borde 10 no existe). En `PUT`, omitirlo conserva el CUIL
+  actual y `null` lo borra; se distingue con `model_fields_set` porque `DocenteUpdate` hereda del
+  alta y el servicio pisa todos los campos.
+- **Decisión — controles del CUIL:** el formulario lo arma con tres piezas (select de prefijo que
+  arranca vacío, DNI de solo lectura con ceros a la izquierda y verificador de un dígito) en lugar
+  de un input único, y la tabla lo muestra como `XX-XXXXXXXX-X`. Cambiar el DNI o el prefijo limpia
+  el verificador; al editar se recomponen los 8 dígitos con el DNI actual, así que un CUIL guardado
+  que no coincidía se corrige al guardar.
+- **Decisión — seed:** el CUIL de Rita pasa a `27301112225` (`27-30111222-5`, coherente con su DNI
+  `30111222`) y `_upsert_docente` asigna `cuil` también en la rama de fila existente. Sin eso,
+  volver a correr el seed no corregiría una base que ya tiene el CUIL viejo. El teléfono del seed
+  se deja como `+54 11 4000-0001` a propósito: es el caso legacy parseable que ejercita la
+  normalización al editar.
+- **Decisión — fuera de alcance:** el mapeo de los `422` de Pydantic a errores por campo va en el
+  change aparte `errores-422-por-campo`; acá el rechazo de la API sigue llegando como un mensaje
+  general. Tampoco se tocan `StudentProfilePage`, el CUIT de la empresa, el nombre de curso con
+  solo espacios, el modal de inscripción ni las validaciones de `PaymentsPage`.
+- **Alternativas descartadas:** un input único de CUIL (el pedido pide prefijo, DNI y verificador
+  separados); calcular el verificador por módulo 11 (queda para cuando haya docentes reales);
+  normalizar los teléfonos legacy en una migración (el front ya puede reingresarlos); y agregar
+  `phonenumbers` al backend en este change (no hace falta para la forma de transporte).
+- **Dónde:** `backend/app/schemas/validators.py`, `backend/app/schemas/alumnos.py`,
+  `backend/app/schemas/padron.py`, `backend/app/services/padron.py`,
+  `backend/app/services/seed.py`, `frontend/src/domain/validacion.js`,
+  `frontend/src/components/ui/CampoTelefono.jsx`, `frontend/src/admin/TeachersPage.jsx`,
+  `frontend/src/admin/StudentsPage.jsx`, `frontend/src/admin/CoursesPage.jsx`.

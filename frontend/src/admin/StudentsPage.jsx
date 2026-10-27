@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Input, Modal, StatusIndicator, Table } from '../components/ui'
+import { isValidPhoneNumber } from 'react-phone-number-input'
+import {
+  Badge,
+  Button,
+  CampoTelefono,
+  Card,
+  Input,
+  Modal,
+  StatusIndicator,
+  Table,
+} from '../components/ui'
+import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
+import { dniConForma, emailConForma } from '../domain/validacion'
 import {
   buscarAlumnoReactivable,
   buscarAlumnos,
@@ -35,7 +47,9 @@ import {
  *
  * **El alta reutiliza el modal de Docentes y no crea componentes visuales.** Pide DNI, nombre,
  * email y teléfono opcional —nunca `tipo_documento`, porque esta entrega registra solo DNI
- * (D44)— y valida en el cliente lo mismo que valida el backend antes de enviar. Un rechazo de la
+ * (D44)— y valida en el cliente lo mismo que valida el backend antes de enviar. La regla del DNI
+ * y la del email son las compartidas con docentes (D57), y el teléfono se carga con selector de
+ * país y viaja en E.164 o `null`. Un rechazo de la
  * fuente deja el modal abierto con lo cargado y muestra el motivo; un fallo de red no confirma
  * nada. Al confirmar, un modal superpuesto muestra **usuario y contraseña inicial** para que el
  * administrador se los entregue al alumno: no se envía ningún correo y el alumno deberá cambiarla
@@ -61,24 +75,6 @@ const SIN_DOCUMENTO = 'Sin DNI (alumno exterior)'
 const SIN_COMISION = 'Sin comisión'
 const SIN_DATO = '—'
 
-/** Lo único que puede aparecer en un DNI además de sus dígitos: puntos, espacios y guiones. */
-const DNI_CON_SEPARADORES = /^[0-9.\s-]+$/
-
-/**
- * La misma regla mínima de email que valida el backend (`app/schemas/validators.py`): algo antes
- * de la primera arroba y un dominio con punto que no termina en punto. Una pantalla que calculara
- * distinto del servidor rechazaría un formulario que la base acepta, o al revés.
- */
-function emailConForma(valor) {
-  const arroba = valor.indexOf('@')
-  if (arroba === -1) {
-    return false
-  }
-  const local = valor.slice(0, arroba)
-  const dominio = valor.slice(arroba + 1)
-  return local !== '' && dominio !== '' && dominio.includes('.') && !dominio.endsWith('.')
-}
-
 function columnaCategoria(categoria, porcentajeBeca) {
   const definicion = CATEGORIAS.get(categoria)
 
@@ -96,7 +92,7 @@ const COLUMNAS_ALUMNOS = [
   {
     clave: 'documento',
     titulo: 'DNI',
-    render: (fila) => fila.documento ?? SIN_DOCUMENTO,
+    render: (fila) => formatDocumento(fila.documento ?? SIN_DOCUMENTO),
   },
   {
     clave: 'nombre',
@@ -104,6 +100,11 @@ const COLUMNAS_ALUMNOS = [
     render: (fila) => <span className="font-medium">{fila.nombre}</span>,
   },
   { clave: 'email', titulo: 'EMAIL', render: (fila) => fila.email },
+  {
+    clave: 'telefono',
+    titulo: 'TELÉFONO',
+    render: (fila) => (fila.telefono ? formatTelefono(fila.telefono) : SIN_DATO),
+  },
   {
     clave: 'comision',
     titulo: 'COMISIÓN ASIGNADA',
@@ -227,11 +228,10 @@ export function StudentsPage() {
   function validarAlumno(campos = camposAlumno) {
     const encontrados = {}
     const documento = campos.documento.trim()
-    const digitos = documento.replace(/\D/g, '')
 
     if (documento === '') {
       encontrados.documento = 'El DNI es obligatorio.'
-    } else if (!DNI_CON_SEPARADORES.test(documento) || ![7, 8].includes(digitos.length)) {
+    } else if (!dniConForma(documento)) {
       encontrados.documento = 'El DNI debe tener 7 u 8 dígitos.'
     }
     if (campos.nombre.trim() === '') {
@@ -239,8 +239,11 @@ export function StudentsPage() {
     }
     if (campos.email.trim() === '') {
       encontrados.email = 'El email es obligatorio.'
-    } else if (!emailConForma(campos.email.trim())) {
+    } else if (!emailConForma(campos.email)) {
       encontrados.email = 'El email no tiene un formato válido.'
+    }
+    if (campos.telefono !== '' && !isValidPhoneNumber(campos.telefono)) {
+      encontrados.telefono = 'El teléfono no es válido: elegí el país y escribí el número.'
     }
 
     return encontrados
@@ -687,11 +690,14 @@ export function StudentsPage() {
             obligatorio
             error={erroresAlumno.email ?? null}
           />
-          <Input
+          <CampoTelefono
             id="alumno-telefono"
             etiqueta="Teléfono"
             valor={camposAlumno.telefono}
-            onChange={cambiarAlumno('telefono')}
+            onChange={(valor) =>
+              setCamposAlumno((anteriores) => ({ ...anteriores, telefono: valor }))
+            }
+            error={erroresAlumno.telefono ?? null}
           />
         </div>
 
@@ -827,11 +833,14 @@ export function StudentsPage() {
             obligatorio
             error={erroresEdicion.email ?? null}
           />
-          <Input
+          <CampoTelefono
             id="editar-alumno-telefono"
             etiqueta="Teléfono"
             valor={camposEdicion.telefono}
-            onChange={cambiarEdicion('telefono')}
+            onChange={(valor) =>
+              setCamposEdicion((anteriores) => ({ ...anteriores, telefono: valor }))
+            }
+            error={erroresEdicion.telefono ?? null}
           />
         </div>
 

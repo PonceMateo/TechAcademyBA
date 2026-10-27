@@ -8,7 +8,8 @@ importa.
 Lo que estos tests afirma por debajo de la respuesta:
 - el alta de un curso **no admite un campo de código** (`extra="forbid"`), y uno que lo mande
   recibe 422;
-- el alta de un docente **no admite un campo de CUIL** (D33), y uno que lo mande recibe 422;
+- el alta de un docente **admite un CUIL opcional** (D57) que se valida contra el DNI, y el
+  teléfono de los dos padrones solo acepta E.164 o `null`;
 - la comisión sin docente, con cupo inválido o con arancel inválido se rechazan; la de modalidad
   presencial o híbrida **sin sede se registra**, porque la sede es opcional en toda modalidad
   (historia #8), y la que la lleva en `Virtual` se rechaza con 422;
@@ -386,13 +387,14 @@ def test_alta_de_docente_crea_el_docente_y_su_cuenta(
             "apellido": "Molina",
             "dni": "30111222",
             "email": "rita.molina@techacademy.invalid",
-            "telefono": "+54 11 4000-0001",
+            "telefono": "+5491140000001",
         },
     )
 
     assert respuesta.status_code == 201, respuesta.text
     cuerpo = respuesta.json()
-    assert cuerpo["cuil"] is None, "D33: el CUIL es opcional"
+    assert cuerpo["cuil"] is None, "D57: el CUIL es opcional"
+    assert cuerpo["telefono"] == "+5491140000001"
     assert cuerpo["cantidad_comisiones"] == 0
 
     # Y la cuenta existe con la contraseña de demostración: el criterio de #9 pide que el
@@ -402,8 +404,8 @@ def test_alta_de_docente_crea_el_docente_y_su_cuenta(
     assert usuario.must_change_password is False, "D18: sin cambio pendiente"
 
 
-def test_el_alta_de_docente_no_admite_un_cuil(cliente_admin: TestClient) -> None:
-    """D33: la columna existe pero el contrato no la pide. Mandarla es un 422."""
+def test_el_alta_de_docente_acepta_un_cuil_valido(cliente_admin: TestClient) -> None:
+    """D57: el CUIL forma parte del contrato y se guarda en 11 dígitos, con o sin guiones."""
     respuesta = cliente_admin.post(
         "/docentes",
         json={
@@ -411,7 +413,112 @@ def test_el_alta_de_docente_no_admite_un_cuil(cliente_admin: TestClient) -> None
             "apellido": "Molina",
             "dni": "30111222",
             "email": "rita.molina@techacademy.invalid",
-            "cuil": "27345678907",
+            "cuil": "27-30111222-5",
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["cuil"] == "27301112225"
+
+
+def test_el_alta_de_docente_acepta_un_cuil_con_el_dni_separado(
+    cliente_admin: TestClient,
+) -> None:
+    """El DNI se compara por sus dígitos: los separadores no invalidan el CUIL."""
+    respuesta = cliente_admin.post(
+        "/docentes",
+        json={
+            "nombre": "Rita",
+            "apellido": "Molina",
+            "dni": "30.111.222",
+            "email": "rita.molina@techacademy.invalid",
+            "cuil": "27-30111222-5",
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["cuil"] == "27301112225"
+
+
+@pytest.mark.parametrize(
+    "cuil",
+    [
+        "2730111222",  # parcial
+        "273011122255",  # 12 dígitos
+        "30301112225",  # prefijo no permitido
+        "27999888776",  # los 8 del medio no son el DNI
+        "no-es-un-cuil",
+    ],
+)
+def test_el_alta_de_docente_rechaza_un_cuil_invalido(
+    cliente_admin: TestClient, cuil: str
+) -> None:
+    """D57: un CUIL parcial o con estructura inválida responde 422 y no crea el docente."""
+    respuesta = cliente_admin.post(
+        "/docentes",
+        json={
+            "nombre": "Rita",
+            "apellido": "Molina",
+            "dni": "30111222",
+            "email": "rita.molina@techacademy.invalid",
+            "cuil": cuil,
+        },
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+
+
+def test_el_alta_de_docente_acepta_un_cuil_con_verificador_incorrecto(
+    cliente_admin: TestClient,
+) -> None:
+    """D57: el dígito verificador no se calcula ni se valida; se guarda el informado."""
+    respuesta = cliente_admin.post(
+        "/docentes",
+        json={
+            "nombre": "Rita",
+            "apellido": "Molina",
+            "dni": "30111222",
+            "email": "rita.molina@techacademy.invalid",
+            "cuil": "27301112220",
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["cuil"] == "27301112220"
+
+
+@pytest.mark.parametrize("telefono", ["+5491140000001", None])
+def test_el_alta_de_docente_acepta_e164_o_null(
+    cliente_admin: TestClient, telefono: str | None
+) -> None:
+    respuesta = cliente_admin.post(
+        "/docentes",
+        json={
+            "nombre": "Rita",
+            "apellido": "Molina",
+            "dni": "30111222",
+            "email": "rita.molina@techacademy.invalid",
+            "telefono": telefono,
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["telefono"] == telefono
+
+
+@pytest.mark.parametrize("telefono", ["particular", "000", "+54 11 4000-0001"])
+def test_el_alta_de_docente_rechaza_un_telefono_que_no_es_e164(
+    cliente_admin: TestClient, telefono: str
+) -> None:
+    """D57: la API deja de aceptar texto libre en el teléfono."""
+    respuesta = cliente_admin.post(
+        "/docentes",
+        json={
+            "nombre": "Rita",
+            "apellido": "Molina",
+            "dni": "30111222",
+            "email": "rita.molina@techacademy.invalid",
+            "telefono": telefono,
         },
     )
 
@@ -437,6 +544,32 @@ def test_dni_repetido_se_rechaza_diciendo_dni(
 
     assert respuesta.status_code == 409, respuesta.text
     assert "DNI" in respuesta.json()["detail"]
+
+
+def test_cuil_repetido_se_rechaza_diciendo_cuil(
+    api_client: TestClient, admin: Usuario, db_session: Session
+) -> None:
+    """D57: el CUIL es único y el rechazo lo nombra, aunque el DNI sea otro.
+
+    `3011122` y `03011122` son DNIs distintos —el segundo tiene un cero adelante— y el mismo CUIL,
+    porque la comparación del CUIL usa el DNI completado con ceros a la izquierda.
+    """
+    crear_docente(db_session, dni="3011122", cuil="24030111225")
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(admin)))
+
+    respuesta = api_client.post(
+        "/docentes",
+        json={
+            "nombre": "Otro",
+            "apellido": "Docente",
+            "dni": "03011122",
+            "email": "otro.cuil@techacademy.invalid",
+            "cuil": "24-03011122-5",
+        },
+    )
+
+    assert respuesta.status_code == 409, respuesta.text
+    assert "CUIL" in respuesta.json()["detail"]
 
 
 def test_email_repetido_se_rechaza_diciendo_email(
@@ -497,7 +630,7 @@ def test_email_con_formato_invalido_es_rechazado(cliente_admin: TestClient) -> N
 
 
 def test_varios_docentes_sin_cuil_conviven(cliente_admin: TestClient) -> None:
-    """D33: el índice único del CUIL sobrevive a los nulos."""
+    """D57: el índice único del CUIL sobrevive a los nulos."""
     for indice in range(2):
         respuesta = cliente_admin.post(
             "/docentes",
