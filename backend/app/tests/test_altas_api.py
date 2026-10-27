@@ -421,6 +421,25 @@ def test_el_alta_de_docente_acepta_un_cuil_valido(cliente_admin: TestClient) -> 
     assert respuesta.json()["cuil"] == "27301112225"
 
 
+def test_el_alta_de_docente_acepta_un_cuil_con_el_dni_separado(
+    cliente_admin: TestClient,
+) -> None:
+    """El DNI se compara por sus dígitos: los separadores no invalidan el CUIL."""
+    respuesta = cliente_admin.post(
+        "/docentes",
+        json={
+            "nombre": "Rita",
+            "apellido": "Molina",
+            "dni": "30.111.222",
+            "email": "rita.molina@techacademy.invalid",
+            "cuil": "27-30111222-5",
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["cuil"] == "27301112225"
+
+
 @pytest.mark.parametrize(
     "cuil",
     [

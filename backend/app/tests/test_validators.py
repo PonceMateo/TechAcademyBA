@@ -104,8 +104,17 @@ def test_un_cuil_valido_se_acepta_y_se_guarda_sin_guiones(cuil: str) -> None:
     assert validar_cuil(cuil, "30111222") == cuil.replace("-", "")
 
 
+@pytest.mark.parametrize("dni", ["30.111.222", "30 111 222", "30-111-222"])
+def test_un_cuil_valido_se_acepta_aunque_el_dni_tenga_separadores(dni: str) -> None:
+    assert validar_cuil("27-30111222-5", dni) == "27301112225"
+
+
 def test_un_dni_de_7_digitos_se_completa_con_cero_para_comparar_el_cuil() -> None:
     assert validar_cuil("27030111228", "3011122") == "27030111228"
+
+
+def test_un_dni_de_7_digitos_con_separadores_tambien_coincide_con_el_cuil() -> None:
+    assert validar_cuil("27030112225", "3.011.222") == "27030112225"
 
 
 @pytest.mark.parametrize(

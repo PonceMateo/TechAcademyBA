@@ -1720,6 +1720,8 @@ alcance de este change; queda a criterio del equipo agregarlo.
   sigue fuera del contrato (D33): un `cuil` en el cuerpo responde `422`. En la misma transacción se
   sincronizan `nombre` (`"Nombre Apellido"`) y `email` del `Usuario` vinculado, así que el docente
   entra con el correo nuevo sin que queden dos verdades.
+- **Vigencia:** D57 reemplaza esta parte: desde `validaciones-formularios`, el `PUT` acepta `cuil`
+  opcional (omitido conserva, `null` borra).
 - **Unicidad:** el DNI se compara solo contra el padrón de docentes, excluyendo al propio, que es
   lo que dice D5 y lo que permite que una misma persona sea alumna y docente. El email se verifica
   con `ensure_email_available` excluyendo al docente y a su propia cuenta, y sigue siendo único

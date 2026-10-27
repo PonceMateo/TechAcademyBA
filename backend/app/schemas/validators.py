@@ -80,9 +80,9 @@ def validar_cuil(cuil: str, dni: str) -> str:
     """CUIL de 11 dígitos con prefijo permitido y los 8 del medio iguales al DNI.
 
     **No se calcula ni se valida el dígito verificador** (D57): el formulario lo escribe a mano y
-    la API guarda el que informó la secretaría. Tampoco se completa el DNI con ceros acá: el
-    `zfill(8)` de la comparación es el que hace que un DNI de 7 dígitos coincida con los 8 del
-    medio, y el valor devuelto son los 11 dígitos tal como se van a guardar.
+    la API guarda el que informó la secretaría. El DNI se compara por sus dígitos, sin puntos,
+    espacios ni guiones, y se completa con ceros a la izquierda cuando tiene 7 dígitos. El valor
+    devuelto son los 11 dígitos tal como se van a guardar.
     """
     if _CUIL_CON_GUIONES.fullmatch(cuil) is None:
         raise ValueError("El CUIL debe tener 11 dígitos.")
@@ -91,7 +91,8 @@ def validar_cuil(cuil: str, dni: str) -> str:
         raise ValueError("El CUIL debe tener 11 dígitos.")
     if digitos[:2] not in PREFIJOS_CUIL:
         raise ValueError("El prefijo del CUIL debe ser 20, 23, 24 o 27.")
-    if digitos[2:10] != dni.zfill(8):
+    dni_digitos = re.sub(r"\D", "", dni)
+    if digitos[2:10] != dni_digitos.zfill(8):
         raise ValueError("Los 8 dígitos del medio del CUIL deben coincidir con el DNI.")
     return digitos
 
