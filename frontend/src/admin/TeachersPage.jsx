@@ -17,7 +17,7 @@ import {
   editarDocente,
   restablecerPasswordDocente,
 } from '../services/dataService'
-import { formatTelefono } from '../utils/formato'
+import { formatDocumento, formatTelefono } from '../utils/formato'
 
 /**
  * Padrón de docentes (9.4).
@@ -60,7 +60,7 @@ const COLUMNAS = [
     titulo: 'DOCENTE',
     render: (fila) => <span className="font-medium">{fila.nombre}</span>,
   },
-  { clave: 'dni', titulo: 'DNI', render: (fila) => fila.dni },
+  { clave: 'dni', titulo: 'DNI', render: (fila) => formatDocumento(fila.dni) },
   {
     clave: 'cuil',
     titulo: 'CUIL',

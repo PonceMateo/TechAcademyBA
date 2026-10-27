@@ -10,7 +10,7 @@ import {
   StatusIndicator,
   Table,
 } from '../components/ui'
-import { formatTelefono } from '../utils/formato'
+import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
 import { dniConForma, emailConForma } from '../domain/validacion'
@@ -92,7 +92,7 @@ const COLUMNAS_ALUMNOS = [
   {
     clave: 'documento',
     titulo: 'DNI',
-    render: (fila) => fila.documento ?? SIN_DOCUMENTO,
+    render: (fila) => formatDocumento(fila.documento ?? SIN_DOCUMENTO),
   },
   {
     clave: 'nombre',

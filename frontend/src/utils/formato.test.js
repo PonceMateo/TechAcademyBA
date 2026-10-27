@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatFechaLarga, formatTelefono } from './formato'
+import { formatDocumento, formatFechaLarga, formatTelefono } from './formato'
 
 /**
  * El formato del encabezado queda clavado acá, con fechas fijas construidas en local: es el único
@@ -13,6 +13,31 @@ describe('formatFechaLarga', () => {
 
   it('formatea el día y el mes en el estilo de la casa', () => {
     expect(formatFechaLarga(new Date(2026, 9, 15))).toBe('Jueves 15 de octubre')
+  })
+})
+
+/** El documento de la tabla: se guarda sin puntos (D6) y se lee con puntos. */
+describe('formatDocumento', () => {
+  it('agrupa con puntos un DNI de 8 y uno de 7 dígitos', () => {
+    expect(formatDocumento('30111222')).toBe('30.111.222')
+    expect(formatDocumento('3011122')).toBe('3.011.122')
+  })
+
+  it('normaliza un documento que ya trae separadores', () => {
+    expect(formatDocumento('30.111.222')).toBe('30.111.222')
+    expect(formatDocumento('30 111 222')).toBe('30.111.222')
+    expect(formatDocumento('30-111-222')).toBe('30.111.222')
+  })
+
+  it('devuelve tal cual un documento que no es un DNI de 7 u 8 dígitos', () => {
+    expect(formatDocumento('Sin DNI (alumno exterior)')).toBe('Sin DNI (alumno exterior)')
+    expect(formatDocumento('PASAPORTE 12345678')).toBe('PASAPORTE 12345678')
+    expect(formatDocumento('123')).toBe('123')
+  })
+
+  it('devuelve vacío cuando no hay documento', () => {
+    expect(formatDocumento(null)).toBe('')
+    expect(formatDocumento('')).toBe('')
   })
 })
 

@@ -185,6 +185,23 @@ describe('buscador', () => {
     expect(screen.getByText('Ing. González')).toBeInTheDocument()
   })
 
+  it('muestra con puntos el DNI que la fuente devuelve normalizado', async () => {
+    stubDataSource({
+      buscarDocentes: vi.fn(async () => [
+        { ...docenteDePrueba(7, 'Docente Normalizado'), dni: '30111222' },
+      ]),
+    })
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Buscar docente'), 'Normalizado')
+    await screen.findByText('Docente Normalizado')
+
+    const fila = within(screen.getByRole('table'))
+      .getAllByRole('row')
+      .find((candidata) => candidata.cells[0].textContent === 'Docente Normalizado')
+    expect(fila.cells[1]).toHaveTextContent('30.111.222')
+  })
+
   it('espera 300 ms desde la última tecla antes de consultar', async () => {
     const buscar = vi.fn(async () => [])
     stubDataSource({ buscarDocentes: buscar })

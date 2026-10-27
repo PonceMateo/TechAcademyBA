@@ -122,6 +122,32 @@ describe('padrón de alumnos', () => {
     expect(filaDe('Nicolás Castro').cells[0]).toHaveTextContent('Sin DNI (alumno exterior)')
   })
 
+  it('muestra con puntos el documento que la fuente devuelve normalizado', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 11,
+          nombre: 'Alumno Normalizado',
+          documento: '30111222',
+          tipo_documento: 'DNI',
+          email: 'normalizado@techacademy.invalid',
+          telefono: null,
+          activo: true,
+          comision: null,
+          categoria: null,
+          porcentaje_beca: null,
+          acceso: null,
+        },
+      ],
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+
+    await screen.findByText('Alumno Normalizado')
+
+    expect(filaDe('Alumno Normalizado').cells[0]).toHaveTextContent('30.111.222')
+  })
+
   it('muestra la categoría con su color', () => {
     expect(filaDe('Juan Ignacio Pérez').cells[5].textContent).toContain('PARTICULAR')
     expect(filaDe('Juan Ignacio Pérez').cells[5].querySelector('.text-slate-700')).not.toBeNull()

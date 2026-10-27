@@ -76,6 +76,28 @@ export function formatTelefono(valor) {
   return numero ? formatPhoneNumber(numero.number) : String(valor)
 }
 
+/**
+ * `30111222` → `30.111.222`: el documento se guarda solo con dígitos (D6) y se lee con puntos.
+ * Un texto que no sea un DNI de 7 u 8 dígitos —el alumno del exterior— se devuelve tal cual.
+ */
+export function formatDocumento(valor) {
+  if (!valor) {
+    return ''
+  }
+
+  const texto = String(valor).trim()
+  if (!/^[\d.\s-]+$/.test(texto)) {
+    return texto
+  }
+
+  const digitos = texto.replace(/\D/g, '')
+  if (digitos.length < 7 || digitos.length > 8) {
+    return texto
+  }
+
+  return digitos.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 /** Iniciales de la cuenta para el avatar: dos palabras, dos letras. */
 export function inicialesDe(nombre) {
   return nombre
