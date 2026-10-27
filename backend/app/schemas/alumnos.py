@@ -69,10 +69,13 @@ class ComisionAsignadaOut(BaseModel):
 
 
 class AccesoAlumnoOut(BaseModel):
-    """El acceso derivado de la fila. Hoy siempre `None`: la habilitación es posterior."""
+    """El estado de habilitación derivado (HU #27)."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     estado: str
     causa: str | None = None
+    forzado: bool = False
 
 
 class AlumnoOut(BaseModel):

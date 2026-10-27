@@ -134,7 +134,7 @@ const COLUMNAS_ALUMNOS = [
       fila.acceso === null || fila.acceso === undefined ? (
         SIN_DATO
       ) : (
-        <StatusIndicator estado={fila.acceso.estado} causa={fila.acceso.causa} />
+        <StatusIndicator estado={fila.acceso.estado} causa={fila.acceso.causa} forzado={fila.acceso.forzado} />
       ),
   },
 ]

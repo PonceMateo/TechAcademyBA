@@ -45,6 +45,7 @@ from app.models.padron import Alumno, Usuario
 from app.schemas.alumnos import AlumnoCreate, AlumnoUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available, find_patron_registrado
+from app.services.habilitacion import derivar_estado
 from app.services.normalization import normalize_document
 
 logger = logging.getLogger(__name__)
@@ -261,12 +262,18 @@ def listar_alumnos(session: Session, consulta: str | None = None) -> list[Alumno
                 alumno.comision = None  # type: ignore[attr-defined]
             alumno.categoria = inscripcion.categoria  # type: ignore[attr-defined]
             alumno.porcentaje_beca = inscripcion.porcentaje_beca  # type: ignore[attr-defined]
+            estado, causa, forzado = derivar_estado(session, inscripcion)
+            alumno.acceso = SimpleNamespace(  # type: ignore[attr-defined]
+                estado=estado,
+                causa=causa,
+                forzado=forzado,
+            )
         else:
             alumno.inscripcion_id = None  # type: ignore[attr-defined]
             alumno.comision = None  # type: ignore[attr-defined]
             alumno.categoria = None  # type: ignore[attr-defined]
             alumno.porcentaje_beca = None  # type: ignore[attr-defined]
-        alumno.acceso = None  # type: ignore[attr-defined]
+            alumno.acceso = None  # type: ignore[attr-defined]
 
     return alumnos
 
