@@ -92,6 +92,7 @@ class AlumnoOut(BaseModel):
     email: str
     telefono: str | None
     activo: bool
+    inscripcion_id: int | None = None
     comision: ComisionAsignadaOut | None = None
     categoria: str | None = None
     porcentaje_beca: Decimal | None = None

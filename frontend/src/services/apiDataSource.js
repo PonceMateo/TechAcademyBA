@@ -289,6 +289,13 @@ export function createApiDataSource() {
       return request(PATHS.inscripciones, { method: 'POST', body: datos })
     },
 
+    async actualizarCategoriaInscripcion(inscripcionId, datos) {
+      return request(`${PATHS.inscripciones}/${inscripcionId}`, {
+        method: 'PATCH',
+        body: datos,
+      })
+    },
+
     // ------------------------------------ endpoints que todavía no existen
 
     async listarEmpresas() {

@@ -15,6 +15,7 @@ import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
 import { dniConForma, emailConForma } from '../domain/validacion'
 import {
+  actualizarCategoriaInscripcion,
   buscarAlumnoReactivable,
   buscarAlumnos,
   crearAlumno,
@@ -198,6 +199,14 @@ export function StudentsPage() {
   const [erroresEmpresa, setErroresEmpresa] = useState({})
   const [falloEmpresa, setFalloEmpresa] = useState(null)
   const [guardandoEmpresa, setGuardandoEmpresa] = useState(false)
+
+  const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false)
+  const [alumnoCategoria, setAlumnoCategoria] = useState(null)
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('PARTICULAR')
+  const [porcentajeCategoria, setPorcentajeCategoria] = useState('')
+  const [empresaCategoria, setEmpresaCategoria] = useState('')
+  const [falloCategoria, setFalloCategoria] = useState(null)
+  const [guardandoCategoria, setGuardandoCategoria] = useState(false)
 
   useEffect(() => {
     // El filtro va al servicio, no sobre el arreglo ya cargado: el mismo criterio tiene que
@@ -500,6 +509,62 @@ export function StudentsPage() {
     setFalloEmpresa(null)
   }
 
+  function abrirModalCategoria(alumno) {
+    setAlumnoCategoria(alumno)
+    setCategoriaSeleccionada(alumno.categoria ?? 'PARTICULAR')
+    setPorcentajeCategoria(alumno.porcentaje_beca ?? '')
+    setEmpresaCategoria('')
+    setFalloCategoria(null)
+    setModalCategoriaAbierto(true)
+  }
+
+  function cerrarModalCategoria() {
+    setModalCategoriaAbierto(false)
+    setAlumnoCategoria(null)
+    setFalloCategoria(null)
+  }
+
+  async function guardarCategoria() {
+    if (alumnoCategoria === null || alumnoCategoria.inscripcion_id == null) {
+      setFalloCategoria('El alumno no tiene inscripción.')
+      return
+    }
+    setGuardandoCategoria(true)
+    setFalloCategoria(null)
+    try {
+      const porcentaje =
+        categoriaSeleccionada === 'BECADO_PARCIAL' && porcentajeCategoria !== ''
+          ? Number(porcentajeCategoria)
+          : null
+      const empresaId =
+        categoriaSeleccionada === 'CORPORATIVO' && empresaCategoria !== ''
+          ? Number(empresaCategoria)
+          : null
+      await actualizarCategoriaInscripcion(alumnoCategoria.inscripcion_id, {
+        categoria: categoriaSeleccionada,
+        porcentaje_beca: porcentaje,
+        empresa_id: empresaId,
+      })
+      setAlumnos((anteriores) =>
+        anteriores.map((alumno) =>
+          alumno.id === alumnoCategoria.id
+            ? {
+                ...alumno,
+                categoria: categoriaSeleccionada,
+                porcentaje_beca: porcentaje,
+              }
+            : alumno,
+        ),
+      )
+      cerrarModalCategoria()
+      setMensaje('Categoría actualizada.')
+    } catch (error) {
+      setFalloCategoria(error?.message ?? 'No se pudo actualizar la categoría.')
+    } finally {
+      setGuardandoCategoria(false)
+    }
+  }
+
   function validarEmpresa() {
     const encontrados = {}
 
@@ -548,6 +613,16 @@ export function StudentsPage() {
       titulo: 'ACCIONES',
       render: (fila) => (
         <div className="flex flex-wrap items-center gap-1">
+          {fila.inscripcion_id != null && (
+            <Button
+              variante="secundario"
+              tamano="chico"
+              className="whitespace-nowrap"
+              onClick={() => abrirModalCategoria(fila)}
+            >
+              Categoría
+            </Button>
+          )}
           <Button
             variante="secundario"
             tamano="chico"
@@ -790,6 +865,75 @@ export function StudentsPage() {
             {falloEmpresa}
           </p>
         )}
+      </Modal>
+
+      <Modal
+        abierto={modalCategoriaAbierto}
+        titulo="Asignar categoría"
+        onClose={cerrarModalCategoria}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarModalCategoria}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarCategoria} disabled={guardandoCategoria}>
+              {guardandoCategoria ? 'Guardando…' : 'Guardar'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <label className="text-sm text-slate-700">
+            Categoría
+            <select
+              className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+              value={categoriaSeleccionada}
+              onChange={(evento) => setCategoriaSeleccionada(evento.target.value)}
+            >
+              <option value="PARTICULAR">Particular</option>
+              <option value="BECADO_PARCIAL">Becado parcial</option>
+              <option value="BECADO_TOTAL">Becado total</option>
+              <option value="CORPORATIVO">Corporativo</option>
+            </select>
+          </label>
+
+          {categoriaSeleccionada === 'BECADO_PARCIAL' && (
+            <Input
+              id="porcentaje-categoria"
+              etiqueta="Porcentaje de descuento"
+              type="number"
+              valor={porcentajeCategoria}
+              onChange={(evento) => setPorcentajeCategoria(evento.target.value)}
+            />
+          )}
+
+          {categoriaSeleccionada === 'CORPORATIVO' && (
+            <label className="text-sm text-slate-700">
+              Empresa
+              <select
+                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                value={empresaCategoria}
+                onChange={(evento) => setEmpresaCategoria(evento.target.value)}
+              >
+                <option value="">Seleccionar…</option>
+                {empresas.map((empresa) => (
+                  <option key={empresa.id} value={String(empresa.id)}>
+                    {empresa.razon_social}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {falloCategoria !== null && (
+            <p
+              role="alert"
+              className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            >
+              {falloCategoria}
+            </p>
+          )}
+        </div>
       </Modal>
 
       <Modal
