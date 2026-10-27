@@ -209,9 +209,8 @@ def crear_alumno(session: Session, datos: AlumnoCreate) -> AltaAlumno:
 def listar_alumnos(session: Session, consulta: str | None = None) -> list[Alumno]:
     """Alumnos ordenados por id, con la comisión y categoría de su inscripción.
 
-    La búsqueda por DNI o email es la historia #16: se compara el documento normalizado y el
-    email completo, sin inventar coincidencias parciales. La habilitación queda en `None`: es la
-    HU #27 (Should) y no se inventa un estado.
+    La búsqueda por DNI, email o nombre admite coincidencias parciales (HU #16). La
+    habilitación queda en `None`: es la HU #27 (Should) y no se inventa un estado.
     """
     alumnos = list(
         session.scalars(
@@ -221,12 +220,20 @@ def listar_alumnos(session: Session, consulta: str | None = None) -> list[Alumno
 
     if consulta and consulta.strip():
         aguja = consulta.strip()
+        aguja_lower = aguja.lower()
         normalizada = normalize_document(aguja)
         filtrados: list[Alumno] = []
         for alumno in alumnos:
-            coincide_documento = normalizada and alumno.documento_norm == normalizada
-            coincide_email = alumno.email.lower() == aguja.lower()
-            if coincide_documento or coincide_email:
+            documento = (alumno.documento or "").lower()
+            documento_norm = (alumno.documento_norm or "").lower()
+            email = alumno.email.lower()
+            nombre = alumno.nombre.lower()
+            if (
+                aguja_lower in email
+                or aguja_lower in documento
+                or aguja_lower in nombre
+                or (normalizada is not None and normalizada in documento_norm)
+            ):
                 filtrados.append(alumno)
         alumnos = filtrados
 
@@ -243,14 +250,19 @@ def listar_alumnos(session: Session, consulta: str | None = None) -> list[Alumno
 
     for alumno in alumnos:
         inscripcion = por_alumno.get(alumno.id)
-        if inscripcion is not None and inscripcion.comision is not None:
-            alumno.comision = SimpleNamespace(  # type: ignore[attr-defined]
-                codigo=inscripcion.comision.codigo,
-                nombre=inscripcion.comision.curso.nombre,
-            )
+        if inscripcion is not None:
+            alumno.inscripcion_id = inscripcion.id  # type: ignore[attr-defined]
+            if inscripcion.comision is not None:
+                alumno.comision = SimpleNamespace(  # type: ignore[attr-defined]
+                    codigo=inscripcion.comision.codigo,
+                    nombre=inscripcion.comision.curso.nombre,
+                )
+            else:
+                alumno.comision = None  # type: ignore[attr-defined]
             alumno.categoria = inscripcion.categoria  # type: ignore[attr-defined]
             alumno.porcentaje_beca = inscripcion.porcentaje_beca  # type: ignore[attr-defined]
         else:
+            alumno.inscripcion_id = None  # type: ignore[attr-defined]
             alumno.comision = None  # type: ignore[attr-defined]
             alumno.categoria = None  # type: ignore[attr-defined]
             alumno.porcentaje_beca = None  # type: ignore[attr-defined]

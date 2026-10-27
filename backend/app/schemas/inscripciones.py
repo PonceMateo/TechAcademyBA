@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -24,7 +26,19 @@ class InscripcionOut(BaseModel):
     alumno_id: int
     comision_id: int
     categoria: str
+    porcentaje_beca: Decimal | None = None
+    empresa_id: int | None = None
     estado: str
+
+
+class InscripcionCategoriaUpdate(BaseModel):
+    """Cuerpo de `PATCH /inscripciones/{id}` para asignar categoría (HU #15)."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    categoria: str = Field(min_length=1, max_length=20)
+    porcentaje_beca: int | None = Field(default=None, ge=1, le=99)
+    empresa_id: int | None = Field(default=None, gt=0)
 
 
 class ComisionDisponibleOut(BaseModel):

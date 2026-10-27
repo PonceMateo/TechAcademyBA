@@ -603,6 +603,40 @@ export function createMockDataSource() {
       }
     },
 
+    async actualizarCategoriaInscripcion(inscripcionId, datos) {
+      const inscripcion = (store.inscripciones || []).find((i) => i.id === inscripcionId)
+      if (!inscripcion) {
+        throw new Error('La inscripción no existe.')
+      }
+      const categoria = datos.categoria
+      if (!['PARTICULAR', 'BECADO_PARCIAL', 'BECADO_TOTAL', 'CORPORATIVO'].includes(categoria)) {
+        throw new Error('La categoría no es válida.')
+      }
+      let porcentaje = null
+      if (categoria === 'BECADO_PARCIAL') {
+        if (datos.porcentaje_beca == null || datos.porcentaje_beca < 1 || datos.porcentaje_beca > 99) {
+          throw new Error('El porcentaje debe estar entre 1 y 99.')
+        }
+        porcentaje = datos.porcentaje_beca
+      }
+      let empresaId = null
+      if (categoria === 'CORPORATIVO') {
+        if (!datos.empresa_id) {
+          throw new Error('Seleccioná la empresa.')
+        }
+        empresaId = datos.empresa_id
+      }
+      inscripcion.categoria = categoria
+      inscripcion.porcentaje_beca = porcentaje
+      inscripcion.empresa_id = empresaId
+      const alumno = store.alumnos.find((a) => a.id === inscripcion.alumno_id)
+      if (alumno) {
+        alumno.categoria = categoria
+        alumno.porcentaje_beca = porcentaje
+      }
+      return { ...inscripcion }
+    },
+
     /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
     async buscarAlumnos(texto) {
       return buscarPorTexto(

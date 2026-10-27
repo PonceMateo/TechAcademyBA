@@ -137,22 +137,6 @@ Toda decisión técnica no funcional y la causa raíz de un error se registran e
 `docs/decisions.md` con fecha y autor **antes** de aplicarlas. Las de alcance,
 contrato o modelo van también en el change de OpenSpec.
 
-## Skills
-
-Si la tarea no entra en estas áreas, no cargues skills.
-
-| Área | Skills |
-|---|---|
-| `backend/app/` (rutas, schemas) | `fastapi`, `pydantic` (async: `fastapi-python`) |
-| Modelos, queries, `backend/alembic/` | `sqlalchemy`, `sqlalchemy-alembic-expert-best-practices-code-review`, `supabase-postgres-best-practices` |
-| Consultas lentas / índices | `sql-optimization-patterns` |
-| Tests del backend | `python-testing-patterns` |
-| `frontend/src/` | `vercel-react-best-practices`, `ui-styling` |
-| Pantalla nueva o desde imagen | `ui-ux-pro-max`, `image-to-code` |
-| Tests del frontend | `vitest` |
-| Accesibilidad | `accessibility` |
-| Change de OpenSpec | La skill `openspec-*` del paso |
-
 ## Convenciones técnicas
 
 No se negocian por historia; detalle en `docs/decisions.md`.

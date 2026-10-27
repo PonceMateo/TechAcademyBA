@@ -106,6 +106,10 @@ export function listarAlumnos() {
   return getDataSource().listarAlumnos()
 }
 
+export function actualizarCategoriaInscripcion(inscripcionId, datos) {
+  return getDataSource().actualizarCategoriaInscripcion(inscripcionId, datos)
+}
+
 export function crearInscripcion(datos) {
   return getDataSource().crearInscripcion(datos)
 }
