@@ -1,149 +1,95 @@
 # AGENTS.md
 
-Flujo de trabajo del equipo de TechAcademy BA. Leerlo antes de tocar nada.
+TechAcademy BA workflow. Read before touching anything.
 
-OpenSpec administra `openspec/` y `.opencode/`. Si aparecen bloques
-`<!-- OPENSPEC:START -->` / `<!-- OPENSPEC:END -->`, OpenSpec reescribe solo lo
-que está entre ellos.
+OpenSpec manages `openspec/` and `.opencode/`. If `<!-- OPENSPEC:START -->` / `<!-- OPENSPEC:END -->` blocks appear, OpenSpec rewrites only between them.
 
-## Idioma
+## Language
 
-- El agente habla en español. Los commits van en español.
-- Los subagentes trabajan y responden en inglés, salvo que su tarea produzca
-  texto para el usuario (strings de UI, commits, docs en español).
-    - Los subagentes no devuelven código ni logs completos.
-- La UI es es-AR y no hay i18n: los strings no se extraen.
-- Nombres en el código: seguí la convención de la capa (frontend mayormente en
-  español, backend mayormente en inglés), sin mezclar idiomas dentro de un
-  módulo ni renombrar solo por idioma.
-- Sin tildes en identificadores, archivos y ramas (sí en texto de UI).
-- `docs/glossary.md` traduce la terminología del cliente: consultalo antes de
-  nombrar un concepto del dominio.
+- Agent speaks Spanish. Commits in Spanish.
+- Subagents work/respond in English, except output for user (UI strings, commits, docs in Spanish).
+- UI is es-AR, no i18n: strings not extracted.
+- Code names: follow layer convention (frontend mostly Spanish, backend mostly English), no mixing languages inside module or renaming only by language.
+- No accents in identifiers, files, branches (yes in UI text).
+- `docs/glossary.md` translates client terminology: consult before naming domain concept.
 
-## Herramientas
+## Tools
 
-Antes de cualquier tarea, una sola vez por sesión: `node .opencode/commands/check-tools.mjs`.
-Si todo dice OK, seguí. Si algo no, leé `docs/tooling.md` y resolvelo antes de
-arrancar skills o planificación.
+Before every task, once per session: `node .opencode/commands/check-tools.mjs`. If OK, proceed. If not, read `docs/tooling.md` and fix before launching skills or planning.
 
-Cada vez que este archivo diga "preguntá", usá la herramienta `question` de
-opencode (opción múltiple), no texto libre.
+When this file says "preguntá", use opencode `question` tool (multiple choice), not free text.
 
-- **gh:** necesario para leer el backlog. Nunca pidas el token por chat.
-- **CodeGraph:** preferilo a leer archivos enteros.
-- **Context7:** docs de librerías. Si falla, no inventes APIs ni versiones y avisá.
-- **Engram:** memoria entre sesiones. Si falla, seguí sin memoria.
+- **gh:** needed for backlog. Never ask for token in chat.
+- **CodeGraph:** prefer to reading entire files.
+- **Context7:** library docs. If fails, do not invent APIs or versions; warn.
+- **Engram:** memory between sessions. If fails, continue without memory.
 
-## Comandos y estructura
+## Commands and structure
 
-Todo corre en contenedores con `docker compose`, no con Python ni Node locales.
-Comandos: sección "Comandos" del `README.md`. Carpetas: sección "Estructura".
-- Limitá siempre el output de los comandos (modo silencioso, `-q`, solo las
-  últimas ~40 líneas). En docker compose: servicios con `up -d` y comandos con
-  `exec`, nunca `up` en primer plano.
-- Si estás en Windows, el shell es PowerShell 5.1: no uses `||`, `&&`, `grep`,
-  `head`, `cat` ni `2>/dev/null`. Usá `;`, `Select-String`,
-  `Select-Object -First N` y la herramienta Read para leer archivos. En
-  Linux/Mac usá bash normal.
-- Si un comando falla, corregilo con la sintaxis del shell; no lo reemplaces por
-  scripts de `node -e`.
+Everything runs in containers with `docker compose`, not local Python or Node. Commands: "Commands" section in `README.md`. Folders: "Structure" section.
 
-## Fuentes de verdad
+- Always limit command output (silent mode, `-q`, last ~40 lines). In docker compose: services with `up -d`, commands with `exec`, never `up` in foreground.
+- On Windows, shell is PowerShell 5.1: do not use `||`, `&&`, `grep`, `head`, `cat`, or `2>/dev/null`. Use `;`, `Select-String`, `Select-Object -First N`, and Read tool for files. On Linux/Mac use normal bash.
+- If command fails, fix with shell syntax; do not replace with `node -e` scripts.
 
-1. **GitHub Projects** (`TechAcademyBA`, project #1, owner `PonceMateo`): única
-   fuente viva del backlog (texto, prioridad, épica, estimación y estado:
-   `Backlog`, `Ready`, `In progress`, `In review`, `Done`).
+## Sources of truth
+
+1. **GitHub Projects** (`TechAcademyBA`, project #1, owner `PonceMateo`): only live backlog source (text, priority, epic, estimation, status: `Backlog`, `Ready`, `In progress`, `In review`, `Done`).
 
    ```
    gh project item-list 1 --owner PonceMateo --limit 100 --format json --jq '.items[] | [.content.number, .content.title, .status, .priority] | @tsv'
-   gh issue view <número> --json title,body,state
+   gh issue view <number> --json title,body,state
    ```
 
-   - Copiá el primer comando tal cual y filtrá las filas después. Nunca vuelques
-     el JSON completo: trae el cuerpo de cada issue.
-   - Siempre `--limit 100`: sin eso recorta a 30 y parece que faltan historias.
-   - Cada historia es un issue `H/U <n> · <título>`; el número del issue no es
-     el de la historia. Priority es MoSCoW.
-   - Una historia está terminada cuando `Status` es `Done`, no cuando el issue
-     está cerrado.
-   - En PowerShell 5.1 no pongas comillas dobles dentro de `--jq`: las pierde y
-     `jq` falla.
-   - Si el board no es accesible, pedile acceso al usuario; si prefiere seguir,
-     usá lo que haya en el repo y decilo.
-   - Para una historia, buscá su fila por título (`H/U 28 ·`) en el listado y
-     usá el número de issue de esa fila con `gh issue view`. Nunca asumas que
-     coinciden.
-   - Nunca corras `gh project item-list` sin el `--jq` del comando de arriba.
-2. **Contextualización del problema** (`docs/requirements/`): modelo de negocio.
-3. **Maqueta PPTX:** alcance negociado y los dos caminos de MVP.
-4. **Referencia secundaria:** Figma (pantallas y estilo, cero datos), Excel del
-   cliente (es el problema, no la solución) y el CSV de historias (congelado, no
-   se lee ni se actualiza).
+   - Copy first command exactly, filter rows after. Never dump full JSON: brings body of each issue.
+   - Always `--limit 100`: without it cuts to 30 and looks like stories missing.
+   - Each story is issue `H/U <n> · <title>`; issue number is not story number. Priority is MoSCoW.
+   - Story done when `Status` is `Done`, not when issue is closed.
+   - In PowerShell 5.1 do not put double quotes inside `--jq`: loses them and `jq` fails.
+   - If board inaccessible, ask user for access; if prefers to continue, use whatever is in repo and say so.
+   - For a story, find row by title (`H/U 28 ·`) in list and use that row's issue number with `gh issue view`. Never assume they match.
+   - Never run `gh project item-list` without `--jq` from command above.
+2. **Problem context** (`docs/requirements/`): business model.
+3. **PPTX mockup:** negotiated scope and two MVP paths.
+4. **Secondary reference:** Figma (screens and style, zero data), client's Excel (is the problem, not the solution) and story CSV (frozen, not read or updated).
 
-## Historia nueva
+## New story
 
-Se agrega al board, nunca al CSV: issue `H/U <n> · <título>` con descripción y
-criterios de aceptación, label `Épica: <nombre>`, y en el project Priority,
-Épica, Estimación y `Status=Backlog`. Verificá que esté en el board antes de
-implementarla.
+Add to board, never to CSV: issue `H/U <n> · <title>` with description and acceptance criteria, label `Epic: <name>`, and in project Priority, Epic, Estimation and `Status=Backlog`. Verify it is on board before implementing.
 
-## Cambio directo o propuesta
+## Direct change or proposal
 
-- **Cambio directo** si el comportamiento observable no cambia: bugfix que
-  restaura lo especificado, typos, estilos, refactor interno, tests de código
-  existente, configuración y dependencias.
-- **Propuesta en OpenSpec** (`/opsx-propose`) si cambia el contrato: historia
-  nueva o modificada, regla de negocio, modelo de datos, API, seguridad o permisos.
-- **Ante la duda**, consultá en una línea a una persona del equipo.
+- **Direct change** if observable behavior does not change: bugfix restoring spec, typos, styles, internal refactor, tests of existing code, config and dependencies.
+- **OpenSpec proposal** (`/opsx-propose`) if contract changes: new or modified story, business rule, data model, API, security or permissions.
+- **When in doubt**, ask in one line a team member.
 
-## Sesiones y contexto
+## Sessions and context
 
-- Al arrancar una planificación, preguntá **una sola vez** (Sí / No) si quiere
-  una sesión de preguntas exhaustiva para calibrar el alcance (opcional;
-  explicalo sin jerga). Avisale que consume muchos tokens, y recomendala solo
-  si el pedido inicial es vago o ambiguo. Si el pedido ya es claro, recomendá que no.
-  **Sí:** cargá `grill-me` y no escribas ni abras la rama hasta que el usuario
-  confirme que el entendimiento es compartido. **No:** seguí.
-- Al terminar el grill, recomendale al usuario abrir una sesión nueva para el apply; si prefiere
- seguir en la misma, que corra `/compact` antes.
-- No leas archivos de más de 200 líneas completos: usá CodeGraph, Grep o Read
-  con offset/limit.
+- When starting planning, ask **once only** (Yes / No) if wants exhaustive question session to calibrate scope (optional; explain without jargon). Warn it consumes many tokens; recommend only if initial request vague or ambiguous. If request clear, recommend no.
+  - **Yes:** load `grill-me`, do not write or open branch until user confirms shared understanding. **No:** proceed.
+- After grill, recommend opening new session for apply; if prefers to stay in same, run `/compact` first.
+- Do not read entire files over 200 lines: use CodeGraph, Grep or Read with offset/limit.
 
-## Ramas y commits
+## Branches and commits
 
-**Ramas:** `<tipo>/<slug>/<Nombre>-<Apellido>`, desde `main`, terminadas con
-nombre y apellido de quien la crea. Tipos: `feat/hu-<n>-<slug>`, `fix/<slug>`,
-`chore/<slug>`. Mirá `git config user.name` y la tabla de `docs/branching.md`;
-si no está, preguntá con una opción por integrante.
+**Branches:** `<type>/<slug>/<First>-<Last>`, from `main`, ending with name and surname of creator. Types: `feat/hu-<n>-<slug>`, `fix/<slug>`, `chore/<slug>`. Check `git config user.name` and `docs/branching.md` table; if missing, ask option per member.
 
-**Commits:** `<tipo>(<ámbito>): <descripción en imperativo y en minúscula>`, con
-tipo entre `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `build`,
-`ci`. Un work unit, un commit. Sin `Co-Authored-By` ni firmas de IA.
+**Commits:** `<type>(<scope>): <imperative description in lowercase>`, type in `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `build`, `ci`. One work unit, one commit. No `Co-Authored-By` or AI signatures.
 
-**Trazabilidad:** `Refs #N` referencia la historia. `Closes #N` solo si cumple
-todos sus criterios y queda `Done`. El PR pide el issue o `ninguno, cambio menor`.
+**Traceability:** `Refs #N` references story. `Closes #N` only if meets all criteria and stays `Done`. PR asks for issue or `none, minor change`.
 
-## Migraciones
+## Migrations
 
-Si la rama toca `backend/alembic/`, avisale al usuario antes de pushear a
-`main`: el job `migrations` de CI aplica `alembic upgrade head` en Supabase
-producción después de que pasen las suites y de que se apruebe el environment
-`db-migrations` (D56). Toda migración nueva debe ser expand/contract: nunca
-borres o renombres en el mismo deploy que cambia el código que lo usa.
+If branch touches `backend/alembic/`, warn user before pushing to `main`: CI `migrations` job applies `alembic upgrade head` on Supabase production after suites pass and `db-migrations` environment approved (D56). Every new migration must be expand/contract: never delete or rename in same deploy that changes code using it.
 
-## Decisiones
+## Decisions
 
-Toda decisión técnica no funcional y la causa raíz de un error se registran en
-`docs/decisions.md` con fecha y autor **antes** de aplicarlas. Las de alcance,
-contrato o modelo van también en el change de OpenSpec.
+Every non-functional technical decision and root cause of error recorded in `docs/decisions.md` with date and author **before applying**. Scope, contract or model ones also go in OpenSpec change.
 
-## Convenciones técnicas
+## Technical conventions
 
-No se negocian por historia; detalle en `docs/decisions.md`.
+Not negotiated per story; detail in `docs/decisions.md`.
 
-- Sin TypeScript: el frontend es JavaScript.
-- Tests del backend con pytest contra PostgreSQL real, nunca SQLite (el modelo
-  usa `num_nonnulls`, índices únicos sobre columnas normalizadas y CHECKs).
-- Los componentes no llaman al backend: todo pasa por `src/services/`, salvo
-  login y cambio de contraseña (`src/auth/authClient.js`). No importan
-  `src/mocks/` ni se agregan datos inventados a las pantallas.
+- No TypeScript: frontend is JavaScript.
+- Backend tests with pytest against real PostgreSQL, never SQLite (model uses `num_nonnulls`, unique indexes on normalized columns and CHECKs).
+- Components do not call backend: everything through `src/services/`, except login and password change (`src/auth/authClient.js`). Do not import `src/mocks/` or add invented data to screens.

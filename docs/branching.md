@@ -1,16 +1,15 @@
-# Ramas: tabla de autores
+# Branches: author table
 
-Formato: `<tipo>/<slug>/<Nombre>-<Apellido>`, siempre desde `main`. El slug puede ir en español o en inglés.
+Format: `<type>/<slug>/<First>-<Last>`, from `main`. Slug: Es or En.
 
-- `feat/hu-<n>-<slug>/<Nombre>-<Apellido>` (ej: `feat/hu-27-estado-habilitacion/Mateo-Ponce`)
-- `fix/<slug>/<Nombre>-<Apellido>`: corrección sin historia.
-- `chore/<slug>/<Nombre>-<Apellido>`: higiene, tooling, docs, configuración.
+- `feat/hu-<n>-<slug>/<First>-<Last>` (ex: `feat/hu-27-estado-habilitacion/Mateo-Ponce`)
+- `fix/<slug>/<First>-<Last>`: fix without user story.
+- `chore/<slug>/<First>-<Last>`: hygiene, tooling, docs, config.
 
-| `user.name`     | Autor de la rama    |
+| `user.name`     | Branch author    |
 |-----------------|---------------------|
 | `PonceMateo`    | `Mateo-Ponce`       |
 | `santitorrens1` | `Santiago-Torrens`  |
 | `agutor`        | `Agustin-Torres`    |
 
-Mirar `git config user.name` antes de crear la rama. Si no está en la tabla, no
-adivinar: preguntar con una opción por integrante.
+Check `git config user.name` before branch. If not in table, ask option by member; don't guess.
