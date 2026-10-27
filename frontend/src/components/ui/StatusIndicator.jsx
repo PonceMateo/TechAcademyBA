@@ -19,7 +19,7 @@ const TONOS_POR_ESTADO = {
   [ESTADO_HABILITACION.BLOQUEADO]: TONO.ROJO,
 }
 
-export function StatusIndicator({ estado, causa = null, habilitadoTexto = null }) {
+export function StatusIndicator({ estado, causa = null, habilitadoTexto = null, forzado = false }) {
   const bloqueado = estado === ESTADO_HABILITACION.BLOQUEADO
 
   if (bloqueado && (causa === null || causa === '')) {
@@ -35,7 +35,10 @@ export function StatusIndicator({ estado, causa = null, habilitadoTexto = null }
     >
       <Badge tono={TONOS_POR_ESTADO[estado] ?? TONO.GRIS}>{estado}</Badge>
       {bloqueado ? (
-        <span className="text-xs text-red-700">{causa}</span>
+        <span className="text-xs text-red-700">
+          {causa}
+          {forzado ? ' (forzado)' : ''}
+        </span>
       ) : (
         habilitadoTexto !== null && (
           <span className="text-xs text-slate-500">{habilitadoTexto}</span>
