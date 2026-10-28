@@ -25,7 +25,7 @@
 
 ## 5. Pantallas del alumno
 
-- [ ] 5.1 Recomponer `frontend/src/alumno/StudentCoursesPage.jsx` con los datos reales, el banner de acceso con causa y el estado de carga que no muestra "sin cursos" antes de resolver; verificar con tests de pantalla que un alumno sin inscripciones ve el mensaje y que uno bloqueado ve la causa.
+- [x] 5.1 Recomponer `frontend/src/alumno/StudentCoursesPage.jsx` con los datos reales, el banner de acceso con causa y el estado de carga que no muestra "sin cursos" antes de resolver; verificar con tests de pantalla que un alumno sin inscripciones ve el mensaje y que uno bloqueado ve la causa.
 - [ ] 5.2 Recomponer `frontend/src/alumno/CourseDetailPage.jsx` con período y próximos encuentros reales, tema pendiente cuando falta y estado de "no encontré esa cursada" para una comisión ajena; verificar con tests de pantalla que no se renderiza ningún link ni botón de ingreso.
 - [ ] 5.3 Implementar en `frontend/src/alumno/StudentProfilePage.jsx` el guardado real de email y teléfono (con botón deshabilitado mientras guarda), el mensaje de conflicto de email y la tarjeta de seguridad que usa `SessionContext.changePassword`; verificar con tests de pantalla el guardado exitoso, el `409` y el cambio de contraseña exitoso y fallido.
 - [ ] 5.4 Actualizar los tests existentes que esperan los literales del maquetado (`CUR-102`, `Lic. Laura Benítez`, `$31.000`) y el aviso de datos de referencia; verificar con `docker compose run --rm frontend npm run test` en verde.

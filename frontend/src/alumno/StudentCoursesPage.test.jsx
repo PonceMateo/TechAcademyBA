@@ -168,10 +168,23 @@ describe('alumno esperando la respuesta de la API', () => {
     expect(screen.getByText('Tu agenda')).toBeInTheDocument()
     expect(screen.getByText('No tenés encuentros programados por ahora.')).toBeInTheDocument()
   })
+
+  it('no afirma que el alumno no tiene cursos hasta que la lectura resuelve', async () => {
+    cleanup()
+    stubDataSource({ listarInscripcionesAlumno: () => new Promise(() => {}) })
+    renderAppAs('ALUMNO', '/alumno')
+    await screen.findByRole('heading', { name: SALUDO })
+
+    // Sin respuesta todavía no se sabe si tiene cursos: la pantalla lo dice.
+    expect(screen.getByText('Cargando tus cursos…')).toBeInTheDocument()
+    expect(
+      screen.queryByText('No tenés cursos activos en este período lectivo.'),
+    ).not.toBeInTheDocument()
+  })
 })
 
 describe('alumno sin respuesta de la API', () => {
-  it('conserva la forma con los cuatro valores dependientes en —, nunca en 0', async () => {
+  it('informa que no pudo leer los cursos en vez de afirmar que no tiene', async () => {
     cleanup()
     stubDataSource({
       listarInscripcionesAlumno: async () => {
@@ -181,8 +194,11 @@ describe('alumno sin respuesta de la API', () => {
     renderAppAs('ALUMNO', '/alumno')
 
     expect(
-      await screen.findByText('No tenés cursos activos en este período lectivo.'),
+      await screen.findByText('No pudimos cargar tus cursos. Volvé a intentar en un momento.'),
     ).toBeInTheDocument()
+    expect(
+      screen.queryByText('No tenés cursos activos en este período lectivo.'),
+    ).not.toBeInTheDocument()
     expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('—')
     expect(tarjeta('CURSOS EN MARCHA')).not.toHaveTextContent('0')
     expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('—')
@@ -191,5 +207,46 @@ describe('alumno sin respuesta de la API', () => {
     expect(screen.getByText('Tu agenda')).toBeInTheDocument()
     expect(screen.getByText('No tenés encuentros programados por ahora.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Ver detalle' })).not.toBeInTheDocument()
+  })
+})
+
+describe('una comisión que todavía no tiene docente', () => {
+  it('dice a confirmar en lugar de nombrar a una persona inventada', async () => {
+    cleanup()
+    stubDataSource({
+      listarInscripcionesAlumno: async () => [
+        {
+          codigo: 'CUR-102',
+          nombre_curso: 'Desarrollo Web Full Stack',
+          docente_nombre: null,
+          horario: 'Lun y Miér · 18:30 a 21:30',
+          horarios: [{ dia: 'LUN', inicio: '18:30', fin: '21:30' }],
+          categoria: 'PARTICULAR',
+          porcentaje_beca: null,
+          acceso: { estado: 'HABILITADO', causa: null, forzado: false },
+        },
+      ],
+      obtenerDetalleInscripcion: async () => ({ proximos_encuentros: [] }),
+    })
+    renderAppAs('ALUMNO', '/alumno')
+
+    expect(await screen.findByText('Docente · a confirmar')).toBeInTheDocument()
+  })
+})
+
+describe('la agenda', () => {
+  it('muestra el tema pendiente cuando el encuentro todavía no lo tiene', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerDetalleInscripcion: async () => ({
+        proximos_encuentros: [{ fecha: '2026-05-25', tema: null }],
+      }),
+    })
+    renderAppAs('ALUMNO', '/alumno')
+    await screen.findByRole('heading', { name: SALUDO })
+
+    const agenda = within(screen.getByRole('heading', { name: 'Tu agenda' }).closest('section'))
+    expect(await agenda.findByText('25/05/2026')).toBeInTheDocument()
+    expect(agenda.getByText('Tema a confirmar')).toBeInTheDocument()
   })
 })
