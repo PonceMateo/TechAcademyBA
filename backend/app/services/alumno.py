@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import ORDEN_DIA, Comision
+from app.models.clases import Clase
 from app.models.enums import DiaSemana, EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Alumno, Usuario
@@ -147,7 +148,7 @@ def obtener_detalle(
         # `fin` no existe en el modelo (D58): el contrato informa que todavía no está definida en
         # lugar de completarla con una fecha de ejemplo.
         cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=None),
-        proximos_encuentros=_proximos_encuentros(comision, hoy or date.today()),
+        proximos_encuentros=_proximos_encuentros(session, comision, hoy or date.today()),
     )
 
 
@@ -164,15 +165,32 @@ def _clave_de_codigo(codigo: str) -> str:
     return (codigo or "").strip().upper()
 
 
-def _proximos_encuentros(comision: Comision, desde: date) -> list[EncuentroOut]:
+def _proximos_encuentros(session: Session, comision: Comision, desde: date) -> list[EncuentroOut]:
     """Los próximos `ENCUENTROS_VISIBLES` días de cursada, del más cercano al más lejano.
 
-    **El tema todavía no se completa acá:** sale de `Clase`, y esa carga llega con las historias #33
-    y #34. Mientras no haya fila, el encuentro viaja sin tema y la pantalla lo muestra pendiente.
+    **Los días salen de los horarios y el tema de `Clase`.** Mientras nadie haya cargado la clase de
+    esa fecha —la carga llega con las historias #33 y #34— el encuentro viaja sin tema y la pantalla
+    lo muestra pendiente, en lugar de completarlo con un texto de ejemplo.
+
+    ponytail: el cálculo no conoce feriados ni suspensiones, así que un día que se dicta y no se
+    dictó igual aparece. Cuando #33/#34 carguen las clases reales, la fuente del encuentro pasa a
+    ser `Clase` y esto queda como respaldo.
     """
     dias = {DIA_DE_LA_SEMANA[horario.dia] for horario in comision.horarios}
     fechas = _dias_de_cursada(comision, desde, dias)
-    return [EncuentroOut(fecha=fecha, tema=None) for fecha in fechas]
+    if not fechas:
+        return []
+
+    temas = dict(
+        session.execute(
+            select(Clase.fecha, Clase.tema).where(
+                Clase.comision_id == comision.id,
+                Clase.fecha.in_(fechas),
+            )
+        ).all()
+    )
+
+    return [EncuentroOut(fecha=fecha, tema=temas.get(fecha)) for fecha in fechas]
 
 
 def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[date]:

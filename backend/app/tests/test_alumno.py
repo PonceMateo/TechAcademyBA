@@ -230,3 +230,71 @@ def test_una_comision_ajena_responde_igual_que_una_inexistente(db_session) -> No
         obtener_detalle(db_session, usuario, "CUR999-9")
 
     assert str(de_otro.value) == str(inexistente.value)
+
+
+# --- Servicio: próximos encuentros (HU 38) -----------------------------------------------------
+
+from datetime import date  # noqa: E402
+
+from app.models.clases import Clase  # noqa: E402
+
+#: Lunes. Los encuentros de una comisión de lunes y miércoles salen de acá con fechas fijas.
+HOY = date(2026, 10, 26)
+
+
+def test_los_encuentros_salen_en_orden_cronologico(db_session) -> None:
+    comision = crear_comision(
+        db_session, horarios_semana=[("LUN", "18:00", "20:00"), ("MIE", "18:00", "20:00")]
+    )
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert [encuentro.fecha for encuentro in detalle.proximos_encuentros] == [
+        date(2026, 10, 26),
+        date(2026, 10, 28),
+        date(2026, 11, 2),
+        date(2026, 11, 4),
+    ]
+
+
+def test_un_encuentro_sin_clase_cargada_viene_sin_tema(db_session) -> None:
+    comision = crear_comision(db_session, horarios_semana=[("LUN", "18:00", "20:00")])
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert detalle.proximos_encuentros[0].tema is None
+
+
+def test_el_tema_sale_de_la_clase_cargada_para_esa_fecha(db_session) -> None:
+    comision = crear_comision(db_session, horarios_semana=[("LUN", "18:00", "20:00")])
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+    db_session.add(
+        Clase(comision_id=comision.id, fecha=date(2026, 10, 26), tema="Variables y tipos")
+    )
+    db_session.flush()
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert detalle.proximos_encuentros[0].tema == "Variables y tipos"
+    # La clase de esa fecha no completa las otras: cada encuentro trae su propio tema.
+    assert detalle.proximos_encuentros[1].tema is None
+
+
+def test_una_comision_que_empieza_mas_adelante_no_muestra_encuentros_pasados(db_session) -> None:
+    comision = crear_comision(db_session, horarios_semana=[("LUN", "18:00", "20:00")])
+    comision.fecha_inicio = date(2026, 11, 9)
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert detalle.proximos_encuentros[0].fecha == date(2026, 11, 9)
