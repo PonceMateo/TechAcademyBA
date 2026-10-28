@@ -36,7 +36,8 @@ describe('información de la comisión', () => {
       screen.getByRole('heading', { name: 'Cronograma' }).closest('section'),
     )
     expect(cronograma.getByText('04/05/2026')).toBeInTheDocument()
-    expect(cronograma.getByText('29/07/2026')).toBeInTheDocument()
+    // El contrato del alumno no tiene fecha de fin: la comisión todavía no la define (D58).
+    expect(cronograma.queryByText('29/07/2026')).not.toBeInTheDocument()
 
     const encuentros = within(
       screen.getByRole('heading', { name: 'Próximos encuentros' }).closest('section'),

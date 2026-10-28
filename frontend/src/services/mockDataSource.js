@@ -326,6 +326,32 @@ export function createMockDataSource() {
       .find(({ alumno }) => alumno !== undefined)
   }
 
+  /**
+   * La inscripción del alumno del ejemplo, o un error.
+   *
+   * El perfil y el guardado del contacto no tienen un "no hay nada que mostrar": si el ejemplo no
+   * tuviera alumno, la pantalla respondería con un dato vacío que parece un guardado exitoso.
+   */
+  function propiaDelAlumno() {
+    const propia = inscripcionDelAlumno()
+
+    if (propia === undefined) {
+      throw new Error('No hay ningún alumno para mostrar.')
+    }
+
+    return propia
+  }
+
+  /** Los cuatro datos del perfil, con la forma del contrato `/alumno/mi-perfil`. */
+  function perfilDe(alumno) {
+    return {
+      nombre: alumno.nombre,
+      documento: alumno.documento,
+      email: alumno.email,
+      telefono: alumno.telefono ?? null,
+    }
+  }
+
   /** La fila del catálogo de una comisión, o `undefined` si el código no existe. */
   function comision(comisionCodigo) {
     const codigo = normalizeCode(comisionCodigo)
@@ -1239,6 +1265,10 @@ export function createMockDataSource() {
      * **El acceso viaja con la inscripción y es el derivado (D9).** No se calcula nada acá: el
      * forzado que haga la secretaría se ve en la tarjeta del alumno porque las dos pantallas leen el
      * mismo registro.
+     *
+     * **La forma es la del contrato `/alumno`**, incluidos los `horarios` estructurados: los tests de
+     * pantalla corren contra la misma forma que devuelve la API, así que un campo que falte se ve
+     * acá y no en producción.
      */
     async listarInscripcionesAlumno() {
       const propia = inscripcionDelAlumno()
@@ -1255,6 +1285,7 @@ export function createMockDataSource() {
           nombre_curso: inscripcion.comision.nombre,
           docente_nombre: inscripcion.comision.docente_nombre,
           horario: inscripcion.comision.horario_legible,
+          horarios: copiar(inscripcion.comision.horarios ?? []),
           categoria: alumno.categoria,
           porcentaje_beca: alumno.porcentaje_beca,
           acceso: { ...alumno.acceso },
@@ -1263,9 +1294,12 @@ export function createMockDataSource() {
     },
 
     /**
-     * Detalle de una inscripción del alumno (11.3): lo de la comisión, el cronograma, los próximos
-     * encuentros y el link de clase. `null` cuando el alumno no está inscripto en esa comisión, que
-     * es lo que impide que un alumno abra el curso de otro.
+     * Detalle de una inscripción del alumno (11.3): lo de la comisión, el cronograma y los próximos
+     * encuentros. `null` cuando el alumno no está inscripto en esa comisión, que es lo que impide
+     * que un alumno abra el curso de otro.
+     *
+     * **Sin `link`.** El link de la clase no forma parte del contrato `/alumno` hasta la historia
+     * #39: el detalle del alumno no lo devuelve, y la pantalla no tiene de dónde sacarlo.
      */
     async obtenerDetalleInscripcion(comisionCodigo) {
       const propia = inscripcionDelAlumno()
@@ -1282,12 +1316,17 @@ export function createMockDataSource() {
       const comision = { ...inscripcion.comision }
 
       return {
-        comision,
+        comision: {
+          ...comision,
+          horarios: copiar(comision.horarios ?? []),
+        },
         categoria: alumno.categoria,
         porcentaje_beca: alumno.porcentaje_beca,
         acceso: { ...alumno.acceso },
         cronograma: { ...inscripcion.cronograma },
         proximos_encuentros: inscripcion.proximos_encuentros.map((encuentro) => ({ ...encuentro })),
+        // El detalle del alumno deja de leerlo en la HU 38: se va con la pantalla en el mismo
+        // commit, para que el ejemplo no tenga un campo que el contrato ya no devuelve.
         link: linkGuardado(comision.codigo),
       }
     },
@@ -1344,20 +1383,34 @@ export function createMockDataSource() {
      * pantalla —los campos deshabilitados—, no una bandera que el servicio le pase.
      */
     async obtenerPerfilAlumno() {
-      const propia = inscripcionDelAlumno()
+      const { alumno } = propiaDelAlumno()
 
-      if (propia === undefined) {
-        return null
+      return perfilDe(alumno)
+    },
+
+    /**
+     * Guardado de los datos de contacto (HU 43) con el mismo contrato que la API: email y teléfono,
+     * conflicto si el email ya es de otro alumno y teléfono vacío guardado como no informado.
+     *
+     * **El teléfono no se valida acá.** La forma E.164 es una regla del contrato de entrada y vive
+     * en `domain/validacion.js` y en el backend; un mock que aceptara cualquier cosa haría pasar un
+     * test que en producción falla con 422.
+     */
+    async actualizarPerfilAlumno({ email, telefono }) {
+      const { alumno } = propiaDelAlumno()
+      const correo = String(email ?? '').trim()
+      const ocupado = store.alumnos.some(
+        (candidato) => candidato.id !== alumno.id && candidato.email === correo,
+      )
+
+      if (ocupado) {
+        throw new Error(`El email ${correo} ya está registrado en el padrón de alumnos.`)
       }
 
-      const { alumno } = propia
+      alumno.email = correo
+      alumno.telefono = telefono ? String(telefono).trim() : null
 
-      return {
-        nombre: alumno.nombre,
-        documento: alumno.documento,
-        email: alumno.email,
-        telefono: alumno.telefono ?? null,
-      }
+      return perfilDe(alumno)
     },
   }
 }

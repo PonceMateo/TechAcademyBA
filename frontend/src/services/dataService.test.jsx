@@ -16,6 +16,7 @@ import {
   listarAlumnos,
   listarComisiones,
   listarCursos,
+  obtenerPerfilAlumno,
   reactivarAlumno,
   restablecerPasswordAlumno,
   restablecerPasswordDocente,
@@ -498,5 +499,27 @@ describe('el autoservicio del alumno en la frontera de datos', () => {
     await expect(
       actualizarPerfilAlumno({ email: 'agustina@mail.com', telefono: null }),
     ).rejects.toThrow(/ya está registrado/)
+  })
+})
+
+describe('el perfil del alumno contra el ejemplo', () => {
+  it('guarda el teléfono en el ejemplo y lo devuelve en el perfil', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const guardado = await actualizarPerfilAlumno({
+      email: (await obtenerPerfilAlumno()).email,
+      telefono: '+5491140000009',
+    })
+
+    expect(guardado.telefono).toBe('+5491140000009')
+    expect((await obtenerPerfilAlumno()).telefono).toBe('+5491140000009')
+  })
+
+  it('rechaza un email que ya es de otro alumno del ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await expect(
+      actualizarPerfilAlumno({ email: 'juan.perez@gmail.com', telefono: null }),
+    ).rejects.toThrow('ya está registrado en el padrón de alumnos')
   })
 })
