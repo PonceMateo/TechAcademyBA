@@ -3,7 +3,7 @@
 **Lo que estas pruebas cubren es el contrato HTTP y el aislamiento.** El rol se exige con
 `require_roles(Rol.ALUMNO)`, así que Administración y Docente no tienen acceso, y una cuenta con
 cambio de contraseña pendiente tampoco (D45). Además, ninguna respuesta puede traer datos de otro
-alumno: el legajo sale de la cuenta autenticada y el código se busca entre sus inscripciones (D58).
+alumno: el legajo sale de la cuenta autenticada y el código se busca entre sus inscripciones (D60).
 """
 
 from __future__ import annotations
@@ -129,6 +129,7 @@ def test_el_detalle_propio_trae_el_cronograma_y_los_encuentros(
     cuerpo = respuesta.json()
     assert cuerpo["cronograma"] == {"inicio": None, "fin": None}
     assert len(cuerpo["proximos_encuentros"]) == 4
+    assert cuerpo["proximos_encuentros"][0]["horario"] == "18:00-20:00"
     assert cuerpo["proximos_encuentros"][0]["tema"] is None
     assert "link" not in cuerpo
     assert "link_virtual" not in cuerpo["comision"]
@@ -226,7 +227,7 @@ def test_una_cuenta_con_cambio_pendiente_solo_puede_cambiar_la_contrasena(
 def test_ninguna_respuesta_trae_datos_de_otro_alumno(
     cliente_alumna: TestClient, db_session: Session, alumna: Alumno
 ) -> None:
-    """Sin identificador en la URL, el único camino es leer la propia cuenta (D58)."""
+    """Sin identificador en la URL, el único camino es leer la propia cuenta (D60)."""
     docente = crear_docente(db_session)
     sede = crear_sede(db_session)
     curso = crear_curso(db_session)

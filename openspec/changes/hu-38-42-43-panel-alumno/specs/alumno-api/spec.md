@@ -56,8 +56,8 @@ los próximos encuentros.
 El período de cursada SHALL mostrar la fecha de inicio cuando esté cargada y SHALL informar que la
 fecha de fin todavía no está definida cuando no lo esté; el sistema SHALL NOT inventar fechas de
 referencia. Los próximos encuentros SHALL derivarse de los días y horarios cargados de la comisión,
-desde el día corriente en adelante, con la fecha de cada encuentro y el tema de la clase cuando
-exista. El link de la clase virtual SHALL NOT formar parte de este contrato.
+desde el día corriente en adelante, con la fecha de cada encuentro, el horario de ese día y el tema
+de la clase cuando exista. El link de la clase virtual SHALL NOT formar parte de este contrato.
 
 Cuando el código no corresponda a una inscripción del alumno que llama —porque no existe o porque
 es de otra comisión— el sistema SHALL responder `404` con el mismo mensaje en ambos casos, sin
@@ -76,7 +76,12 @@ revelar si la comisión existe.
 #### Scenario: El tema de la clase todavía no está cargado
 
 - **WHEN** los próximos encuentros se derivan de los horarios y no hay tema cargado para esa fecha
-- **THEN** el encuentro informa su fecha y deja el tema sin definir, para que la pantalla lo muestre como pendiente
+- **THEN** el encuentro informa su fecha y su horario y deja el tema sin definir, y la pantalla no muestra ningún texto de tema en su lugar
+
+#### Scenario: Cada encuentro informa su horario
+
+- **WHEN** el alumno consulta los próximos encuentros de una comisión
+- **THEN** cada encuentro trae el rango horario de ese día en la grilla de la comisión, por ejemplo `18:30-21:30`, aunque todavía no haya clase cargada
 
 #### Scenario: El link de la clase no está disponible
 

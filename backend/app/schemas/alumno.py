@@ -2,7 +2,7 @@
 
 **El recurso no lleva el identificador del alumno.** El alumno sale de la cuenta autenticada, así
 que ningún esquema de este módulo acepta `alumno_id` ni `id`: no hay nada que el cliente pueda
-cambiar para pedir los datos de otro (D58).
+cambiar para pedir los datos de otro (D60).
 
 **La entrada de la edición tiene dos campos y nada más.** `PerfilAlumnoUpdate` es `extra="forbid"`
 con `email` y `telefono`, los dos únicos datos que el alumno puede cambiar; el documento, el nombre
@@ -92,7 +92,7 @@ class ComisionCursadaOut(BaseModel):
 class CronogramaOut(BaseModel):
     """Período de cursada. `fin` es `None` mientras la comisión no lo tenga definido.
 
-    No existe `comision.fecha_fin` (D58): el contrato informa la fecha de inicio real y deja la de
+    No existe `comision.fecha_fin` (D60): el contrato informa la fecha de inicio real y deja la de
     fin sin definir, en lugar de completarla con una fecha de ejemplo.
     """
 
@@ -103,15 +103,19 @@ class CronogramaOut(BaseModel):
 
 
 class EncuentroOut(BaseModel):
-    """Una clase venidera: la fecha y el tema cuando ya está cargado.
+    """Una clase venidera: su fecha, el horario de ese día y el tema cuando ya está cargado.
 
-    `tema` es `None` cuando todavía nadie cargó la clase de esa fecha, y la pantalla lo muestra
-    como pendiente. **El link de la clase no forma parte de este contrato**: llega con la HU 39.
+    `horario` es el rango de ese día de cursada (`18:30-21:30`), sacado de los horarios de la
+    comisión: la agenda y el detalle muestran a qué hora se dicta, no solo en qué fecha.
+    `tema` es `None` cuando todavía nadie cargó la clase de esa fecha y la fila no completa nada
+    en su lugar: no existe un "tema a confirmar", existe un tema que todavía no se cargó.
+    **El link de la clase no forma parte de este contrato**: llega con la HU 39.
     """
 
     model_config = ConfigDict(from_attributes=True)
 
     fecha: date
+    horario: str | None = None
     tema: str | None = None
 
 

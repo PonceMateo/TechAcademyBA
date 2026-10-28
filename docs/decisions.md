@@ -2051,3 +2051,32 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/mockDataSource.js`, `frontend/src/alumno/StudentCoursesPage.jsx`,
   `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`.
+
+## Panel del alumno: tablero, sección de cursos y horarios (change `hu-38-42-43-panel-alumno`)
+
+### D61 — La raíz `/alumno` es el Dashboard, `Mis Cursos` es una pantalla propia y cada encuentro trae su horario
+
+- **Fecha:** 2026-10-27
+- **Autor:** PonceMateo
+- **Decisión:** el índice del shell del alumno pasa a llamarse `Dashboard` y conserva solo lo que ya
+  tenía —el saludo, los cuatro indicadores y `Tu agenda`—; las tarjetas de las inscripciones se
+  mudan a `Mis Cursos`, una pantalla propia en `/alumno/cursos` accesible desde un ítem nuevo del
+  panel lateral (orden del menú: `Dashboard`, `Mis Cursos`, `Mis Pagos`, `Pagar la cuota`,
+  `Certificados`, `Mi Perfil`). El ítem `Dashboard` es `exacta` sobre `/alumno` y el de cursos no,
+  así el detalle de una cursada sigue destacando y nombrando a `Mis Cursos` en el breadcrumb. Cada
+  encuentro del cronograma y de la agenda trae además `horario`, el rango de ese día en la grilla de
+  la comisión, derivado en `_proximos_encuentros` y no calculado en el frontend.
+- **Por qué:** el usuario pidió al revisar el panel que la raíz fuera un tablero y no una lista, y
+  que la agenda y el detalle dijeran a qué hora se dicta cada encuentro. El horario se deriva de
+  `comision_horario` —la misma fuente que los días— para que no haya dos lugares que lo calculen.
+- **Sin texto de tema de relleno:** un encuentro sin `Clase` cargada viaja sin tema y la pantalla no
+  completa nada en su lugar; `Tema a confirmar` no existe en el dominio y se eliminó de las dos
+  pantallas. La fila queda con fecha, horario y tema vacío hasta que #33/#34 carguen las clases.
+- **Rebase sobre `main`:** la rama se rebasó sobre `origin/main` (HU 23), que traía su propio
+  `backend/app/api/alumno.py` con `GET /alumno/pagos`; las dos versiones se unieron en un solo
+  router con las cinco rutas y una sola inclusión en `router.py`. Por esa colisión esta decisión es
+  `D61`: `main` ya había ocupado `D58` y `D59`.
+- **Dónde:** `backend/app/schemas/alumno.py`, `backend/app/services/alumno.py`,
+  `frontend/src/alumno/StudentDashboardPage.jsx`, `frontend/src/alumno/StudentCoursesPage.jsx`,
+  `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/navegacion.js`,
+  `frontend/src/App.jsx`, `frontend/src/mocks/inscripciones.js`.

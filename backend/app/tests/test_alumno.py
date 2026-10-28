@@ -218,7 +218,7 @@ def test_el_detalle_no_expone_el_link_de_la_clase(db_session) -> None:
 
 
 def test_una_comision_ajena_responde_igual_que_una_inexistente(db_session) -> None:
-    """El mismo error en los dos casos: la respuesta no dice si la comisión existe (D58)."""
+    """El mismo error en los dos casos: la respuesta no dice si la comisión existe (D60)."""
     docente = crear_docente(db_session)
     sede = crear_sede(db_session)
     curso = crear_curso(db_session)
@@ -263,6 +263,23 @@ def test_los_encuentros_salen_en_orden_cronologico(db_session) -> None:
         date(2026, 11, 2),
         date(2026, 11, 4),
     ]
+
+
+def test_cada_encuentro_trae_el_horario_de_su_dia(db_session) -> None:
+    """La agenda y el detalle dicen a qué hora se dicta, no solo en qué fecha."""
+    comision = crear_comision(
+        db_session, horarios_semana=[("LUN", "18:00", "20:00"), ("MIE", "19:00", "21:00")]
+    )
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert detalle.proximos_encuentros[0].horario == "18:00-20:00"
+    assert detalle.proximos_encuentros[1].horario == "19:00-21:00"
+    # El horario no depende de que haya clase cargada: sale de la grilla de la comisión.
+    assert detalle.proximos_encuentros[0].tema is None
 
 
 def test_un_encuentro_sin_clase_cargada_viene_sin_tema(db_session) -> None:
@@ -329,7 +346,7 @@ def test_un_perfil_sin_telefono_lo_devuelve_vacio(db_session) -> None:
 
 
 def test_guardar_el_contacto_actualiza_el_padron_y_la_cuenta(db_session) -> None:
-    """Si las dos filas no se sincronizan, el email nuevo no sirve para entrar (D58)."""
+    """Si las dos filas no se sincronizan, el email nuevo no sirve para entrar (D60)."""
     alumno = crear_alumno(db_session)
     usuario = crear_usuario_alumno(db_session, alumno=alumno, email="agustina@viejomail.com")
 

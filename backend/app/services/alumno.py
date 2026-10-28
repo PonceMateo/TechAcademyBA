@@ -2,7 +2,7 @@
 
 **El alumno nunca se recibe por parámetro.** Todas las funciones parten de la cuenta autenticada y
 resuelven su legajo con `alumno_de`, así que ninguna consulta de este módulo puede devolver datos de
-otro alumno (D58).
+otro alumno (D60).
 
 **El estado de habilitación no se recalcula acá.** Sale de `habilitacion.derivar_estado`, la misma
 función que usa Administración, porque la causa que ve el alumno tiene que ser la administrativa —
@@ -132,7 +132,7 @@ def obtener_detalle(
 
     **El código se busca dentro de las inscripciones del alumno, no en el catálogo.** Una comisión
     que existe pero no es suya da el mismo `CursadaNoEncontrada` que un código inexistente, así que
-    la respuesta no sirve para averiguar qué comisiones tiene otro (D58).
+    la respuesta no sirve para averiguar qué comisiones tiene otro (D60).
     """
     alumno = alumno_de(usuario)
     inscripcion = _inscripcion_por_codigo(session, alumno, codigo)
@@ -149,7 +149,7 @@ def obtener_detalle(
         categoria=inscripcion.categoria,
         porcentaje_beca=inscripcion.porcentaje_beca,
         acceso=_acceso(session, inscripcion),
-        # `fin` no existe en el modelo (D58): el contrato informa que todavía no está definida en
+        # `fin` no existe en el modelo (D60): el contrato informa que todavía no está definida en
         # lugar de completarla con una fecha de ejemplo.
         cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=None),
         proximos_encuentros=_proximos_encuentros(session, comision, hoy or date.today()),
@@ -172,9 +172,11 @@ def _clave_de_codigo(codigo: str) -> str:
 def _proximos_encuentros(session: Session, comision: Comision, desde: date) -> list[EncuentroOut]:
     """Los próximos `ENCUENTROS_VISIBLES` días de cursada, del más cercano al más lejano.
 
-    **Los días salen de los horarios y el tema de `Clase`.** Mientras nadie haya cargado la clase de
-    esa fecha —la carga llega con las historias #33 y #34— el encuentro viaja sin tema y la pantalla
-    lo muestra pendiente, en lugar de completarlo con un texto de ejemplo.
+    **Los días salen de los horarios, cada uno trae su hora y el tema de `Clase`.** El `horario` del
+    encuentro es el rango de ese día de la semana en la grilla de la comisión, así la agenda y el
+    detalle dicen a qué hora se dicta y no solo en qué fecha. Mientras nadie haya cargado la clase
+    de esa fecha —la carga llega con las historias #33 y #34— el encuentro viaja sin tema, en lugar
+    de completarlo con un texto de ejemplo: no hay ningún "tema a confirmar" que mostrar.
 
     ponytail: el cálculo no conoce feriados ni suspensiones, así que un día que se dicta y no se
     dictó igual aparece. Cuando #33/#34 carguen las clases reales, la fuente del encuentro pasa a
@@ -194,7 +196,26 @@ def _proximos_encuentros(session: Session, comision: Comision, desde: date) -> l
         ).all()
     )
 
-    return [EncuentroOut(fecha=fecha, tema=temas.get(fecha)) for fecha in fechas]
+    return [
+        EncuentroOut(
+            fecha=fecha,
+            horario=", ".join(_rangos_del_dia(comision, fecha)) or None,
+            tema=temas.get(fecha),
+        )
+        for fecha in fechas
+    ]
+
+
+def _rangos_del_dia(comision: Comision, fecha: date) -> list[str]:
+    """Los rangos `HH:MM-HH:MM` de esa fecha en la grilla de la comisión, en orden de carga.
+
+    Una comisión puede dictar más de un tramo el mismo día: los dos viajan, separados por coma.
+    """
+    return [
+        f"{_hora(horario.inicio)}-{_hora(horario.fin)}"
+        for horario in comision.horarios
+        if DIA_DE_LA_SEMANA[horario.dia] == fecha.weekday()
+    ]
 
 
 def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[date]:
@@ -235,7 +256,7 @@ def actualizar_perfil(
     **Los dos datos viajan juntos porque salen de la misma pantalla, y las dos filas se escriben en
     la misma transacción.** `usuario.email` es el correo de login y `alumno.email` el del padrón: si
     se actualiara solo uno, el alumno entraría con un correo y la secretaría vería otro, o dejaría
-    de poder entrar. Es el mismo patrón de la edición administrativa (D52 y D58).
+    de poder entrar. Es el mismo patrón de la edición administrativa (D52 y D60).
 
     La unicidad la resuelve `ensure_email_available` excluyendo la propia cuenta —guardar el mismo
     email no puede chocar contra uno mismo— y la carrera entre dos cuentas que piden el mismo correo
