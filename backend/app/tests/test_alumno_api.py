@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.api.deps import MENSAJE_CAMBIO_PASSWORD_PENDIENTE, MENSAJE_SIN_PERMISOS
 from app.models.enums import CategoriaInscripcion
 from app.models.padron import Alumno, Usuario
 from app.tests.factories import (
@@ -21,7 +22,9 @@ from app.tests.factories import (
     crear_docente,
     crear_inscripcion,
     crear_sede,
+    crear_usuario_admin,
     crear_usuario_alumno,
+    crear_usuario_docente,
     encabezado_de_autorizacion,
     token_de_prueba,
 )
@@ -185,3 +188,66 @@ def test_un_email_o_un_telefono_con_forma_invalida_es_un_422(cliente_alumna: Tes
 
     assert sin_forma_de_email.status_code == 422
     assert sin_forma_de_telefono.status_code == 422
+
+
+# --- Autorización y aislamiento -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("cuenta", ["admin", "docente"])
+def test_solo_el_rol_alumno_entra_al_panel(
+    api_client: TestClient, db_session: Session, cuenta: str
+) -> None:
+    usuario = (
+        crear_usuario_admin(db_session) if cuenta == "admin" else crear_usuario_docente(db_session)
+    )
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(usuario)))
+
+    for ruta in ("/alumno/inscripciones", "/alumno/mi-perfil"):
+        respuesta = api_client.get(ruta)
+        assert respuesta.status_code == 403
+        assert respuesta.json()["detail"] == MENSAJE_SIN_PERMISOS
+
+
+def test_una_cuenta_con_cambio_pendiente_solo_puede_cambiar_la_contrasena(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """D45: el alumno recién dado de alta no llega al panel hasta cambiar la contraseña."""
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno, must_change_password=True)
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(usuario)))
+
+    respuesta = api_client.get("/alumno/inscripciones")
+
+    assert respuesta.status_code == 403
+    assert respuesta.json()["detail"] == MENSAJE_CAMBIO_PASSWORD_PENDIENTE
+    assert respuesta.headers["X-Cambio-Password-Pendiente"] == "true"
+
+
+def test_ninguna_respuesta_trae_datos_de_otro_alumno(
+    cliente_alumna: TestClient, db_session: Session, alumna: Alumno
+) -> None:
+    """Sin identificador en la URL, el único camino es leer la propia cuenta (D58)."""
+    docente = crear_docente(db_session)
+    sede = crear_sede(db_session)
+    curso = crear_curso(db_session)
+    propia = crear_comision(db_session, curso=curso, docente=docente, sede=sede)
+    crear_inscripcion(db_session, alumno=alumna, comision=propia)
+
+    otro = crear_alumno(
+        db_session,
+        nombre="Alumno Ajeno",
+        documento="35555666",
+        email="ajeno@techacademy.invalid",
+    )
+    ajena = crear_comision(db_session, curso=curso, docente=docente, sede=sede)
+    crear_inscripcion(db_session, alumno=otro, comision=ajena)
+
+    listado = cliente_alumna.get("/alumno/inscripciones").json()
+    detalle_ajeno = cliente_alumna.get(f"/alumno/inscripciones/{ajena.codigo}")
+    perfil = cliente_alumna.get("/alumno/mi-perfil").json()
+
+    assert [inscripcion["codigo"] for inscripcion in listado] == [propia.codigo]
+    assert detalle_ajeno.status_code == 404
+    assert perfil["nombre"] == alumna.nombre
+    assert perfil["email"] == alumna.email
+    assert "documento" not in listado[0]
