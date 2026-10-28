@@ -532,7 +532,8 @@ describe('edición del estado de una cobranza', () => {
     const actualizada = filas().find((fila) => fila.cells[0].textContent === '16/05/2026')
     expect(actualizada.cells[6]).toHaveTextContent('ACREDITADO')
     expect(within(actualizada).getByRole('button', { name: 'Editar estado' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Se acreditó la cobranza del 16/05/2026.')
+    expect(screen.getByRole('status')).toHaveTextContent('Estado actualizado a Acreditado.')
+    expect(screen.getByRole('status')).not.toHaveTextContent('Se registró el cobro')
   })
 
   it('corrige una cobranza acreditada por error y muestra la causa del rechazo', async () => {
@@ -552,6 +553,8 @@ describe('edición del estado de una cobranza', () => {
     const actualizada = filas().find((fila) => fila.cells[0].textContent === '10/05/2026')
     expect(actualizada.cells[6]).toHaveTextContent('RECHAZADO')
     expect(actualizada.cells[6]).toHaveTextContent('El banco devolvió la transferencia.')
+    expect(screen.getByRole('status')).toHaveTextContent('Estado actualizado a Rechazado.')
+    expect(screen.getByRole('status')).not.toHaveTextContent('Se registró el cobro')
 
     cleanup()
     renderAppAs('ADMIN', '/admin/cobranzas')
@@ -559,6 +562,26 @@ describe('edición del estado de una cobranza', () => {
 
     const recargada = filas().find((fila) => fila.cells[0].textContent === '10/05/2026')
     expect(recargada.cells[6]).toHaveTextContent('RECHAZADO')
+  })
+
+  it('avisa el estado nuevo y no habla de un cobro registrado', async () => {
+    const user = userEvent.setup()
+
+    await abrirEdicion(user, '10/05/2026')
+    await user.selectOptions(screen.getByLabelText(/Nuevo estado/), 'OBSERVADO')
+    await user.type(
+      screen.getByLabelText(/Justificación del cambio/),
+      'El comprobante llegó ilegible.',
+    )
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
+    await user.click(screen.getByRole('button', { name: 'Confirmar y guardar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const aviso = screen.getByRole('status')
+    expect(aviso).toHaveTextContent('Estado actualizado a Observado.')
+    expect(aviso).not.toHaveTextContent('Se registró')
+    expect(aviso).not.toHaveTextContent('Se acreditó')
   })
 
   it('conserva el estado nuevo después de recargar la pantalla', async () => {
@@ -594,5 +617,313 @@ describe('edición del estado de una cobranza', () => {
 
     const sinCambios = filas().find((fila) => fila.cells[0].textContent === '19/05/2026')
     expect(sinCambios.cells[6]).toHaveTextContent('OBSERVADO')
+  })
+})
+
+/**
+ * HU 23: una cobranza se reparte entre varios alumnos o queda sin imputar, y el saldo se imputa
+ * después desde el historial. La cobranza es una sola en todos los casos.
+ */
+describe('HU 23: distribución entre varios alumnos', () => {
+  async function cargarDatosBase(user, importe = '120000') {
+    await user.type(screen.getByLabelText(/Fecha Pago/), '2026-06-01')
+    await user.type(screen.getByLabelText(/Importe Cobrado/), importe)
+    await user.selectOptions(screen.getByLabelText(/Medio de Pago/), 'EFECTIVO')
+    await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Familiar de los tres')
+  }
+
+  const JUAN = { busqueda: 'Juan', nombre: 'Juan Ignacio Pérez' }
+  const CAMILA = { busqueda: 'Camila', nombre: 'Camila Rodríguez' }
+  const VALERIA = { busqueda: 'Valeria', nombre: 'Valeria Rossi' }
+
+  /** El buscador de la fila filtra al escribir y la coincidencia se elige en la misma lista. */
+  async function elegirAlumno(user, indice, alumno) {
+    await user.type(screen.getByLabelText(new RegExp(`Alumno ${indice}`)), alumno.busqueda)
+    await user.click(await screen.findByRole('option', { name: new RegExp(alumno.nombre) }))
+  }
+
+  async function escribirMonto(user, indice, monto) {
+    await user.type(screen.getAllByLabelText(/Importe imputado/)[indice - 1], String(monto))
+  }
+
+  async function agregarFila(user, indice, alumno, monto) {
+    await user.click(screen.getByRole('button', { name: 'Agregar otro alumno' }))
+    await elegirAlumno(user, indice, alumno)
+    await escribirMonto(user, indice, monto)
+  }
+
+  async function completarDosAlumnos(user, montos = [50000, 70000], alumnos = [JUAN, CAMILA]) {
+    await user.click(screen.getByLabelText('Varios alumnos'))
+    await cargarDatosBase(user)
+    await elegirAlumno(user, 1, alumnos[0])
+    await elegirAlumno(user, 2, alumnos[1])
+    await escribirMonto(user, 1, montos[0])
+    await escribirMonto(user, 2, montos[1])
+  }
+
+  it('arranca con dos filas y no habilita el registro hasta completar dos alumnos distintos', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByLabelText('Varios alumnos'))
+    await cargarDatosBase(user)
+
+    expect(screen.getAllByLabelText(/Alumno \d/)).toHaveLength(2)
+    const registrar = screen.getByRole('button', { name: 'Registrar Cobro' })
+    expect(registrar).toBeDisabled()
+
+    await elegirAlumno(user, 1, JUAN)
+    await escribirMonto(user, 1, 50000)
+    expect(registrar).toBeDisabled()
+
+    // El mismo alumno dos veces no es un reparto.
+    await elegirAlumno(user, 2, JUAN)
+    await escribirMonto(user, 2, 70000)
+    expect(screen.getByText('Cada alumno tiene que ser distinto.')).toBeInTheDocument()
+    expect(registrar).toBeDisabled()
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Alumno 2' })).getByRole('button', {
+        name: 'Cambiar',
+      }),
+    )
+    await elegirAlumno(user, 2, CAMILA)
+    expect(registrar).toBeEnabled()
+  })
+
+  it('busca al alumno de cada fila por nombre, DNI o email', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByLabelText('Varios alumnos'))
+    await cargarDatosBase(user)
+    await elegirAlumno(user, 1, { busqueda: '36.778.990', nombre: 'Valeria Rossi' })
+    await elegirAlumno(user, 2, { busqueda: 'cami_rod@hotmail.com', nombre: 'Camila Rodríguez' })
+
+    expect(
+      within(screen.getByRole('group', { name: 'Alumno 1' })).getByText('Valeria Rossi'),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('group', { name: 'Alumno 2' })).getByText('Camila Rodríguez'),
+    ).toBeInTheDocument()
+
+    await escribirMonto(user, 1, 60000)
+    await escribirMonto(user, 2, 60000)
+    expect(screen.getByRole('button', { name: 'Registrar Cobro' })).toBeEnabled()
+  })
+
+  it('reparte $120.000 entre tres alumnos en una sola cobranza', async () => {
+    const user = userEvent.setup()
+
+    await completarDosAlumnos(user, [50000, 40000])
+    await agregarFila(user, 3, VALERIA, 30000)
+
+    expect(screen.getByText('Distribuido').closest('dl')).toHaveTextContent('Sin imputar$0')
+
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    await waitFor(() => expect(filas()).toHaveLength(7))
+    expect(filas()[0].cells[2]).toHaveTextContent('Juan Ignacio Pérez +2')
+    expect(filas()[0].cells[5]).toHaveTextContent('$120.000')
+    expect(screen.getByRole('status')).toHaveTextContent('Se registró el cobro del 01/06/2026.')
+  })
+
+  it('permite quitar filas y una distribución parcial pide confirmación', async () => {
+    const user = userEvent.setup()
+
+    await completarDosAlumnos(user, [50000, 20000])
+
+    expect(screen.getByText('Distribuido').closest('dl')).toHaveTextContent('Sin imputar$50.000')
+    expect(screen.getByText(/Quedan \$50\.000 sin imputar/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    expect(filas()).toHaveLength(6)
+    expect(screen.getByText(/¿Registrar la cobranza/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Volver' }))
+    expect(screen.queryByText(/¿Registrar la cobranza/)).not.toBeInTheDocument()
+    expect(filas()).toHaveLength(6)
+
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    await user.click(screen.getByRole('button', { name: 'Sí, registrar con saldo pendiente' }))
+
+    await waitFor(() => expect(filas()).toHaveLength(7))
+    expect(filas()[0].cells[2]).toHaveTextContent('Juan Ignacio Pérez +1')
+  })
+
+  it('no deja repartir más que el importe cobrado', async () => {
+    const user = userEvent.setup()
+
+    await completarDosAlumnos(user, [100000, 30000])
+
+    expect(screen.getByRole('button', { name: 'Registrar Cobro' })).toBeDisabled()
+    expect(screen.getByText(/supera el importe recibido en \$10\.000/)).toBeInTheDocument()
+    expect(filas()).toHaveLength(6)
+  })
+
+  it('muestra los alumnos y los importes en el detalle del historial', async () => {
+    const user = userEvent.setup()
+
+    await completarDosAlumnos(user, [50000, 70000])
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    await waitFor(() => expect(filas()).toHaveLength(7))
+
+    const nueva = filas()[0]
+    await user.click(within(nueva).getByRole('button', { name: 'Ver imputaciones' }))
+
+    const detalle = screen.getByText('Importe total').closest('dl').parentElement
+    expect(detalle).toHaveTextContent('Juan Ignacio Pérez')
+    expect(detalle).toHaveTextContent('$50.000')
+    expect(detalle).toHaveTextContent('Camila Rodríguez')
+    expect(detalle).toHaveTextContent('$70.000')
+    expect(within(detalle).getByText('Total imputado').closest('div')).toHaveTextContent('$120.000')
+    expect(within(detalle).getByText('Saldo disponible').closest('div')).toHaveTextContent('$0')
+
+    // Con saldo $0 se puede consultar, pero no hay nada más que imputar.
+    expect(
+      within(nueva).queryByRole('button', { name: 'Agregar imputación' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(within(nueva).getByRole('button', { name: 'Ocultar detalle' }))
+    expect(screen.queryByText('Importe total')).not.toBeInTheDocument()
+  })
+
+  it('registra sin imputar y después reparte el saldo desde el historial', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByLabelText('Sin imputar'))
+    await cargarDatosBase(user)
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    await waitFor(() => expect(filas()).toHaveLength(7))
+    expect(filas()[0].cells[2]).toHaveTextContent('')
+
+    await user.click(within(filas()[0]).getByRole('button', { name: 'Agregar imputación' }))
+    const dialogo = await screen.findByRole('dialog')
+    expect(within(dialogo).getByText('Todavía no tiene imputaciones.')).toBeInTheDocument()
+    expect(within(dialogo).getByText('Saldo sin imputar').closest('div')).toHaveTextContent(
+      '$120.000',
+    )
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Agregar alumno' }))
+    await user.type(within(dialogo).getByLabelText(/Alumno 1/), 'Juan')
+    await user.click(await within(dialogo).findByRole('option', { name: /Juan Ignacio Pérez/ }))
+    await user.type(within(dialogo).getByLabelText(/Importe imputado/), '70000')
+    await user.click(within(dialogo).getByRole('button', { name: 'Imputar saldo' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(filas()[0].cells[2]).toHaveTextContent('Juan Ignacio Pérez')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Se agregó una imputación a la cobranza del 01/06/2026.',
+    )
+
+    await user.click(within(filas()[0]).getByRole('button', { name: 'Agregar imputación' }))
+    const reabierto = await screen.findByRole('dialog')
+    expect(within(reabierto).getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(within(reabierto).getByText('Imputado').closest('div')).toHaveTextContent('$70.000')
+    expect(within(reabierto).getByText('Saldo sin imputar').closest('div')).toHaveTextContent(
+      '$50.000',
+    )
+  })
+
+  it('reparte en partes iguales con el botón', async () => {
+    const user = userEvent.setup()
+
+    await completarDosAlumnos(user, [0, 0])
+    await user.click(screen.getByRole('button', { name: 'Distribuir en partes iguales' }))
+
+    expect(screen.getAllByLabelText(/Importe imputado/).map((campo) => campo.value)).toEqual([
+      '60000',
+      '60000',
+    ])
+    expect(screen.getByText('Distribuido').closest('dl')).toHaveTextContent('Sin imputar$0')
+  })
+
+  it('no ofrece imputar una cobranza que ya está completa', async () => {
+    await screen.findByText('10/05/2026')
+    const completa = filas().find((fila) => fila.cells[0].textContent === '10/05/2026')
+
+    expect(
+      within(completa).queryByRole('button', { name: 'Agregar imputación' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('solo ofrece ver el detalle cuando hay varios alumnos imputados', async () => {
+    await screen.findByText('10/05/2026')
+    const unAlumno = filas().find((fila) => fila.cells[0].textContent === '10/05/2026')
+    const sinImputar = filas().find((fila) => fila.cells[0].textContent === '16/05/2026')
+
+    expect(
+      within(unAlumno).queryByRole('button', { name: 'Ver imputaciones' }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(sinImputar).queryByRole('button', { name: 'Ver imputaciones' }),
+    ).not.toBeInTheDocument()
+
+    const user = userEvent.setup()
+    await completarDosAlumnos(user, [50000, 70000])
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    await waitFor(() => expect(filas()).toHaveLength(7))
+
+    expect(within(filas()[0]).getByRole('button', { name: 'Ver imputaciones' })).toBeInTheDocument()
+  })
+})
+
+/**
+ * Un comprobante que se registró sin titular queda como "Sin identificar". Desde `Editar estado`
+ * se puede completar sin necesidad de cambiar el estado; un titular ya identificado no se edita.
+ */
+describe('completar el titular desde Editar estado', () => {
+  async function registrarSinTitular(user) {
+    await user.type(screen.getByLabelText(/Fecha Pago/), '2026-06-02')
+    await user.type(screen.getByLabelText(/Importe Cobrado/), '15000')
+    await user.selectOptions(screen.getByLabelText(/Medio de Pago/), 'EFECTIVO')
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+    await waitFor(() => expect(filas()).toHaveLength(7))
+  }
+
+  it('permite completar el titular sin cambiar el estado', async () => {
+    const user = userEvent.setup()
+    await registrarSinTitular(user)
+
+    expect(filas()[0].cells[1]).toHaveTextContent('Sin identificar')
+
+    await user.click(within(filas()[0]).getByRole('button', { name: 'Editar estado' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Editar estado de la cobranza' })
+    const continuar = within(dialogo).getByRole('button', { name: 'Continuar' })
+
+    // No hace falta elegir estado ni escribir una justificación: alcanza con el titular.
+    await user.type(within(dialogo).getByLabelText(/Titular del comprobante/), 'María López')
+    expect(continuar).toBeEnabled()
+    await user.click(continuar)
+
+    expect(
+      within(dialogo).getByText('No vas a cambiar el estado de la cobranza.'),
+    ).toBeInTheDocument()
+    expect(within(dialogo).getByText(/Vas a completar el titular como/)).toBeInTheDocument()
+    expect(within(dialogo).queryByText(/Justificación:/)).not.toBeInTheDocument()
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Confirmar y guardar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    expect(screen.getByRole('status')).toHaveTextContent('Se completó el titular del comprobante.')
+    expect(filas()[0].cells[1]).toHaveTextContent('María López')
+    expect(filas()[0].cells[6]).toHaveTextContent('ACREDITADO')
+
+    // Ya identificado, el modal vuelve a mostrar el titular como dato de solo lectura.
+    await user.click(within(filas()[0]).getByRole('button', { name: 'Editar estado' }))
+    const reabierto = screen.getByRole('dialog', { name: 'Editar estado de la cobranza' })
+    expect(within(reabierto).queryByLabelText(/Titular del comprobante/)).not.toBeInTheDocument()
+    expect(within(reabierto).getByText('María López')).toBeInTheDocument()
+  })
+
+  it('no ofrece editar el titular de una cobranza ya identificada', async () => {
+    const user = userEvent.setup()
+    const fila = filas().find((candidata) => candidata.cells[0].textContent === '10/05/2026')
+
+    await user.click(within(fila).getByRole('button', { name: 'Editar estado' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Editar estado de la cobranza' })
+
+    expect(within(dialogo).queryByLabelText(/Titular del comprobante/)).not.toBeInTheDocument()
+    expect(within(dialogo).getByText('Titular del pago').closest('div')).toHaveTextContent(
+      'Juan Ignacio Pérez',
+    )
   })
 })

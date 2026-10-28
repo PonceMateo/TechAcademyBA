@@ -11,7 +11,12 @@ import {
   LINKS_DE_CLASE,
   SEDES,
 } from '../mocks'
-import { ESTADO_COBRANZA, TIPO_FACTURA, TRANSICIONES_ESTADO_COBRANZA } from '../domain/enums'
+import {
+  ESTADO_COBRANZA,
+  TIPO_FACTURA,
+  TITULAR_SIN_IDENTIFICAR,
+  TRANSICIONES_ESTADO_COBRANZA,
+} from '../domain/enums'
 import { textoHorarios } from '../domain/horarios'
 import {
   normalizeCode,
@@ -63,6 +68,40 @@ function copiar(registros) {
 /** El identificador siguiente de una colección: el máximo + 1, o 1 si está vacía. */
 function siguienteId(registros) {
   return registros.reduce((mayor, registro) => Math.max(mayor, registro.id ?? 0), 0) + 1
+}
+
+/** Saldo sin imputar de una cobranza (HU 23). Las filas de ejemplo sin monto valen el total. */
+function saldoSinImputar(cobranza) {
+  const imputaciones = cobranza.imputaciones ?? (cobranza.imputacion ? [cobranza.imputacion] : [])
+  const imputado = imputaciones.reduce(
+    (suma, imputacion) => suma + Number(imputacion.monto ?? cobranza.importe ?? 0),
+    0,
+  )
+  return Number(cobranza.importe ?? 0) - imputado
+}
+
+/** Traduce una imputación del cuerpo a la fila que guarda la fuente de ejemplo. */
+function imputacionDelMock(store, item) {
+  if (item.empresa_id) {
+    const empresa = store.empresas.find((candidata) => candidata.id === Number(item.empresa_id))
+    return {
+      destino: DESTINO_IMPUTACION.EMPRESA,
+      id: Number(item.empresa_id),
+      empresa_id: Number(item.empresa_id),
+      nombre: empresa?.razon_social ?? '',
+      monto: Number(item.monto),
+    }
+  }
+  // En el ejemplo el identificador estable de la inscripción es el del alumno.
+  const alumno = store.alumnos.find((candidato) => candidato.id === Number(item.inscripcion_id))
+  return {
+    destino: DESTINO_IMPUTACION.ALUMNO,
+    id: Number(item.inscripcion_id),
+    inscripcion_id: Number(item.inscripcion_id),
+    alumno_id: alumno?.id ?? null,
+    nombre: alumno?.nombre ?? '',
+    monto: Number(item.monto),
+  }
 }
 
 /**
@@ -614,7 +653,11 @@ export function createMockDataSource() {
       }
       let porcentaje = null
       if (categoria === 'BECADO_PARCIAL') {
-        if (datos.porcentaje_beca == null || datos.porcentaje_beca < 1 || datos.porcentaje_beca > 99) {
+        if (
+          datos.porcentaje_beca == null ||
+          datos.porcentaje_beca < 1 ||
+          datos.porcentaje_beca > 99
+        ) {
           throw new Error('El porcentaje debe estar entre 1 y 99.')
         }
         porcentaje = datos.porcentaje_beca
@@ -909,6 +952,21 @@ export function createMockDataSource() {
     async registrarCobranza(datos) {
       const id = siguienteId(store.cobranzas)
       const alumno = store.alumnos.find((candidato) => candidato.id === datos.alumno_id)
+      const distribuidas = (datos.imputaciones ?? []).map((item) => imputacionDelMock(store, item))
+      const imputaciones =
+        distribuidas.length > 0
+          ? distribuidas
+          : datos.alumno_id
+            ? [
+                {
+                  destino: DESTINO_IMPUTACION.ALUMNO,
+                  id: datos.inscripcion_id ?? datos.alumno_id,
+                  inscripcion_id: datos.inscripcion_id ?? null,
+                  nombre: alumno?.nombre ?? '',
+                  monto: Number(datos.importe),
+                },
+              ]
+            : []
       const cobranza = {
         id,
         fecha: datos.fecha,
@@ -919,17 +977,31 @@ export function createMockDataSource() {
         importe: Number(datos.importe),
         estado: datos.estado,
         causa: datos.estado === 'ACREDITADO' ? null : (datos.causa ?? ''),
-        imputacion: datos.alumno_id
-          ? {
-              destino: DESTINO_IMPUTACION.ALUMNO,
-              id: datos.inscripcion_id ?? datos.alumno_id,
-              inscripcion_id: datos.inscripcion_id ?? null,
-              nombre: alumno?.nombre ?? '',
-            }
-          : null,
+        imputacion: imputaciones[0] ?? null,
+        imputaciones,
         _ejemplo: true,
       }
       store.cobranzas.unshift(cobranza)
+      return { ...cobranza }
+    },
+
+    /**
+     * Imputación posterior sobre una cobranza existente (HU 23). Solo reparte el saldo y conserva
+     * las imputaciones anteriores; no crea otro cobro.
+     */
+    async agregarImputaciones(id, datos) {
+      const cobranza = store.cobranzas.find((fila) => fila.id === Number(id))
+      if (cobranza === undefined) {
+        throw new Error('La cobranza no existe.')
+      }
+      const saldo = saldoSinImputar(cobranza)
+      const nuevos = datos.imputaciones.map((item) => imputacionDelMock(store, item))
+      const total = nuevos.reduce((suma, imputacion) => suma + imputacion.monto, 0)
+      if (total > saldo) {
+        throw new Error(`La imputación supera el saldo sin imputar de la cobranza (${saldo}).`)
+      }
+      cobranza.imputaciones = [...(cobranza.imputaciones ?? []), ...nuevos]
+      cobranza.imputacion = cobranza.imputaciones[0]
       return { ...cobranza }
     },
 
@@ -943,15 +1015,29 @@ export function createMockDataSource() {
       if (cobranza === undefined) {
         throw new Error('La cobranza no existe.')
       }
-      if (datos.estado === cobranza.estado) {
-        throw new Error('La cobranza ya está en ese estado.')
+      // El titular solo se completa cuando el comprobante no lo tenía identificado.
+      if (datos.titular !== undefined && datos.titular !== null && datos.titular !== '') {
+        if (cobranza.pagador.nombre !== TITULAR_SIN_IDENTIFICAR) {
+          throw new Error(
+            'El comprobante ya tiene un titular identificado: no se cambia desde acá.',
+          )
+        }
+        cobranza.pagador = { ...cobranza.pagador, nombre: datos.titular }
       }
-      if (!TRANSICIONES_ESTADO_COBRANZA[cobranza.estado].includes(datos.estado)) {
-        throw new Error(`No se puede pasar una cobranza de ${cobranza.estado} a ${datos.estado}.`)
-      }
-      cobranza.estado = datos.estado
-      if (datos.estado !== ESTADO_COBRANZA.ACREDITADO) {
-        cobranza.causa = datos.justificacion
+      if (datos.estado !== undefined) {
+        const cambiaEstado = datos.estado !== cobranza.estado
+        if (!cambiaEstado && datos.titular === undefined) {
+          throw new Error('La cobranza ya está en ese estado.')
+        }
+        if (cambiaEstado && !TRANSICIONES_ESTADO_COBRANZA[cobranza.estado].includes(datos.estado)) {
+          throw new Error(`No se puede pasar una cobranza de ${cobranza.estado} a ${datos.estado}.`)
+        }
+        if (cambiaEstado) {
+          cobranza.estado = datos.estado
+          if (datos.estado !== ESTADO_COBRANZA.ACREDITADO) {
+            cobranza.causa = datos.justificacion
+          }
+        }
       }
       return { ...cobranza }
     },
@@ -1221,17 +1307,35 @@ export function createMockDataSource() {
       const { alumno } = propia
 
       return store.cobranzas
-        .filter(
-          (cobranza) =>
-            cobranza.imputacion?.destino === DESTINO_IMPUTACION.ALUMNO &&
-            normalizeCode(cobranza.imputacion.nombre) === normalizeCode(alumno.nombre),
-        )
-        .map((cobranza) => ({
-          ...cobranza,
-          // En este dominio el pagador puede no ser el alumno (D7), y la fila tiene que decirlo.
-          pagado_por_tercero:
-            normalizeCode(cobranza.pagador.nombre) !== normalizeCode(alumno.nombre),
-        }))
+        .filter((cobranza) => {
+          const imputaciones =
+            cobranza.imputaciones ?? (cobranza.imputacion ? [cobranza.imputacion] : [])
+          return imputaciones.some(
+            (imputacion) =>
+              imputacion.destino === DESTINO_IMPUTACION.ALUMNO &&
+              normalizeCode(imputacion.nombre) === normalizeCode(alumno.nombre),
+          )
+        })
+        .map((cobranza) => {
+          const imputaciones =
+            cobranza.imputaciones ?? (cobranza.imputacion ? [cobranza.imputacion] : [])
+          const propiaDelAlumno = imputaciones.filter(
+            (imputacion) =>
+              imputacion.destino === DESTINO_IMPUTACION.ALUMNO &&
+              normalizeCode(imputacion.nombre) === normalizeCode(alumno.nombre),
+          )
+          return {
+            ...cobranza,
+            // Como en la API, cada alumno ve lo que se le imputó a él, no el total repartido.
+            importe: propiaDelAlumno.reduce(
+              (suma, imputacion) => suma + Number(imputacion.monto ?? cobranza.importe ?? 0),
+              0,
+            ),
+            // En este dominio el pagador puede no ser el alumno (D7), y la fila tiene que decirlo.
+            pagado_por_tercero:
+              normalizeCode(cobranza.pagador.nombre) !== normalizeCode(alumno.nombre),
+          }
+        })
     },
 
     /**

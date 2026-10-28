@@ -197,6 +197,11 @@ export function registrarCobranza(datos) {
   return getDataSource().registrarCobranza(datos)
 }
 
+/** Reparte el saldo sin imputar de una cobranza ya registrada (HU 23). */
+export function agregarImputaciones(id, datos) {
+  return getDataSource().agregarImputaciones(id, datos)
+}
+
 /** Acredita una cobranza observada o rechazada (ampliación de la HU 21). */
 export function actualizarEstadoCobranza(id, datos) {
   return getDataSource().actualizarEstadoCobranza(id, datos)

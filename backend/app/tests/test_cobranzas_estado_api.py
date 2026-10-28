@@ -74,9 +74,7 @@ def cambiar_estado(
 ):
     cuerpo = {"estado": estado.value, "justificacion": JUSTIFICACION}
     cuerpo.update(cambios)
-    return api_client.patch(
-        f"/cobranzas/{cobranza_id}/estado", headers=headers, json=cuerpo
-    )
+    return api_client.patch(f"/cobranzas/{cobranza_id}/estado", headers=headers, json=cuerpo)
 
 
 @pytest.mark.parametrize(
@@ -124,9 +122,7 @@ def test_pasar_a_no_acreditado_guarda_la_justificacion_como_causa(
 ) -> None:
     creada = registrar(api_client, admin_headers, EstadoCobranza.ACREDITADO)
 
-    respuesta = cambiar_estado(
-        api_client, admin_headers, creada["id"], EstadoCobranza.OBSERVADO
-    )
+    respuesta = cambiar_estado(api_client, admin_headers, creada["id"], EstadoCobranza.OBSERVADO)
 
     assert respuesta.status_code == 200, respuesta.text
     db_session.expire_all()
@@ -183,9 +179,7 @@ def test_transicion_no_permitida(
 ) -> None:
     creada = registrar(api_client, admin_headers, EstadoCobranza.RECHAZADO)
 
-    respuesta = cambiar_estado(
-        api_client, admin_headers, creada["id"], EstadoCobranza.OBSERVADO
-    )
+    respuesta = cambiar_estado(api_client, admin_headers, creada["id"], EstadoCobranza.OBSERVADO)
 
     assert respuesta.status_code == 422, respuesta.text
     assert "No se puede pasar" in respuesta.json()["detail"]
@@ -216,9 +210,7 @@ def test_la_justificacion_es_obligatoria(
     assert db_session.get(Cobranza, creada["id"]).estado == EstadoCobranza.OBSERVADO.value
 
 
-def test_cobranza_inexistente(
-    api_client: TestClient, db_session: Session, admin_headers
-) -> None:
+def test_cobranza_inexistente(api_client: TestClient, db_session: Session, admin_headers) -> None:
     respuesta = cambiar_estado(api_client, admin_headers, 999999)
 
     assert respuesta.status_code == 404, respuesta.text
@@ -273,3 +265,95 @@ def test_conserva_importe_titular_fecha_e_imputacion(
     assert db_session.scalar(select(func.count()).select_from(Cobranza)) == 1
     assert db_session.scalar(select(func.count()).select_from(Pagador)) == 1
     assert db_session.scalar(select(func.count()).select_from(Imputacion)) == 1
+
+
+def test_completa_el_titular_de_un_comprobante_sin_identificar(
+    api_client: TestClient,
+    db_session: Session,
+    admin: Usuario,
+    admin_headers,
+) -> None:
+    """El PATCH completa el titular sin exigir un cambio de estado."""
+    creada = registrar(
+        api_client, admin_headers, EstadoCobranza.ACREDITADO, titular="Sin identificar"
+    )
+
+    respuesta = api_client.patch(
+        f"/cobranzas/{creada['id']}/estado",
+        headers=admin_headers,
+        json={"titular": "María López"},
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["pagador"]["nombre"] == "María López"
+
+    db_session.expire_all()
+    cobranza = db_session.get(Cobranza, creada["id"])
+    assert cobranza.estado == EstadoCobranza.ACREDITADO.value
+    assert cobranza.estado_cambiado_at is None
+    assert cobranza.pagador.nombre == "María López"
+
+    entrada = db_session.scalar(select(AuditLog))
+    assert entrada.accion == "cobranza.titular_completado"
+    detalle = json.loads(entrada.detalle)
+    assert detalle["titular_anterior"] == "Sin identificar"
+    assert detalle["titular_nuevo"] == "María López"
+    assert detalle["estado_anterior"] == detalle["estado_nuevo"]
+    assert detalle["justificacion"] == "Titular del comprobante completado."
+
+
+def test_completa_el_titular_junto_con_el_cambio_de_estado(
+    api_client: TestClient,
+    db_session: Session,
+    admin_headers,
+) -> None:
+    creada = registrar(
+        api_client, admin_headers, EstadoCobranza.OBSERVADO, titular="Sin identificar"
+    )
+
+    respuesta = cambiar_estado(
+        api_client, admin_headers, creada["id"], EstadoCobranza.ACREDITADO, titular="María López"
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    db_session.expire_all()
+    cobranza = db_session.get(Cobranza, creada["id"])
+    assert cobranza.estado == EstadoCobranza.ACREDITADO.value
+    assert cobranza.pagador.nombre == "María López"
+    detalle = json.loads(db_session.scalar(select(AuditLog)).detalle)
+    assert detalle["titular_nuevo"] == "María López"
+
+
+def test_no_reescribe_el_titular_de_un_comprobante_identificado(
+    api_client: TestClient, db_session: Session, admin_headers
+) -> None:
+    creada = registrar(api_client, admin_headers, EstadoCobranza.ACREDITADO)
+
+    respuesta = cambiar_estado(
+        api_client, admin_headers, creada["id"], EstadoCobranza.OBSERVADO, titular="Otra Persona"
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert "ya tiene un titular" in respuesta.json()["detail"]
+    db_session.expire_all()
+    cobranza = db_session.get(Cobranza, creada["id"])
+    assert cobranza.estado == EstadoCobranza.ACREDITADO.value
+    assert cobranza.pagador.nombre == "Juan Ignacio Pérez"
+    assert db_session.scalar(select(func.count()).select_from(AuditLog)) == 0
+
+
+@pytest.mark.parametrize("titular", [None, "", "   "])
+def test_el_patch_necesita_estado_o_titular(
+    api_client: TestClient, db_session: Session, admin_headers, titular: str | None
+) -> None:
+    creada = registrar(api_client, admin_headers, EstadoCobranza.ACREDITADO)
+
+    cuerpo = {"justificacion": JUSTIFICACION}
+    if titular is not None:
+        cuerpo["titular"] = titular
+    respuesta = api_client.patch(
+        f"/cobranzas/{creada['id']}/estado", headers=admin_headers, json=cuerpo
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert db_session.scalar(select(func.count()).select_from(AuditLog)) == 0

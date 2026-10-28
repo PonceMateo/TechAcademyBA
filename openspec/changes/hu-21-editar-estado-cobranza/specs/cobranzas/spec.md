@@ -4,7 +4,7 @@
 
 ### Requirement: Edición del estado de una cobranza
 
-El sistema SHALL exponer `PATCH /cobranzas/{id}/estado` con rol `ADMIN`, que acepta `estado` y `justificacion` y solo permite `ACREDITADO → OBSERVADO | RECHAZADO`, `OBSERVADO → ACREDITADO | RECHAZADO` y `RECHAZADO → ACREDITADO`. WHEN el cambio es válido SHALL responder 200 con la cobranza actualizada y persistir el estado nuevo, su autor, su fecha y una entrada de `audit_log`; en cualquier otro caso SHALL rechazarlo sin modificar la cobranza ni crear un cobro nuevo.
+El sistema SHALL exponer `PATCH /cobranzas/{id}/estado` con rol `ADMIN`, que acepta `estado`, `titular` y `justificacion` y solo permite `ACREDITADO → OBSERVADO | RECHAZADO`, `OBSERVADO → ACREDITADO | RECHAZADO` y `RECHAZADO → ACREDITADO`. WHEN el cambio es válido SHALL responder 200 con la cobranza actualizada y persistir el estado nuevo, su autor, su fecha y una entrada de `audit_log`; en cualquier otro caso SHALL rechazarlo sin modificar la cobranza ni crear un cobro nuevo.
 
 #### Scenario: Acreditar una cobranza observada
 - **WHEN** un administrador envía `ACREDITADO` y una justificación sobre una cobranza `OBSERVADO`
@@ -52,4 +52,28 @@ El sistema SHALL exponer `PATCH /cobranzas/{id}/estado` con rol `ADMIN`, que ace
 
 #### Scenario: Importe e imputación intactos
 - **WHEN** se cambia el estado de una cobranza imputada a una inscripción
-- **THEN** el importe, el titular, la fecha, el medio y la imputación original quedan iguales y no aparecen una cobranza, un pagador ni una imputación nuevos
+- **THEN** el importe, la fecha, el medio, el titular identificado y la imputación original quedan iguales y no aparecen una cobranza, un pagador ni una imputación nuevos
+
+### Requirement: Completar el titular de un comprobante sin identificar
+
+`PATCH /cobranzas/{id}/estado` SHALL aceptar `titular` como dato opcional, junto con `estado`,
+para completar el titular de un comprobante registrado como `Sin identificar`. SHALL rechazar con
+422 el intento de reescribir un titular ya identificado. SHALL permitir completar el titular sin
+cambiar el estado y sin justificación; la justificación SHALL ser obligatoria solo cuando se
+informa un estado. El cambio SHALL quedar en `audit_log` con el titular anterior y el nuevo.
+
+#### Scenario: Completar el titular sin cambiar el estado
+- **WHEN** se envía solo `titular`, sin estado ni justificación, sobre una cobranza `Sin identificar`
+- **THEN** el sistema responde 200, actualiza el pagador y conserva el estado
+
+#### Scenario: Completar el titular junto con el estado
+- **WHEN** se envía `titular`, un estado válido y la justificación
+- **THEN** el sistema responde 200, actualiza el titular y el estado, y audita las dos cosas
+
+#### Scenario: Titular ya identificado
+- **WHEN** se envía `titular` sobre una cobranza cuyo pagador ya tiene nombre
+- **THEN** el sistema responde 422 y no modifica ni la cobranza ni el pagador
+
+#### Scenario: Cuerpo sin estado ni titular
+- **WHEN** el cuerpo incluye la justificación pero ni `estado` ni un `titular` con texto
+- **THEN** el sistema responde 422

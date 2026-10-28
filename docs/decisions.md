@@ -1962,3 +1962,49 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `backend/app/services/seed.py`, `frontend/src/domain/validacion.js`,
   `frontend/src/components/ui/CampoTelefono.jsx`, `frontend/src/admin/TeachersPage.jsx`,
   `frontend/src/admin/StudentsPage.jsx`, `frontend/src/admin/CoursesPage.jsx`.
+
+## Imputaciones de una cobranza (HU 23)
+
+### D58 — La cobranza es una sola y sus imputaciones se suman hasta el importe
+
+- **Fecha:** 2026-10-27
+- **Autor:** santitorrens1
+- **Decisión:** se reutiliza `Imputacion` y su relación con `Cobranza`; **no hay migración**. El
+  alta acepta `imputaciones[]` (`inscripcion_id` **o** `empresa_id`, más `monto`) como alternativa
+  a `alumno_id`/`inscripcion_id`. Sin ninguno de los dos, la cobranza queda sin imputar.
+- **Reparto:** la suma de las imputaciones no puede superar `cobranza.importe`; cada monto debe
+  ser positivo y un mismo destino no puede repetirse en el mismo pedido. Se valida en Pydantic
+  para devolver 422 con mensaje de interfaz y otra vez en el servicio, que es la única defensa
+  cuando ya existen imputaciones previas.
+- **Imputación posterior:** `POST /cobranzas/{id}/imputaciones` reparte solo el saldo. Bloquea la
+  cobranza con `SELECT ... FOR UPDATE` antes de leer lo imputado, así dos operaciones simultáneas
+  se serializan y la segunda no puede sobreimputar. No crea otra cobranza ni toca las imputaciones
+  anteriores; el cambio queda en `audit_log` (`cobranza.imputacion_agregada`) con el saldo
+  restante.
+- **Compatibilidad:** la respuesta conserva `imputacion` (la primera) y agrega `imputaciones`,
+  `monto_imputado` y `saldo_sin_imputar`. La tabla de la HU 21 sigue leyendo `imputacion.nombre`.
+- **Empresas:** el backend acepta `empresa_id` reutilizando `Imputacion.empresa_id` y exige que la
+  empresa esté activa y tenga un `ContratoCorporativo` en estado `ACTIVO`. **Bloqueo:** la HU 19
+  tiene el modelo pero no endpoint ni pantalla para crear contratos (`/empresas` solo da alta y
+  consulta), así que el formulario no ofrece el destino empresa: no se inventan contratos ni
+  datos. Cuando exista la HU 19 alcanza con agregar el selector; la API ya lo soporta y está
+  probada.
+- **Historial del alumno:** se agrega `GET /alumno/pagos` (rol `ALUMNO`), limitado a
+  `usuario.alumno_id`. `importe` es lo imputado a ese legajo, no el total del comprobante, porque
+  un pago repartido entre varios alumnos debe mostrar la parte de cada uno.
+
+### D59 — El titular se completa desde la edición del estado, solo si quedó sin identificar
+
+- **Fecha:** 2026-10-27
+- **Autor:** santitorrens1
+- **Decisión:** `PATCH /cobranzas/{id}/estado` acepta `titular` opcional y `estado` pasa a ser
+  opcional, con la regla de que hay que enviar al menos uno. Así se puede completar el pagador de
+  un comprobante registrado como `Sin identificar` sin obligar a cambiar el estado y volverlo a
+  cambiar. La justificación también es opcional cuando solo se completa el titular; si se informa
+  un estado sigue siendo obligatoria. El alta sigue guardando `Sin identificar` cuando el
+  formulario no trae titular.
+- **Límite:** solo se completa un titular ausente. Si el pagador ya tiene nombre, la API responde
+  422 y no lo reescribe; no se agrega un padrón de pagadores ni se edita el documento.
+- **Auditoría:** un cambio solo de titular deja `audit_log` con `accion =
+  "cobranza.titular_completado"` y el titular anterior y nuevo; si además cambia el estado, la
+  entrada sigue siendo `cobranza.estado_cambiado` e incluye los dos datos.

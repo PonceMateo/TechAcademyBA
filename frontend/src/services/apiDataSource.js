@@ -126,16 +126,26 @@ async function leerDetalle(response) {
  * así la pantalla no necesita saber de dónde vinieron las filas (D13).
  */
 function normalizarCobranza(cobranza) {
-  if (cobranza === null || cobranza === undefined || cobranza.imputacion == null) {
+  if (cobranza === null || cobranza === undefined) {
     return cobranza
   }
 
+  const imputaciones = (cobranza.imputaciones ?? []).map((imputacion) => ({
+    ...imputacion,
+    nombre: imputacion.nombre ?? imputacion.alumno ?? imputacion.empresa ?? '',
+  }))
+  const primera = cobranza.imputacion ?? imputaciones[0] ?? null
+
   return {
     ...cobranza,
-    imputacion: {
-      ...cobranza.imputacion,
-      nombre: cobranza.imputacion.nombre ?? cobranza.imputacion.alumno ?? '',
-    },
+    imputaciones,
+    imputacion:
+      primera === null
+        ? null
+        : {
+            ...primera,
+            nombre: primera.nombre ?? primera.alumno ?? primera.empresa ?? '',
+          },
   }
 }
 
@@ -322,6 +332,13 @@ export function createApiDataSource() {
 
     async registrarCobranza(datos) {
       return normalizarCobranza(await request(PATHS.cobranzas, { method: 'POST', body: datos }))
+    },
+
+    /** Reparte el saldo de una cobranza ya registrada sin crear otro cobro (HU 23). */
+    async agregarImputaciones(id, datos) {
+      return normalizarCobranza(
+        await request(`${PATHS.cobranzas}/${id}/imputaciones`, { method: 'POST', body: datos }),
+      )
     },
 
     /** Acredita una cobranza observada o rechazada sin crear otro cobro (HU 21). */
