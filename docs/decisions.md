@@ -2039,6 +2039,10 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Fuera de alcance:** los pagos del alumno (HU 40), el link de la clase (HU 39) y los certificados.
   El cambio de contraseña del panel reutiliza `POST /auth/change-password` a través de
   `SessionContext.changePassword`: no se agrega ruta ni pantalla.
+- **Cambio de contraseña voluntario:** `SessionContext.changePassword` acepta `redirigir: false` para
+  que la tarjeta de seguridad del perfil (HU 43) se quede en la pantalla y pueda informar el
+  resultado; el cambio obligatorio del primer ingreso sigue volviendo al inicio de la sección, que
+  es de donde vino el `403`.
 - **Alternativas descartadas:** `/alumnos/me`, que choca con el orden de rutas de `/{alumno_id}`;
   exponer el link virtual en el detalle antes de la HU 39; y agregar `fecha_fin` a `comision` para
   poder pintar un cronograma completo.

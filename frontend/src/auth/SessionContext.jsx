@@ -93,9 +93,14 @@ export function SessionProvider({ children }) {
    *
    * La respuesta del backend ya trae `must_change_password` en `false`, así que no hace falta
    * releer el `/auth/me`. Recién después de esto la cuenta puede entrar a su sección.
+   *
+   * **`redirigir` en `false` es para el cambio voluntario.** El cambio obligatorio del primer
+   * ingreso vuelve al inicio de la sección —la cuenta venía de un `403` y no hay dónde más
+   * quedarse—, pero el que se hace desde la tarjeta de seguridad del perfil (HU 43) se queda en la
+   * pantalla, que es la que informa el resultado.
    */
   const changePassword = useCallback(
-    async ({ currentPassword, newPassword }) => {
+    async ({ currentPassword, newPassword, redirigir = true }) => {
       const token = readStoredToken()
       if (!token || !state.session) {
         throw new Error('No hay una sesión para cambiar la contraseña.')
@@ -107,7 +112,9 @@ export function SessionProvider({ children }) {
         newPassword,
       })
       setState({ status: SESSION_STATUS.AUTHENTICATED, session })
-      navigate(homePathForRole(session.rol), { replace: true })
+      if (redirigir) {
+        navigate(homePathForRole(session.rol), { replace: true })
+      }
       return session
     },
     [navigate, state.session],
