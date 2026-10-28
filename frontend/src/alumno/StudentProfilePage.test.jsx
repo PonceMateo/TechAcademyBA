@@ -20,6 +20,15 @@ import { TITULO_MENU } from './navegacion'
  * deshabilitados con la leyenda `solo lectura`, y `Email` y `Teléfono` aceptan escribir. El ítem
  * deshabilitado de certificados se comprueba por lo que no tiene: la ruta da 404 y el contenido del
  * prototype —la pantalla con `Descargar certificado`— no se construyó.
+ *
+ * **El guardado ya no es local.** `Guardar cambios` persiste contra la fuente, así que los casos que
+ * importan son los tres del spec: éxito, email que ya usa otra cuenta y forma inválida. El teléfono
+ * del ejemplo es el texto crudo de la planilla del cliente, y por eso el caso de éxito lo reingresa
+ * en formato internacional: sin eso el guardado falla con la regla del padrón (D57), que es
+ * exactamente lo que comprueba el caso del formato viejo.
+ *
+ * La tarjeta de seguridad usa el backend falso de `stubBackend`, que ya implementa
+ * `POST /auth/change-password` con la contraseña de demostración.
  */
 
 beforeEach(async () => {
