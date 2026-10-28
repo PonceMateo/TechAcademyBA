@@ -2008,3 +2008,42 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Auditoría:** un cambio solo de titular deja `audit_log` con `accion =
   "cobranza.titular_completado"` y el titular anterior y nuevo; si además cambia el estado, la
   entrada sigue siendo `cobranza.estado_cambiado` e incluye los dos datos.
+## Panel del alumno (change `hu-38-42-43-panel-alumno`)
+
+### D60 — El autoservicio del alumno es un recurso `/alumno` sin identificador, con el estado derivado y el perfil sincronizado
+
+- **Fecha:** 2026-10-27
+- **Autor:** PonceMateo
+- **Decisión:** las cuatro rutas del panel del alumno —`GET /alumno/inscripciones`,
+  `GET /alumno/inscripciones/{codigo}`, `GET /alumno/mi-perfil` y `PUT /alumno/mi-perfil`— viven en un
+  router propio, en singular y **sin ningún identificador de alumno en la URL**: el alumno sale de
+  `usuario.alumno` de la cuenta autenticada. El detalle de cursada resuelve la comisión por código
+  dentro de las inscripciones propias y responde `404` con el mismo mensaje cuando no existe y cuando
+  es de otro. El estado de habilitación y su causa salen de `services/habilitacion.derivar_estado`,
+  la misma función que usa Administración, sin recalcular nada en el schema ni en el frontend. La
+  edición de contacto acepta solo `email` y `telefono` (`extra="forbid"`), valida la unicidad con
+  `ensure_email_available` excluyendo la propia cuenta y actualiza `Alumno.email`/`telefono` y
+  `Usuario.email` en una sola transacción.
+- **Por qué:** los endpoints de `/alumnos` son de Administración y reciben `alumno_id` por
+  parámetro; reutilizarlos obligaría a filtrar por cuenta dentro de cada handler y dejaría abierto un
+  IDOR en cuanto una ruta lo olvidara. `/alumno` no acepta identificador, así que no hay nada que
+  falsificar. `derivar_estado` es la única forma de que la causa que ve el alumno no pueda diferir de
+  la administrativa (HU 42, incluido el forzado de Secretaría). El email es el login y está duplicado
+  en `Alumno` y `Usuario`: separarlos rompe el ingreso, de ahí la transacción única (mismo patrón de
+  D52).
+- **El cronograma se deriva, no se inventa:** los próximos encuentros salen de `comision_horario`
+  desde el día corriente y el tema de `Clase` cuando existe; la fecha de fin no se modela porque
+  `comision` no tiene `fecha_fin` y el contrato informa que todavía no está definida. Queda un
+  `ponytail:` en el servicio: el cálculo no conoce feriados ni suspensiones y, cuando #33/#34 carguen
+  las clases reales, la fuente pasa a ser esa tabla.
+- **Fuera de alcance:** los pagos del alumno (HU 40), el link de la clase (HU 39) y los certificados.
+  El cambio de contraseña del panel reutiliza `POST /auth/change-password` a través de
+  `SessionContext.changePassword`: no se agrega ruta ni pantalla.
+- **Alternativas descartadas:** `/alumnos/me`, que choca con el orden de rutas de `/{alumno_id}`;
+  exponer el link virtual en el detalle antes de la HU 39; y agregar `fecha_fin` a `comision` para
+  poder pintar un cronograma completo.
+- **Dónde:** `backend/app/schemas/alumno.py`, `backend/app/services/alumno.py`,
+  `backend/app/api/alumno.py`, `backend/app/api/router.py`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/alumno/StudentCoursesPage.jsx`,
+  `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`.
