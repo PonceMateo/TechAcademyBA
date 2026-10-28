@@ -15,7 +15,7 @@ en la capa de API habría dos lugares donde agregar un campo.
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import date, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -26,6 +26,10 @@ from app.models.inscripciones import Inscripcion
 from app.models.padron import Alumno, Usuario
 from app.schemas.alumno import (
     AccesoAlumnoOut,
+    ComisionCursadaOut,
+    CronogramaOut,
+    DetalleCursadaOut,
+    EncuentroOut,
     HorarioCursadaOut,
     InscripcionAlumnoOut,
 )
@@ -98,6 +102,99 @@ def _a_inscripcion(session: Session, inscripcion: Inscripcion) -> InscripcionAlu
         porcentaje_beca=inscripcion.porcentaje_beca,
         acceso=_acceso(session, inscripcion),
     )
+
+
+#: Cuántos encuentros venideros muestra el detalle. Cuatro es lo que entra sin scroll en la
+#: tarjeta del cronograma; la lista completa espera a que exista la fecha de fin de la comisión.
+ENCUENTROS_VISIBLES = 4
+
+#: Día de la semana de Python (`Monday=0`) para cada día del enum `DiaSemana`.
+DIA_DE_LA_SEMANA = {
+    "LUN": 0,
+    "MAR": 1,
+    "MIE": 2,
+    "JUE": 3,
+    "VIE": 4,
+    "SAB": 5,
+    "DOM": 6,
+}
+
+
+def obtener_detalle(
+    session: Session, usuario: Usuario, codigo: str, *, hoy: date | None = None
+) -> DetalleCursadaOut:
+    """Detalle de una cursada propia, a partir del código de la comisión (HU 38).
+
+    **El código se busca dentro de las inscripciones del alumno, no en el catálogo.** Una comisión
+    que existe pero no es suya da el mismo `CursadaNoEncontrada` que un código inexistente, así que
+    la respuesta no sirve para averiguar qué comisiones tiene otro (D58).
+    """
+    alumno = alumno_de(usuario)
+    inscripcion = _inscripcion_por_codigo(session, alumno, codigo)
+    comision = inscripcion.comision
+
+    return DetalleCursadaOut(
+        comision=ComisionCursadaOut(
+            codigo=comision.codigo,
+            nombre=comision.curso.nombre,
+            docente_nombre=comision.docente_nombre,
+            horario=comision.resumen_horarios,
+            horarios=_horarios(comision),
+        ),
+        categoria=inscripcion.categoria,
+        porcentaje_beca=inscripcion.porcentaje_beca,
+        acceso=_acceso(session, inscripcion),
+        # `fin` no existe en el modelo (D58): el contrato informa que todavía no está definida en
+        # lugar de completarla con una fecha de ejemplo.
+        cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=None),
+        proximos_encuentros=_proximos_encuentros(comision, hoy or date.today()),
+    )
+
+
+def _inscripcion_por_codigo(session: Session, alumno: Alumno, codigo: str) -> Inscripcion:
+    buscado = _clave_de_codigo(codigo)
+    for inscripcion in inscripciones_activas(session, alumno):
+        if _clave_de_codigo(inscripcion.comision.codigo) == buscado:
+            return inscripcion
+    raise CursadaNoEncontrada("No encontré esa cursada entre tus inscripciones.")
+
+
+def _clave_de_codigo(codigo: str) -> str:
+    """El código comparable: sin espacios y sin distinguir mayúsculas, como el frontend."""
+    return (codigo or "").strip().upper()
+
+
+def _proximos_encuentros(comision: Comision, desde: date) -> list[EncuentroOut]:
+    """Los próximos `ENCUENTROS_VISIBLES` días de cursada, del más cercano al más lejano.
+
+    **El tema todavía no se completa acá:** sale de `Clase`, y esa carga llega con las historias #33
+    y #34. Mientras no haya fila, el encuentro viaja sin tema y la pantalla lo muestra pendiente.
+    """
+    dias = {DIA_DE_LA_SEMANA[horario.dia] for horario in comision.horarios}
+    fechas = _dias_de_cursada(comision, desde, dias)
+    return [EncuentroOut(fecha=fecha, tema=None) for fecha in fechas]
+
+
+def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[date]:
+    """Las fechas de cursada desde `desde`, en orden cronológico.
+
+    Arranca en el día corriente o en la fecha de inicio de la comisión, la que sea posterior, así
+    que una comisión que todavía no empezó no muestra encuentros del pasado. Sin días cargados no
+    hay nada que derivar: devuelve una lista vacía en vez de girar para siempre.
+    """
+    if not dias:
+        return []
+
+    fecha = desde
+    if comision.fecha_inicio is not None:
+        fecha = max(desde, comision.fecha_inicio)
+
+    fechas: list[date] = []
+    while len(fechas) < ENCUENTROS_VISIBLES:
+        if fecha.weekday() in dias:
+            fechas.append(fecha)
+        fecha += timedelta(days=1)
+    return fechas
 
 
 def _acceso(session: Session, inscripcion: Inscripcion) -> AccesoAlumnoOut:

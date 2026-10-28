@@ -65,6 +65,7 @@ from app.tests.factories import (  # noqa: E402
     crear_comision,
     crear_curso,
     crear_docente,
+    crear_empresa,
     crear_inscripcion,
     crear_override,
     crear_sede,
@@ -165,3 +166,67 @@ def test_un_alumno_sin_inscripciones_recibe_una_lista_vacia(db_session) -> None:
     usuario = crear_usuario_alumno(db_session, alumno=alumno)
 
     assert listar_inscripciones(db_session, usuario) == []
+
+
+# --- Servicio: detalle de la cursada (HU 38) ---------------------------------------------------
+
+from app.services.alumno import CursadaNoEncontrada, obtener_detalle  # noqa: E402
+
+
+def test_el_detalle_trae_la_comision_los_horarios_y_el_acceso(db_session) -> None:
+    docente = crear_docente(db_session, nombre="Laura", apellido="Benítez")
+    comision = crear_comision(db_session, docente=docente)
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(
+        db_session,
+        alumno=alumno,
+        comision=comision,
+        categoria=CategoriaInscripcion.CORPORATIVO.value,
+        empresa_id=crear_empresa(db_session).id,
+    )
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo)
+
+    assert detalle.comision.codigo == comision.codigo
+    assert detalle.comision.docente_nombre == "Laura Benítez"
+    assert detalle.comision.horario == "Lun y Mié 18-20hs"
+    assert detalle.categoria == CategoriaInscripcion.CORPORATIVO.value
+    assert detalle.acceso.estado == EstadoHabilitacion.HABILITADO.value
+
+
+def test_el_detalle_no_expone_el_link_de_la_clase(db_session) -> None:
+    """El link llega con la HU 39: antes de eso no forma parte del contrato."""
+    comision = crear_comision(db_session)
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo)
+
+    assert "link" not in detalle.model_dump()
+    assert "link_virtual" not in detalle.model_dump()["comision"]
+
+
+def test_una_comision_ajena_responde_igual_que_una_inexistente(db_session) -> None:
+    """El mismo error en los dos casos: la respuesta no dice si la comisión existe (D58)."""
+    docente = crear_docente(db_session)
+    sede = crear_sede(db_session)
+    curso = crear_curso(db_session)
+    agustina = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=agustina)
+    propia = crear_comision(db_session, curso=curso, docente=docente, sede=sede)
+    crear_inscripcion(db_session, alumno=agustina, comision=propia)
+
+    otro = crear_alumno(
+        db_session, nombre="Otro Alumno", documento="39999888", email="otro2@techacademy.invalid"
+    )
+    ajena = crear_comision(db_session, curso=curso, docente=docente, sede=sede)
+    crear_inscripcion(db_session, alumno=otro, comision=ajena)
+
+    with pytest.raises(CursadaNoEncontrada) as de_otro:
+        obtener_detalle(db_session, usuario, ajena.codigo)
+    with pytest.raises(CursadaNoEncontrada) as inexistente:
+        obtener_detalle(db_session, usuario, "CUR999-9")
+
+    assert str(de_otro.value) == str(inexistente.value)
