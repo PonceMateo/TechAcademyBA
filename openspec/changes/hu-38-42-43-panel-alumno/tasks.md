@@ -3,7 +3,7 @@
 ## 1. Decisiones y contratos
 
 - [x] 1.1 Registrar en `docs/decisions.md` las decisiones del change (recurso `/alumno` sin identificador de alumno, reutilización de `derivar_estado`, cronograma derivado de `comision_horario`, sincronización de email entre cuenta y padrón) con fecha y autor; verificar que la entrada existe y cita el change.
-- [ ] 1.2 Crear `backend/app/schemas/alumno.py` con los contratos de salida (`InscripcionAlumnoOut`, `DetalleCursadaOut`, `PerfilAlumnoOut`) y el de entrada `PerfilAlumnoUpdate` con solo `email` y `telefono` y `extra="forbid"`, reutilizando `EmailConForma` y `TelefonoE164`; verificar con un test que el esquema rechaza `documento`, `nombre` e `id` con `ValidationError`.
+- [x] 1.2 Crear `backend/app/schemas/alumno.py` con los contratos de salida (`InscripcionAlumnoOut`, `DetalleCursadaOut`, `PerfilAlumnoOut`) y el de entrada `PerfilAlumnoUpdate` con solo `email` y `telefono` y `extra="forbid"`, reutilizando `EmailConForma` y `TelefonoE164`; verificar con un test que el esquema rechaza `documento`, `nombre` e `id` con `ValidationError`.
 
 ## 2. Servicio del alumno (backend)
 
