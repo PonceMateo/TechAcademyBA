@@ -1,6 +1,6 @@
-"""Reglas de negocio de cobranzas manuales (HU 21).
+"""Reglas de negocio de cobranzas manuales (HU 21 y HU 23).
 
-El alta es transaccional: o quedan el pagador, la cobranza y su imputación, o no queda nada.
+El alta es transaccional: o quedan el pagador, la cobranza y sus imputaciones, o no queda nada.
 El pagador se crea por operación y no se deduplica, porque esta historia no administra un padrón
 de pagadores (decisión acordada con el equipo).
 """
@@ -9,18 +9,31 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import Comision
 from app.models.clases import AuditLog
 from app.models.cobranza import Cobranza, Imputacion, Pagador
-from app.models.enums import EstadoCobranza, EstadoInscripcion, OrigenCobranza
-from app.models.inscripciones import Inscripcion
+from app.models.enums import (
+    EstadoCobranza,
+    EstadoContrato,
+    EstadoInscripcion,
+    OrigenCobranza,
+)
+from app.models.inscripciones import ContratoCorporativo, Empresa, Inscripcion
 from app.models.padron import Alumno
-from app.schemas.cobranzas import ZONA_ACADEMIA, CobranzaCreate, CobranzaEstadoUpdate
+from app.schemas.cobranzas import (
+    TITULAR_SIN_IDENTIFICAR,
+    ZONA_ACADEMIA,
+    CobranzaCreate,
+    CobranzaEstadoUpdate,
+    ImputacionCreate,
+    ImputacionesCreate,
+)
 from app.services.normalization import normalize_document
 
 
@@ -58,6 +71,31 @@ class CobranzaNoEncontrada(Exception):
 
 class CambioEstadoInvalido(Exception):
     """La transición de estado pedida no está permitida."""
+
+
+class TitularNoModificable(Exception):
+    """El comprobante ya tiene un titular identificado y no se cambia desde esta edición."""
+
+
+class EmpresaNoEncontrada(Exception):
+    """La empresa elegida para imputar no existe o está inactiva."""
+
+
+class EmpresaSinContrato(Exception):
+    """La empresa no tiene un contrato corporativo activo al que imputar el pago."""
+
+
+class ImputacionesExcedenSaldo(Exception):
+    """La distribución supera el importe de la cobranza."""
+
+
+def _monto_imputado(session: Session, cobranza_id: int) -> Decimal:
+    """Cuánto de la cobranza ya está imputado (D10: se deriva, no es una columna)."""
+    return session.scalar(
+        select(func.coalesce(func.sum(Imputacion.monto), 0)).where(
+            Imputacion.cobranza_id == cobranza_id
+        )
+    )
 
 
 #: Transiciones válidas (HU 21, ampliación). Corregir un pago acreditado por error también cuenta:
@@ -126,13 +164,46 @@ def resolver_inscripcion(
     return activas[0]
 
 
-def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
-    """Crea pagador, cobranza e imputación en una sola transacción."""
-    inscripcion = resolver_inscripcion(
-        session,
-        alumno_id=datos.alumno_id,
-        inscripcion_id=datos.inscripcion_id,
+def _cargar_empresa(session: Session, empresa_id: int) -> Empresa:
+    """Valida que la empresa exista, esté activa y tenga un contrato corporativo vigente."""
+    empresa = session.get(Empresa, empresa_id)
+    if empresa is None or not empresa.activo:
+        raise EmpresaNoEncontrada("La empresa elegida no existe.")
+    contrato = session.scalar(
+        select(ContratoCorporativo)
+        .where(
+            ContratoCorporativo.empresa_id == empresa.id,
+            ContratoCorporativo.estado == EstadoContrato.ACTIVO.value,
+        )
+        .limit(1)
     )
+    if contrato is None:
+        raise EmpresaSinContrato("La empresa no tiene un contrato activo al que imputar el pago.")
+    return empresa
+
+
+def _resolver_destino(
+    session: Session, imputacion: ImputacionCreate
+) -> tuple[int | None, int | None, Decimal]:
+    """Traduce un destino del cuerpo a `(inscripcion_id, empresa_id, monto)` ya validado."""
+    if imputacion.inscripcion_id is not None:
+        inscripcion = _cargar_inscripcion(session, None, imputacion.inscripcion_id)
+        return inscripcion.id, None, imputacion.monto
+    empresa = _cargar_empresa(session, imputacion.empresa_id)
+    return None, empresa.id, imputacion.monto
+
+
+def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
+    """Crea pagador, cobranza e imputaciones en una sola transacción."""
+    if datos.imputaciones is None:
+        inscripcion = resolver_inscripcion(
+            session,
+            alumno_id=datos.alumno_id,
+            inscripcion_id=datos.inscripcion_id,
+        )
+        destinos = [] if inscripcion is None else [(inscripcion.id, None, datos.importe)]
+    else:
+        destinos = [_resolver_destino(session, item) for item in datos.imputaciones]
 
     pagador = Pagador(
         nombre=datos.titular,
@@ -153,20 +224,85 @@ def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
     session.add(cobranza)
     try:
         session.flush()
-        if inscripcion is not None:
+        for inscripcion_id, empresa_id, monto in destinos:
             session.add(
                 Imputacion(
                     cobranza_id=cobranza.id,
-                    inscripcion_id=inscripcion.id,
-                    monto=datos.importe,
+                    inscripcion_id=inscripcion_id,
+                    empresa_id=empresa_id,
+                    monto=monto,
                 )
             )
         session.commit()
     except (IntegrityError, DataError) as error:
         session.rollback()
-        raise CobranzaInvalida(
-            "No pudimos registrar el cobro con los datos informados."
-        ) from error
+        raise CobranzaInvalida("No pudimos registrar el cobro con los datos informados.") from error
+
+    session.refresh(cobranza)
+    return cobranza
+
+
+def agregar_imputaciones(
+    session: Session,
+    cobranza_id: int,
+    datos: ImputacionesCreate,
+    usuario_id: int,
+) -> Cobranza:
+    """Reparte el saldo sin imputar de una cobranza ya registrada (HU 23).
+
+    La fila de la cobranza se bloquea con `FOR UPDATE` antes de leer lo ya imputado: dos
+    operaciones simultáneas se serializan y la segunda ve lo que dejó la primera, así no se puede
+    sobreimputar. Las imputaciones anteriores no se tocan.
+    """
+    cobranza = session.scalar(select(Cobranza).where(Cobranza.id == cobranza_id).with_for_update())
+    if cobranza is None:
+        raise CobranzaNoEncontrada("La cobranza no existe.")
+
+    nuevos = [_resolver_destino(session, item) for item in datos.imputaciones]
+    saldo = cobranza.importe - _monto_imputado(session, cobranza.id)
+    total = sum((monto for _, _, monto in nuevos), Decimal("0"))
+    if total > saldo:
+        raise ImputacionesExcedenSaldo(
+            f"La imputación supera el saldo sin imputar de la cobranza ({saldo})."
+        )
+
+    for inscripcion_id, empresa_id, monto in nuevos:
+        session.add(
+            Imputacion(
+                cobranza_id=cobranza.id,
+                inscripcion_id=inscripcion_id,
+                empresa_id=empresa_id,
+                monto=monto,
+            )
+        )
+    session.add(
+        AuditLog(
+            usuario_id=usuario_id,
+            accion="cobranza.imputacion_agregada",
+            entidad="cobranza",
+            entidad_id=cobranza.id,
+            detalle=json.dumps(
+                {
+                    "imputaciones": [
+                        {
+                            "inscripcion_id": inscripcion_id,
+                            "empresa_id": empresa_id,
+                            "monto": str(monto),
+                        }
+                        for inscripcion_id, empresa_id, monto in nuevos
+                    ],
+                    "saldo_restante": str(saldo - total),
+                },
+                ensure_ascii=False,
+            ),
+        )
+    )
+
+    try:
+        session.commit()
+    except (IntegrityError, DataError) as error:
+        session.rollback()
+        raise CobranzaInvalida("No pudimos imputar el pago con los datos informados.") from error
 
     session.refresh(cobranza)
     return cobranza
@@ -178,48 +314,66 @@ def cambiar_estado_cobranza(
     datos: CobranzaEstadoUpdate,
     usuario_id: int,
 ) -> Cobranza:
-    """Cambia el estado de una cobranza y deja el cambio en `audit_log`.
+    """Cambia el estado y/o completa el titular, y lo deja en `audit_log`.
 
-    Actualiza la fila original: no crea cobranza, pagador ni imputación, y no toca el importe, el
-    titular, la fecha ni la inscripción. El estado y su entrada de auditoría van en la misma
-    transacción, con la fila bloqueada para que dos cambios simultáneos no dejen dos entradas.
+    Actualiza la fila original: no crea cobranza, pagador ni imputación. El titular solo se puede
+    completar cuando quedó "Sin identificar"; un comprobante con titular no se reescribe desde acá.
+    El estado, el titular y su entrada de auditoría van en la misma transacción, con la fila
+    bloqueada para que dos cambios simultáneos no dejen dos entradas.
     """
-    cobranza = session.scalar(
-        select(Cobranza).where(Cobranza.id == cobranza_id).with_for_update()
-    )
+    cobranza = session.scalar(select(Cobranza).where(Cobranza.id == cobranza_id).with_for_update())
     if cobranza is None:
         raise CobranzaNoEncontrada("La cobranza no existe.")
-    if datos.estado.value == cobranza.estado:
-        raise CambioEstadoInvalido("La cobranza ya está en ese estado.")
-    if datos.estado.value not in TRANSICIONES_ESTADO[cobranza.estado]:
-        raise CambioEstadoInvalido(
-            f"No se puede pasar una cobranza de {cobranza.estado} a {datos.estado.value}."
-        )
+
+    estado_nuevo = datos.estado.value if datos.estado is not None else None
+    cambia_estado = estado_nuevo is not None and estado_nuevo != cobranza.estado
+
+    titular_anterior = None
+    if datos.titular is not None:
+        if cobranza.pagador is None or cobranza.pagador.nombre != TITULAR_SIN_IDENTIFICAR:
+            raise TitularNoModificable(
+                "El comprobante ya tiene un titular identificado: no se cambia desde acá."
+            )
+        titular_anterior = cobranza.pagador.nombre
+        cobranza.pagador.nombre = datos.titular
+
+    if estado_nuevo is not None:
+        if not cambia_estado and datos.titular is None:
+            raise CambioEstadoInvalido("La cobranza ya está en ese estado.")
+        if cambia_estado and estado_nuevo not in TRANSICIONES_ESTADO[cobranza.estado]:
+            raise CambioEstadoInvalido(
+                f"No se puede pasar una cobranza de {cobranza.estado} a {estado_nuevo}."
+            )
+    elif datos.titular is None:
+        raise CambioEstadoInvalido("Indicá el estado nuevo o el titular del comprobante.")
 
     anterior = cobranza.estado
     ahora = datetime.now(ZONA_ACADEMIA)
-    cobranza.estado = datos.estado.value
-    # El modelo exige causa mientras la cobranza no está acreditada, y es el motivo que muestra el
-    # historial: la justificación del cambio es esa causa. Al acreditar se conserva la anterior.
-    if datos.estado != EstadoCobranza.ACREDITADO:
-        cobranza.causa = datos.justificacion
-    cobranza.estado_cambiado_por = usuario_id
-    cobranza.estado_cambiado_at = ahora
+    if cambia_estado:
+        cobranza.estado = estado_nuevo
+        # El modelo exige causa mientras la cobranza no está acreditada, y es el motivo que
+        # muestra el historial: la justificación es esa causa. Al acreditar se conserva la anterior.
+        if datos.estado != EstadoCobranza.ACREDITADO:
+            cobranza.causa = datos.justificacion
+        cobranza.estado_cambiado_por = usuario_id
+        cobranza.estado_cambiado_at = ahora
+
+    detalle = {
+        "estado_anterior": anterior,
+        "estado_nuevo": cobranza.estado,
+        "justificacion": datos.justificacion or "Titular del comprobante completado.",
+        "fecha": ahora.isoformat(),
+    }
+    if titular_anterior is not None:
+        detalle["titular_anterior"] = titular_anterior
+        detalle["titular_nuevo"] = datos.titular
     session.add(
         AuditLog(
             usuario_id=usuario_id,
-            accion="cobranza.estado_cambiado",
+            accion="cobranza.estado_cambiado" if cambia_estado else "cobranza.titular_completado",
             entidad="cobranza",
             entidad_id=cobranza.id,
-            detalle=json.dumps(
-                {
-                    "estado_anterior": anterior,
-                    "estado_nuevo": datos.estado.value,
-                    "justificacion": datos.justificacion,
-                    "fecha": ahora.isoformat(),
-                },
-                ensure_ascii=False,
-            ),
+            detalle=json.dumps(detalle, ensure_ascii=False),
         )
     )
 
@@ -227,9 +381,7 @@ def cambiar_estado_cobranza(
         session.commit()
     except (IntegrityError, DataError) as error:
         session.rollback()
-        raise CobranzaInvalida(
-            "No pudimos actualizar el estado de la cobranza."
-        ) from error
+        raise CobranzaInvalida("No pudimos actualizar la cobranza.") from error
 
     session.refresh(cobranza)
     return cobranza
@@ -248,20 +400,107 @@ def listar_cobranzas(session: Session, q: str | None = None) -> list[Cobranza]:
             .selectinload(Imputacion.inscripcion)
             .selectinload(Inscripcion.comision)
             .selectinload(Comision.curso),
+            selectinload(Cobranza.imputaciones).selectinload(Imputacion.empresa),
         )
         .order_by(Cobranza.fecha.desc(), Cobranza.id.desc())
     )
     if q is not None and q.strip() != "":
-        consulta = consulta.where(
-            Cobranza.pagador.has(Pagador.nombre.ilike(f"%{q.strip()}%"))
-        )
+        consulta = consulta.where(Cobranza.pagador.has(Pagador.nombre.ilike(f"%{q.strip()}%")))
     return list(session.scalars(consulta).all())
 
 
-def serializar_cobranza(cobranza: Cobranza) -> dict[str, object]:
-    """Arma la fila que consume el frontend, con pagador e imputación resueltos."""
-    imputacion = cobranza.imputaciones[0] if cobranza.imputaciones else None
+def listar_pagos_de_alumno(session: Session, alumno_id: int) -> list[Cobranza]:
+    """Cobranzas con al menos una imputación a una inscripción del alumno (HU 23).
+
+    El filtro va en la consulta y no en la pantalla: el alumno solo puede ver lo que está imputado
+    a su legajo, nunca el historial administrativo completo.
+    """
+    consulta = (
+        select(Cobranza)
+        .where(
+            Cobranza.imputaciones.any(
+                Imputacion.inscripcion.has(Inscripcion.alumno_id == alumno_id)
+            )
+        )
+        .options(
+            selectinload(Cobranza.pagador),
+            selectinload(Cobranza.imputaciones)
+            .selectinload(Imputacion.inscripcion)
+            .selectinload(Inscripcion.alumno),
+            selectinload(Cobranza.imputaciones)
+            .selectinload(Imputacion.inscripcion)
+            .selectinload(Inscripcion.comision)
+            .selectinload(Comision.curso),
+        )
+        .order_by(Cobranza.fecha.desc(), Cobranza.id.desc())
+    )
+    return list(session.scalars(consulta).all())
+
+
+def serializar_pago_de_alumno(cobranza: Cobranza, alumno_id: int) -> dict[str, object]:
+    """Fila del historial del alumno, con lo imputado a él y no el total del comprobante."""
+    propias = [
+        imputacion
+        for imputacion in cobranza.imputaciones
+        if imputacion.inscripcion is not None and imputacion.inscripcion.alumno_id == alumno_id
+    ]
+    imputado = sum((imputacion.monto for imputacion in propias), Decimal("0"))
+    alumno = propias[0].inscripcion.alumno.nombre if propias else ""
+    return {
+        "id": cobranza.id,
+        "fecha": cobranza.fecha,
+        "importe": imputado,
+        "medio": cobranza.medio,
+        "estado": cobranza.estado,
+        "causa": cobranza.causa,
+        # El comprobante lo puede mandar un familiar o una empresa (D7).
+        "pagado_por_tercero": cobranza.pagador.nombre != alumno,
+    }
+
+
+def _serializar_imputacion(imputacion: Imputacion) -> dict[str, object]:
     salida: dict[str, object] = {
+        "id": imputacion.id,
+        "monto": imputacion.monto,
+        "inscripcion_id": None,
+        "alumno_id": None,
+        "alumno": None,
+        "empresa_id": None,
+        "empresa": None,
+        "comision": None,
+    }
+    if imputacion.inscripcion is not None:
+        inscripcion = imputacion.inscripcion
+        salida.update(
+            {
+                "destino": "ALUMNO",
+                "nombre": inscripcion.alumno.nombre,
+                "inscripcion_id": inscripcion.id,
+                "alumno_id": inscripcion.alumno_id,
+                "alumno": inscripcion.alumno.nombre,
+                "comision": {
+                    "codigo": inscripcion.comision.codigo,
+                    "nombre": inscripcion.comision.curso.nombre,
+                },
+            }
+        )
+    else:
+        salida.update(
+            {
+                "destino": "EMPRESA",
+                "nombre": imputacion.empresa.razon_social,
+                "empresa_id": imputacion.empresa_id,
+                "empresa": imputacion.empresa.razon_social,
+            }
+        )
+    return salida
+
+
+def serializar_cobranza(cobranza: Cobranza) -> dict[str, object]:
+    """Arma la fila que consume el frontend, con pagador e imputaciones resueltas."""
+    imputaciones = [_serializar_imputacion(item) for item in cobranza.imputaciones]
+    monto_imputado = sum((item.monto for item in cobranza.imputaciones), Decimal("0"))
+    return {
         "id": cobranza.id,
         "fecha": cobranza.fecha,
         "importe": cobranza.importe,
@@ -276,19 +515,8 @@ def serializar_cobranza(cobranza: Cobranza) -> dict[str, object]:
             "nombre": cobranza.pagador.nombre,
             "documento": cobranza.pagador.documento,
         },
-        "imputacion": None,
+        "imputacion": imputaciones[0] if imputaciones else None,
+        "imputaciones": imputaciones,
+        "monto_imputado": monto_imputado,
+        "saldo_sin_imputar": cobranza.importe - monto_imputado,
     }
-    if imputacion is not None:
-        inscripcion = imputacion.inscripcion
-        salida["imputacion"] = {
-            "id": imputacion.id,
-            "inscripcion_id": inscripcion.id,
-            "monto": imputacion.monto,
-            "alumno_id": inscripcion.alumno_id,
-            "alumno": inscripcion.alumno.nombre,
-            "comision": {
-                "codigo": inscripcion.comision.codigo,
-                "nombre": inscripcion.comision.curso.nombre,
-            },
-        }
-    return salida

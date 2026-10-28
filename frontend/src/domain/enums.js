@@ -39,6 +39,12 @@ export const ESTADO_COBRANZA = Object.freeze({
 })
 
 /**
+ * Titular que se guarda cuando el comprobante no lo trae. Es el único caso en el que la pantalla
+ * deja completar el titular después de registrada la cobranza (misma regla que el backend).
+ */
+export const TITULAR_SIN_IDENTIFICAR = 'Sin identificar'
+
+/**
  * Destinos válidos de un cambio de estado de cobranza (HU 21, ampliación).
  *
  * Es la misma matriz que valida el backend (`TRANSICIONES_ESTADO`). Vive acá para que el selector

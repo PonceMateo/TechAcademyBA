@@ -12,7 +12,7 @@ trigger de solo agregado, pero ninguna de las dos se usa todavía.
 ## What Changes
 
 - Nuevo `PATCH /cobranzas/{id}/estado`, exclusivo de Administración, con `estado` y `justificacion`
-  obligatoria. Las transiciones válidas son `ACREDITADO → OBSERVADO`, `ACREDITADO → RECHAZADO`,
+  obligatoria, y `titular` opcional para completar un comprobante que quedó `Sin identificar`. Las transiciones válidas son `ACREDITADO → OBSERVADO`, `ACREDITADO → RECHAZADO`,
   `OBSERVADO → ACREDITADO`, `OBSERVADO → RECHAZADO` y `RECHAZADO → ACREDITADO`; cualquier otra,
   incluido el cambio al mismo estado, se rechaza con 422.
 - La actualización modifica la cobranza original y nada más: `estado`, `estado_cambiado_por` y
@@ -33,7 +33,7 @@ trigger de solo agregado, pero ninguna de las dos se usa todavía.
   habilitación— siguen leyendo `GET /cobranzas` y filtrando por `ACREDITADO`, así que una cobranza
   observada o rechazada deja de contarse sin cambios de código y queda cubierto por prueba.
 
-**Fuera de alcance:** editar importe, titular, fecha, medio o inscripción; eliminar pagos; crear
+**Fuera de alcance:** editar importe, fecha, medio, inscripción o un titular ya identificado; eliminar pagos; crear
 cobranzas nuevas al cambiar el estado; acreditar automáticamente (HU 24); consultar el historial
 de cambios por API o por pantalla.
 

@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { MARCA_UI } from './paleta'
 
 /**
@@ -10,8 +11,17 @@ import { MARCA_UI } from './paleta'
  * `filas` acepta `null` para dejar la celda vacía. Es lo que necesitan el comprobante ilegible —
  * el importe nunca pudo leerse— y el cheque que todavía no tiene a quién imputarse: la
  * ausencia se muestra como ausencia y no como un `—` inventado.
+ *
+ * `detalle` es opcional y agrega una fila debajo de la que corresponde, con el ancho completo.
+ * La usa el historial de cobranzas para desplegar las imputaciones sin salir de la tabla.
  */
-export function Table({ columnas, filas, claveDeFila = (fila) => fila.id, vacio = null }) {
+export function Table({
+  columnas,
+  filas,
+  claveDeFila = (fila) => fila.id,
+  vacio = null,
+  detalle = null,
+}) {
   if (filas.length === 0) {
     return vacio
   }
@@ -33,15 +43,27 @@ export function Table({ columnas, filas, claveDeFila = (fila) => fila.id, vacio 
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
-          {filas.map((fila) => (
-            <tr key={claveDeFila(fila)} className="align-top transition hover:bg-slate-50/70">
-              {columnas.map((columna) => (
-                <td key={columna.clave} className="px-4 py-3 text-slate-700 tabular-nums">
-                  {columna.render(fila)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {filas.map((fila) => {
+            const contenido = detalle === null ? null : detalle(fila)
+            return (
+              <Fragment key={claveDeFila(fila)}>
+                <tr className="align-top transition hover:bg-slate-50/70">
+                  {columnas.map((columna) => (
+                    <td key={columna.clave} className="px-4 py-3 text-slate-700 tabular-nums">
+                      {columna.render(fila)}
+                    </td>
+                  ))}
+                </tr>
+                {contenido != null && (
+                  <tr className="bg-slate-50/80">
+                    <td colSpan={columnas.length} className="px-4 py-3">
+                      {contenido}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
         </tbody>
       </table>
     </div>
