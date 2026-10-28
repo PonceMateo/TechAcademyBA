@@ -426,3 +426,38 @@ describe('cobranzas manuales (HU 21)', () => {
     ).rejects.toThrow(/ya está acreditada/)
   })
 })
+
+describe('el autoservicio del alumno', () => {
+  it('consulta el detalle sobre la ruta de la comisión, no sobre el listado', async () => {
+    const fetchMock = responder(200, { comision: { codigo: 'CUR001-1' } })
+
+    await createApiDataSource().obtenerDetalleInscripcion('CUR001-1')
+
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumno\/inscripciones\/CUR001-1$/)
+  })
+
+  it('guarda el contacto con PUT a /alumno/mi-perfil y solo email y teléfono', async () => {
+    const fetchMock = responder(200, {
+      nombre: 'Agustina Benítez',
+      documento: '38111222',
+      email: 'agustina@nuevomail.com',
+      telefono: '+5491140000009',
+    })
+    const CONTACTO = { email: 'agustina@nuevomail.com', telefono: '+5491140000009' }
+
+    const guardado = await createApiDataSource().actualizarPerfilAlumno(CONTACTO)
+
+    expect(guardado).toMatchObject({ email: 'agustina@nuevomail.com' })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumno\/mi-perfil$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('PUT')
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)[1].body)).toEqual(CONTACTO)
+  })
+
+  it('propaga el conflicto cuando el email ya pertenece a otra cuenta', async () => {
+    responder(409, { detail: 'El email agustina@mail.com ya está registrado en el padrón de alumnos.' })
+
+    await expect(
+      createApiDataSource().actualizarPerfilAlumno({ email: 'agustina@mail.com', telefono: null }),
+    ).rejects.toThrow(/ya está registrado en el padrón de alumnos/)
+  })
+})

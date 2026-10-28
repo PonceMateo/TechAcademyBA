@@ -55,6 +55,7 @@ const PATHS = Object.freeze({
   asistencia: '/comisiones/:codigo/asistencia',
   linkClase: '/clases/link',
   inscripcionesAlumno: '/alumno/inscripciones',
+  detalleInscripcionAlumno: '/alumno/inscripciones/:codigo',
   pagosAlumno: '/alumno/pagos',
   perfilAlumno: '/alumno/mi-perfil',
 })
@@ -396,7 +397,7 @@ export function createApiDataSource() {
     },
 
     async obtenerDetalleInscripcion(comisionCodigo) {
-      return request(PATHS.inscripcionesAlumno, {
+      return request(PATHS.detalleInscripcionAlumno, {
         params: { codigo: comisionCodigo },
       })
     },
@@ -407,6 +408,15 @@ export function createApiDataSource() {
 
     async obtenerPerfilAlumno() {
       return request(PATHS.perfilAlumno)
+    },
+
+    /**
+     * Guardado de los datos de contacto del alumno (HU 43). El cuerpo lleva **solo** email y
+     * teléfono: el documento, el nombre y el identificador no forman parte del contrato y la API
+     * rechaza con 422 cualquier otro campo.
+     */
+    async actualizarPerfilAlumno(datos) {
+      return request(PATHS.perfilAlumno, { method: 'PUT', body: datos })
     },
   }
 

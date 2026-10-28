@@ -20,7 +20,7 @@
 
 ## 4. Frontera de datos (frontend)
 
-- [ ] 4.1 Agregar `actualizarPerfilAlumno` a `frontend/src/services/dataService.js` y a `apiDataSource.js` (`PUT` a `/alumno/mi-perfil`) y ajustar el detalle al contrato nuevo (`horarios`, `cronograma.fin` nulo, sin `link`); verificar con el test de `dataService` que el servicio devuelve lo que entrega la fuente.
+- [x] 4.1 Agregar `actualizarPerfilAlumno` a `frontend/src/services/dataService.js` y a `apiDataSource.js` (`PUT` a `/alumno/mi-perfil`) y ajustar el detalle al contrato nuevo (`horarios`, `cronograma.fin` nulo, sin `link`); verificar con el test de `dataService` que el servicio devuelve lo que entrega la fuente.
 - [ ] 4.2 Alinear `frontend/src/services/mockDataSource.js` a la misma forma y agregar el guardado del perfil con conflicto de email simulado; verificar que los tests de pantalla que usan el mock pasan sin cambiar sus expectativas de forma.
 
 ## 5. Pantallas del alumno
