@@ -1325,9 +1325,6 @@ export function createMockDataSource() {
         acceso: { ...alumno.acceso },
         cronograma: { ...inscripcion.cronograma },
         proximos_encuentros: inscripcion.proximos_encuentros.map((encuentro) => ({ ...encuentro })),
-        // El detalle del alumno deja de leerlo en la HU 38: se va con la pantalla en el mismo
-        // commit, para que el ejemplo no tenga un campo que el contrato ya no devuelve.
-        link: linkGuardado(comision.codigo),
       }
     },
 

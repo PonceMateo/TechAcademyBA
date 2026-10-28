@@ -31,7 +31,6 @@ export const INSCRIPCIONES = markAsExample([
       nombre: 'Desarrollo Web Full Stack',
       docente_nombre: 'Lic. Laura Benítez',
       horario_legible: 'Lun y Miér · 18:30 a 21:30',
-      horario_prolongado: 'Lunes y miércoles · 18:30 a 21:30',
       horarios: [
         { dia: 'LUN', inicio: '18:30', fin: '21:30' },
         { dia: 'MIE', inicio: '18:30', fin: '21:30' },
