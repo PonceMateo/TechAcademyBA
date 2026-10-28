@@ -26,12 +26,18 @@
 ## 5. Pantallas del alumno
 
 - [x] 5.1 Recomponer `frontend/src/alumno/StudentCoursesPage.jsx` con los datos reales, el banner de acceso con causa y el estado de carga que no muestra "sin cursos" antes de resolver; verificar con tests de pantalla que un alumno sin inscripciones ve el mensaje y que uno bloqueado ve la causa.
-- [x] 5.2 Recomponer `frontend/src/alumno/CourseDetailPage.jsx` con período y próximos encuentros reales, tema pendiente cuando falta y estado de "no encontré esa cursada" para una comisión ajena; verificar con tests de pantalla que no se renderiza ningún link ni botón de ingreso.
+- [x] 5.2 Recomponer `frontend/src/alumno/CourseDetailPage.jsx` con período y próximos encuentros reales —cada uno con su fecha y su horario y con el tema solo cuando está cargado, sin texto de relleno— y estado de "no encontré esa cursada" para una comisión ajena; verificar con tests de pantalla que no se renderiza ningún link ni botón de ingreso.
 - [x] 5.3 Implementar en `frontend/src/alumno/StudentProfilePage.jsx` el guardado real de email y teléfono (con botón deshabilitado mientras guarda), el mensaje de conflicto de email y la tarjeta de seguridad que usa `SessionContext.changePassword`; verificar con tests de pantalla el guardado exitoso, el `409` y el cambio de contraseña exitoso y fallido.
 - [x] 5.4 Actualizar los tests existentes que esperan los literales del maquetado (`CUR-102`, `Lic. Laura Benítez`, `$31.000`) y el aviso de datos de referencia; verificar con `docker compose run --rm frontend npm run test` en verde.
 
 ## 6. Cierre
 
-- [ ] 6.1 Correr la suite completa y el lint de los dos servicios (`docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run test`, `docker compose run --rm frontend npm run lint`) y verificar que terminan sin errores.
-- [ ] 6.2 Verificar que `Mis Pagos`, el link de la clase y los certificados siguen sin cambios funcionales y que no se agregaron rutas ni ítems de menú; comprobar con `git diff --stat` y una revisión de `App.jsx` y `navegacion.js`.
-- [ ] 6.3 Probar el flujo completo en el navegador contra la API real: alumno bloqueado ve causa, alumno habilitado ve cursada y cronograma, cambio de teléfono persiste y el cambio de contraseña deja la anterior inválida.
+- [x] 6.1 Correr la suite completa y el lint de los dos servicios (`docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run test`, `docker compose run --rm frontend npm run lint`) y verificar que terminan sin errores.
+- [x] 6.2 Verificar que `Mis Pagos`, el link de la clase y los certificados siguen sin cambios funcionales, y que el único cambio de menú y de rutas es `Dashboard` en la raíz y `Mis Cursos` en `/alumno/cursos`; comprobar con `git diff --stat` y una revisión de `App.jsx` y `navegacion.js`.
+- [ ] 6.3 Probar el flujo completo en el navegador contra la API real: alumno bloqueado ve causa, alumno habilitado ve cursada y cronograma con horarios, cambio de teléfono persiste y el cambio de contraseña deja la anterior inválida.
+
+## 7. Rebase sobre `main` y reorden del panel
+
+- [x] 7.1 Rebasar la rama sobre `origin/main` (HU 23 imputaciones) resolviendo el choque de `backend/app/api/alumno.py` —que en `main` trae `GET /alumno/pagos`— con el router propio del change, dejando las cinco rutas en un solo archivo y una sola inclusión en `router.py`; renumerar la decisión propia de `D58` a `D60` porque `main` ya ocupó `D58` y `D59`, y actualizar las citas en código y tests. Verificar con `pytest` y la suite del frontend en verde.
+- [x] 7.2 Mover la sección `Mis Cursos` del tablero a su propia pantalla en `/alumno/cursos`, alcanzable desde un ítem nuevo del panel lateral, y renombrar el ítem de la raíz a `Dashboard` con `StudentDashboardPage` conservando indicadores y agenda; verificar con `StudentLayout.test`, `StudentDashboardPage.test` y `StudentCoursesPage.test`.
+- [x] 7.3 Agregar el horario a cada encuentro: `EncuentroOut.horario` derivado de la grilla de la comisión en el backend, la columna `HORARIO` en el detalle y la fecha con hora en la agenda; eliminar el literal `Tema a confirmar` de las dos pantallas porque el tema simplemente no está cargado. Verificar con los tests de servicio, de API y de pantalla.

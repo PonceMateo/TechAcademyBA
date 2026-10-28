@@ -21,7 +21,8 @@ import { markAsExample } from './placeholderNotice'
  * **El cronograma y los temas son material de referencia** (P5): tienen forma de fecha y tema, pero
  * la secretaría carga los reales cuando el sistema esté funcional. La fecha de inicio es coherente
  * con los días de cursada —un lunes— y **el fin es `null` a propósito**: `comision` no tiene fecha de
- * fin (D58), así que el ejemplo no puede inventar una.
+ * fin (D60), así que el ejemplo no puede inventar una. El `horario` de cada encuentro es el rango de
+ * ese día en la grilla de la comisión, igual que en el contrato real.
  */
 export const INSCRIPCIONES = markAsExample([
   {
@@ -40,9 +41,9 @@ export const INSCRIPCIONES = markAsExample([
     },
     cronograma: { inicio: '2026-05-04', fin: null },
     proximos_encuentros: [
-      { fecha: '2026-05-25', tema: 'Componentes y props' },
-      { fecha: '2026-05-27', tema: 'Estado y eventos' },
-      { fecha: '2026-06-01', tema: 'Rutas y formularios' },
+      { fecha: '2026-05-25', horario: '18:30-21:30', tema: 'Componentes y props' },
+      { fecha: '2026-05-27', horario: '18:30-21:30', tema: 'Estado y eventos' },
+      { fecha: '2026-06-01', horario: '18:30-21:30', tema: 'Rutas y formularios' },
     ],
   },
 ])

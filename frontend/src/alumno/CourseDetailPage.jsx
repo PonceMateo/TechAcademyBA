@@ -12,9 +12,10 @@ import { formatFechaCorta } from '../utils/formato'
  *
  * **Todo sale de `GET /alumno/inscripciones/{codigo}`.** El cronograma ya no es material de
  * referencia: la fecha de inicio es la de la comisión y la de fin se informa como no definida
- * —`comision` no tiene `fecha_fin` (D58)—, porque inventar una fecha de cierre es peor que decir
- * que falta. Los encuentros se derivan de los días y horarios reales, y el tema sale de la clase
- * cargada: sin clase, la fila dice `Tema a confirmar`.
+ * —`comision` no tiene `fecha_fin` (D60)—, porque inventar una fecha de cierre es peor que decir
+ * que falta. Los encuentros se derivan de los días y horarios reales y cada fila trae la hora de
+ * ese día; el tema sale de la clase cargada y, sin clase, la celda queda vacía: no existe ningún
+ * "tema a confirmar" que mostrar.
  *
  * **El bloque de acceso cubre dos de los tres estados del spec.** Habilitado y bloqueado; el
  * habilitado con link cargado todavía no existe, porque el contrato del alumno no incluye el link
@@ -30,11 +31,11 @@ import { formatFechaCorta } from '../utils/formato'
 const TEXTO_ACCESO_HABILITADO = 'Tu acceso a la clase está habilitado.'
 const TEXTO_SIN_LINK =
   'El profesor todavía no publicó el link de la clase. Te avisamos apenas lo suba.'
-const TEMA_PENDIENTE = 'Tema a confirmar'
 
 const COLUMNAS_ENCUENTROS = [
   { clave: 'fecha', titulo: 'FECHA', render: (fila) => formatFechaCorta(fila.fecha) },
-  { clave: 'tema', titulo: 'TEMA', render: (fila) => fila.tema ?? TEMA_PENDIENTE },
+  { clave: 'horario', titulo: 'HORARIO', render: (fila) => fila.horario ?? '—' },
+  { clave: 'tema', titulo: 'TEMA', render: (fila) => fila.tema ?? '—' },
 ]
 const FIN_SIN_DEFINIR = 'Todavía no está definida'
 const NO_ENCONTRADA = 'No encontré esa cursada entre tus inscripciones.'

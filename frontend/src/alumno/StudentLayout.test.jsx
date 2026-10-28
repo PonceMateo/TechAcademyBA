@@ -14,6 +14,7 @@ import { PERIODO_LECTIVO, SECCIONES_ALUMNO, TITULO_MENU } from './navegacion'
  */
 
 const ETIQUETAS_ESPERADAS = [
+  'Dashboard',
   'Mis Cursos',
   'Mis Pagos',
   'Pagar la cuota',
@@ -66,6 +67,16 @@ describe('armazón del shell de Alumno', () => {
       ETIQUETAS_ESPERADAS,
     )
     expect(SECCIONES_ALUMNO.map((seccion) => seccion.etiqueta)).toEqual(ETIQUETAS_ESPERADAS)
+  })
+
+  it('abre el Dashboard en la raíz y Mis Cursos en su propia pantalla', () => {
+    const menu = within(screen.getByRole('navigation', { name: TITULO_MENU }))
+
+    expect(menu.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/alumno')
+    expect(menu.getByRole('link', { name: 'Mis Cursos' })).toHaveAttribute(
+      'href',
+      '/alumno/cursos',
+    )
   })
 
   it('deja los dos ítems deshabilitados sin enlace y con Próximamente', () => {

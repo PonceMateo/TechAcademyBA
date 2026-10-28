@@ -61,9 +61,12 @@ pantalla tenga que parsear el texto y mantiene compatibilidad con la tarjeta act
 
 **Próximos encuentros derivados de `ComisionHorario`, no de `Clase`.**
 Con la comisión y sus horarios alcanza para saber qué días hay clase; el tema se toma de `Clase`
-cuando exista una fila con esa fecha, y si no el encuentro viaja sin tema y la pantalla dice "Tema a
-confirmar". Se devuelven los próximos cuatro encuentros desde el día corriente. La lista completa del
-ciclo espera a la fecha de fin, que no existe todavía.
+cuando exista una fila con esa fecha, y si no el encuentro viaja sin tema: la pantalla **no completa
+ningún texto de tema en su lugar** (no existe un "tema a confirmar" en el dominio). Cada encuentro
+trae además el `horario` de su día —el rango de la grilla para ese día de la semana— porque la agenda
+y el detalle tienen que decir a qué hora se dicta, no solo en qué fecha. Se devuelven los próximos
+cuatro encuentros desde el día corriente. La lista completa del ciclo espera a la fecha de fin, que
+no existe todavía.
 *Techo asumido:* el cálculo no conoce feriados ni suspensiones; cuando #33/#34 carguen las clases
 reales, la fuente pasa a ser esa tabla y el cálculo queda como respaldo. Se marca con un comentario
 `ponytail:` en el servicio.
@@ -88,8 +91,15 @@ encontré esa cursada" que ya usa `CourseDetailPage`.
 **Rediseño alineado al Figma ya versionado.**
 La recomposición visual usa `docs/design/figma-dashboards-overhaul/Dashboard · Alumno.json` y
 `Diseño-Alumno.png` como autoridad de estilo, y los componentes existentes (`Card`, `Badge`, `Input`,
-`Campo`, `Button`). No se agregan rutas, ítems de menú ni pantallas: los tres tableros del shell ya
-están compuestos con esa referencia.
+`Campo`, `Button`).
+
+**La raíz `/alumno` es `Dashboard` y `Mis Cursos` es una pantalla propia.**
+El tablero conserva lo que ya estaba —los cuatro indicadores y `Tu agenda`— y las tarjetas de las
+inscripciones se mudan a `/alumno/cursos`, alcanzables desde un ítem nuevo del panel lateral. Es el
+único cambio de menú y de rutas del change, pedido por el usuario: no se agregan pantallas más allá
+de esa y no se mueve nada de `Mis Pagos` ni de `Mi Perfil`. El ítem `Dashboard` es `exacta` sobre
+`/alumno`; el de `Mis Cursos` no, así el detalle de una cursada sigue destacando y nombrando a la
+sección en el breadcrumb.
 
 **El mock se alinea al contrato, no al revés.**
 `mockDataSource` pasa a devolver la misma forma que la API (`horarios`, `cronograma.fin` en `null`,

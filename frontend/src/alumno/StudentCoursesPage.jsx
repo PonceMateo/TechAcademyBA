@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { useSession } from '../auth/SessionContext'
 import { Badge, Card } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION, ESTADO_HABILITACION } from '../domain/enums'
-import { listarInscripcionesAlumno, obtenerDetalleInscripcion } from '../services/dataService'
-import { formatFechaLarga, formatFechaCorta } from '../utils/formato'
+import { listarInscripcionesAlumno } from '../services/dataService'
 
 /**
- * Tablero del alumno (11.2), con la composición del diseño
- * (`docs/design/figma-dashboards-overhaul/`) y los datos reales de `GET /alumno/inscripciones`
- * (HUs 38 y 42).
+ * `Mis Cursos` (`/alumno/cursos`): la tarjeta de cada inscripción real del alumno (HUs 38 y 42).
  *
  * **Una tarjeta por inscripción y ni una más.** El estado bloqueado es un estado de la misma
  * tarjeta, no una segunda: cuando la inscripción no tiene un pago acreditado o Secretaría la forzó,
@@ -20,16 +16,14 @@ import { formatFechaLarga, formatFechaCorta } from '../utils/formato'
  * **La pantalla distingue "no lo sé" de "no hay".** `inscripciones` arranca en `null` y sigue en
  * `null` si la consulta falla, así que el mensaje de que el alumno no tiene cursos **solo** aparece
  * cuando la fuente confirmó una lista vacía. Mientras carga se dice que está cargando, y si la
- * consulta falla se dice eso: hace unos commits la pantalla mostraba "no tenés cursos" en los tres
- * casos, que es afirmar algo que nadie verificó.
+ * consulta falla se dice eso: la ausencia de tarjetas significa "todavía no lo sé" hasta que la
+ * consulta resuelve.
  *
  * **El docente puede no estar asignado.** La comisión admite `docente_id` nulo, así que la línea
  * dice `a confirmar` en lugar de nombrar a una persona inventada.
  *
- * **Los indicadores salen de los datos reales.** `CURSOS EN MARCHA` cuenta las inscripciones,
- * `PRÓXIMA CLASE` sale del cronograma derivado de los horarios y `ACCESO A LA CLASE` del estado de
- * la inscripción. `COMPROBANTES ACREDITADOS` sigue en `—` porque los pagos del alumno son la HU 40 y
- * ninguna fuente respalda su valor (D43).
+ * El tablero con los indicadores y la agenda vive en `/alumno` (`StudentDashboardPage`); esta
+ * pantalla es la lista de cursadas a la que llega el ítem `Mis Cursos` del panel lateral.
  */
 
 const TONOS_CATEGORIA = {
@@ -42,7 +36,6 @@ const TONOS_CATEGORIA = {
 const SIN_INSCRIPCIONES = 'No tenés cursos activos en este período lectivo.'
 const CARGANDO = 'Cargando tus cursos…'
 const NO_SE_PUDO_LEER = 'No pudimos cargar tus cursos. Volvé a intentar en un momento.'
-const TEMA_PENDIENTE = 'Tema a confirmar'
 const DOCENTE_A_CONFIRMAR = 'a confirmar'
 
 function etiquetaCategoria(categoria, porcentajeBeca) {
@@ -51,17 +44,6 @@ function etiquetaCategoria(categoria, porcentajeBeca) {
     definicion.etiqueta === 'Becado parcial' && porcentajeBeca !== null ? ` ${porcentajeBeca}%` : ''
 
   return `${definicion.etiqueta}${conPorcentaje}`
-}
-
-/** Tarjeta de indicador del tablero: rótulo arriba, valor grande y una línea de apoyo. */
-function Indicador({ rotulo, children, apoyo }) {
-  return (
-    <Card>
-      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">{rotulo}</p>
-      <div className="mt-2 text-3xl font-extrabold text-slate-900">{children}</div>
-      <p className="mt-1 text-xs text-slate-500">{apoyo}</p>
-    </Card>
-  )
 }
 
 /** Tarjeta de una cursada: identificación, datos de la comisión y estado de acceso. */
@@ -123,159 +105,67 @@ function TarjetaCurso({ inscripcion }) {
 }
 
 export function StudentCoursesPage() {
-  const { session } = useSession()
   const [inscripciones, setInscripciones] = useState(null)
   const [fallo, setFallo] = useState(false)
-  const [agenda, setAgenda] = useState([])
 
   useEffect(() => {
     listarInscripcionesAlumno()
-      .then(async (resultado) => {
-        setInscripciones(resultado)
-
-        // La agenda de la columna derecha son los próximos encuentros de las inscripciones que el
-        // alumno ya tiene, por el mismo servicio que usa el detalle del curso. Cada encuentro lleva
-        // el curso al que pertenece para que `PRÓXIMA CLASE` lo pueda nombrar y para que la clave de
-        // la lista no se repita cuando dos cursos caen el mismo día.
-        const detalles = await Promise.all(
-          resultado.map((inscripcion) => obtenerDetalleInscripcion(inscripcion.codigo)),
-        )
-        setAgenda(
-          resultado.flatMap((inscripcion, indice) =>
-            (detalles[indice]?.proximos_encuentros ?? []).map((encuentro) => ({
-              ...encuentro,
-              codigo: inscripcion.codigo,
-              nombre_curso: inscripcion.nombre_curso,
-            })),
-          ),
-        )
-      })
+      .then(setInscripciones)
       .catch(() => {
         // El rechazo deja `inscripciones` en `null`: la pantalla no sabe cuántas hay, no afirma que
         // sean cero y lo dice en lugar de mostrar el mensaje de "no tenés cursos".
         setFallo(true)
-        setAgenda([])
       })
   }, [])
 
-  const primera = inscripciones?.[0]
-  const bloqueado = primera?.acceso.estado === ESTADO_HABILITACION.BLOQUEADO
-  const proxima = agenda[0]
   const cargando = inscripciones === null && !fallo
   const sinCursos = inscripciones !== null && inscripciones.length === 0
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
-          {`Buen día, ${session.nombre}`}
-        </h1>
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Mis Cursos</h1>
         <p className="mt-1 text-sm text-slate-600">
-          {`${formatFechaLarga()} · Cada paso cuenta. Este es tu espacio para avanzar.`}
+          Una tarjeta por cada cursada en la que estás inscripto.
         </p>
       </header>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Indicador
-          rotulo="CURSOS EN MARCHA"
-          apoyo={(inscripciones ?? [])
-            .map((inscripcion) => `${inscripcion.codigo} · ${inscripcion.nombre_curso}`)
-            .join(', ')}
-        >
-          {inscripciones === null ? '—' : inscripciones.length}
-        </Indicador>
-
-        <Indicador
-          rotulo="ACCESO A LA CLASE"
-          apoyo={
-            primera
-              ? bloqueado
-                ? `Causa: ${primera.acceso.causa}`
-                : 'Tu inscripción está habilitada en el período.'
-              : ''
-          }
-        >
-          {primera ? (
-            <Badge tono={bloqueado ? TONO.ROJO : TONO.VERDE}>
-              {bloqueado ? 'BLOQUEADO' : 'HABILITADO'}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold tracking-wide text-slate-800">Cursadas</h2>
+          {inscripciones !== null && (
+            <Badge tono={TONO.GRIS}>
+              {`${inscripciones.length} ${inscripciones.length === 1 ? 'cursada' : 'cursadas'}`}
             </Badge>
-          ) : (
-            '—'
           )}
-        </Indicador>
+        </div>
 
-        <Indicador rotulo="COMPROBANTES ACREDITADOS">—</Indicador>
+        {cargando && (
+          <Card>
+            <p className="text-sm text-slate-500">{CARGANDO}</p>
+          </Card>
+        )}
 
-        <Indicador rotulo="PRÓXIMA CLASE" apoyo={proxima ? proxima.nombre_curso : ''}>
-          {proxima ? (
-            <span className="text-2xl">{formatFechaCorta(proxima.fecha)}</span>
-          ) : (
-            '—'
-          )}
-        </Indicador>
-      </div>
+        {fallo && (
+          <Card>
+            <p className="text-sm text-red-700">{NO_SE_PUDO_LEER}</p>
+          </Card>
+        )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold tracking-wide text-slate-800">Mis Cursos</h2>
-            {inscripciones !== null && (
-              <Badge tono={TONO.GRIS}>
-                {`${inscripciones.length} ${inscripciones.length === 1 ? 'cursada' : 'cursadas'}`}
-              </Badge>
-            )}
+        {sinCursos && (
+          <Card>
+            <p className="text-sm text-slate-600">{SIN_INSCRIPCIONES}</p>
+          </Card>
+        )}
+
+        {(inscripciones ?? []).length > 0 && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {inscripciones.map((inscripcion) => (
+              <TarjetaCurso key={inscripcion.codigo} inscripcion={inscripcion} />
+            ))}
           </div>
-
-          {cargando && (
-            <Card>
-              <p className="text-sm text-slate-500">{CARGANDO}</p>
-            </Card>
-          )}
-
-          {fallo && (
-            <Card>
-              <p className="text-sm text-red-700">{NO_SE_PUDO_LEER}</p>
-            </Card>
-          )}
-
-          {sinCursos && (
-            <Card>
-              <p className="text-sm text-slate-600">{SIN_INSCRIPCIONES}</p>
-            </Card>
-          )}
-
-          {(inscripciones ?? []).length > 0 && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {inscripciones.map((inscripcion) => (
-                <TarjetaCurso key={inscripcion.codigo} inscripcion={inscripcion} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <Card titulo="Tu agenda">
-          {agenda.length === 0 ? (
-            <p className="text-sm text-slate-500">No tenés encuentros programados por ahora.</p>
-          ) : (
-            <ul className="space-y-3">
-              {agenda.map((encuentro) => (
-                <li
-                  key={`${encuentro.codigo}-${encuentro.fecha}`}
-                  className="rounded-xl bg-slate-50 px-4 py-3"
-                >
-                  <p className="text-sm font-semibold text-slate-800">
-                    {formatFechaCorta(encuentro.fecha)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">{encuentro.nombre_curso}</p>
-                  <p className="mt-0.5 text-sm text-slate-600">
-                    {encuentro.tema ?? TEMA_PENDIENTE}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+        )}
+      </section>
     </div>
   )
 }

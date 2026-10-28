@@ -27,20 +27,22 @@ describe('información de la comisión', () => {
     expect(screen.getByText('Categoría: Becado parcial 50%')).toBeInTheDocument()
   })
 
-  it('muestra el cronograma y los próximos encuentros con fecha y tema', () => {
+  it('muestra el cronograma y los próximos encuentros con fecha, horario y tema', () => {
     expect(screen.getByRole('heading', { name: 'Cronograma' })).toBeInTheDocument()
 
     const cronograma = within(
       screen.getByRole('heading', { name: 'Cronograma' }).closest('section'),
     )
     expect(cronograma.getByText('04/05/2026')).toBeInTheDocument()
-    // El contrato del alumno no tiene fecha de fin: la comisión todavía no la define (D58).
+    // El contrato del alumno no tiene fecha de fin: la comisión todavía no la define (D60).
     expect(cronograma.queryByText('29/07/2026')).not.toBeInTheDocument()
 
     const encuentros = within(
       screen.getByRole('heading', { name: 'Próximos encuentros' }).closest('section'),
     )
     expect(encuentros.getByText('25/05/2026')).toBeInTheDocument()
+    // Cada encuentro trae la hora de su día: la tabla tiene columna HORARIO, no solo FECHA.
+    expect(encuentros.getAllByText('18:30-21:30')).toHaveLength(3)
     expect(encuentros.getByText('Componentes y props')).toBeInTheDocument()
   })
 
@@ -134,7 +136,7 @@ describe('navegación desde la tarjeta', () => {
   it('abre el detalle desde Ver detalle', async () => {
     const user = userEvent.setup()
     cleanup()
-    renderAppAs('ALUMNO', '/alumno')
+    renderAppAs('ALUMNO', '/alumno/cursos')
     await screen.findByRole('link', { name: 'Ver detalle' })
 
     await user.click(screen.getByRole('link', { name: 'Ver detalle' }))
