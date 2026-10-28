@@ -123,9 +123,10 @@ SHALL ser un valor calculado a partir del día corriente, no un literal del maqu
 The system SHALL mostrar cuatro tarjetas de indicador: `CURSOS EN MARCHA` cuyo valor SHALL ser la
 cantidad real de inscripciones del alumno y cuyo texto de apoyo SHALL nombrar esas inscripciones
 —código y nombre del curso—, con un `0` real cuando el alumno no tiene ninguna; `ACCESO A LA
-CLASE` con el valor tomado del estado de la inscripción real —`HABILITADO` en verde o `BLOQUEADO`
-en rojo con su causa—, que es un campo existente y no un cálculo, con `—` cuando el alumno no
-tiene ninguna inscripción; `COMPROBANTES ACREDITADOS` con el valor `—`, porque no existe ningún
+CLASE` con el valor tomado del estado real de sus inscripciones —cuando alguna está bloqueada,
+`BLOQUEADO` en rojo con la causa de esa inscripción, y `HABILITADO` en verde solo cuando todas lo
+están—, que es un campo existente y no un cálculo, con `—` cuando el alumno no tiene ninguna
+inscripción; `COMPROBANTES ACREDITADOS` con el valor `—`, porque no existe ningún
 endpoint de pagos del alumno que respalde su valor; y `PRÓXIMA CLASE` cuyo valor SHALL tomarse
 del cronograma real de la inscripción y cuyo texto de apoyo SHALL nombrar el curso real, con `—`
 cuando no hay ninguna próxima clase.
@@ -148,7 +149,8 @@ Cursos` es la que conserva su mensaje de vacío cuando el alumno no tiene ningun
 
 El tablero SHALL organizarse en dos bloques: arriba el encabezado y los cuatro indicadores, y
 debajo el bloque `Tu agenda` con una fila por próximo encuentro de las inscripciones, tomado de los
-mismos datos que muestra el detalle del curso. El tablero SHALL NOT calcular porcentajes de
+mismos datos que muestra el detalle del curso y **ordenado por fecha, de más cercano a más lejano**,
+sin importar a qué cursada pertenece. El tablero SHALL NOT calcular porcentajes de
 progreso, asistencia ni avance, y SHALL NOT mostrar bloques de tareas, calificaciones ni
 novedades: el maquetado no tiene esas entidades y los valores del prototipo (`68 %` de progreso,
 `3` tareas pendientes, `96 %` de asistencia) no son datos del sistema.
@@ -175,7 +177,11 @@ novedades: el maquetado no tiene esas entidades y los valores del prototipo (`68
 
 #### Scenario: La alumna revisa su agenda
 - **WHEN** la alumna mira un encuentro de `Tu agenda`
-- **THEN** ve la fecha junto al horario de ese día y el nombre del curso, y ve el tema solo si la clase de esa fecha ya está cargada, sin ningún texto de tema de relleno
+- **THEN** ve la fecha junto al horario de ese día y el nombre del curso, ve el tema solo si la clase de esa fecha ya está cargada, sin ningún texto de tema de relleno, y los encuentros están ordenados por fecha
+
+#### Scenario: La alumna compara el indicador de acceso con varias cursadas
+- **WHEN** la alumna tiene una cursada habilitada y otra bloqueada
+- **THEN** `ACCESO A LA CLASE` muestra `BLOQUEADO` en rojo con la causa de la cursada bloqueada, sin importar en qué orden devuelve la API las inscripciones
 
 #### Scenario: La alumna busca sus tareas o sus calificaciones
 - **WHEN** la alumna recorre el tablero buscando tareas pendientes, calificaciones o un porcentaje de progreso

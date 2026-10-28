@@ -123,6 +123,90 @@ describe('la agenda', () => {
   })
 })
 
+/** Una cursada para los tests de más de una inscripción: la API devuelve una lista, no una fila. */
+function cursada(codigo, nombreCurso) {
+  return {
+    codigo,
+    nombre_curso: nombreCurso,
+    docente_nombre: 'Lic. Laura Benítez',
+    horario: 'Lun y Miér · 18:30 a 21:30',
+    horarios: [{ dia: 'LUN', inicio: '18:30', fin: '21:30' }],
+    categoria: 'PARTICULAR',
+    porcentaje_beca: null,
+    acceso: { estado: 'HABILITADO', causa: null, forzado: false },
+  }
+}
+
+describe('varias cursadas al mismo tiempo', () => {
+  it('ordena la agenda por fecha y toma la clase más cercana de todas', async () => {
+    cleanup()
+    stubDataSource({
+      listarInscripcionesAlumno: async () => [
+        cursada('CUR-200', 'Curso A'),
+        cursada('CUR-100', 'Curso B'),
+      ],
+      obtenerDetalleInscripcion: async (codigo) => ({
+        proximos_encuentros:
+          codigo === 'CUR-200'
+            ? [{ fecha: '2026-05-30', horario: '10:00-12:00', tema: null }]
+            : [{ fecha: '2026-05-25', horario: '18:30-21:30', tema: null }],
+      }),
+    })
+    renderAppAs('ALUMNO', '/alumno')
+    await waitFor(() => expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('25/05/2026'))
+
+    // La agenda es una sola línea de tiempo: no sale la fecha del primer curso si es más lejana.
+    const filas = agenda().getAllByText(/\d{2}\/\d{2}\/\d{4}/).map((nodo) => nodo.textContent)
+    expect(filas).toEqual(['25/05/2026 · 18:30-21:30', '30/05/2026 · 10:00-12:00'])
+    expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('Curso B')
+  })
+
+  it('conserva la agenda de las demás cursadas cuando el detalle de una falla', async () => {
+    cleanup()
+    stubDataSource({
+      listarInscripcionesAlumno: async () => [
+        cursada('CUR-ROTO', 'Curso roto'),
+        cursada('CUR-100', 'Curso B'),
+      ],
+      obtenerDetalleInscripcion: async (codigo) => {
+        if (codigo === 'CUR-ROTO') {
+          throw new Error('No pudimos conectar con el servidor.')
+        }
+        return {
+          proximos_encuentros: [{ fecha: '2026-05-25', horario: '18:30-21:30', tema: null }],
+        }
+      },
+    })
+    renderAppAs('ALUMNO', '/alumno')
+    await waitFor(() => expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('25/05/2026'))
+
+    expect(agenda().getAllByText(/\d{2}\/\d{2}\/\d{4}/)).toHaveLength(1)
+    // El fallo fue de un detalle, no de la lectura de inscripciones: los indicadores siguen bien.
+    expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('2')
+    expect(
+      screen.queryByText('No pudimos cargar tus cursos. Volvé a intentar en un momento.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('muestra el estado bloqueado aunque la primera inscripción esté habilitada', async () => {
+    const habilitada = cursada('CUR-100', 'Curso habilitado')
+    const bloqueada = {
+      ...cursada('CUR-200', 'Curso bloqueado'),
+      acceso: { estado: 'BLOQUEADO', causa: 'pago pendiente', forzado: false },
+    }
+
+    cleanup()
+    stubDataSource({
+      listarInscripcionesAlumno: async () => [habilitada, bloqueada],
+    })
+    renderAppAs('ALUMNO', '/alumno')
+    await waitFor(() => expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('BLOQUEADO'))
+
+    // El orden de la respuesta lo decide la base: el indicador refleja el peor estado, no el primero.
+    expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('Causa: pago pendiente')
+  })
+})
+
 describe('alumno sin inscripciones', () => {
   it('muestra CURSOS EN MARCHA con un 0 real y el resto con —', async () => {
     cleanup()

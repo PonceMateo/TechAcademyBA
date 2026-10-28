@@ -77,17 +77,33 @@ export function StudentDashboardPage() {
         // mismo servicio que usa el detalle del curso. Cada encuentro lleva el curso al que
         // pertenece para que `PRÓXIMA CLASE` lo pueda nombrar y para que la clave de la lista no se
         // repita cuando dos cursos caen el mismo día.
-        const detalles = await Promise.all(
+        //
+        // **`allSettled` y no `all`:** si el detalle de una de las cursadas falla —una comisión que
+        // se desactivó entre las dos llamadas, por ejemplo— la agenda de las otras sigue en pie.
+        // Con `all` un solo rechazo borraba toda la agenda y la pantalla terminaba diciendo que no
+        // pudo cargar los cursos mientras los indicadores ya tenían datos.
+        const detalles = await Promise.allSettled(
           resultado.map((inscripcion) => obtenerDetalleInscripcion(inscripcion.codigo)),
         )
         setAgenda(
-          resultado.flatMap((inscripcion, indice) =>
-            (detalles[indice]?.proximos_encuentros ?? []).map((encuentro) => ({
-              ...encuentro,
-              codigo: inscripcion.codigo,
-              nombre_curso: inscripcion.nombre_curso,
-            })),
-          ),
+          resultado
+            .flatMap((inscripcion, indice) => {
+              const detalle = detalles[indice]
+              const encuentros =
+                detalle.status === 'fulfilled' ? (detalle.value?.proximos_encuentros ?? []) : []
+              return encuentros.map((encuentro) => ({
+                ...encuentro,
+                codigo: inscripcion.codigo,
+                nombre_curso: inscripcion.nombre_curso,
+              }))
+            })
+            // **La agenda es una sola línea de tiempo.** Los encuentros llegan agrupados por
+            // inscripción, así que sin ordenar aparecían fechas de un curso después de las de otro
+            // y `PRÓXIMA CLASE` tomaba la primera fila del primer curso, que no siempre es la más
+            // cercana de todas las cursadas.
+            .sort((izquierda, derecha) =>
+              String(izquierda.fecha).localeCompare(String(derecha.fecha)),
+            ),
         )
       })
       .catch(() => {
@@ -98,8 +114,14 @@ export function StudentDashboardPage() {
       })
   }, [])
 
-  const primera = inscripciones?.[0]
-  const bloqueado = primera?.acceso.estado === ESTADO_HABILITACION.BLOQUEADO
+  // El indicador refleja el **peor** estado entre las cursadas, no el de la primera fila: el orden
+  // de la respuesta lo decide la base y con estados mezclados —una habilitada y otra bloqueada—
+  // mostrar el primero podía decir `HABILITADO` mientras otra cursada está bloqueada.
+  const bloqueada =
+    inscripciones?.find(
+      (inscripcion) => inscripcion.acceso.estado === ESTADO_HABILITACION.BLOQUEADO,
+    ) ?? null
+  const hayInscripciones = Boolean(inscripciones?.length)
   const proxima = agenda[0]
 
   return (
@@ -126,16 +148,16 @@ export function StudentDashboardPage() {
         <Indicador
           rotulo="ACCESO A LA CLASE"
           apoyo={
-            primera
-              ? bloqueado
-                ? `Causa: ${primera.acceso.causa}`
+            hayInscripciones
+              ? bloqueada
+                ? `Causa: ${bloqueada.acceso.causa}`
                 : 'Tu inscripción está habilitada en el período.'
               : ''
           }
         >
-          {primera ? (
-            <Badge tono={bloqueado ? TONO.ROJO : TONO.VERDE}>
-              {bloqueado ? 'BLOQUEADO' : 'HABILITADO'}
+          {hayInscripciones ? (
+            <Badge tono={bloqueada ? TONO.ROJO : TONO.VERDE}>
+              {bloqueada ? 'BLOQUEADO' : 'HABILITADO'}
             </Badge>
           ) : (
             '—'
