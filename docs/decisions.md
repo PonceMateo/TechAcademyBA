@@ -2008,3 +2008,75 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Auditoría:** un cambio solo de titular deja `audit_log` con `accion =
   "cobranza.titular_completado"` y el titular anterior y nuevo; si además cambia el estado, la
   entrada sigue siendo `cobranza.estado_cambiado` e incluye los dos datos.
+## Panel del alumno (change `hu-38-42-43-panel-alumno`)
+
+### D60 — El autoservicio del alumno es un recurso `/alumno` sin identificador, con el estado derivado y el perfil sincronizado
+
+- **Fecha:** 2026-10-27
+- **Autor:** PonceMateo
+- **Decisión:** las cuatro rutas del panel del alumno —`GET /alumno/inscripciones`,
+  `GET /alumno/inscripciones/{codigo}`, `GET /alumno/mi-perfil` y `PUT /alumno/mi-perfil`— viven en un
+  router propio, en singular y **sin ningún identificador de alumno en la URL**: el alumno sale de
+  `usuario.alumno` de la cuenta autenticada. El detalle de cursada resuelve la comisión por código
+  dentro de las inscripciones propias y responde `404` con el mismo mensaje cuando no existe y cuando
+  es de otro. El estado de habilitación y su causa salen de `services/habilitacion.derivar_estado`,
+  la misma función que usa Administración, sin recalcular nada en el schema ni en el frontend. La
+  edición de contacto acepta solo `email` y `telefono` (`extra="forbid"`), valida la unicidad con
+  `ensure_email_available` excluyendo la propia cuenta y actualiza `Alumno.email`/`telefono` y
+  `Usuario.email` en una sola transacción.
+- **Por qué:** los endpoints de `/alumnos` son de Administración y reciben `alumno_id` por
+  parámetro; reutilizarlos obligaría a filtrar por cuenta dentro de cada handler y dejaría abierto un
+  IDOR en cuanto una ruta lo olvidara. `/alumno` no acepta identificador, así que no hay nada que
+  falsificar. `derivar_estado` es la única forma de que la causa que ve el alumno no pueda diferir de
+  la administrativa (HU 42, incluido el forzado de Secretaría). El email es el login y está duplicado
+  en `Alumno` y `Usuario`: separarlos rompe el ingreso, de ahí la transacción única (mismo patrón de
+  D52).
+- **El cronograma se deriva, no se inventa:** los próximos encuentros salen de `comision_horario`
+  desde el día corriente y el tema de `Clase` cuando existe; la fecha de fin no se modela porque
+  `comision` no tiene `fecha_fin` y el contrato informa que todavía no está definida. Queda un
+  `ponytail:` en el servicio: el cálculo no conoce feriados ni suspensiones y, cuando #33/#34 carguen
+  las clases reales, la fuente pasa a ser esa tabla.
+- **Fuera de alcance:** los pagos del alumno (HU 40), el link de la clase (HU 39) y los certificados.
+  El cambio de contraseña del panel reutiliza `POST /auth/change-password` a través de
+  `SessionContext.changePassword`: no se agrega ruta ni pantalla.
+- **Cambio de contraseña voluntario:** `SessionContext.changePassword` acepta `redirigir: false` para
+  que la tarjeta de seguridad del perfil (HU 43) se quede en la pantalla y pueda informar el
+  resultado; el cambio obligatorio del primer ingreso sigue volviendo al inicio de la sección, que
+  es de donde vino el `403`.
+- **Alternativas descartadas:** `/alumnos/me`, que choca con el orden de rutas de `/{alumno_id}`;
+  exponer el link virtual en el detalle antes de la HU 39; y agregar `fecha_fin` a `comision` para
+  poder pintar un cronograma completo.
+- **Dónde:** `backend/app/schemas/alumno.py`, `backend/app/services/alumno.py`,
+  `backend/app/api/alumno.py`, `backend/app/api/router.py`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/alumno/StudentCoursesPage.jsx`,
+  `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/StudentProfilePage.jsx`.
+
+## Panel del alumno: tablero, sección de cursos y horarios (change `hu-38-42-43-panel-alumno`)
+
+### D61 — La raíz `/alumno` es el Dashboard, `Mis Cursos` es una pantalla propia y cada encuentro trae su horario
+
+- **Fecha:** 2026-10-27
+- **Autor:** PonceMateo
+- **Decisión:** el índice del shell del alumno pasa a llamarse `Dashboard` y conserva solo lo que ya
+  tenía —el saludo, los cuatro indicadores y `Tu agenda`—; las tarjetas de las inscripciones se
+  mudan a `Mis Cursos`, una pantalla propia en `/alumno/cursos` accesible desde un ítem nuevo del
+  panel lateral (orden del menú: `Dashboard`, `Mis Cursos`, `Mis Pagos`, `Pagar la cuota`,
+  `Certificados`, `Mi Perfil`). El ítem `Dashboard` es `exacta` sobre `/alumno` y el de cursos no,
+  así el detalle de una cursada sigue destacando y nombrando a `Mis Cursos` en el breadcrumb. Cada
+  encuentro del cronograma y de la agenda trae además `horario`, el rango de ese día en la grilla de
+  la comisión, derivado en `_proximos_encuentros` y no calculado en el frontend.
+- **Por qué:** el usuario pidió al revisar el panel que la raíz fuera un tablero y no una lista, y
+  que la agenda y el detalle dijeran a qué hora se dicta cada encuentro. El horario se deriva de
+  `comision_horario` —la misma fuente que los días— para que no haya dos lugares que lo calculen.
+- **Sin texto de tema de relleno:** un encuentro sin `Clase` cargada viaja sin tema y la pantalla no
+  completa nada en su lugar; `Tema a confirmar` no existe en el dominio y se eliminó de las dos
+  pantallas. La fila queda con fecha, horario y tema vacío hasta que #33/#34 carguen las clases.
+- **Rebase sobre `main`:** la rama se rebasó sobre `origin/main` (HU 23), que traía su propio
+  `backend/app/api/alumno.py` con `GET /alumno/pagos`; las dos versiones se unieron en un solo
+  router con las cinco rutas y una sola inclusión en `router.py`. Por esa colisión esta decisión es
+  `D61`: `main` ya había ocupado `D58` y `D59`.
+- **Dónde:** `backend/app/schemas/alumno.py`, `backend/app/services/alumno.py`,
+  `frontend/src/alumno/StudentDashboardPage.jsx`, `frontend/src/alumno/StudentCoursesPage.jsx`,
+  `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/navegacion.js`,
+  `frontend/src/App.jsx`, `frontend/src/mocks/inscripciones.js`.

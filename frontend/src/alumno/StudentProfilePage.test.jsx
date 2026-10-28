@@ -2,7 +2,9 @@ import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  DEMO_PASSWORD,
   accountForRole,
+  currentPath,
   renderAppAs,
   resetDataSource,
   stubBackend,
@@ -18,6 +20,15 @@ import { TITULO_MENU } from './navegacion'
  * deshabilitados con la leyenda `solo lectura`, y `Email` y `Teléfono` aceptan escribir. El ítem
  * deshabilitado de certificados se comprueba por lo que no tiene: la ruta da 404 y el contenido del
  * prototype —la pantalla con `Descargar certificado`— no se construyó.
+ *
+ * **El guardado ya no es local.** `Guardar cambios` persiste contra la fuente, así que los casos que
+ * importan son los tres del spec: éxito, email que ya usa otra cuenta y forma inválida. El teléfono
+ * del ejemplo es el texto crudo de la planilla del cliente, y por eso el caso de éxito lo reingresa
+ * en formato internacional: sin eso el guardado falla con la regla del padrón (D57), que es
+ * exactamente lo que comprueba el caso del formato viejo.
+ *
+ * La tarjeta de seguridad usa el backend falso de `stubBackend`, que ya implementa
+ * `POST /auth/change-password` con la contraseña de demostración.
  */
 
 beforeEach(async () => {
@@ -79,10 +90,88 @@ describe('datos personales', () => {
 
     await user.clear(email)
     await user.type(email, 'camila.rod@gmail.com')
+    // El teléfono del ejemplo es el texto crudo de la planilla del cliente: para guardar hay que
+    // reingresarlo en formato internacional, que es la regla del padrón (D57).
+    await user.clear(telefono)
+    await user.type(telefono, '+5491147881122')
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent('Datos de contacto actualizados.')
-    expect(email).toHaveValue('camila.rod@gmail.com')
+    expect(screen.getByLabelText(/Email/)).toHaveValue('camila.rod@gmail.com')
+  })
+
+  it('marca el teléfono cuando todavía tiene el formato viejo del padrón', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'El teléfono debe tener el formato internacional',
+    )
+  })
+
+  it('deshabilita el botón mientras guarda', async () => {
+    const user = userEvent.setup()
+    stubDataSource({ actualizarPerfilAlumno: () => new Promise(() => {}) })
+    await user.clear(screen.getByLabelText(/Teléfono/))
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    const boton = await screen.findByRole('button', { name: 'Guardando…' })
+    expect(boton).toBeDisabled()
+  })
+
+  it('informa el conflicto cuando el email ya es de otra cuenta y conserva lo anterior', async () => {
+    const user = userEvent.setup()
+    const email = screen.getByLabelText(/Email/)
+
+    await user.clear(email)
+    await user.type(email, 'juan.perez@gmail.com')
+    await user.clear(screen.getByLabelText(/Teléfono/))
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('ya está registrado')
+    expect(screen.getByLabelText(/Email/)).toHaveValue('cami_rod@hotmail.com')
+  })
+})
+
+describe('tarjeta de seguridad', () => {
+  it('cambia la contraseña y lo informa sin salir del perfil', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Contraseña actual'), DEMO_PASSWORD)
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'NuevaClave1')
+    await user.type(screen.getByLabelText('Repetí la nueva'), 'NuevaClave1')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Contraseña actualizada.')
+    expect(currentPath()).toBe('/alumno/perfil')
+  })
+
+  it('rechaza la contraseña actual incorrecta', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Contraseña actual'), 'NoEsLaClave')
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'NuevaClave1')
+    await user.type(screen.getByLabelText('Repetí la nueva'), 'NuevaClave1')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La contraseña actual no es correcta.',
+    )
+  })
+
+  it('no manda el cambio si la confirmación no coincide', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Contraseña actual'), DEMO_PASSWORD)
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'NuevaClave1')
+    await user.type(screen.getByLabelText('Repetí la nueva'), 'OtraClave1')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La confirmación no coincide con la contraseña nueva.',
+    )
   })
 })
 

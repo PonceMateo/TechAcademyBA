@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { API_MODE, configurarFuenteDeDatos, createDataSource } from './dataSourceFactory'
 import { createMockDataSource } from './mockDataSource'
 import {
+  actualizarPerfilAlumno,
   buscarAlumnoReactivable,
   buscarDocentes,
   crearAlumno,
@@ -15,6 +16,7 @@ import {
   listarAlumnos,
   listarComisiones,
   listarCursos,
+  obtenerPerfilAlumno,
   reactivarAlumno,
   restablecerPasswordAlumno,
   restablecerPasswordDocente,
@@ -469,5 +471,55 @@ describe('la edición de comisión', () => {
     await expect(editarComision(1, { ...DATOS, cupo_maximo: 10 })).rejects.toThrow(
       '23 inscriptos activos',
     )
+  })
+})
+
+describe('el autoservicio del alumno en la frontera de datos', () => {
+  it('el servicio devuelve lo que entrega la fuente, sin transformar el contrato', async () => {
+    const guardado = {
+      nombre: 'Agustina Benítez',
+      documento: '38111222',
+      email: 'agustina@nuevomail.com',
+      telefono: null,
+    }
+    configurarFuenteDeDatos({ actualizarPerfilAlumno: async () => guardado })
+
+    await expect(
+      actualizarPerfilAlumno({ email: 'agustina@nuevomail.com', telefono: null }),
+    ).resolves.toEqual(guardado)
+  })
+
+  it('propaga el conflicto de email en lugar de confirmar un guardado que no pasó', async () => {
+    configurarFuenteDeDatos({
+      actualizarPerfilAlumno: async () => {
+        throw new Error('El email agustina@mail.com ya está registrado en el padrón de alumnos.')
+      },
+    })
+
+    await expect(
+      actualizarPerfilAlumno({ email: 'agustina@mail.com', telefono: null }),
+    ).rejects.toThrow(/ya está registrado/)
+  })
+})
+
+describe('el perfil del alumno contra el ejemplo', () => {
+  it('guarda el teléfono en el ejemplo y lo devuelve en el perfil', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const guardado = await actualizarPerfilAlumno({
+      email: (await obtenerPerfilAlumno()).email,
+      telefono: '+5491140000009',
+    })
+
+    expect(guardado.telefono).toBe('+5491140000009')
+    expect((await obtenerPerfilAlumno()).telefono).toBe('+5491140000009')
+  })
+
+  it('rechaza un email que ya es de otro alumno del ejemplo', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    await expect(
+      actualizarPerfilAlumno({ email: 'juan.perez@gmail.com', telefono: null }),
+    ).rejects.toThrow('ya está registrado en el padrón de alumnos')
   })
 })

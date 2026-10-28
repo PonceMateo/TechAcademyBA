@@ -2,42 +2,44 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
+import { resumenHorarios } from '../domain/horarios'
 import { CATEGORIA_INSCRIPCION, ESTADO_HABILITACION } from '../domain/enums'
 import { obtenerDetalleInscripcion } from '../services/dataService'
 import { formatFechaCorta } from '../utils/formato'
 
 /**
- * Detalle de curso y acceso a la clase (11.3).
+ * Detalle de la cursada y acceso a la clase (HU 38).
  *
- * **El bloque de acceso tiene tres estados y el botón aparece en uno solo.** Habilitado con link
- * cargado muestra el botón de ingreso; habilitado sin link muestra un mensaje que dice que el
- * profesor todavía no lo publicó; bloqueado no muestra link ni botón, solo el estado con su causa.
- * El caso del medio no es un error de la pantalla: es lo que ve el alumno desde que se inscribe
- * hasta que el docente carga el link.
+ * **Todo sale de `GET /alumno/inscripciones/{codigo}`.** El cronograma ya no es material de
+ * referencia: la fecha de inicio es la de la comisión y la de fin se informa como no definida
+ * —`comision` no tiene `fecha_fin` (D60)—, porque inventar una fecha de cierre es peor que decir
+ * que falta. Los encuentros se derivan de los días y horarios reales y cada fila trae la hora de
+ * ese día; el tema sale de la clase cargada y, sin clase, la celda queda vacía: no existe ningún
+ * "tema a confirmar" que mostrar.
  *
- * **El cronograma y los próximos encuentros son de referencia** (P5). Tienen forma de fecha y tema
- * porque es lo que el alumno necesita ver, pero los carga la secretaría cuando el sistema esté
- * funcional, y la pantalla lo aclara en vez de dejarlo pasar como dato definitivo.
+ * **El bloque de acceso cubre dos de los tres estados del spec.** Habilitado y bloqueado; el
+ * habilitado con link cargado todavía no existe, porque el contrato del alumno no incluye el link
+ * de la clase hasta la historia #39. Mientras tanto se renderiza el estado habilitado sin link con
+ * el aviso de que el profesor todavía no lo publicó, y **no hay ningún botón de ingreso**: no hay
+ * link que abrir.
  *
- * **El link no se muestra a un alumno bloqueado ni por error.** El servicio devuelve el detalle con
- * el link resuelto y esta pantalla decide qué hacer con él: cuando el acceso está bloqueado, no lo
- * dibuja. El filtro está acá y no en el servicio a propósito, porque la regla es de la interfaz.
+ * **Una comisión ajena y un código inexistente se ven igual.** El backend responde el mismo `404`
+ * para los dos casos y la pantalla lo único que puede decir es que no encontró esa cursada; no
+ * muestra ningún dato de la comisión.
  */
-const COLUMNAS_CRONOGRAMA = [
-  { clave: 'inicio', titulo: 'INICIO', render: (fila) => formatFechaCorta(fila.inicio) },
-  { clave: 'fin', titulo: 'FIN', render: (fila) => formatFechaCorta(fila.fin) },
-]
-
-const COLUMNAS_ENCUENTROS = [
-  { clave: 'fecha', titulo: 'FECHA', render: (fila) => formatFechaCorta(fila.fecha) },
-  { clave: 'tema', titulo: 'TEMA', render: (fila) => fila.tema },
-]
 
 const TEXTO_ACCESO_HABILITADO = 'Tu acceso a la clase está habilitado.'
 const TEXTO_SIN_LINK =
   'El profesor todavía no publicó el link de la clase. Te avisamos apenas lo suba.'
-const AVISO_REFERENCIA =
-  'Cronograma y temas de referencia: la secretaría carga el calendario definitivo de cada comisión.'
+
+const COLUMNAS_ENCUENTROS = [
+  { clave: 'fecha', titulo: 'FECHA', render: (fila) => formatFechaCorta(fila.fecha) },
+  { clave: 'horario', titulo: 'HORARIO', render: (fila) => fila.horario ?? '—' },
+  { clave: 'tema', titulo: 'TEMA', render: (fila) => fila.tema ?? '—' },
+]
+const FIN_SIN_DEFINIR = 'Todavía no está definida'
+const NO_ENCONTRADA = 'No encontré esa cursada entre tus inscripciones.'
+const BUSCANDO = 'Buscando la cursada…'
 
 function etiquetaCategoria(categoria, porcentajeBeca) {
   const nombres = {
@@ -50,60 +52,103 @@ function etiquetaCategoria(categoria, porcentajeBeca) {
   return nombres[categoria] ?? categoria
 }
 
-export function CourseDetailPage() {
-  const { codigo } = useParams()
+/** Los días y horarios como chips, con el texto de la comisión como respaldo. */
+function Horarios({ horarios, texto }) {
+  const grupos = resumenHorarios(horarios)
+
+  if (grupos.length === 0) {
+    return <span className="text-sm text-slate-800">{texto}</span>
+  }
+
+  return (
+    <span className="flex flex-wrap gap-1">
+      {grupos.map((grupo) => (
+        <Badge key={grupo} tono={TONO.GRIS}>
+          {grupo}
+        </Badge>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * El detalle de una cursada, montado por código.
+ *
+ * La `key` es el código: al abrir otra cursada el componente se monta de nuevo y su estado arranca
+ * en "buscando". Sin eso, el detalle de la comisión anterior seguiría en pantalla mientras llega la
+ * nueva, que es mostrar un dato que ya no corresponde.
+ */
+function DetalleCursada({ codigo }) {
   const [detalle, setDetalle] = useState(null)
   const [buscado, setBuscado] = useState(false)
 
   useEffect(() => {
+    let vigente = true
+
     obtenerDetalleInscripcion(codigo)
       .then((resultado) => {
-        setDetalle(resultado)
-        setBuscado(true)
+        if (vigente) {
+          setDetalle(resultado)
+        }
       })
-      .catch(() => setBuscado(true))
+      .catch(() => {})
+      .finally(() => {
+        if (vigente) {
+          setBuscado(true)
+        }
+      })
+
+    return () => {
+      vigente = false
+    }
   }, [codigo])
 
   if (detalle === null) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-slate-900">{codigo}</h2>
-        <p className="text-sm text-slate-600">
-          {buscado ? 'No estás inscripto en este curso.' : 'Buscando el curso que estás cursando…'}
-        </p>
+        <Card>
+          <p className={buscado ? 'text-sm text-red-700' : 'text-sm text-slate-600'}>
+            {buscado ? NO_ENCONTRADA : BUSCANDO}
+          </p>
+        </Card>
       </div>
     )
   }
 
-  const { comision, acceso, link } = detalle
+  const { comision, acceso, cronograma, proximos_encuentros: encuentros } = detalle
   const bloqueado = acceso.estado === ESTADO_HABILITACION.BLOQUEADO
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-slate-900">
-        {`${comision.nombre} · ${comision.codigo}`}
-      </h2>
+      <header>
+        <h2 className="text-xl font-semibold text-slate-900">
+          {`${comision.nombre} · ${comision.codigo}`}
+        </h2>
+      </header>
 
       <Card titulo="Información de la comisión">
-        <dl className="grid gap-3 sm:grid-cols-2">
+        <dl className="grid gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Docente</dt>
-            <dd className="text-sm text-slate-800">{`Docente · ${comision.docente_nombre}`}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Horario</dt>
-            <dd className="text-sm text-slate-800">{comision.horario_prolongado}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Sede</dt>
-            <dd className="text-sm text-slate-800">{comision.sede_nombre}</dd>
+            <dd className="text-sm text-slate-800">
+              {`Docente · ${comision.docente_nombre ?? 'a confirmar'}`}
+            </dd>
           </div>
           <div>
             <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
+              Días y horarios
+            </dt>
+            <dd className="mt-1">
+              <Horarios horarios={comision.horarios} texto={comision.horario} />
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">
               Categoría
             </dt>
-            <dd className="text-sm text-slate-800">
-              <Badge tono={TONO.VIOLETA}>
+            <dd className="mt-1">
+              <Badge tono={TONO.DORADO}>
                 {`Categoría: ${etiquetaCategoria(detalle.categoria, detalle.porcentaje_beca)}`}
               </Badge>
             </dd>
@@ -113,7 +158,7 @@ export function CourseDetailPage() {
 
       <Card titulo="Acceso a la clase">
         {bloqueado ? (
-          // Sin link y sin botón: el link se reparte solo a los habilitados.
+          // Sin link y sin botón: el bloqueo no ofrece ninguna forma de entrar.
           <div className="flex flex-col items-start gap-1">
             <Badge tono={TONO.ROJO}>BLOQUEADO</Badge>
             <p className="text-sm text-red-700">{`Causa: ${acceso.causa}`}</p>
@@ -122,38 +167,49 @@ export function CourseDetailPage() {
           <div className="flex flex-col items-start gap-2">
             <Badge tono={TONO.VERDE}>HABILITADO</Badge>
             <p className="text-sm text-slate-700">{TEXTO_ACCESO_HABILITADO}</p>
-
-            {link === null ? (
-              <p className="text-sm text-amber-800">{TEXTO_SIN_LINK}</p>
-            ) : (
-              <a
-                href={link}
-                className="boton-primario foco-acento inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-white transition"
-              >
-                Ingresar a la clase por Zoom
-              </a>
-            )}
+            <p className="text-sm text-amber-800">{TEXTO_SIN_LINK}</p>
           </div>
         )}
       </Card>
 
-      <Card titulo="Cronograma">
-        <Table
-          columnas={COLUMNAS_CRONOGRAMA}
-          filas={[detalle.cronograma]}
-          claveDeFila={(fila) => fila.inicio}
-        />
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <Card titulo="Cronograma">
+          <dl className="space-y-3">
+            <div>
+              <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Inicio</dt>
+              <dd className="text-sm text-slate-800">
+                {cronograma.inicio ? formatFechaCorta(cronograma.inicio) : FIN_SIN_DEFINIR}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium tracking-wide text-slate-500 uppercase">Fin</dt>
+              <dd className="text-sm text-slate-800">
+                {cronograma.fin ? formatFechaCorta(cronograma.fin) : FIN_SIN_DEFINIR}
+              </dd>
+            </div>
+          </dl>
+        </Card>
 
-      <Card titulo="Próximos encuentros">
-        <Table
-          columnas={COLUMNAS_ENCUENTROS}
-          filas={detalle.proximos_encuentros}
-          claveDeFila={(fila) => fila.fecha}
-        />
-
-        <p className="mt-4 text-xs text-slate-500">{AVISO_REFERENCIA}</p>
-      </Card>
+        <Card titulo="Próximos encuentros">
+          {encuentros.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              La comisión todavía no tiene días de cursada cargados.
+            </p>
+          ) : (
+            <Table
+              columnas={COLUMNAS_ENCUENTROS}
+              filas={encuentros}
+              claveDeFila={(fila) => fila.fecha}
+            />
+          )}
+        </Card>
+      </div>
     </div>
   )
+}
+
+export function CourseDetailPage() {
+  const { codigo } = useParams()
+
+  return <DetalleCursada key={codigo} codigo={codigo} />
 }

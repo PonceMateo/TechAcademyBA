@@ -14,14 +14,15 @@ import { markAsExample } from './placeholderNotice'
  * Administración no muestra. La inscripción lleva lo que la pantalla del alumno necesita y el
  * catálogo no usa: docente, horarios, arancel, cronograma y encuentros.
  *
- * **Los dos horarios son el mismo dato en las dos formas en que lo pide el spec**: la tarjeta del
- * curso muestra `Lun y Miér · 18:30 a 21:30` y el detalle `Lunes y miércoles · 18:30 a 21:30`. No se
+ * **Los horarios viajan en las dos formas del contrato `/alumno`**: las filas estructuradas
+ * (`horarios`), que son las que agrupa la pantalla, y el texto ya legible de la tarjeta. No se
  * derivan uno del otro porque un horario no se parte por espacios.
  *
  * **El cronograma y los temas son material de referencia** (P5): tienen forma de fecha y tema, pero
- * la secretaría carga los reales cuando el sistema esté funcional. Las fechas sí son coherentes con
- * los días de cursada: la comisión imparte lunes y miércoles, y el inicio es un lunes y el fin un
- * miércoles.
+ * la secretaría carga los reales cuando el sistema esté funcional. La fecha de inicio es coherente
+ * con los días de cursada —un lunes— y **el fin es `null` a propósito**: `comision` no tiene fecha de
+ * fin (D60), así que el ejemplo no puede inventar una. El `horario` de cada encuentro es el rango de
+ * ese día en la grilla de la comisión, igual que en el contrato real.
  */
 export const INSCRIPCIONES = markAsExample([
   {
@@ -31,15 +32,18 @@ export const INSCRIPCIONES = markAsExample([
       nombre: 'Desarrollo Web Full Stack',
       docente_nombre: 'Lic. Laura Benítez',
       horario_legible: 'Lun y Miér · 18:30 a 21:30',
-      horario_prolongado: 'Lunes y miércoles · 18:30 a 21:30',
+      horarios: [
+        { dia: 'LUN', inicio: '18:30', fin: '21:30' },
+        { dia: 'MIE', inicio: '18:30', fin: '21:30' },
+      ],
       arancel: 62000,
       sede_nombre: 'Sede Constituciones',
     },
-    cronograma: { inicio: '2026-05-04', fin: '2026-07-29' },
+    cronograma: { inicio: '2026-05-04', fin: null },
     proximos_encuentros: [
-      { fecha: '2026-05-25', tema: 'Componentes y props' },
-      { fecha: '2026-05-27', tema: 'Estado y eventos' },
-      { fecha: '2026-06-01', tema: 'Rutas y formularios' },
+      { fecha: '2026-05-25', horario: '18:30-21:30', tema: 'Componentes y props' },
+      { fecha: '2026-05-27', horario: '18:30-21:30', tema: 'Estado y eventos' },
+      { fecha: '2026-06-01', horario: '18:30-21:30', tema: 'Rutas y formularios' },
     ],
   },
 ])

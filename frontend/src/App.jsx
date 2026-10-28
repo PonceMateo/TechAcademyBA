@@ -16,6 +16,7 @@ import {
 import { SESSION_STATUS, SessionProvider, useSession } from './auth/SessionContext'
 import { CourseDetailPage } from './alumno/CourseDetailPage'
 import { StudentCoursesPage } from './alumno/StudentCoursesPage'
+import { StudentDashboardPage } from './alumno/StudentDashboardPage'
 import { StudentLayout } from './alumno/StudentLayout'
 import { StudentPaymentsPage } from './alumno/StudentPaymentsPage'
 import { StudentProfilePage } from './alumno/StudentProfilePage'
@@ -56,7 +57,8 @@ function RootRedirect() {
  * tres rutas sin cambiar quién puede verlas (M10).
  *
  * **Cada sección cuelga de su layout y el layout no sabe qué pantalla hay.** Administración tiene sus
- * seis pantallas, Docente cuatro y Alumno cuatro; `/docente/notas`, `/alumno/pagar-la-cuota` y
+ * seis pantallas, Docente cuatro y Alumno cinco —`Dashboard`, `Mis Cursos`, el detalle de una
+ * cursada, `Mis Pagos` y `Mi Perfil`—; `/docente/notas`, `/alumno/pagar-la-cuota` y
  * `/alumno/certificados` no existen, porque los ítems Won't no son enlaces (D20). Agregar una
  * pantalla es agregar una ruta hija: ni el armazón ni el guard de rol cambian.
  */
@@ -112,7 +114,8 @@ export function AppRoutes() {
           </RequireRole>
         }
       >
-        <Route index element={<StudentCoursesPage />} />
+        <Route index element={<StudentDashboardPage />} />
+        <Route path="cursos" element={<StudentCoursesPage />} />
         <Route path="cursos/:codigo" element={<CourseDetailPage />} />
         <Route path="pagos" element={<StudentPaymentsPage />} />
         <Route path="perfil" element={<StudentProfilePage />} />

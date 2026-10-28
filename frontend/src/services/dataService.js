@@ -270,7 +270,20 @@ export function listarPagosAlumno() {
   return getDataSource().listarPagosAlumno()
 }
 
-/** Ficha del alumno del ejemplo (11.5). */
+/**
+ * Ficha del alumno autenticado (11.5 y HU 43). `documento` y `nombre` son de solo lectura: los
+ * cambia la secretaría, y el contrato del guardado ni siquiera los acepta.
+ */
 export function obtenerPerfilAlumno() {
   return getDataSource().obtenerPerfilAlumno()
+}
+
+/**
+ * Guardado de los datos de contacto del alumno (HU 43). Recibe `{ email, telefono }` y devuelve el
+ * perfil guardado; un email que ya usa otra cuenta falla con el conflicto, y la pantalla lo muestra
+ * sin tocar los campos. La promesa **nunca cae al ejemplo**: un guardado que no llega a la base
+ * tiene que fallar y decirlo (D36).
+ */
+export function actualizarPerfilAlumno(datos) {
+  return getDataSource().actualizarPerfilAlumno(datos)
 }
