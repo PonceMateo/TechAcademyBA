@@ -34,7 +34,7 @@
 
 - [x] 6.1 Correr la suite completa y el lint de los dos servicios (`docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run test`, `docker compose run --rm frontend npm run lint`) y verificar que terminan sin errores.
 - [x] 6.2 Verificar que `Mis Pagos`, el link de la clase y los certificados siguen sin cambios funcionales, y que el único cambio de menú y de rutas es `Dashboard` en la raíz y `Mis Cursos` en `/alumno/cursos`; comprobar con `git diff --stat` y una revisión de `App.jsx` y `navegacion.js`.
-- [ ] 6.3 Probar el flujo completo en el navegador contra la API real: alumno bloqueado ve causa, alumno habilitado ve cursada y cronograma con horarios, cambio de teléfono persiste y el cambio de contraseña deja la anterior inválida.
+- [x] 6.3 Probar el flujo completo en el navegador contra la API real: alumno bloqueado ve causa, alumno habilitado ve cursada y cronograma con horarios, cambio de teléfono persiste y el cambio de contraseña deja la anterior inválida.
 
 ## 7. Rebase sobre `main` y reorden del panel
 
