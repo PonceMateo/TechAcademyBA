@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import date, time, timedelta
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import ORDEN_DIA, Comision
@@ -33,8 +34,11 @@ from app.schemas.alumno import (
     EncuentroOut,
     HorarioCursadaOut,
     InscripcionAlumnoOut,
+    PerfilAlumnoOut,
+    PerfilAlumnoUpdate,
 )
 from app.services import habilitacion
+from app.services.emails import EmailAlreadyRegistered, ensure_email_available
 
 
 class SinAlumnoAsociado(Exception):
@@ -213,6 +217,60 @@ def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[da
             fechas.append(fecha)
         fecha += timedelta(days=1)
     return fechas
+
+
+def obtener_perfil(usuario: Usuario) -> PerfilAlumnoOut:
+    """Los datos del alumno autenticado, sin el identificador del sistema ni datos de terceros.
+
+    No toca la base: el legajo y la cuenta ya vienen con la sesión autenticada.
+    """
+    return _perfil(alumno_de(usuario))
+
+
+def actualizar_perfil(
+    session: Session, usuario: Usuario, datos: PerfilAlumnoUpdate
+) -> PerfilAlumnoOut:
+    """Actualiza el email y el teléfono del alumno en el padrón **y en su cuenta** (HU 43).
+
+    **Los dos datos viajan juntos porque salen de la misma pantalla, y las dos filas se escriben en
+    la misma transacción.** `usuario.email` es el correo de login y `alumno.email` el del padrón: si
+    se actualiara solo uno, el alumno entraría con un correo y la secretaría vería otro, o dejaría
+    de poder entrar. Es el mismo patrón de la edición administrativa (D52 y D58).
+
+    La unicidad la resuelve `ensure_email_available` excluyendo la propia cuenta —guardar el mismo
+    email no puede chocar contra uno mismo— y la carrera entre dos cuentas que piden el mismo correo
+    la traduce el `IntegrityError` al mismo conflicto.
+    """
+    alumno = alumno_de(usuario)
+    ensure_email_available(
+        session,
+        datos.email,
+        exclude_alumno_id=alumno.id,
+        exclude_usuario_id=usuario.id,
+    )
+
+    alumno.email = datos.email
+    alumno.telefono = datos.telefono
+    usuario.email = datos.email
+
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        if "uq_alumno_email" in str(error.orig) or "uq_usuario_email" in str(error.orig):
+            raise EmailAlreadyRegistered(datos.email, "alumnos") from error
+        raise
+
+    return _perfil(alumno)
+
+
+def _perfil(alumno: Alumno) -> PerfilAlumnoOut:
+    return PerfilAlumnoOut(
+        nombre=alumno.nombre,
+        documento=alumno.documento,
+        email=alumno.email,
+        telefono=alumno.telefono,
+    )
 
 
 def _acceso(session: Session, inscripcion: Inscripcion) -> AccesoAlumnoOut:

@@ -10,7 +10,7 @@
 - [x] 2.1 Implementar en `backend/app/services/alumno.py` la resolución del alumno desde la cuenta autenticada y el listado de inscripciones propias con `habilitacion.derivar_estado`, horarios y categoría; verificar con tests de servicio sobre PostgreSQL real que trae solo las inscripciones del alumno y que la causa coincide con la administrativa.
 - [x] 2.2 Implementar el detalle por código de comisión que devuelve los datos de la comisión y responde como no encontrado cuando la comisión no es una inscripción del alumno; verificar con tests que un alumno distinto recibe el mismo resultado que un código inexistente.
 - [x] 2.3 Implementar el cálculo de próximos encuentros desde `ComisionHorario` (cuatro encuentros desde el día corriente) con el tema de `Clase` cuando exista, dejando el comentario `ponytail:` sobre feriados y suspensiones; verificar con tests de fechas fijas que el orden es cronológico y que un encuentro sin clase cargada viene sin tema.
-- [ ] 2.4 Implementar lectura del perfil y actualización de email y teléfono en una sola transacción (padrón y cuenta), con `ensure_email_available` excluyendo la propia cuenta y teléfono vacío guardado como `None`; verificar con tests que el email duplicado lanza el conflicto, que el email viejo deja de servir para login y que un teléfono inválido no se persiste.
+- [x] 2.4 Implementar lectura del perfil y actualización de email y teléfono en una sola transacción (padrón y cuenta), con `ensure_email_available` excluyendo la propia cuenta y teléfono vacío guardado como `None`; verificar con tests que el email duplicado lanza el conflicto, que el email viejo deja de servir para login y que un teléfono inválido no se persiste.
 
 ## 3. API `/alumno` (backend)
 

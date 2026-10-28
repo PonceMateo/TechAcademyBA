@@ -11,10 +11,37 @@ que un cuerpo que los mande tiene que caer acá y no depender de que el servicio
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from pydantic import ValidationError
 
+from app.models.clases import Clase
+from app.models.enums import CategoriaInscripcion, EstadoHabilitacion
 from app.schemas.alumno import PerfilAlumnoUpdate
+from app.services import alumnos as servicio_alumnos
+from app.services.alumno import (
+    CursadaNoEncontrada,
+    actualizar_perfil,
+    listar_inscripciones,
+    obtener_detalle,
+    obtener_perfil,
+)
+from app.services.auth import CredencialesInvalidas, autenticar
+from app.services.emails import EmailAlreadyRegistered
+from app.tests.factories import (
+    PASSWORD_DE_PRUEBA,
+    crear_alumno,
+    crear_comision,
+    crear_curso,
+    crear_docente,
+    crear_empresa,
+    crear_inscripcion,
+    crear_override,
+    crear_sede,
+    crear_usuario_admin,
+    crear_usuario_alumno,
+)
 
 #: Cuerpo válido de la edición del perfil, para cambiar un solo campo por test.
 PERFIL = {
@@ -56,22 +83,6 @@ def test_un_email_sin_forma_se_rechaza() -> None:
 
 
 # --- Servicio: cursadas del alumno (HU 38 y 42) ------------------------------------------------
-
-from app.models.enums import CategoriaInscripcion, EstadoHabilitacion  # noqa: E402
-from app.services import alumnos as servicio_alumnos  # noqa: E402
-from app.services.alumno import listar_inscripciones  # noqa: E402
-from app.tests.factories import (  # noqa: E402
-    crear_alumno,
-    crear_comision,
-    crear_curso,
-    crear_docente,
-    crear_empresa,
-    crear_inscripcion,
-    crear_override,
-    crear_sede,
-    crear_usuario_admin,
-    crear_usuario_alumno,
-)
 
 
 def test_lista_solo_las_inscripciones_del_alumno(db_session) -> None:
@@ -170,8 +181,6 @@ def test_un_alumno_sin_inscripciones_recibe_una_lista_vacia(db_session) -> None:
 
 # --- Servicio: detalle de la cursada (HU 38) ---------------------------------------------------
 
-from app.services.alumno import CursadaNoEncontrada, obtener_detalle  # noqa: E402
-
 
 def test_el_detalle_trae_la_comision_los_horarios_y_el_acceso(db_session) -> None:
     docente = crear_docente(db_session, nombre="Laura", apellido="Benítez")
@@ -234,10 +243,6 @@ def test_una_comision_ajena_responde_igual_que_una_inexistente(db_session) -> No
 
 # --- Servicio: próximos encuentros (HU 38) -----------------------------------------------------
 
-from datetime import date  # noqa: E402
-
-from app.models.clases import Clase  # noqa: E402
-
 #: Lunes. Los encuentros de una comisión de lunes y miércoles salen de acá con fechas fijas.
 HOY = date(2026, 10, 26)
 
@@ -298,3 +303,101 @@ def test_una_comision_que_empieza_mas_adelante_no_muestra_encuentros_pasados(db_
     detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
 
     assert detalle.proximos_encuentros[0].fecha == date(2026, 11, 9)
+
+
+# --- Servicio: perfil del alumno (HU 43) --------------------------------------------------------
+
+
+def test_el_perfil_trae_los_datos_del_alumno_autenticado(db_session) -> None:
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+
+    perfil = obtener_perfil(usuario)
+
+    assert perfil.nombre == alumno.nombre
+    assert perfil.documento == alumno.documento
+    assert perfil.email == alumno.email
+    assert perfil.telefono == alumno.telefono
+
+
+def test_un_perfil_sin_telefono_lo_devuelve_vacio(db_session) -> None:
+    alumno = crear_alumno(db_session)
+    alumno.telefono = None
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+
+    assert obtener_perfil(usuario).telefono is None
+
+
+def test_guardar_el_contacto_actualiza_el_padron_y_la_cuenta(db_session) -> None:
+    """Si las dos filas no se sincronizan, el email nuevo no sirve para entrar (D58)."""
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno, email="agustina@viejomail.com")
+
+    perfil = actualizar_perfil(
+        db_session,
+        usuario,
+        PerfilAlumnoUpdate(email="agustina@nuevomail.com", telefono="+5491140000003"),
+    )
+
+    assert perfil.email == "agustina@nuevomail.com"
+    assert perfil.telefono == "+5491140000003"
+    assert alumno.email == "agustina@nuevomail.com"
+    assert usuario.email == "agustina@nuevomail.com"
+    # El email viejo deja de servir para entrar y el nuevo sí.
+    with pytest.raises(CredencialesInvalidas):
+        autenticar(db_session, "agustina@viejomail.com", PASSWORD_DE_PRUEBA)
+    assert autenticar(db_session, "agustina@nuevomail.com", PASSWORD_DE_PRUEBA).id == usuario.id
+
+
+def test_un_email_de_otra_cuenta_es_un_conflicto_y_no_cambia_nada(db_session) -> None:
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno, email="agustina@mail.com")
+    otro = crear_alumno(
+        db_session, nombre="Otro Alumno", documento="39999888", email="ocupado@mail.com"
+    )
+
+    with pytest.raises(EmailAlreadyRegistered):
+        actualizar_perfil(
+            db_session,
+            usuario,
+            PerfilAlumnoUpdate(email=otro.email, telefono="+5491140000003"),
+        )
+
+    assert alumno.email == "agustina.benitez@techacademy.invalid"
+    assert usuario.email == "agustina@mail.com"
+    assert alumno.telefono == "+54 11 4000-0002"
+
+
+def test_guardar_el_mismo_email_no_es_un_conflicto(db_session) -> None:
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+
+    perfil = actualizar_perfil(
+        db_session,
+        usuario,
+        PerfilAlumnoUpdate(email=alumno.email, telefono="+5491140000004"),
+    )
+
+    assert perfil.email == alumno.email
+
+
+def test_borrar_el_telefono_lo_deja_no_informado(db_session) -> None:
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+
+    perfil = actualizar_perfil(
+        db_session, usuario, PerfilAlumnoUpdate(email=alumno.email, telefono="")
+    )
+
+    assert perfil.telefono is None
+    assert alumno.telefono is None
+
+
+def test_un_telefono_invalido_no_se_persiste(db_session) -> None:
+    alumno = crear_alumno(db_session)
+    crear_usuario_alumno(db_session, alumno=alumno)
+
+    with pytest.raises(ValidationError):
+        PerfilAlumnoUpdate(email=alumno.email, telefono="011 4788-1122")
+
+    assert alumno.telefono == "+54 11 4000-0002"
