@@ -15,7 +15,7 @@
 ## 3. API `/alumno` (backend)
 
 - [x] 3.1 Crear `backend/app/api/alumno.py` con `GET /alumno/inscripciones`, `GET /alumno/inscripciones/{codigo}`, `GET /alumno/mi-perfil` y `PUT /alumno/mi-perfil`, todas con `require_roles(Rol.ALUMNO)`, y registrarlo en `app/api/router.py`; verificar que las cuatro rutas aparecen en `/docs` y que el import de la app no rompe.
-- [ ] 3.2 Mapear los errores del servicio a `404` (comisión ajena o inexistente), `409` (email duplicado) y `422` (forma inválida o campos no editables); verificar con tests de API que cada código y su mensaje en es-AR son los esperados.
+- [x] 3.2 Mapear los errores del servicio a `404` (comisión ajena o inexistente), `409` (email duplicado) y `422` (forma inválida o campos no editables); verificar con tests de API que cada código y su mensaje en es-AR son los esperados.
 - [ ] 3.3 Cubrir el aislamiento y la autorización en `app/tests/test_alumno_api.py`: `403` para `ADMIN` y `DOCENTE`, `403` de contraseña pendiente para una cuenta de alumno con `must_change_password` y datos de otro alumno inaccesibles en cualquier respuesta; verificar corriendo `docker compose run --rm backend pytest app/tests/test_alumno_api.py`.
 
 ## 4. Frontera de datos (frontend)

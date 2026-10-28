@@ -8,6 +8,24 @@ alumno: el legajo sale de la cuenta autenticada y el código se busca entre sus 
 
 from __future__ import annotations
 
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.models.enums import CategoriaInscripcion
+from app.models.padron import Alumno, Usuario
+from app.tests.factories import (
+    crear_alumno,
+    crear_comision,
+    crear_curso,
+    crear_docente,
+    crear_inscripcion,
+    crear_sede,
+    crear_usuario_alumno,
+    encabezado_de_autorizacion,
+    token_de_prueba,
+)
+
 
 def test_las_cuatro_rutas_del_alumno_estan_registradas(client) -> None:
     """El router está incluido en la aplicación y todas sus rutas existen."""
@@ -19,3 +37,151 @@ def test_las_cuatro_rutas_del_alumno_estan_registradas(client) -> None:
         "/alumno/mi-perfil",
     } <= set(esquema["paths"])
     assert set(esquema["paths"]["/alumno/mi-perfil"]) == {"get", "put"}
+
+
+# --- Contrato HTTP: códigos y mensajes ----------------------------------------------------------
+
+
+@pytest.fixture
+def alumna(db_session: Session) -> Alumno:
+    return crear_alumno(db_session)
+
+
+@pytest.fixture
+def cuenta_alumna(db_session: Session, alumna: Alumno) -> Usuario:
+    return crear_usuario_alumno(db_session, alumno=alumna)
+
+
+@pytest.fixture
+def cliente_alumna(api_client: TestClient, cuenta_alumna: Usuario) -> TestClient:
+    api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(cuenta_alumna)))
+    return api_client
+
+
+def test_las_cursadas_llegan_con_su_estado_y_su_causa(
+    cliente_alumna: TestClient, db_session: Session, alumna: Alumno
+) -> None:
+    docente = crear_docente(db_session, nombre="Laura", apellido="Benítez")
+    comision = crear_comision(db_session, docente=docente)
+    crear_inscripcion(
+        db_session,
+        alumno=alumna,
+        comision=comision,
+        categoria=CategoriaInscripcion.BECADO_TOTAL.value,
+    )
+
+    respuesta = cliente_alumna.get("/alumno/inscripciones")
+
+    assert respuesta.status_code == 200, respuesta.text
+    (inscripcion,) = respuesta.json()
+    assert inscripcion["codigo"] == comision.codigo
+    assert inscripcion["nombre_curso"] == comision.curso.nombre
+    assert inscripcion["docente_nombre"] == "Laura Benítez"
+    assert inscripcion["horario"] == "Lun y Mié 18-20hs"
+    assert inscripcion["categoria"] == CategoriaInscripcion.BECADO_TOTAL.value
+    assert inscripcion["acceso"] == {"estado": "HABILITADO", "causa": None, "forzado": False}
+
+
+def test_un_alumno_sin_cursadas_recibe_una_lista_vacia(cliente_alumna: TestClient) -> None:
+    respuesta = cliente_alumna.get("/alumno/inscripciones")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json() == []
+
+
+def test_el_detalle_de_una_comision_ajena_es_un_404_sin_pistas(
+    cliente_alumna: TestClient, db_session: Session
+) -> None:
+    docente = crear_docente(db_session)
+    sede = crear_sede(db_session)
+    curso = crear_curso(db_session)
+    propia = crear_comision(db_session, curso=curso, docente=docente, sede=sede)
+    otro = crear_alumno(
+        db_session,
+        nombre="Otro Alumno",
+        documento="39999888",
+        email="otro.detalle@techacademy.invalid",
+    )
+    crear_inscripcion(db_session, alumno=otro, comision=propia)
+
+    de_otro = cliente_alumna.get(f"/alumno/inscripciones/{propia.codigo}")
+    inexistente = cliente_alumna.get("/alumno/inscripciones/CUR999-9")
+
+    assert de_otro.status_code == 404
+    assert inexistente.status_code == 404
+    assert de_otro.json()["detail"] == inexistente.json()["detail"]
+    assert de_otro.json()["detail"] == "No encontré esa cursada entre tus inscripciones."
+
+
+def test_el_detalle_propio_trae_el_cronograma_y_los_encuentros(
+    cliente_alumna: TestClient, db_session: Session, alumna: Alumno
+) -> None:
+    comision = crear_comision(db_session)
+    comision.fecha_inicio = None
+    crear_inscripcion(db_session, alumno=alumna, comision=comision)
+
+    respuesta = cliente_alumna.get(f"/alumno/inscripciones/{comision.codigo}")
+
+    assert respuesta.status_code == 200, respuesta.text
+    cuerpo = respuesta.json()
+    assert cuerpo["cronograma"] == {"inicio": None, "fin": None}
+    assert len(cuerpo["proximos_encuentros"]) == 4
+    assert cuerpo["proximos_encuentros"][0]["tema"] is None
+    assert "link" not in cuerpo
+    assert "link_virtual" not in cuerpo["comision"]
+
+
+def test_editar_el_contacto_devuelve_lo_guardado(cliente_alumna: TestClient) -> None:
+    respuesta = cliente_alumna.put(
+        "/alumno/mi-perfil",
+        json={"email": "agustina.nueva@techacademy.invalid", "telefono": "+5491140000009"},
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["email"] == "agustina.nueva@techacademy.invalid"
+    assert respuesta.json()["telefono"] == "+5491140000009"
+
+
+def test_un_email_de_otra_cuenta_es_un_409_y_no_cambia_nada(
+    cliente_alumna: TestClient, db_session: Session, alumna: Alumno
+) -> None:
+    otro = crear_alumno(
+        db_session, nombre="Otro Alumno", documento="39999888", email="ocupado@techacademy.invalid"
+    )
+
+    respuesta = cliente_alumna.put(
+        "/alumno/mi-perfil", json={"email": otro.email, "telefono": None}
+    )
+
+    assert respuesta.status_code == 409
+    assert respuesta.json()["detail"] == (
+        f"El email {otro.email} ya está registrado en el padrón de alumnos."
+    )
+    assert alumna.email == "agustina.benitez@techacademy.invalid"
+
+
+@pytest.mark.parametrize("campo", ["documento", "nombre", "id"])
+def test_los_campos_no_editables_son_un_422(cliente_alumna: TestClient, campo: str) -> None:
+    respuesta = cliente_alumna.put(
+        "/alumno/mi-perfil",
+        json={
+            "email": "agustina.nueva@techacademy.invalid",
+            "telefono": None,
+            campo: "otro valor",
+        },
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_un_email_o_un_telefono_con_forma_invalida_es_un_422(cliente_alumna: TestClient) -> None:
+    sin_forma_de_email = cliente_alumna.put(
+        "/alumno/mi-perfil", json={"email": "agustina", "telefono": None}
+    )
+    sin_forma_de_telefono = cliente_alumna.put(
+        "/alumno/mi-perfil",
+        json={"email": "agustina.nueva@techacademy.invalid", "telefono": "011 4788-1122"},
+    )
+
+    assert sin_forma_de_email.status_code == 422
+    assert sin_forma_de_telefono.status_code == 422
