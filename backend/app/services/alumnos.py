@@ -28,8 +28,6 @@ restricción (D44).
 from __future__ import annotations
 
 import logging
-import re
-import unicodedata
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -46,16 +44,9 @@ from app.schemas.alumnos import AlumnoCreate, AlumnoUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available, find_patron_registrado
 from app.services.habilitacion import derivar_estado
-from app.services.normalization import normalize_document
+from app.services.normalization import generar_password_inicial, normalize_document
 
 logger = logging.getLogger(__name__)
-
-#: Parte del nombre que entra en la contraseña inicial. El DNI aporta hasta 8 dígitos, así que con
-#: 32 caracteres la contraseña nunca se acerca al límite de 72 bytes que procesa bcrypt.
-_MAX_NOMBRE_EN_PASSWORD = 32
-
-#: Caracteres que se conservan del primer nombre: letras sin tildes y dígitos, en minúsculas.
-_NON_ALPHANUMERIC_LOWER = re.compile(r"[^a-z0-9]+")
 
 
 @dataclass(frozen=True)
@@ -119,34 +110,6 @@ class AlumnoSinCuenta(Exception):
 
     def __init__(self) -> None:
         super().__init__("El alumno no tiene una cuenta de acceso.")
-
-
-def generar_password_inicial(nombre: str, documento: str) -> str:
-    """Genera la contraseña inicial del alumno: `<primer nombre><DNI>` (D45).
-
-    El primer nombre va en minúsculas, sin tildes y sin signos; el DNI, solo sus dígitos. Así
-    `Rocío Álvarez` con `30.111.222` recibe `rocio30111222`. Es una convención que la secretaría
-    puede dictar en voz alta y que el alumno cambia en su primer ingreso.
-
-    >>> generar_password_inicial("Juan Ignacio Pérez", "38.456.789")
-    'juan38456789'
-    >>> generar_password_inicial("Ángel", "30111222")
-    'angel30111222'
-    """
-    primer_nombre = nombre.strip().split()[0] if nombre.strip() else ""
-    descompuesto = unicodedata.normalize("NFKD", primer_nombre)
-    sin_tildes = "".join(char for char in descompuesto if not unicodedata.combining(char))
-    limpio = _NON_ALPHANUMERIC_LOWER.sub("", sin_tildes.lower())[:_MAX_NOMBRE_EN_PASSWORD]
-    digitos = normalize_document(documento) or ""
-    password = f"{limpio or 'alumno'}{digitos}"
-
-    # El DNI del contrato tiene 7 u 8 dígitos y el nombre se corta, así que hoy no se alcanza.
-    # La comprobación queda para que la convención no pueda producir una clave que bcrypt
-    # truncaría en silencio si mañana cambia el contrato.
-    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
-        raise ValueError("la contraseña inicial supera el límite de bcrypt")
-
-    return password
 
 
 def crear_alumno(session: Session, datos: AlumnoCreate) -> AltaAlumno:

@@ -23,6 +23,7 @@ from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
 from app.schemas.padron import (
+    DocenteCreadoOut,
     DocenteCreate,
     DocenteOut,
     DocenteUpdate,
@@ -55,7 +56,7 @@ def listar_docentes(
 
 @router.post(
     "",
-    response_model=DocenteOut,
+    response_model=DocenteCreadoOut,
     status_code=status.HTTP_201_CREATED,
     summary="Dar de alta un docente",
 )
@@ -63,20 +64,22 @@ def crear_docente(
     cuerpo: DocenteCreate,
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
-) -> DocenteOut:
+) -> DocenteCreadoOut:
     """Alta de docente. El cuerpo admite nombre, apellido, DNI, email, teléfono opcional y
     `cuil` opcional, que se valida contra el DNI del mismo cuerpo (D57): 11 dígitos, prefijo
     permitido y los 8 del medio iguales al DNI. El dígito verificador no se calcula.
 
-    Crea el docente y su cuenta de acceso en una sola transacción, con la contraseña de
-    demostración y sin cambio pendiente.
+    Crea el docente y su cuenta de acceso en una sola transacción. La cuenta nace con una
+    contraseña inicial generada —`<primer nombre><DNI>`— y con cambio obligatorio en el primer
+    ingreso (HU #66). **No envía ningún correo**: la respuesta trae `password_inicial` para que
+    el administrador se la entregue al docente.
 
-    201 con el docente, 409 si el DNI o el email ya están registrados —el mensaje dice cuál—,
-    422 si falta un campo obligatorio o el email no tiene forma, y 409 si el correo ya está en
-    el padrón de alumnos.
+    201 con el docente y la contraseña inicial, 409 si el DNI o el email ya están registrados
+    —el mensaje dice cuál—, 422 si falta un campo obligatorio o el email no tiene forma, y 409 si
+    el correo ya está en el padrón de alumnos.
     """
     try:
-        docente = padron.crear_docente(session, cuerpo)
+        alta = padron.crear_docente(session, cuerpo)
     except padron.DocenteDuplicado as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except EmailAlreadyRegistered as error:
@@ -88,9 +91,13 @@ def crear_docente(
 
     # La respuesta recién creada no tiene nada que contar: el docente todavía no tiene
     # comisiones asignadas.
+    docente = alta.docente
     docente.cantidad_comisiones = 0
     docente.comisiones = []  # type: ignore[attr-defined]
-    return DocenteOut.model_validate(docente)
+    return DocenteCreadoOut(
+        **DocenteOut.model_validate(docente).model_dump(),
+        password_inicial=alta.password_inicial,
+    )
 
 
 @router.put("/{docente_id}", response_model=DocenteOut, summary="Editar un docente")

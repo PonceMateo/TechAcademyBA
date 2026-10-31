@@ -213,8 +213,14 @@ export function createApiDataSource() {
       return (await request(PATHS.docentes, { query: { q: texto } })).map(filaDeDocente)
     },
 
+    /**
+     * Alta de docente (HU #66). La respuesta conserva `password_inicial` **solo en el resultado
+     * del alta**: es la única vez que el administrador puede verla. Las filas del padrón que
+     * devuelven `listarDocentes` y `buscarDocentes` no la traen.
+     */
     async crearDocente(datos) {
-      return filaDeDocente(await request(PATHS.docentes, { method: 'POST', body: datos }))
+      const cuerpo = await request(PATHS.docentes, { method: 'POST', body: datos })
+      return { ...filaDeDocente(cuerpo), password_inicial: cuerpo.password_inicial }
     },
 
     /** Edición de los datos personales (historia #11). El cuerpo es el que arma la pantalla:
