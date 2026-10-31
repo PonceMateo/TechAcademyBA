@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -35,6 +35,7 @@ const COLUMNAS = [
   'CURSO / PROGRAMA',
   'DOCENTE',
   'HORARIO',
+  'PERÍODO',
   'CUPO MÁX.',
   'VACANTES',
   'ARANCEL',
@@ -125,6 +126,9 @@ async function completarComision(
   }
   await user.selectOptions(screen.getByLabelText(/^Docente Asignado/), '1')
   await cargarHorarios(user)
+  // El período de cursada es obligatorio en el alta (historia #49): dos semanas del cuatrimestre.
+  await user.type(screen.getByLabelText(/Fecha de Inicio de la Cursada/), '2026-08-03')
+  await user.type(screen.getByLabelText(/Fecha de Fin de la Cursada/), '2026-08-14')
   if (cupo !== '') {
     await user.type(screen.getByLabelText(/Cupo Máximo/), cupo)
   }
@@ -253,6 +257,11 @@ describe('vista de comisiones del curso', () => {
 
     expect(filas.map((fila) => fila.cells[0].textContent)).toEqual(['CUR-101'])
     expect(within(screen.getByRole('table')).getByText('$45.000')).toBeInTheDocument()
+  })
+
+  it('muestra el período de cursada en la columna PERÍODO', async () => {
+    // `PERÍODO` va después de `HORARIO`: las dos fechas del período de cursada (historia #49).
+    expect(filasDeComisiones()[0].cells[4].textContent).toBe('04/08/2026 – 26/11/2026')
   })
 
   it('no muestra comisiones de otro curso', () => {
@@ -486,6 +495,8 @@ describe('modal de alta', () => {
       curso_id: 1,
       docente_id: 1,
       horarios: HORARIOS_POR_DEFECTO,
+      fecha_inicio: '2026-08-03',
+      fecha_fin: '2026-08-14',
       arancel: 52000,
       cupo_maximo: 20,
       modalidad: 'VIRTUAL',
@@ -554,11 +565,55 @@ describe('modal de alta', () => {
       curso_id: 1,
       docente_id: 1,
       horarios: HORARIOS_POR_DEFECTO,
+      fecha_inicio: '2026-08-03',
+      fecha_fin: '2026-08-14',
       arancel: 52000,
       cupo_maximo: 20,
       modalidad: 'VIRTUAL',
       sede_id: null,
     })
+  })
+
+  it('exige las dos fechas del período antes de guardar', async () => {
+    const crear = vi.fn()
+    stubDataSource({ crearComision: crear })
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await user.selectOptions(screen.getByLabelText(/^Modalidad/), 'VIRTUAL')
+    const cursos = screen.getByLabelText(/^Curso \/ Programa/)
+    await user.selectOptions(cursos, within(cursos).getByRole('option', { name: 'Python Inicial' }))
+    await user.selectOptions(screen.getByLabelText(/^Docente Asignado/), '1')
+    await cargarHorarios(user)
+    await user.type(screen.getByLabelText(/Cupo Máximo/), '20')
+    await user.type(screen.getByLabelText(/Valor de Arancel de Comisión/), '52000')
+    await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+    expect(
+      await screen.findByText('Indicá la fecha de inicio de la cursada.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Indicá la fecha de fin de la cursada.')).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
+  })
+
+  it('no guarda con la fecha de fin anterior a la de inicio', async () => {
+    // El orden lo comprueba el formulario antes de enviar, así que el 422 del backend no llega a
+    // verse: la secretaría corrige la fecha en el campo (historia #49).
+    const crear = vi.fn()
+    stubDataSource({ crearComision: crear })
+    const user = userEvent.setup()
+    await abrirModal(user)
+
+    await completarComision(user, { modalidad: 'VIRTUAL' })
+    const fin = screen.getByLabelText(/Fecha de Fin de la Cursada/)
+    await user.clear(fin)
+    await user.type(fin, '2026-07-31')
+    await user.click(screen.getByRole('button', { name: 'Guardar Comisión' }))
+
+    expect(
+      await screen.findByText('La fecha de fin no puede ser anterior a la de inicio.'),
+    ).toBeInTheDocument()
+    expect(crear).not.toHaveBeenCalled()
   })
 
   it('exige el docente de la comisión', async () => {
@@ -967,6 +1022,16 @@ describe('alta de curso', () => {
   })
 })
 
+describe('comisión heredada sin período', () => {
+  // CUR-103 llegó del cliente sin fechas: la tabla dice que no está definido en lugar de dejar la
+  // celda vacía, que se confundiría con un dato que no cargó (D62).
+  beforeEach(() => abrirCurso('/admin/cursos/CUR-103'))
+
+  it('muestra Sin definir en la columna del período', () => {
+    expect(filasDeComisiones()[0].cells[4].textContent).toBe('Sin definir')
+  })
+})
+
 describe('edición de comisión', () => {
   beforeEach(() => abrirCurso())
 
@@ -990,6 +1055,37 @@ describe('edición de comisión', () => {
     expect(within(dialogo).queryByLabelText(/Código/)).not.toBeInTheDocument()
     // CUR-101 tiene cupo 30 y 7 vacantes: 23 inscriptos ocupan banco.
     expect(dialogo).toHaveTextContent('23 inscriptos activos')
+  })
+
+  it('precarga el período guardado y muestra cuántas clases tiene', async () => {
+    const user = userEvent.setup()
+
+    const dialogo = await abrirEdicion(user)
+
+    expect(within(dialogo).getByLabelText(/Fecha de Inicio de la Cursada/)).toHaveValue(
+      '2026-08-04',
+    )
+    expect(within(dialogo).getByLabelText(/Fecha de Fin de la Cursada/)).toHaveValue('2026-11-26')
+    // El número lo calcula la API sobre el período guardado —34 martes y jueves— y el navegador lo
+    // muestra sin volver a contarlo (D62).
+    expect(dialogo).toHaveTextContent('34 clases en el período guardado')
+  })
+
+  it('exige el período al editar una comisión que no lo tiene', async () => {
+    // La comisión heredada se puede editar, pero no se puede guardar sin fechas: si no, quedaría sin
+    // período para siempre (D62).
+    cleanup()
+    await abrirCurso('/admin/cursos/CUR-103')
+    const user = userEvent.setup()
+    const dialogo = await abrirEdicion(user)
+
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    expect(
+      await within(dialogo).findByText('Indicá la fecha de inicio de la cursada.'),
+    ).toBeInTheDocument()
+    expect(within(dialogo).getByText('Indicá la fecha de fin de la cursada.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar Comisión' })).toBeInTheDocument()
   })
 
   it('guarda, actualiza la fila con las vacantes nuevas y confirma la edición', async () => {

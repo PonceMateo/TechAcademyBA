@@ -149,9 +149,9 @@ def obtener_detalle(
         categoria=inscripcion.categoria,
         porcentaje_beca=inscripcion.porcentaje_beca,
         acceso=_acceso(session, inscripcion),
-        # `fin` no existe en el modelo (D60): el contrato informa que todavía no está definida en
-        # lugar de completarla con una fecha de ejemplo.
-        cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=None),
+        # Las dos fechas del período van juntas o ninguna (D62): la comisión heredada informa que
+        # todavía no está definida en lugar de completarla con una fecha de ejemplo.
+        cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=comision.fecha_fin),
         proximos_encuentros=_proximos_encuentros(session, comision, hoy or date.today()),
     )
 
@@ -219,11 +219,13 @@ def _rangos_del_dia(comision: Comision, fecha: date) -> list[str]:
 
 
 def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[date]:
-    """Las fechas de cursada desde `desde`, en orden cronológico.
+    """Las fechas de cursada del período, desde `desde`, en orden cronológico.
 
     Arranca en el día corriente o en la fecha de inicio de la comisión, la que sea posterior, así
-    que una comisión que todavía no empezó no muestra encuentros del pasado. Sin días cargados no
-    hay nada que derivar: devuelve una lista vacía en vez de girar para siempre.
+    que una comisión que todavía no empezó no muestra encuentros del pasado. Termina en la fecha
+    de fin: una cursada terminada no informa encuentros y la lista no puede pasarse del cierre
+    (historia #49). Sin días cargados no hay nada que derivar: devuelve una lista vacía en vez de
+    girar para siempre.
     """
     if not dias:
         return []
@@ -234,6 +236,8 @@ def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[da
 
     fechas: list[date] = []
     while len(fechas) < ENCUENTROS_VISIBLES:
+        if comision.fecha_fin is not None and fecha > comision.fecha_fin:
+            break
         if fecha.weekday() in dias:
             fechas.append(fecha)
         fecha += timedelta(days=1)

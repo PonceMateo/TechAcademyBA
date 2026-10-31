@@ -51,6 +51,7 @@ CHECKS_ESPERADOS = {
     "ck_comision_arancel_positivo",
     "ck_comision_modalidad_virtual_sin_sede",
     "ck_comision_modalidad_valida",
+    "ck_comision_periodo_coherente",
     "ck_comision_horario_dia_valido",
     "ck_comision_horario_minutos_en_paso",
     "ck_comision_horario_en_rango_horario",
@@ -148,7 +149,7 @@ def test_la_migracion_inicial_deja_el_esquema_completo(db_session) -> None:
 
 def test_la_version_de_alembic_queda_registrada(db_session) -> None:
     versiones = db_session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    assert versiones == ["0005_comision_horario"]
+    assert versiones == ["0006_comision_periodo"]
 
 
 def test_la_migracion_escrita_a_mano_cuadra_con_los_modelos(

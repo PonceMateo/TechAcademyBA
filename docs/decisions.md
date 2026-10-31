@@ -2080,3 +2080,42 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/alumno/StudentDashboardPage.jsx`, `frontend/src/alumno/StudentCoursesPage.jsx`,
   `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/navegacion.js`,
   `frontend/src/App.jsx`, `frontend/src/mocks/inscripciones.js`.
+
+## Período de cursada de una comisión (change `hu-49-periodo-cursada-comision`)
+
+### D62 — La comisión declara su período, la cantidad de clases se deriva y el panel del alumno se corta en el fin
+
+- **Fecha:** 2026-10-31
+- **Autor:** PonceMateo
+- **Decisión:** `comision` suma `fecha_fin` nula y `fecha_inicio` deja de ser una columna muda: las dos
+  se editan y se leen por la API y son **obligatorias en el alta y en la edición**, aunque la columna
+  admita nulos para que las comisiones heredadas se puedan leer. El CHECK
+  `ck_comision_periodo_coherente` —`fecha_fin IS NULL OR (fecha_inicio IS NOT NULL AND
+  fecha_fin >= fecha_inicio)`— permite el legado con fecha de inicio sola y prohíbe un fin sin inicio
+  o anterior. La cantidad total de clases es **derivada** con
+  `clases_del_periodo(inicio, fin, horarios)`, que cuenta los días del rango con sus dos extremos
+  incluidos que caen en un día de cursada; viaja como `cantidad_clases` en `ComisionOut` y no se
+  persiste, igual que `vacantes` (D10) y `codigo` (D34). Los dos rechazos del período se lanzan desde
+  el servicio como `PeriodoInvalido` y la ruta los traduce a `422` con `detail` de texto. Los
+  próximos encuentros del panel del alumno se cortan en `fecha_fin`, y una cursada terminada no
+  informa encuentros.
+- **Por qué:** el sistema no conocía el calendario de la comisión y sin eso la H/U 50 no puede
+  prorratear el arancel de un alta tardía. La cuenta de clases vive en el modelo —como
+  `resumen_de_horarios`— para que la validación del período, la respuesta y el prorrateo usen la
+  misma función y no haya dos lugares que cuenten distinto. La validación cruzada va en el servicio y
+  no en Pydantic porque el `422` de un validador viaja como arreglo y el frontend solo muestra
+  `detail` cuando es texto: el administrador leería «La API respondió 422».
+- **Alternativas descartadas:** `fecha_fin` con `NOT NULL` y backfill (obligaría a inventar el
+  calendario de cada comisión existente, justo lo que D60 evitó, y arriesga el deploy); una tabla
+  `comision_periodo` aparte (una relación 1:1 sin atributos propios no se modela con tabla);
+  persistir `cantidad_clases` (se desincroniza apenas se editan horarios o período); y dejar los
+  encuentros sin tope (una cursada terminada seguiría mostrando clases futuras).
+- **Fuera de alcance:** el prorrateo y el aviso de «no se pudo prorratear» en la inscripción (H/U 50
+  y 51), el recálculo de importes ya calculados al editar el período, y el calendario de feriados y
+  suspensiones, que el conteo no contempla.
+- **Dónde:** `backend/app/models/catalogo.py`, `backend/alembic/versions/0006_comision_periodo.py`,
+  `backend/app/schemas/catalogo.py`, `backend/app/services/catalogo.py`,
+  `backend/app/api/catalogo.py`, `backend/app/services/alumno.py`,
+  `backend/app/schemas/alumno.py`, `frontend/src/admin/CoursesPage.jsx`,
+  `frontend/src/mocks/comisiones.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/alumno/CourseDetailPage.jsx`.

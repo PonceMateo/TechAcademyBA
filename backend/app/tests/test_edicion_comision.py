@@ -14,6 +14,7 @@ Corre contra PostgreSQL real (D15). Lo que se afirma:
 from __future__ import annotations
 
 import itertools
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -69,12 +70,14 @@ def _docente(session: Session, **cambios: object) -> Docente:
 
 
 def _datos(docente: Docente, **cambios: object) -> dict:
-    """Cuerpo válido de la edición, con los cuatro datos que admite el contrato."""
+    """Cuerpo válido de la edición, con los datos que admite el contrato (historias #4 y #49)."""
     datos = {
         "docente_id": docente.id,
         "horarios": horarios("MAR JUE", inicio="19:00", fin="21:00"),
         "arancel": "48000.00",
         "cupo_maximo": 25,
+        "fecha_inicio": "2026-03-02",
+        "fecha_fin": "2026-07-03",
     }
     datos.update(cambios)
     return datos
@@ -210,6 +213,8 @@ def _datos_nuevo(docente_id: int, **cambios: object) -> dict:
         "horarios": horarios("SAB", inicio="09:00", fin="12:00"),
         "arancel": "35000.00",
         "cupo_maximo": 20,
+        "fecha_inicio": "2026-03-02",
+        "fecha_fin": "2026-07-03",
     }
     datos.update(cambios)
     return datos
@@ -377,3 +382,73 @@ def test_editar_exige_rol_de_administracion(
     assert respuesta.headers["X-Roles-Admitidos"] == "ADMIN"
     db_session.expire_all()
     assert db_session.get(Comision, comision.id).cupo_maximo == 20
+
+
+# ------------------------------------------------------ período de cursada (HU 49) ---------------
+
+
+def test_editar_el_periodo_lo_guarda_y_no_toca_las_inscripciones(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """D62: el período nuevo se persiste y las inscripciones quedan como estaban.
+
+    Del lunes 6 de abril al viernes 7 de agosto de 2026 hay 36 clases de martes y jueves, que es
+    el horario que manda `_datos`.
+    """
+    comision = crear_comision(db_session, cupo_maximo=20)
+    inscripcion = _inscribir(db_session, comision, 1)[0]
+    docente = _docente(db_session)
+    estado_anterior = inscripcion.estado
+
+    respuesta = cliente_admin.put(
+        f"/comisiones/{comision.id}",
+        json=_datos(docente, fecha_inicio="2026-04-06", fecha_fin="2026-08-07"),
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    cuerpo = respuesta.json()
+    assert cuerpo["fecha_inicio"] == "2026-04-06"
+    assert cuerpo["fecha_fin"] == "2026-08-07"
+    assert cuerpo["cantidad_clases"] == 36
+    db_session.refresh(inscripcion)
+    assert inscripcion.comision_id == comision.id
+    assert inscripcion.estado == estado_anterior
+
+
+def test_un_periodo_invalido_conserva_las_fechas_anteriores(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """Escenario «Período inválido en la edición»: 422 y la comisión conserva su período."""
+    comision = crear_comision(
+        db_session, fecha_inicio=date(2026, 3, 2), fecha_fin=date(2026, 7, 3)
+    )
+    docente = _docente(db_session)
+
+    respuesta = cliente_admin.put(
+        f"/comisiones/{comision.id}",
+        json=_datos(docente, fecha_inicio="2026-07-03", fecha_fin="2026-03-02"),
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert respuesta.json()["detail"] == "La fecha de fin no puede ser anterior a la de inicio."
+    db_session.refresh(comision)
+    assert comision.fecha_inicio == date(2026, 3, 2)
+    assert comision.fecha_fin == date(2026, 7, 3)
+
+
+def test_una_comision_heredada_no_se_guarda_sin_periodo(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """La edición exige el período: una comisión del legado no se guarda sin fechas."""
+    comision = crear_comision(db_session)
+    docente = _docente(db_session)
+    cuerpo = {
+        clave: valor for clave, valor in _datos(docente).items() if not clave.startswith("fecha_")
+    }
+
+    respuesta = cliente_admin.put(f"/comisiones/{comision.id}", json=cuerpo)
+
+    assert respuesta.status_code == 422, respuesta.text
+    db_session.refresh(comision)
+    assert comision.fecha_inicio is None
+    assert comision.fecha_fin is None

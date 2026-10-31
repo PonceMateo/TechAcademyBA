@@ -8,6 +8,8 @@ alumno: el legajo sale de la cuenta autenticada y el código se busca entre sus 
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -252,3 +254,18 @@ def test_ninguna_respuesta_trae_datos_de_otro_alumno(
     assert perfil["nombre"] == alumna.nombre
     assert perfil["email"] == alumna.email
     assert "documento" not in listado[0]
+
+
+def test_el_detalle_propio_informa_la_fecha_de_fin(
+    cliente_alumna: TestClient, db_session: Session, alumna: Alumno
+) -> None:
+    """Historia #49: el cronograma informa las dos fechas del período, no solo el inicio."""
+    comision = crear_comision(
+        db_session, fecha_inicio=date(2026, 10, 1), fecha_fin=date(2026, 12, 18)
+    )
+    crear_inscripcion(db_session, alumno=alumna, comision=comision)
+
+    respuesta = cliente_alumna.get(f"/alumno/inscripciones/{comision.codigo}")
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["cronograma"] == {"inicio": "2026-10-01", "fin": "2026-12-18"}

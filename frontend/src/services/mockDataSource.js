@@ -5,6 +5,7 @@ import {
   COBRANZAS,
   COMISIONES,
   DESTINO_IMPUTACION,
+  clasesDelPeriodo,
   DOCENTES,
   EMPRESAS,
   INSCRIPCIONES,
@@ -560,6 +561,8 @@ export function createMockDataSource() {
       curso_id,
       docente_id,
       horarios,
+      fecha_inicio,
+      fecha_fin,
       arancel,
       cupo_maximo,
       modalidad,
@@ -584,6 +587,11 @@ export function createMockDataSource() {
         // El texto es derivado, igual que en el backend (historia #48): el ejemplo no guarda una
         // segunda verdad que pueda desincronizarse de los horarios.
         dias_horarios: textoHorarios(horarios),
+        fecha_inicio,
+        fecha_fin,
+        // La cuenta la hace el mismo helper que usan las filas del ejemplo, y es la que la API hace
+        // sobre las fechas y los días de cursada (D62).
+        cantidad_clases: clasesDelPeriodo(fecha_inicio, fecha_fin, horarios),
         cupo_maximo: Number(cupo_maximo),
         arancel,
         vacantes: Number(cupo_maximo),
@@ -603,7 +611,10 @@ export function createMockDataSource() {
      * quedar por debajo de ellos, que es lo que el servidor valida contra las inscripciones
      * `ACTIVA`. Las vacantes se recalculan como en la fuente real (D10).
      */
-    async editarComision(id, { docente_id, horarios, arancel, cupo_maximo }) {
+    async editarComision(
+      id,
+      { docente_id, horarios, arancel, cupo_maximo, fecha_inicio, fecha_fin },
+    ) {
       const comision = store.comisiones.find((candidato) => candidato.id === id)
       if (!comision) {
         throw new Error('La comisión no existe.')
@@ -629,6 +640,9 @@ export function createMockDataSource() {
         docente_nombre: docente.nombre,
         horarios,
         dias_horarios: textoHorarios(horarios),
+        fecha_inicio,
+        fecha_fin,
+        cantidad_clases: clasesDelPeriodo(fecha_inicio, fecha_fin, horarios),
         arancel,
         cupo_maximo: Number(cupo_maximo),
         inscriptos,

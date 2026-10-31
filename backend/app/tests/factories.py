@@ -18,7 +18,7 @@ de AFIP (pesos 5, 4, 3, 2, 7, 6, 5, 4, 3, 2; `dv = 11 - (suma mod 11)`, con 11 �
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import date, time
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -123,6 +123,8 @@ def crear_comision(
     modalidad: str = Modalidad.PRESENCIAL.value,
     docente: Docente | None = None,
     horarios_semana: list[tuple[str, str, str]] | None = None,
+    fecha_inicio: date | None = None,
+    fecha_fin: date | None = None,
 ) -> Comision:
     """Comisión válida por defecto.
 
@@ -132,6 +134,10 @@ def crear_comision(
     `numero=None` toma el siguiente del curso, que es la regla de D34 y deja que un test
     pueda crear varias comisiones del mismo curso sin pasar el número a mano. Para probar
     la colisión de `uq_comision_curso_numero` hay que pasar el número explícito.
+
+    `fecha_inicio` y `fecha_fin` son opcionales: la columna las admite nulas (D62), así que
+    el valor por defecto deja la comisión en el estado del legado y es un test el que elige
+    el período cuando lo necesita.
     """
     sede_efectiva = None
     if con_sede:
@@ -158,6 +164,8 @@ def crear_comision(
             arancel=Decimal(arancel),
             modalidad=modalidad,
             sede_id=sede_efectiva.id if sede_efectiva else None,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
             horarios=horas,
         ),
     )

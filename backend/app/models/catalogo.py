@@ -7,7 +7,7 @@ tolerante a formato sobre columnas normalizadas).
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -54,6 +54,10 @@ EXPRESION_MINUTOS_EN_PASO = (
 
 #: La cursada va de 6:00 a 22:00, y las 22:00 se pueden usar como fin (no como inicio).
 EXPRESION_HORARIO_EN_RANGO = "inicio >= TIME '06:00' AND fin <= TIME '22:00'"
+
+#: Historia #49 (D62): el período se declara con sus dos fechas. El legado con `fecha_inicio`
+#: sola se permite; lo que no se permite es un fin sin inicio o anterior al inicio.
+EXPRESION_PERIODO = "fecha_fin IS NULL OR (fecha_inicio IS NOT NULL AND fecha_fin >= fecha_inicio)"
 
 
 class Sede(TimestampMixin, Base):
@@ -133,6 +137,10 @@ class Comision(TimestampMixin, Base):
     los siete estados de comisión que tiene la planilla del cliente no se modelan
     porque ninguna historia Must ni Should los necesita. La baja lógica va con
     `activo`.
+
+    Historia #49 (D62): el período de cursada son `fecha_inicio` y `fecha_fin`, nulas en el
+    legado. La cantidad de clases no es una columna: se deriva en `cantidad_clases` con los días
+    de cursada, para que el alta, la edición y el prorrateo de la H/U 50 cuenten igual.
     """
 
     __tablename__ = "comision"
@@ -146,6 +154,8 @@ class Comision(TimestampMixin, Base):
         CheckConstraint("cupo_maximo > 0", name="cupo_maximo_positivo"),
         CheckConstraint("arancel > 0", name="arancel_positivo"),
         enum_check("modalidad", Modalidad, "modalidad_valida"),
+        # Historia #49: el fin no puede quedar antes del inicio ni sin inicio.
+        CheckConstraint(EXPRESION_PERIODO, name="periodo_coherente"),
         # Historia #8: la sede es **opcional en toda modalidad**. Este CHECK no la pide en ningún
         # caso: lo que hace es prohibirla en Virtual, donde una `sede_id` es el dato incoherente
         # que el formulario ni siquiera renderiza.
@@ -172,6 +182,7 @@ class Comision(TimestampMixin, Base):
         ForeignKey("sede.id", ondelete="RESTRICT"), nullable=True
     )
     fecha_inicio: Mapped[date | None] = mapped_column(Date)
+    fecha_fin: Mapped[date | None] = mapped_column(Date)
     activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     curso: Mapped[Curso] = relationship(back_populates="comisiones")
@@ -214,6 +225,18 @@ class Comision(TimestampMixin, Base):
         if not self.horarios:
             return self.dias_horarios
         return resumen_de_horarios(self.horarios)
+
+    @property
+    def cantidad_clases(self) -> int | None:
+        """Cuántas clases tiene la comisión en su período (historia #49).
+
+        Es `None` cuando falta alguna de las dos fechas: una comisión heredada no tiene período y
+        no se le inventa una cantidad. La cuenta vive en `clases_del_periodo`, la misma función
+        que valida el período al guardar y que va a usar el prorrateo de la H/U 50.
+        """
+        if self.fecha_inicio is None or self.fecha_fin is None:
+            return None
+        return clases_del_periodo(self.fecha_inicio, self.fecha_fin, self.horarios)
 
     @property
     def sede_nombre(self) -> str | None:
@@ -302,3 +325,27 @@ def resumen_de_horarios(horarios: Iterable[ComisionHorario]) -> str:
         etiqueta = nombres[0] if len(nombres) == 1 else f"{', '.join(nombres[:-1])} y {nombres[-1]}"
         partes.append(f"{etiqueta} {_hora_del_resumen(inicio)}-{_hora_del_resumen(fin)}hs")
     return ", ".join(partes)
+
+
+def clases_del_periodo(
+    inicio: date, fin: date, horarios: Iterable[ComisionHorario]
+) -> int:
+    """Cantidad de clases del período: días del rango que caen en un día de cursada.
+
+    El rango se cuenta con sus **dos extremos incluidos**, así que una comisión de un solo día
+    que cae en un día de cursada tiene una clase. Se miran los días de la semana de los horarios,
+    no las filas: dos rangos del mismo día no se modelan (historia #48). Un fin anterior al inicio
+    devuelve 0, y es la validación del período la que lo rechaza antes de guardar.
+
+    Recorre día por día, que para un cuatrimestre son decenas de iteraciones y deja la regla
+    legible; si el volumen llegara a importar, se reemplaza por aritmética de semanas sin tocar
+    el contrato.
+    """
+    dias = {ORDEN_DIA[DiaSemana(horario.dia)] for horario in horarios}
+    cantidad = 0
+    fecha = inicio
+    while fecha <= fin:
+        if fecha.weekday() in dias:
+            cantidad += 1
+        fecha += timedelta(days=1)
+    return cantidad

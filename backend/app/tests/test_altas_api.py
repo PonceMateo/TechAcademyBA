@@ -144,6 +144,8 @@ def test_alta_de_comision_devuelve_el_codigo_derivado(
             "horarios": horarios("LUN MIE"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.PRESENCIAL.value,
             "sede_id": sede.id,
         },
@@ -170,6 +172,8 @@ def test_las_comisiones_de_un_curso_se_numeran_consecutivas(
         "horarios": horarios("LUN"),
         "arancel": "52000.00",
         "cupo_maximo": 20,
+        "fecha_inicio": "2026-03-02",
+        "fecha_fin": "2026-07-03",
         "modalidad": Modalidad.PRESENCIAL.value,
         "sede_id": sede.id,
     }
@@ -197,6 +201,8 @@ def test_comision_sin_docente_es_rechazada(cliente_admin: TestClient, db_session
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
         },
     )
@@ -221,6 +227,8 @@ def test_cupo_invalido_es_rechazado(
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": cupo,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
         },
     )
@@ -244,6 +252,8 @@ def test_arancel_invalido_es_rechazado(
             "horarios": horarios("LUN"),
             "arancel": arancel,
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
         },
     )
@@ -268,6 +278,8 @@ def test_modalidad_que_exige_sede_sin_sede_se_registra(
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": modalidad,
         },
     )
@@ -297,6 +309,8 @@ def test_modalidad_virtual_con_sede_es_rechazada(
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
             "sede_id": sede.id,
         },
@@ -318,6 +332,8 @@ def test_modalidad_virtual_no_exige_sede(cliente_admin: TestClient, db_session: 
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
         },
     )
@@ -335,6 +351,8 @@ def test_alta_de_comision_con_curso_inexistente_es_404(cliente_admin: TestClient
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
         },
     )
@@ -735,6 +753,8 @@ def test_las_altas_exigen_rol_de_administracion(
             "horarios": horarios("LUN"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
             "modalidad": Modalidad.VIRTUAL.value,
         },
         "/docentes": {
@@ -778,6 +798,8 @@ def test_la_carrera_de_dos_altas_del_mismo_curso_es_409(
         "horarios": horarios("LUN"),
         "arancel": "52000.00",
         "cupo_maximo": 20,
+        "fecha_inicio": "2026-03-02",
+        "fecha_fin": "2026-07-03",
         "modalidad": Modalidad.VIRTUAL.value,
     }
     primera = cliente_admin.post("/comisiones", json=cuerpo)
@@ -789,3 +811,137 @@ def test_la_carrera_de_dos_altas_del_mismo_curso_es_409(
 
     assert segunda.status_code == 409, segunda.text
     assert "Probá de nuevo" in segunda.text
+
+
+# ----------------------------------------------------------- período de cursada (HU 49) ---------
+
+
+def test_el_alta_guarda_el_periodo_y_calcula_la_cantidad_de_clases(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """D62: el período se persiste y `cantidad_clases` es derivada, no una columna.
+
+    Del lunes 2 de marzo al viernes 3 de julio de 2026 hay 36 clases de lunes y miércoles.
+    """
+    curso = crear_curso(db_session, nombre="Python con período")
+    docente = crear_docente(db_session)
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json={
+            "curso_id": curso.id,
+            "docente_id": docente.id,
+            "horarios": horarios("LUN MIE"),
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-07-03",
+            "modalidad": Modalidad.PRESENCIAL.value,
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    cuerpo = respuesta.json()
+    assert cuerpo["fecha_inicio"] == "2026-03-02"
+    assert cuerpo["fecha_fin"] == "2026-07-03"
+    assert cuerpo["cantidad_clases"] == 36
+
+
+def test_el_alta_sin_las_fechas_del_periodo_se_rechaza(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """El período es obligatorio en el alta: la columna admite nulos solo para el legado."""
+    curso = crear_curso(db_session, nombre="Python sin período")
+    docente = crear_docente(db_session)
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json={
+            "curso_id": curso.id,
+            "docente_id": docente.id,
+            "horarios": horarios("LUN MIE"),
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "modalidad": Modalidad.PRESENCIAL.value,
+        },
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert not catalogo.listar_comisiones(db_session)
+
+
+def test_un_periodo_con_el_fin_anterior_al_inicio_se_rechaza_con_su_mensaje(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """Escenario «Fecha de fin anterior a la de inicio»: el mensaje llega en el `detail`."""
+    curso = crear_curso(db_session, nombre="Python al revés")
+    docente = crear_docente(db_session)
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json={
+            "curso_id": curso.id,
+            "docente_id": docente.id,
+            "horarios": horarios("LUN MIE"),
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "fecha_inicio": "2026-07-03",
+            "fecha_fin": "2026-03-02",
+            "modalidad": Modalidad.PRESENCIAL.value,
+        },
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert respuesta.json()["detail"] == "La fecha de fin no puede ser anterior a la de inicio."
+    assert not catalogo.listar_comisiones(db_session)
+
+
+def test_un_periodo_que_no_contiene_ninguna_clase_se_rechaza(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """Escenario «Período sin ninguna clase»: de martes a jueves, con cursada lunes y miércoles."""
+    curso = crear_curso(db_session, nombre="Python sin clases")
+    docente = crear_docente(db_session)
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json={
+            "curso_id": curso.id,
+            "docente_id": docente.id,
+            "horarios": horarios("LUN MIE"),
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-03",
+            "fecha_fin": "2026-03-05",
+            "modalidad": Modalidad.PRESENCIAL.value,
+        },
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert "no contiene ninguna clase" in respuesta.json()["detail"]
+    assert not catalogo.listar_comisiones(db_session)
+
+
+def test_un_periodo_de_un_solo_dia_cuenta_su_clase(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """El rango se cuenta con sus dos extremos incluidos."""
+    curso = crear_curso(db_session, nombre="Python de un día")
+    docente = crear_docente(db_session)
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json={
+            "curso_id": curso.id,
+            "docente_id": docente.id,
+            "horarios": horarios("LUN"),
+            "arancel": "52000.00",
+            "cupo_maximo": 20,
+            "fecha_inicio": "2026-03-02",
+            "fecha_fin": "2026-03-02",
+            "modalidad": Modalidad.PRESENCIAL.value,
+        },
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["cantidad_clases"] == 1

@@ -13,7 +13,7 @@ distribución de D19.
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import date, time
 from decimal import Decimal
 
 from pydantic import (
@@ -147,6 +147,11 @@ class ComisionCreate(BaseModel):
     (D34). `sede_id` es **opcional en toda modalidad**, y solo se acepta cuando la modalidad no
     es Virtual: el CHECK `modalidad_virtual_sin_sede` es el que sostiene esa regla en la base, y
     no hay un validador acá que la duplique.
+
+    Las dos fechas del período son **obligatorias** (historia #49): la columna admite nulos para
+    el legado, pero toda alta nueva declara cuándo empieza y cuándo termina la cursada. La
+    coherencia entre ellas y el conteo de clases los valida el servicio, que es el que puede
+    devolver el mensaje en es-AR por el `detail` del `422` (D62).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -158,6 +163,8 @@ class ComisionCreate(BaseModel):
     cupo_maximo: int = Field(gt=0)
     modalidad: Modalidad
     sede_id: int | None = Field(default=None, gt=0)
+    fecha_inicio: date
+    fecha_fin: date
 
     @field_validator("horarios")
     @classmethod
@@ -168,7 +175,7 @@ class ComisionCreate(BaseModel):
 
 
 class ComisionUpdate(BaseModel):
-    """Cuerpo de `PUT /comisiones/{id}`: solo los cuatro datos editables (historia #4).
+    """Cuerpo de `PUT /comisiones/{id}`: solo los seis datos editables (historias #4 y #49).
 
     El curso, el número, la modalidad y la sede **no** están en el contrato: cambiar el curso o el
     número rompería el código derivado y las inscripciones, y la modalidad con su sede son una
@@ -177,6 +184,10 @@ class ComisionUpdate(BaseModel):
 
     El docente es obligatorio aunque la columna admita nulo: una comisión abierta sin docente se
     puede editar, pero para guardarla hay que asignarle uno, igual que en el alta.
+
+    El período también es obligatorio: una comisión heredada sin fechas no se puede guardar
+    hasta completarlas, y editar las fechas no recalcula aranceles ni toca las inscripciones
+    (D62).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -185,6 +196,8 @@ class ComisionUpdate(BaseModel):
     horarios: list[HorarioComision]
     arancel: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     cupo_maximo: int = Field(gt=0)
+    fecha_inicio: date
+    fecha_fin: date
 
     @field_validator("horarios")
     @classmethod
@@ -205,6 +218,10 @@ class ComisionOut(BaseModel):
     porque la tabla de Administración ya muestra esa columna y dejarla en blanco sería una
     regresión visible; esto **no** implementa la historia #6, que además necesita el caso de
     extremo a extremo con una inscripción real.
+
+    `fecha_inicio`, `fecha_fin` y `cantidad_clases` son el período (historia #49). Las fechas son
+    nulas solo en las comisiones heredadas, y `cantidad_clases` es **derivada** —la property del
+    modelo— porque una columna se desincroniza apenas se editan los horarios o el período (D62).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -216,6 +233,9 @@ class ComisionOut(BaseModel):
     docente_nombre: str | None
     horarios: list[HorarioComision]
     dias_horarios: str
+    fecha_inicio: date | None
+    fecha_fin: date | None
+    cantidad_clases: int | None
     cupo_maximo: int
     arancel: Decimal
     modalidad: Modalidad

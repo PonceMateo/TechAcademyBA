@@ -10,12 +10,13 @@ import { formatFechaCorta } from '../utils/formato'
 /**
  * Detalle de la cursada y acceso a la clase (HU 38).
  *
- * **Todo sale de `GET /alumno/inscripciones/{codigo}`.** El cronograma ya no es material de
- * referencia: la fecha de inicio es la de la comisión y la de fin se informa como no definida
- * —`comision` no tiene `fecha_fin` (D60)—, porque inventar una fecha de cierre es peor que decir
- * que falta. Los encuentros se derivan de los días y horarios reales y cada fila trae la hora de
- * ese día; el tema sale de la clase cargada y, sin clase, la celda queda vacía: no existe ningún
- * "tema a confirmar" que mostrar.
+ * **Todo sale de `GET /alumno/inscripciones/{codigo}`.** El cronograma es el período real de la
+ * comisión desde la historia #49: las dos fechas las carga la secretaría (D62), y la de fin solo se
+ * informa como no definida en la comisión heredada, que todavía no la tiene, porque inventar una
+ * fecha de cierre es peor que decir que falta. Los encuentros se derivan de los días y horarios
+ * reales desde el día corriente y se cortan en la fecha de fin, así que una cursada terminada no
+ * muestra ninguno; cada fila trae la hora de ese día, y el tema sale de la clase cargada y, sin
+ * clase, la celda queda vacía: no existe ningún "tema a confirmar" que mostrar.
  *
  * **El bloque de acceso cubre dos de los tres estados del spec.** Habilitado y bloqueado; el
  * habilitado con link cargado todavía no existe, porque el contrato del alumno no incluye el link
