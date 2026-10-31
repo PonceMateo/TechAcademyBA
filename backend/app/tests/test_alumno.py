@@ -418,3 +418,61 @@ def test_un_telefono_invalido_no_se_persiste(db_session) -> None:
         PerfilAlumnoUpdate(email=alumno.email, telefono="011 4788-1122")
 
     assert alumno.telefono == "+54 11 4000-0002"
+
+
+# --------------------------------------------------------- período de cursada (HU 49) ------------
+
+
+def test_el_cronograma_informa_las_dos_fechas_del_periodo(db_session) -> None:
+    comision = crear_comision(
+        db_session,
+        horarios_semana=[("LUN", "18:00", "20:00")],
+        fecha_inicio=date(2026, 10, 1),
+        fecha_fin=date(2026, 12, 18),
+    )
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert detalle.cronograma.inicio == date(2026, 10, 1)
+    assert detalle.cronograma.fin == date(2026, 12, 18)
+
+
+def test_los_encuentros_no_pasan_la_fecha_de_fin(db_session) -> None:
+    """Desde el 26 de octubre hay lunes hasta el 9 de noviembre: tres, y el cuarto queda afuera."""
+    comision = crear_comision(
+        db_session,
+        horarios_semana=[("LUN", "18:00", "20:00")],
+        fecha_inicio=date(2026, 10, 1),
+        fecha_fin=date(2026, 11, 9),
+    )
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert [encuentro.fecha for encuentro in detalle.proximos_encuentros] == [
+        date(2026, 10, 26),
+        date(2026, 11, 2),
+        date(2026, 11, 9),
+    ]
+
+
+def test_una_cursada_terminada_no_informa_encuentros(db_session) -> None:
+    comision = crear_comision(
+        db_session,
+        horarios_semana=[("LUN", "18:00", "20:00")],
+        fecha_inicio=date(2026, 8, 3),
+        fecha_fin=date(2026, 9, 30),
+    )
+    alumno = crear_alumno(db_session)
+    usuario = crear_usuario_alumno(db_session, alumno=alumno)
+    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    detalle = obtener_detalle(db_session, usuario, comision.codigo, hoy=HOY)
+
+    assert detalle.proximos_encuentros == []
+    assert detalle.cronograma.fin == date(2026, 9, 30)

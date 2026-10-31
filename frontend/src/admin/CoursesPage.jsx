@@ -17,7 +17,7 @@ import {
   listarDocentes,
   listarSedes,
 } from '../services/dataService'
-import { formatMoneda } from '../utils/formato'
+import { formatFechaCorta, formatMoneda } from '../utils/formato'
 import { CampoHorarios } from '../components/horarios/CampoHorarios'
 import { HorarioCompacto } from '../components/horarios/HorarioCompacto'
 import { SelectorHorarios } from '../components/horarios/SelectorHorarios'
@@ -76,6 +76,17 @@ const COLUMNAS = [
     // cuando hay más de un grupo (historia #48).
     render: (fila) => <HorarioCompacto horarios={fila.horarios} texto={fila.dias_horarios} />,
   },
+  {
+    clave: 'periodo',
+    titulo: 'PERÍODO',
+    // Las dos fechas del período de cursada (historia #49). La comisión heredada del catálogo del
+    // cliente no tiene período: se lee `Sin definir`, que es lo que informa la API, en lugar de una
+    // celda vacía que se confunde con un dato que no cargó (D64).
+    render: (fila) =>
+      fila.fecha_inicio && fila.fecha_fin
+        ? `${formatFechaCorta(fila.fecha_inicio)} – ${formatFechaCorta(fila.fecha_fin)}`
+        : PERIODO_SIN_DEFINIR,
+  },
   { clave: 'cupo', titulo: 'CUPO MÁX.', render: (fila) => fila.cupo_maximo },
   {
     clave: 'vacantes',
@@ -107,21 +118,56 @@ const CAMPOS_COMISION_VACIOS = {
   arancel: '',
   modalidad: '',
   sede: '',
+  // Las dos fechas del período de cursada (historia #49) viajan como `AAAA-MM-DD`, que es lo que
+  // devuelve y espera el `<input type="date">` y lo que la API guarda (D64).
+  fecha_inicio: '',
+  fecha_fin: '',
 }
 
 const CAMPOS_CURSO_VACIOS = { nombre: '', descripcion: '' }
 
 /**
- * El formulario de edición de comisión: solo los cuatro datos que la historia #4 habilita.
+ * El formulario de edición de comisión: los datos que habilitan las historias #4 y #49.
  *
  * Curso, número, modalidad, sede y código **no** están, porque el contrato de la edición no los
- * admite (D51): no son un olvido de la pantalla.
+ * admite (D51): no son un olvido de la pantalla. El período de cursada sí se edita, y es
+ * **obligatorio aunque la comisión no lo tenga**: la comisión heredada del catálogo del cliente se
+ * puede editar, pero guardarla sin fechas la dejaría sin período para siempre (D64).
  */
 const CAMPOS_EDICION_COMISION_VACIOS = {
   docente: '',
   horarios: [],
   cupo: '',
   arancel: '',
+  fecha_inicio: '',
+  fecha_fin: '',
+}
+
+/**
+ * Las reglas del período de cursada que el formulario puede comprobar solo (historia #49).
+ *
+ * Son dos: que estén las dos fechas y que el fin no quede antes del inicio. **No** se cuenta acá
+ * si el período contiene al menos una clase: esa cuenta la hace la API sobre los días de cursada
+ * del horario, y repetirla en JavaScript sería una segunda versión de la misma regla, libre de
+ * desincronizarse de la primera. Por eso el rechazo por período vacío llega como mensaje de la
+ * fuente y no como error de campo.
+ *
+ * Las fechas llegan del `<input type="date">` como `AAAA-MM-DD`, así que comparar el texto ordena
+ * igual que comparar las fechas.
+ */
+function erroresDelPeriodo(campos) {
+  const encontrados = {}
+
+  if (campos.fecha_inicio === '') {
+    encontrados.fecha_inicio = 'Indicá la fecha de inicio de la cursada.'
+  }
+  if (campos.fecha_fin === '') {
+    encontrados.fecha_fin = 'Indicá la fecha de fin de la cursada.'
+  } else if (campos.fecha_inicio !== '' && campos.fecha_fin < campos.fecha_inicio) {
+    encontrados.fecha_fin = 'La fecha de fin no puede ser anterior a la de inicio.'
+  }
+
+  return encontrados
 }
 
 /**
@@ -132,6 +178,9 @@ const CAMPOS_EDICION_COMISION_VACIOS = {
  * probarlo para enterarse (D20).
  */
 const LEYENDA_BUSCADOR = 'la búsqueda todavía no está disponible'
+
+/** Lo que la tabla dice de la comisión que no tiene período, en vez de dejar la celda vacía. */
+const PERIODO_SIN_DEFINIR = 'Sin definir'
 
 export function CoursesPage() {
   // `undefined` es la vista del catálogo; con parámetro, la vista de ese curso.
@@ -363,6 +412,8 @@ export function CoursesPage() {
       horarios: comision.horarios ?? [],
       cupo: String(comision.cupo_maximo),
       arancel: String(comision.arancel),
+      fecha_inicio: comision.fecha_inicio ?? '',
+      fecha_fin: comision.fecha_fin ?? '',
     })
     setErroresEdicionComision({})
     setFalloEdicionComision(null)
@@ -415,6 +466,7 @@ export function CoursesPage() {
     if (camposEdicionComision.arancel.trim() === '' || Number(camposEdicionComision.arancel) <= 0) {
       encontrados.arancel = 'El arancel debe ser un valor positivo.'
     }
+    Object.assign(encontrados, erroresDelPeriodo(camposEdicionComision))
 
     return encontrados
   }
@@ -440,6 +492,8 @@ export function CoursesPage() {
       const actualizada = await editarComision(comisionEditando.id, {
         docente_id: Number(camposEdicionComision.docente),
         horarios: camposEdicionComision.horarios,
+        fecha_inicio: camposEdicionComision.fecha_inicio,
+        fecha_fin: camposEdicionComision.fecha_fin,
         cupo_maximo: Number(camposEdicionComision.cupo),
         arancel: Number(camposEdicionComision.arancel),
       })
@@ -536,6 +590,7 @@ export function CoursesPage() {
     }
     // La sede no se valida: es opcional en toda modalidad (historia #8). La regla que sí existe es
     // la inversa y la sostiene el CHECK `modalidad_virtual_sin_sede` de la base.
+    Object.assign(encontrados, erroresDelPeriodo(campos))
 
     return encontrados
   }
@@ -564,6 +619,8 @@ export function CoursesPage() {
         curso_id: Number(campos.curso),
         docente_id: Number(campos.docente),
         horarios: campos.horarios,
+        fecha_inicio: campos.fecha_inicio,
+        fecha_fin: campos.fecha_fin,
         arancel: Number(campos.arancel),
         cupo_maximo: Number(campos.cupo),
         modalidad: campos.modalidad,
@@ -805,6 +862,36 @@ export function CoursesPage() {
           />
 
           <Input
+            id="editar-comision-fecha-inicio"
+            etiqueta="Fecha de Inicio de la Cursada"
+            type="date"
+            valor={camposEdicionComision.fecha_inicio}
+            onChange={cambiarEdicionComision('fecha_inicio')}
+            obligatorio
+            error={erroresEdicionComision.fecha_inicio ?? null}
+          />
+
+          <Input
+            id="editar-comision-fecha-fin"
+            etiqueta="Fecha de Fin de la Cursada"
+            type="date"
+            valor={camposEdicionComision.fecha_fin}
+            onChange={cambiarEdicionComision('fecha_fin')}
+            obligatorio
+            error={erroresEdicionComision.fecha_fin ?? null}
+          />
+
+          {/* La cantidad la calcula la API con las fechas guardadas: el navegador no la cuenta
+              (D64). Al guardar, el número que vuelve es el del período nuevo. */}
+          {comisionEditando?.cantidad_clases != null && (
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              {comisionEditando.cantidad_clases}{' '}
+              {comisionEditando.cantidad_clases === 1 ? 'clase' : 'clases'} en el período
+              guardado. Con las fechas que envíes se recalcula al guardar.
+            </p>
+          )}
+
+          <Input
             id="editar-comision-cupo"
             etiqueta="Cupo Máximo"
             type="number"
@@ -888,6 +975,26 @@ export function CoursesPage() {
             horarios={campos.horarios}
             onAbrir={() => abrirSelectorHorarios('alta')}
             error={errores.horarios ?? null}
+          />
+
+          <Input
+            id="fecha_inicio"
+            etiqueta="Fecha de Inicio de la Cursada"
+            type="date"
+            valor={campos.fecha_inicio}
+            onChange={cambiar('fecha_inicio')}
+            obligatorio
+            error={errores.fecha_inicio ?? null}
+          />
+
+          <Input
+            id="fecha_fin"
+            etiqueta="Fecha de Fin de la Cursada"
+            type="date"
+            valor={campos.fecha_fin}
+            onChange={cambiar('fecha_fin')}
+            obligatorio
+            error={errores.fecha_fin ?? null}
           />
 
           <Input

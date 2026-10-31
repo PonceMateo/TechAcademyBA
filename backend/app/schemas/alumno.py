@@ -78,10 +78,11 @@ class ComisionCursadaOut(BaseModel):
 
 
 class CronogramaOut(BaseModel):
-    """Período de cursada. `fin` es `None` mientras la comisión no lo tenga definido.
+    """Período de cursada. Las dos fechas viajan juntas o ninguna.
 
-    No existe `comision.fecha_fin` (D60): el contrato informa la fecha de inicio real y deja la de
-    fin sin definir, en lugar de completarla con una fecha de ejemplo.
+    Desde la historia #49 `comision` tiene `fecha_inicio` y `fecha_fin` (D64): toda comisión nueva
+    las trae y una heredada las trae nulas hasta que alguien la edite. El contrato informa las dos
+    juntas o ninguna, y no completa una con una fecha de ejemplo.
     """
 
     model_config = ConfigDict(from_attributes=True)

@@ -130,8 +130,9 @@ def crear_comision(
 
     201 con la comisión y su código derivado, 404 si el curso, el docente o la sede no existen,
     409 si la numeración chocó con otra alta simultánea o si el docente ya dicta otra comisión
-    vigente en ese día y horario, 422 si falta un campo obligatorio, si el horario no es válido, si
-    el cupo o el arancel no son positivos, o si la comisión es Virtual y trae sede.
+    vigente en ese día y horario, 422 si falta un campo obligatorio —incluidas las dos fechas del
+    período—, si el horario no es válido, si el cupo o el arancel no son positivos, si el período
+    no contiene ninguna clase o si la comisión es Virtual y trae sede (historia #49).
     """
     try:
         comision = catalogo.crear_comision(session, cuerpo)
@@ -145,6 +146,8 @@ def crear_comision(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except catalogo.HorarioDelDocenteEnConflicto as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except catalogo.PeriodoInvalido as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
     except IntegrityError as error:
         raise _regla_de_alta_rota(error) from error
     return ComisionOut.model_validate(comision)
@@ -161,8 +164,12 @@ def editar_comision(
     session: Annotated[Session, Depends(get_db)],
     _admin: Annotated[Usuario, Depends(_solo_admin)],
 ) -> ComisionOut:
-    """Edición de comisión. El cuerpo admite **solo** docente, días y horarios, arancel y cupo:
-    un `curso_id`, `numero`, `modalidad`, `sede_id` o `codigo` es un 422 (D51).
+    """Edición de comisión. El cuerpo admite **solo** docente, días y horarios, arancel, cupo y
+    período: un `curso_id`, `numero`, `modalidad`, `sede_id` o `codigo` es un 422 (D51 y D64).
+
+    El período es obligatorio y se valida igual que en el alta: un fin anterior al inicio o un
+    período sin ninguna clase responden `422` con el mensaje en el `detail` y la comisión
+    conserva sus fechas anteriores (historia #49).
 
     El cupo no puede quedar por debajo de las inscripciones activas; en ese caso el 422 dice
     cuántos inscriptos hay. La respuesta trae la comisión con sus vacantes recalculadas.
@@ -180,6 +187,8 @@ def editar_comision(
     except catalogo.HorarioDelDocenteEnConflicto as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except catalogo.CupoInsuficiente as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
+    except catalogo.PeriodoInvalido as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)) from error
     return ComisionOut.model_validate(comision)
 

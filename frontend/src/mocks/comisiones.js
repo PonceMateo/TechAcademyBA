@@ -1,5 +1,5 @@
 import { MODALIDAD } from '../domain/enums'
-import { textoHorarios } from '../domain/horarios'
+import { DIAS, textoHorarios } from '../domain/horarios'
 import { markAsExample } from './placeholderNotice'
 
 /**
@@ -17,9 +17,48 @@ import { markAsExample } from './placeholderNotice'
  *
  * Sobre las cinco filas: 160 lugares, 43 ocupados y 117 vacantes. Es el número que sostiene el
  * `27%` fijo del tablero, y por eso `mocks.test.js` lo verifica.
+ *
+ * **El período lo tienen cuatro de las cinco comisiones (historia #49).** La de Marketing Digital
+ * es la que llega sin fechas del cliente y se queda así a propósito: es el caso de la comisión
+ * heredada, que la tabla muestra como `Sin definir` y que la edición obliga a completar (D64). La
+ * cantidad de clases no se escribe a mano: sale de las fechas y los días de cursada con
+ * `clasesDelPeriodo`, que es la misma cuenta que hace el backend.
  */
 
 export const CATALOGO_TOTAL_COMISIONES = 10
+
+/**
+ * Cuántas clases caen en un período de cursada (historia #49), para los datos de ejemplo.
+ *
+ * **Es propio de la demo, no de la pantalla.** El sistema no cuenta clases en el navegador: la
+ * cantidad la devuelve la API, que la deriva de las fechas y los días de cursada de la comisión. Acá
+ * existe para que el ejemplo pueda responder lo mismo cuando se crea o se edita una comisión sin
+ * backend; la pantalla se limita a mostrar el número que llega (D64).
+ *
+ * Los dos extremos se cuentan y se miran los días de la semana del horario, no las filas: dos rangos
+ * del mismo día no se modelan (historia #48). Las fechas se leen al mediodía UTC para que el huso del
+ * navegador no corra el día y cambie el conteo.
+ */
+export function clasesDelPeriodo(inicio, fin, horarios) {
+  if (!inicio || !fin || fin < inicio) {
+    return 0
+  }
+
+  const diasDeCursada = new Set((horarios ?? []).map((horario) => horario.dia))
+  let cantidad = 0
+  const fecha = new Date(`${inicio}T12:00:00Z`)
+  const ultima = new Date(`${fin}T12:00:00Z`)
+
+  while (fecha <= ultima) {
+    // `getUTCDay()` da 0 para el domingo y `DIAS` empieza en lunes, de ahí la rotación.
+    if (diasDeCursada.has(DIAS[(fecha.getUTCDay() + 6) % 7].valor)) {
+      cantidad += 1
+    }
+    fecha.setUTCDate(fecha.getUTCDate() + 1)
+  }
+
+  return cantidad
+}
 
 /** Sede de ejemplo. El modelo la elige la modalidad de la comisión (historia #8). */
 export const SEDES = markAsExample([
@@ -50,6 +89,9 @@ const RAW_COMISIONES = [
     // próximo evento: es dato de referencia, y por eso va como texto y no como fecha que el
     // navegador pueda deserializar (P5 cubre el cronograma real).
     proxima_clase: 'Hoy · 19:00',
+    // Período de cursada del cuatrimestre (historia #49): martes y jueves de agosto a noviembre.
+    fecha_inicio: '2026-08-04',
+    fecha_fin: '2026-11-26',
     cupo_maximo: 30,
     inscriptos: 23,
     arancel: 45000,
@@ -68,6 +110,8 @@ const RAW_COMISIONES = [
     docente_id: null,
     docente_nombre: 'Caro UX',
     horarios: [{ dia: 'MIE', inicio: '19:00', fin: '22:00' }],
+    fecha_inicio: '2026-08-05',
+    fecha_fin: '2026-11-25',
     cupo_maximo: 20,
     inscriptos: 20,
     arancel: 52000,
@@ -81,6 +125,8 @@ const RAW_COMISIONES = [
     docente_id: 5,
     docente_nombre: 'Ing. González',
     horarios: [{ dia: 'SAB', inicio: '09:00', fin: '13:00' }],
+    fecha_inicio: '2026-08-08',
+    fecha_fin: '2026-11-28',
     cupo_maximo: 30,
     inscriptos: 0,
     arancel: 58000,
@@ -97,6 +143,8 @@ const RAW_COMISIONES = [
       { dia: 'MAR', inicio: '18:30', fin: '20:30' },
       { dia: 'JUE', inicio: '18:30', fin: '20:30' },
     ],
+    fecha_inicio: '2026-09-01',
+    fecha_fin: '2026-12-17',
     cupo_maximo: 40,
     inscriptos: 0,
     arancel: 39000,
@@ -110,6 +158,9 @@ const RAW_COMISIONES = [
     docente_id: 3,
     docente_nombre: 'Santi Ads',
     horarios: [{ dia: 'SAB', inicio: '10:00', fin: '13:00' }],
+    // La comisión heredada: llegó del cliente sin fechas y así se muestra, como `Sin definir`.
+    fecha_inicio: null,
+    fecha_fin: null,
     cupo_maximo: 40,
     inscriptos: 0,
     arancel: 38000,
@@ -134,6 +185,10 @@ export const COMISIONES = markAsExample(
     dias_horarios: textoHorarios(comision.horarios),
     sede_nombre: SEDES.find((sede) => sede.id === comision.sede_id)?.nombre ?? null,
     vacantes: comision.cupo_maximo - comision.inscriptos,
+    cantidad_clases:
+      comision.fecha_inicio === null
+        ? null
+        : clasesDelPeriodo(comision.fecha_inicio, comision.fecha_fin, comision.horarios),
     // Estado que la planilla del cliente registra para la comisión, no el `estado` del modelo:
     // el modelo no tiene columna de estado de comisión (`catalogo.py` lo deja escrito).
     cerrada_por_cupo: comision.cupo_maximo - comision.inscriptos === 0,

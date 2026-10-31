@@ -13,7 +13,7 @@
  * Todos los datos son de ejemplo. Ninguno es dato de negocio y ninguno implica que la
  * información del cliente ya se haya migrado.
  */
-export { CATALOGO_TOTAL_COMISIONES, COMISIONES, SEDES } from './comisiones'
+export { CATALOGO_TOTAL_COMISIONES, COMISIONES, SEDES, clasesDelPeriodo } from './comisiones'
 export { ASISTENCIAS } from './asistencias'
 export { COBRANZAS, DESTINO_IMPUTACION } from './cobranzas'
 export { ALUMNOS } from './alumnos'

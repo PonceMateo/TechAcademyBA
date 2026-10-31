@@ -20,9 +20,10 @@ import { markAsExample } from './placeholderNotice'
  *
  * **El cronograma y los temas son material de referencia** (P5): tienen forma de fecha y tema, pero
  * la secretaría carga los reales cuando el sistema esté funcional. La fecha de inicio es coherente
- * con los días de cursada —un lunes— y **el fin es `null` a propósito**: `comision` no tiene fecha de
- * fin (D60), así que el ejemplo no puede inventar una. El `horario` de cada encuentro es el rango de
- * ese día en la grilla de la comisión, igual que en el contrato real.
+ * con los días de cursada —un lunes— y **el fin es `null` a propósito**: esta inscripción es la
+ * comisión heredada, la que llegó del cliente sin período (D64), así que el ejemplo no puede
+ * inventarle una fecha de cierre. El `horario` de cada encuentro es el rango de ese día en la grilla
+ * de la comisión, igual que en el contrato real.
  */
 export const INSCRIPCIONES = markAsExample([
   {

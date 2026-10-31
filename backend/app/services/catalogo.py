@@ -22,12 +22,20 @@ dos altas simultáneas.
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import Comision, ComisionHorario, Curso, Sede, resumen_de_horarios
+from app.models.catalogo import (
+    Comision,
+    ComisionHorario,
+    Curso,
+    Sede,
+    clases_del_periodo,
+    resumen_de_horarios,
+)
 from app.models.enums import EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Docente
@@ -140,6 +148,15 @@ class CupoInsuficiente(Exception):
         )
 
 
+class PeriodoInvalido(Exception):
+    """El período de cursada no cumple las reglas del alta o de la edición (historia #49).
+
+    Viaja como excepción de dominio y no como validador de Pydantic para que el `422` lleve el
+    mensaje en es-AR en el `detail`: es el único texto que el frontend muestra. El CHECK
+    `ck_comision_periodo_coherente` sigue siendo la red de seguridad en la base.
+    """
+
+
 def crear_curso(session: Session, datos: CursoCreate) -> Curso:
     """Crea un curso y devuelve el código que le generó la base (D32).
 
@@ -236,6 +253,9 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
     no se validan acá: son CHECK de la base, y una regla que se sostiene en dos lugares es una
     regla que se desincroniza. La sede es **opcional en toda modalidad**, así que su ausencia no
     es un rechazo.
+
+    El período sí se valida acá: necesita los horarios ya armados y un mensaje en es-AR, que es
+    lo que la ruta devuelve en el `detail` del `422` (historia #49).
     """
     curso = session.get(Curso, datos.curso_id)
     if curso is None:
@@ -252,6 +272,7 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
         raise HorarioDelDocenteEnConflicto(conflicto.comision, conflicto)
 
     horarios = _armar_horarios(datos.horarios)
+    _validar_periodo(datos.fecha_inicio, datos.fecha_fin, horarios)
     comision = Comision(
         curso_id=curso.id,
         docente_id=datos.docente_id,
@@ -261,6 +282,8 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
         arancel=datos.arancel,
         modalidad=datos.modalidad.value,
         sede_id=datos.sede_id,
+        fecha_inicio=datos.fecha_inicio,
+        fecha_fin=datos.fecha_fin,
         horarios=horarios,
     )
     session.add(comision)
@@ -297,7 +320,7 @@ def obtener_comision(session: Session, comision_id: int) -> Comision:
 
 
 def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate) -> Comision:
-    """Actualiza docente, días y horarios, arancel y cupo (historia #4).
+    """Actualiza docente, días y horarios, arancel, cupo y período (historias #4 y #49).
 
     El curso, el número, la modalidad y la sede no se tocan: no forman parte del contrato.
     Las inscripciones y los pagos siguen asociados a la misma comisión porque el `id` no cambia.
@@ -306,6 +329,9 @@ def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate)
     y que el rechazo de la comisión llena: `EN_ESPERA`, `BAJA` y `COMPLETADA` no ocupan banco. La
     cuenta y el `UPDATE` no están serializados contra una inscripción simultánea, igual que el
     alta de inscripción (D51).
+
+    El período no recalcula aranceles ni toca las inscripciones ni los pagos: solo se guarda el
+    calendario nuevo, y los importes ya calculados de cada inscripción quedan como estaban (D64).
     """
     if session.get(Docente, datos.docente_id) is None:
         raise DocenteNoEncontrado(datos.docente_id)
@@ -313,6 +339,11 @@ def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate)
     inscriptos = _inscriptos_activos(session, comision.id)
     if datos.cupo_maximo < inscriptos:
         raise CupoInsuficiente(inscriptos)
+
+    # El período se valida antes de tocar las filas del horario: un rechazo no puede dejar la
+    # sesión con los `DELETE` a medio camino.
+    horarios = _armar_horarios(datos.horarios)
+    _validar_periodo(datos.fecha_inicio, datos.fecha_fin, horarios)
 
     # La propia comisión queda afuera del chequeo: reenviar sus horarios actuales no puede ser un
     # conflicto consigo misma.
@@ -328,12 +359,13 @@ def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate)
     comision.horarios.clear()
     session.flush()
 
-    horarios = _armar_horarios(datos.horarios)
     comision.docente_id = datos.docente_id
     comision.horarios = horarios
     comision.dias_horarios = resumen_de_horarios(horarios)
     comision.arancel = datos.arancel
     comision.cupo_maximo = datos.cupo_maximo
+    comision.fecha_inicio = datos.fecha_inicio
+    comision.fecha_fin = datos.fecha_fin
     session.commit()
     session.refresh(comision)
 
@@ -396,6 +428,24 @@ def listar_comisiones(session: Session) -> list[Comision]:
 def listar_sedes(session: Session) -> list[Sede]:
     """Sedes activas. Es un endpoint de lectura: no hay historia que pida el alta (historia #8)."""
     return list(session.scalars(select(Sede).where(Sede.activo.is_(True)).order_by(Sede.id)))
+
+
+def _validar_periodo(
+    inicio: date, fin: date, horarios: list[ComisionHorario]
+) -> None:
+    """Rechaza el período incoherente o sin clases antes de escribir (historia #49).
+
+    Las dos reglas viven acá y no en el schema porque el `422` de un validador de Pydantic
+    viaja como arreglo y el frontend solo muestra un `detail` de texto. El conteo usa
+    `clases_del_periodo`, la misma función que después informa `cantidad_clases` y que va a usar
+    el prorrateo de la H/U 50, así que el rechazo y el número no pueden divergir.
+    """
+    if fin < inicio:
+        raise PeriodoInvalido("La fecha de fin no puede ser anterior a la de inicio.")
+    if clases_del_periodo(inicio, fin, horarios) == 0:
+        raise PeriodoInvalido(
+            "El período no contiene ninguna clase: revisá las fechas o los días de cursada."
+        )
 
 
 def _armar_horarios(datos: list[HorarioComision]) -> list[ComisionHorario]:

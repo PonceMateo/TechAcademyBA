@@ -55,6 +55,8 @@ def _cuerpo(curso_id: int, docente_id: int, **cambios: object) -> dict:
         "horarios": horarios("LUN MIE", inicio="19:00", fin="21:00"),
         "arancel": "52000.00",
         "cupo_maximo": 20,
+        "fecha_inicio": "2026-03-02",
+        "fecha_fin": "2026-07-03",
         "modalidad": Modalidad.PRESENCIAL.value,
     }
     cuerpo.update(cambios)
@@ -279,6 +281,8 @@ def _editar(docente: Docente, **cambios: object) -> dict:
         "horarios": horarios("LUN MIE", inicio="18:00", fin="20:00"),
         "arancel": "48000.00",
         "cupo_maximo": 25,
+        "fecha_inicio": "2026-03-02",
+        "fecha_fin": "2026-07-03",
     }
     datos.update(cambios)
     return datos
