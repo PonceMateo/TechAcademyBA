@@ -78,17 +78,22 @@ export function CommissionDetailPage() {
   const habilitados = padron.alumnos.filter((alumno) => alumno.acceso.estado === 'HABILITADO')
 
   async function guardar() {
-    const resultado = await guardarLinkClase({ comisionCodigo: codigo, url })
+    try {
+      const resultado = await guardarLinkClase({ comisionCodigo: codigo, url })
 
-    if (!resultado.ok) {
+      if (!resultado?.ok) {
+        setAviso(null)
+        setError(resultado?.error ?? 'No se pudo guardar el link.')
+        return
+      }
+
+      setError(null)
+      setUrl(resultado.link ?? url)
+      setAviso('Link de la clase cargado. Queda disponible para los alumnos habilitados.')
+    } catch (error) {
       setAviso(null)
-      setError(resultado.error)
-      return
+      setError(error?.message ?? 'No se pudo guardar el link.')
     }
-
-    setError(null)
-    setUrl(resultado.link)
-    setAviso('Link de la clase cargado. Queda disponible para los alumnos habilitados.')
   }
 
   async function copiar() {
