@@ -165,6 +165,7 @@ export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
   const [consulta, setConsulta] = useState('')
+  const [comisionFiltro, setComisionFiltro] = useState('')
   const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
   const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
   const [erroresAlumno, setErroresAlumno] = useState({})
@@ -652,6 +653,14 @@ export function StudentsPage() {
     },
   ]
 
+  const comisionesDisponibles = Array.from(
+    new Set(alumnos.map((alumno) => alumno.comision?.codigo).filter(Boolean)),
+  )
+  const alumnosFiltrados =
+    comisionFiltro === ''
+      ? alumnos
+      : alumnos.filter((alumno) => alumno.comision?.codigo === comisionFiltro)
+
   return (
     <div className="space-y-4">
       {mensaje !== null && (
@@ -671,19 +680,39 @@ export function StudentsPage() {
           </Button>
         }
       >
-        <div className="mb-4 max-w-sm">
-          <Input
-            id="buscar-alumno"
+        <div className="mb-4 flex flex-wrap items-end gap-4">
+          <div className="max-w-sm flex-1">
+            <Input
+              id="buscar-alumno"
             etiqueta="Buscar alumno"
             valor={consulta}
             onChange={(evento) => setConsulta(evento.target.value)}
             placeholder="Buscar por DNI o Nombre…"
           />
+          </div>
+          <div className="max-w-xs">
+            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="filtro-comision">
+              Filtrar por comisión
+            </label>
+            <select
+              id="filtro-comision"
+              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+              value={comisionFiltro}
+              onChange={(evento) => setComisionFiltro(evento.target.value)}
+            >
+              <option value="">Todas</option>
+              {comisionesDisponibles.map((codigo) => (
+                <option key={codigo} value={codigo}>
+                  {codigo}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <Table
           columnas={columnasAlumnos}
-          filas={alumnos}
+          filas={alumnosFiltrados}
           vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
         />
       </Card>
