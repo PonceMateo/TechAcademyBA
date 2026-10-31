@@ -1,7 +1,8 @@
 # Tasks
 
-> **Estado:** los pasos 1 a 6 están implementados en la rama. La verificación de la sección 7
-> quedó pendiente porque el entorno no tenía Docker levantado: no se corrió ninguna suite.
+> **Estado:** los pasos 1 a 7.2 están hechos. Las suites, el lint, el build y el
+> upgrade/downgrade de la migración quedaron en verde; falta el aviso del punto 7.3 antes de
+> pushear, porque la rama toca `backend/alembic/` (D56).
 
 ## 1. Decisión y glosario, antes de tocar código
 
@@ -36,6 +37,6 @@
 
 ## 7. Integración
 
-- [ ] 7.1 Correr la suite completa con `docker compose run --rm backend pytest` y `docker compose run --rm frontend npm run test`; si el CI corre lint y build, correr también `docker compose run --rm frontend npm run lint` y `npm run build`. Verificar que todo quede en verde antes de abrir el PR.
-- [ ] 7.2 Verificar el change con `openspec validate hu-49-periodo-cursada-comision --type change` y revisar con `git diff --stat main` que la rama solo traiga los archivos de este change y de la H/U 49, sin migraciones ajenas ni archivos del entorno.
+- [x] 7.1 Correr la suite completa con `docker compose run --rm backend pytest` y `docker compose run --rm frontend npm run test`; si el CI corre lint y build, correr también `docker compose run --rm frontend npm run lint` y `npm run build`. Verificar que todo quede en verde antes de abrir el PR.
+- [x] 7.2 Verificar el change con `openspec validate hu-49-periodo-cursada-comision --type change` y revisar con `git diff --stat main` que la rama solo traiga los archivos de este change y de la H/U 49, sin migraciones ajenas ni archivos del entorno.
 - [ ] 7.3 Avisar al equipo que la rama toca `backend/alembic/` y que el CI aplica `alembic upgrade head` sobre Supabase después de las suites (D56), antes de pushear. Verificar que el aviso quede en el issue o en el PR con la referencia `Refs #74`.

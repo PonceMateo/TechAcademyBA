@@ -306,8 +306,9 @@ describe('las vacantes de una comisión con lugar', () => {
   it('deja las vacantes a la vista y sin chip', () => {
     const fila = filasDeComisiones()[0]
 
-    // `VACANTES` es la sexta columna: el chip `LLENO` va dentro de la celda, al lado del 0.
-    expect(fila.cells[5].textContent).toBe('7')
+    // `VACANTES` es la séptima columna desde la historia #49: `PERÍODO` corrió un lugar las que
+    // siguen a `HORARIO`. El chip `LLENO` va dentro de la celda, al lado del 0.
+    expect(fila.cells[6].textContent).toBe('7')
     expect(within(fila).queryByText('LLENO')).not.toBeInTheDocument()
   })
 })
@@ -1102,8 +1103,8 @@ describe('edición de comisión', () => {
     )
     expect(screen.getByRole('status')).toHaveTextContent('Comisión CUR-101 actualizada.')
     const fila = filasDeComisiones()[0]
-    expect(fila.cells[4].textContent).toBe('25')
-    expect(fila.cells[5].textContent).toBe('2')
+    expect(fila.cells[5].textContent).toBe('25')
+    expect(fila.cells[6].textContent).toBe('2')
   })
 
   it('rechaza un cupo menor que los inscriptos sin llamar a la fuente', async () => {
@@ -1122,7 +1123,7 @@ describe('edición de comisión', () => {
     ).toBeInTheDocument()
     expect(editar).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Editar Comisión' })).toBeInTheDocument()
-    expect(filasDeComisiones()[0].cells[4].textContent).toBe('30')
+    expect(filasDeComisiones()[0].cells[5].textContent).toBe('30')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 

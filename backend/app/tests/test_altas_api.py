@@ -899,7 +899,7 @@ def test_un_periodo_con_el_fin_anterior_al_inicio_se_rechaza_con_su_mensaje(
 def test_un_periodo_que_no_contiene_ninguna_clase_se_rechaza(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
-    """Escenario «Período sin ninguna clase»: de martes a jueves, con cursada lunes y miércoles."""
+    """Escenario «Período sin ninguna clase»: de jueves a viernes, con cursada lunes y miércoles."""
     curso = crear_curso(db_session, nombre="Python sin clases")
     docente = crear_docente(db_session)
 
@@ -911,8 +911,8 @@ def test_un_periodo_que_no_contiene_ninguna_clase_se_rechaza(
             "horarios": horarios("LUN MIE"),
             "arancel": "52000.00",
             "cupo_maximo": 20,
-            "fecha_inicio": "2026-03-03",
-            "fecha_fin": "2026-03-05",
+            "fecha_inicio": "2026-03-05",
+            "fecha_fin": "2026-03-06",
             "modalidad": Modalidad.PRESENCIAL.value,
         },
     )
