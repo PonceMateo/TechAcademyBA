@@ -149,6 +149,33 @@ function filaDeDocente(docente, comisiones = []) {
   }
 }
 
+/**
+ * El perfil del docente autenticado con la forma del contrato de la HU 90: identidad separada,
+ * contacto y comisiones. El nombre del ejemplo viene junto, así que se parte igual que en la fila
+ * del padrón para que las dos fuentes digan lo mismo.
+ */
+function perfilDeDocente(store, docente) {
+  const fila = filaDeDocente(docente)
+  return {
+    nombre: fila.nombres,
+    apellido: fila.apellido,
+    dni: docente.dni,
+    cuil: docente.cuil ?? null,
+    email: docente.email,
+    telefono: docente.telefono ?? null,
+    comisiones: store.comisiones
+      .filter((candidata) => candidata.docente_id === docente.id)
+      .map((candidata) => ({
+        codigo: candidata.codigo,
+        nombre_curso: candidata.curso.nombre,
+        horario: candidata.horario_legible,
+        // El modelo no tiene columna de estado de comisión (M2): la que existe es
+        // `cerrada_por_cupo`, y de ahí sale la etiqueta que ve el docente.
+        estado: candidata.cerrada_por_cupo ? 'Cerrada por cupo' : 'Activa',
+      })),
+  }
+}
+
 /** Las comisiones reales del ejemplo para un docente, sin inventar las que no están. */
 function comisionesDelDocente(store, docenteId) {
   return store.comisiones
@@ -1189,31 +1216,32 @@ export function createMockDataSource() {
     },
 
     /**
-     * Ficha del docente del maqueteado con sus comisiones (10.5). El contacto va tal como lo
-     * registra el cliente: `catedra` y la sede de referencia. El correo y el teléfono existen en el
-     * padrón de docentes pero no se devuelven, porque el spec prohíbe mostrarlos en esta pantalla y
-     * una función que los trae invita a que alguien los muestre.
+     * Ficha del docente del maqueteado (10.5 y HU 90). La forma es la del contrato real: identidad
+     * separada en nombre y apellido, contacto editable y las comisiones asignadas.
      */
     async obtenerPerfilDocente() {
       const docente = store.docentes.find((candidata) => candidata.id === DOCENTE_DEL_MAQUETADO)
-      const comisiones = store.comisiones.filter((candidata) => candidata.docente_id === docente.id)
-      const primera = comisiones[0]
+      return perfilDeDocente(store, docente)
+    },
 
-      return {
-        nombre: docente.nombre,
-        especialidad: docente.catedra,
-        // La sede de referencia es la de la comisión en la que da clases: el padrón de docentes no
-        // tiene columna de sede y no se le inventa una.
-        sede: store.sedes.find((sede) => sede.id === primera.sede_id)?.nombre ?? null,
-        comisiones: comisiones.map((candidata) => ({
-          codigo: candidata.codigo,
-          nombre_curso: candidata.curso.nombre,
-          horario: candidata.horario_legible,
-          // El modelo no tiene columna de estado de comisión (M2): la que existe es
-          // `cerrada_por_cupo`, y de ahí sale la etiqueta que ve el docente.
-          estado: candidata.cerrada_por_cupo ? 'Cerrada por cupo' : 'Activa',
-        })),
+    /**
+     * Guardado de los datos de contacto del docente (HU 90). Aplica la misma unicidad que el
+     * backend para que la pantalla pueda ejercitar el rechazo sin red.
+     */
+    async actualizarPerfilDocente({ email, telefono }) {
+      const docente = store.docentes.find((candidata) => candidata.id === DOCENTE_DEL_MAQUETADO)
+      const correo = String(email ?? '').trim()
+      const ocupado =
+        store.docentes.some((candidata) => candidata.id !== docente.id && candidata.email === correo) ||
+        store.alumnos.some((candidata) => candidata.email === correo)
+
+      if (ocupado) {
+        throw new Error(`El email ${correo} ya está registrado en el padrón de docentes.`)
       }
+
+      docente.email = correo
+      docente.telefono = telefono ? String(telefono).trim() : null
+      return perfilDeDocente(store, docente)
     },
 
     /**

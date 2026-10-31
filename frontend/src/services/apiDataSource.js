@@ -50,7 +50,7 @@ const PATHS = Object.freeze({
   habilitacion: '/habilitaciones/consulta',
   override: '/habilitaciones/override',
   comisionesAsignadas: '/docentes/mis-comisiones',
-  perfilDocente: '/docentes/mi-perfil',
+  perfilDocente: '/docente/mi-perfil',
   padronComision: '/comisiones/:codigo/alumnos',
   asistencia: '/comisiones/:codigo/asistencia',
   linkClase: '/clases/link',
@@ -372,11 +372,20 @@ export function createApiDataSource() {
     },
 
     /**
-     * Ficha del docente que entra. La ruta es **provisional**: no hay endpoint escrito, así que
-     * esto da 404 y el fallo se propaga; la pantalla del docente muestra su estado vacío (M33).
+     * Ficha del docente que entra (HU 90). El perfil sale de la cuenta autenticada: la ruta no
+     * lleva identificador, así que no hay forma de pedir el de otro docente.
      */
     async obtenerPerfilDocente() {
       return request(PATHS.perfilDocente)
+    },
+
+    /**
+     * Guardado de los datos de contacto del docente (HU 90). El cuerpo lleva **solo** email y
+     * teléfono: nombre, apellido, DNI y CUIL no forman parte del contrato y la API rechaza con
+     * 422 cualquier otro campo.
+     */
+    async actualizarPerfilDocente(datos) {
+      return request(PATHS.perfilDocente, { method: 'PUT', body: datos })
     },
 
     async obtenerPadronComision(comisionCodigo) {

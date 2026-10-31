@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
-from pydantic import AfterValidator
+from pydantic import AfterValidator, BeforeValidator
 
 #: Lo único que puede aparecer en un DNI además de sus dígitos: puntos, espacios y guiones.
 _SOLO_DIGITOS_Y_SEPARADORES = re.compile(r"[0-9.\s-]+")
@@ -106,3 +106,14 @@ DniConForma = Annotated[str, AfterValidator(validar_dni)]
 
 #: Tipo de Pydantic para un teléfono E.164.
 TelefonoE164 = Annotated[str, AfterValidator(validar_telefono)]
+
+
+def _vacio_a_none(valor: object) -> object:
+    """Convierte el texto vacío —o de solo espacios— en "no informado"."""
+    if isinstance(valor, str) and valor.strip() == "":
+        return None
+    return valor
+
+
+#: Teléfono opcional donde borrar el dato es mandar vacío o `null`, no un `422`.
+TelefonoOpcional = Annotated[TelefonoE164 | None, BeforeValidator(_vacio_a_none)]
