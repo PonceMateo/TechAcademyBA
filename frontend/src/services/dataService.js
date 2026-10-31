@@ -235,9 +235,18 @@ export function obtenerAsistenciaComision(comisionCodigo) {
   return getDataSource().obtenerAsistenciaComision(comisionCodigo)
 }
 
-/** Ficha del docente con sus comisiones (10.5). */
+/** Ficha del docente con sus comisiones (10.5 y HU 90). */
 export function obtenerPerfilDocente() {
   return getDataSource().obtenerPerfilDocente()
+}
+
+/**
+ * Guardado de los datos de contacto del docente (HU 90). Recibe `{ email, telefono }` y devuelve el
+ * perfil guardado; un email que ya usa otra persona de cualquier padrón falla con el conflicto y la
+ * pantalla lo muestra sin borrar lo ingresado.
+ */
+export function actualizarPerfilDocente(datos) {
+  return getDataSource().actualizarPerfilDocente(datos)
 }
 
 /**

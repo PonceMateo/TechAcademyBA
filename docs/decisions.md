@@ -2121,3 +2121,44 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `backend/app/tests/test_docente_credenciales.py`, `frontend/src/admin/TeachersPage.jsx`,
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/mockDataSource.js` y sus pruebas.
+
+## Edición del perfil del docente (change `editar-perfil-docente`)
+
+### D63 — El autoservicio del docente es un recurso `/docente` sin identificador y sincroniza el email con la cuenta
+
+- **Fecha:** 2026-10-31
+- **Autor:** Santiago Torrens
+- **Decisión:** el docente edita su email y su teléfono desde `Mi Perfil` con `GET` y `PUT
+  /docente/mi-perfil`, bajo `require_roles(Rol.DOCENTE)`. La ruta es **singular y no recibe ningún
+  identificador**: el legajo sale de `usuario.docente` de la cuenta autenticada, así que no existe
+  un parámetro que cambiar para alcanzar el perfil de otro docente. Es la misma decisión de D60
+  para el alumno.
+- **Contrato de dos campos:** `PerfilDocenteUpdate` es `extra="forbid"` con `email` y `telefono`.
+  Nombre, apellido, DNI y CUIL no están declarados, así que un cuerpo que los intente mandar es un
+  `422` y nunca llega al servicio. El teléfono reutiliza `TelefonoOpcional`, que se mueve de
+  `schemas/alumno.py` a `schemas/validators.py` para compartirlo con la HU 43.
+- **Unicidad y transacción:** el email se valida con `ensure_email_available` (M1) excluyendo la
+  propia fila del docente y la propia cuenta, de modo que conservar el email actual no es un
+  duplicado. `docente.email`, `docente.telefono` y `usuario.email` se escriben y confirman en una
+  sola transacción, con el patrón de D52; un `IntegrityError` por `uq_docente_email` o
+  `uq_usuario_email` se traduce al mismo `409` del chequeo previo. Después del cambio, el login usa
+  el email nuevo y el anterior deja de resolver la cuenta mientras no exista otra cuenta legítima
+  con él.
+- **Contraseña sin rutas nuevas:** la tarjeta `Seguridad` del perfil reutiliza
+  `SessionContext.changePassword` y `POST /auth/change-password`; la confirmación se valida en el
+  formulario y el backend sigue verificando la actual y guardando solo el hash. El cambio
+  obligatorio del primer ingreso (HU 66, D45) no se modifica y `ChangePasswordPage` sigue siendo su
+  pantalla.
+- **Perfil con datos reales:** la respuesta trae nombre, apellido, DNI, CUIL, email, teléfono y las
+  comisiones asignadas. `Especialidad` y `Sede de referencia` salen de la pantalla porque el padrón
+  no tiene esas columnas; el estado de la comisión se deriva de `activo` (M2) y no se inventa.
+  `SessionContext.updateSession` refleja el email guardado en la sesión en memoria, sin una segunda
+  llamada a `GET /auth/me`; al recargar, la sesión se relee de la base.
+- **Dónde:** `backend/app/api/docente.py`, `backend/app/schemas/docente.py`,
+  `backend/app/services/docente.py`, `backend/app/api/router.py`,
+  `backend/app/schemas/validators.py`, `backend/app/schemas/alumno.py`,
+  `backend/app/tests/test_docente_perfil.py`, `frontend/src/docente/TeacherProfilePage.jsx`,
+  `frontend/src/auth/SessionContext.jsx`, `frontend/src/services/dataService.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js` y sus
+  pruebas. Sin migración: las columnas ya existían.
+

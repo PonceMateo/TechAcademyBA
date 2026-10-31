@@ -1,6 +1,8 @@
 import { cleanup, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  DEMO_PASSWORD,
   accountForRole,
   renderAppAs,
   resetDataSource,
@@ -11,12 +13,16 @@ import { inicialesDe } from '../utils/formato'
 import { TITULO_MENU } from './navegacion'
 
 /**
- * Perfil del docente (10.5).
+ * Perfil del docente (10.5 y HU 90).
  *
- * La pantalla se verifica por lo que **no** tiene: un campo editable o un botón de guardado
- * convertirían un perfil de solo lectura en un formulario que no guarda nada. Y el ítem de notas y
- * certificación se verifica por lo que tampoco tiene: no hay ruta detrás, así que la comprobación
- * fuerte es pedir esa dirección y ver el 404.
+ * Lo que se verifica es qué campos admiten edición y cuáles no: `Nombre`, `Apellido`, `DNI` y
+ * `CUIL` aparecen deshabilitados, y `Email` y `Teléfono` aceptan escribir y guardar. La tarjeta de
+ * seguridad usa el backend falso de `stubBackend`, que ya implementa
+ * `POST /auth/change-password` con la contraseña de demostración.
+ *
+ * Los casos que importan del guardado son los del spec: éxito, email que ya usa otra persona y
+ * forma inválida. En los dos rechazos, lo ingresado tiene que quedar en pantalla para poder
+ * corregirlo.
  */
 
 const COLUMNAS = ['CÓDIGO', 'CURSO', 'HORARIO', 'ESTADO']
@@ -26,44 +32,137 @@ async function entrar(ruta = '/docente/perfil') {
   stubBackend()
   renderAppAs('DOCENTE', ruta)
   await screen.findByRole('heading', { name: 'Mi Perfil' })
-  // El encabezado se dibuja antes de que lleguen los datos: esperar la especialidad espera de
+  // El encabezado se dibuja antes de que lleguen los datos: esperar el email del perfil espera de
   // verdad a que el perfil se haya cargado.
-  await screen.findByText('Programación')
+  await screen.findByDisplayValue('profe.martin@techacademy.invalid')
 }
 
 // La flecha es necesaria: `beforeEach(entrar)` le pasaría a `entrar` el contexto del test como ruta.
 beforeEach(() => entrar())
 
 describe('tarjeta de identidad', () => {
-  it('muestra el avatar y el nombre de la cuenta de la sesión, el chip y la nota', () => {
+  it('muestra el avatar y el nombre de la cuenta de la sesión y la nota', () => {
     const cuenta = accountForRole('DOCENTE')
-    // El nombre de la cuenta también está en la barra superior: se afirma sobre la tarjeta de
-    // identidad para no depender de cuál de los dos encuentra la consulta.
     const identidad = within(screen.getByRole('heading', { name: 'Identidad' }).closest('section'))
 
     expect(identidad.getByText(inicialesDe(cuenta.nombre))).toBeInTheDocument()
     expect(identidad.getByText(cuenta.nombre)).toBeInTheDocument()
-    expect(identidad.getByText('DOCENTE · PERMISOS REDUCIDOS')).toBeInTheDocument()
+    expect(identidad.queryByText('DOCENTE · PERMISOS REDUCIDOS')).not.toBeInTheDocument()
     expect(
       identidad.getByText('Los cambios administrativos deben solicitarse a Secretaría BA.'),
     ).toBeInTheDocument()
   })
 })
 
-describe('datos de contacto', () => {
-  it('muestra la especialidad y la sede de referencia', () => {
-    expect(screen.getByText('Especialidad')).toBeInTheDocument()
-    expect(screen.getByText('Programación')).toBeInTheDocument()
-    expect(screen.getByText('Sede de referencia')).toBeInTheDocument()
-    expect(screen.getByText('Sede Constituciones')).toBeInTheDocument()
+describe('datos personales', () => {
+  it('muestra la identidad y el contacto del docente autenticado', () => {
+    expect(screen.getByLabelText(/Nombre/)).toHaveValue('Profe')
+    expect(screen.getByLabelText(/Apellido/)).toHaveValue('Martín')
+    expect(screen.getByLabelText(/DNI/)).toHaveValue('28.114.402')
+    expect(screen.getByLabelText(/CUIL/)).toHaveValue('20-28114402-4')
+    expect(screen.getByLabelText(/Email/)).toHaveValue('profe.martin@techacademy.invalid')
   })
 
-  it('no muestra correo ni teléfono, porque el cliente no los registra para los docentes', () => {
-    // Los dos datos existen en el padrón de docentes y esta pantalla no los inventa.
-    expect(screen.queryByText('profe.martin@techacademy.invalid')).not.toBeInTheDocument()
-    expect(screen.queryByText('+54 11 4455-1020')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/tel/i)).not.toBeInTheDocument()
+  it('deja la identidad deshabilitada y sin la leyenda solo lectura', () => {
+    for (const etiqueta of [/Nombre/, /Apellido/, /DNI/, /CUIL/]) {
+      const campo = screen.getByLabelText(etiqueta)
+      expect(campo).toBeDisabled()
+      expect(campo).not.toHaveAccessibleName(/solo lectura/)
+    }
+  })
+
+  it('no deja cambiar la identidad escribiendo en sus campos', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText(/Nombre/), 'Otra Persona')
+    await user.type(screen.getByLabelText(/CUIL/), '99-99999999-9')
+
+    expect(screen.getByLabelText(/Nombre/)).toHaveValue('Profe')
+    expect(screen.getByLabelText(/CUIL/)).toHaveValue('20-28114402-4')
+  })
+
+  it('deja editar el email y el teléfono y confirma el guardado', async () => {
+    const user = userEvent.setup()
+    const email = screen.getByLabelText(/Email/)
+    const telefono = screen.getByLabelText(/Teléfono/)
+
+    expect(email).not.toBeDisabled()
+    expect(telefono).not.toBeDisabled()
+
+    await user.clear(email)
+    await user.type(email, 'profe.martin.nuevo@techacademy.invalid')
+    await user.clear(telefono)
+    await user.type(telefono, '+5491140000099')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Datos de contacto actualizados.')
+    expect(screen.getByLabelText(/Email/)).toHaveValue('profe.martin.nuevo@techacademy.invalid')
+  })
+
+  it('informa el email duplicado y conserva lo ingresado', async () => {
+    const user = userEvent.setup()
+    stubDataSource({
+      actualizarPerfilDocente: async () => {
+        throw new Error('El email ocupado@techacademy.invalid ya está registrado en el padrón de docentes.')
+      },
+    })
+    const email = screen.getByLabelText(/Email/)
+
+    await user.clear(email)
+    await user.type(email, 'ocupado@techacademy.invalid')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('ya está registrado')
+    expect(screen.getByLabelText(/Email/)).toHaveValue('ocupado@techacademy.invalid')
+  })
+
+  it('marca el email con forma inválida y no borra lo escrito', async () => {
+    const user = userEvent.setup()
+    const email = screen.getByLabelText(/Email/)
+
+    await user.clear(email)
+    await user.type(email, 'sin-arroba')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('El email no tiene un formato válido.')
+    expect(screen.getByLabelText(/Email/)).toHaveValue('sin-arroba')
+  })
+})
+
+describe('seguridad', () => {
+  it('cambia la contraseña con la actual correcta', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Contraseña actual'), DEMO_PASSWORD)
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'NuevaClave123!')
+    await user.type(screen.getByLabelText('Repetí la nueva'), 'NuevaClave123!')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Contraseña actualizada.')
+  })
+
+  it('rechaza la confirmación distinta sin enviar el cambio', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Contraseña actual'), DEMO_PASSWORD)
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'NuevaClave123!')
+    await user.type(screen.getByLabelText('Repetí la nueva'), 'OtraClave123!')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La confirmación no coincide con la contraseña nueva.',
+    )
+  })
+
+  it('muestra el error cuando la contraseña actual es incorrecta', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Contraseña actual'), 'Incorrecta123!')
+    await user.type(screen.getByLabelText('Contraseña nueva'), 'NuevaClave123!')
+    await user.type(screen.getByLabelText('Repetí la nueva'), 'NuevaClave123!')
+    await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('La contraseña actual no es correcta.')
   })
 })
 
@@ -81,17 +180,6 @@ describe('comisiones asignadas', () => {
 
     const estado = within(fila.cells[3]).getByText('Activa')
     expect(estado.className).toContain('green')
-  })
-})
-
-describe('pantalla de solo lectura', () => {
-  it('no ofrece ningún campo editable ni botón de guardado', () => {
-    const main = within(screen.getByRole('main'))
-
-    expect(main.queryByRole('textbox')).not.toBeInTheDocument()
-    expect(main.queryByRole('combobox')).not.toBeInTheDocument()
-    expect(main.queryByRole('checkbox')).not.toBeInTheDocument()
-    expect(main.queryByRole('button')).not.toBeInTheDocument()
   })
 })
 

@@ -120,6 +120,21 @@ export function SessionProvider({ children }) {
     [navigate, state.session],
   )
 
+  /**
+   * Refleja en la sesión en memoria los datos que el backend ya guardó (HU 90).
+   *
+   * Se usa después de editar el perfil docente: el email de la barra y del panel tiene que mostrar
+   * el nuevo sin una segunda llamada a `GET /auth/me`. El token no lleva el email, así que no hace
+   * falta reemitirlo; al recargar, la sesión se relee de la base.
+   */
+  const updateSession = useCallback((cambios) => {
+    setState((anterior) =>
+      anterior.session === null
+        ? anterior
+        : { ...anterior, session: { ...anterior.session, ...cambios } },
+    )
+  }, [])
+
   const signOut = useCallback(() => {
     clearStoredToken()
     setState(ANONYMOUS_STATE)
@@ -127,8 +142,15 @@ export function SessionProvider({ children }) {
   }, [navigate])
 
   const value = useMemo(
-    () => ({ status: state.status, session: state.session, signIn, changePassword, signOut }),
-    [state.status, state.session, signIn, changePassword, signOut],
+    () => ({
+      status: state.status,
+      session: state.session,
+      signIn,
+      changePassword,
+      updateSession,
+      signOut,
+    }),
+    [state.status, state.session, signIn, changePassword, updateSession, signOut],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
