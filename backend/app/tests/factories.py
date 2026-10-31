@@ -135,7 +135,7 @@ def crear_comision(
     pueda crear varias comisiones del mismo curso sin pasar el número a mano. Para probar
     la colisión de `uq_comision_curso_numero` hay que pasar el número explícito.
 
-    `fecha_inicio` y `fecha_fin` son opcionales: la columna las admite nulas (D62), así que
+    `fecha_inicio` y `fecha_fin` son opcionales: la columna las admite nulas (D64), así que
     el valor por defecto deja la comisión en el estado del legado y es un test el que elige
     el período cuando lo necesita.
     """

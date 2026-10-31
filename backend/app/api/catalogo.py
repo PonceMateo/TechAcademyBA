@@ -165,7 +165,7 @@ def editar_comision(
     _admin: Annotated[Usuario, Depends(_solo_admin)],
 ) -> ComisionOut:
     """Edición de comisión. El cuerpo admite **solo** docente, días y horarios, arancel, cupo y
-    período: un `curso_id`, `numero`, `modalidad`, `sede_id` o `codigo` es un 422 (D51 y D62).
+    período: un `curso_id`, `numero`, `modalidad`, `sede_id` o `codigo` es un 422 (D51 y D64).
 
     El período es obligatorio y se valida igual que en el alta: un fin anterior al inicio o un
     período sin ninguna clase responden `422` con el mensaje en el `detail` y la comisión

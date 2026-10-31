@@ -11,7 +11,7 @@ import { formatFechaCorta } from '../utils/formato'
  * Detalle de la cursada y acceso a la clase (HU 38).
  *
  * **Todo sale de `GET /alumno/inscripciones/{codigo}`.** El cronograma es el período real de la
- * comisión desde la historia #49: las dos fechas las carga la secretaría (D62), y la de fin solo se
+ * comisión desde la historia #49: las dos fechas las carga la secretaría (D64), y la de fin solo se
  * informa como no definida en la comisión heredada, que todavía no la tiene, porque inventar una
  * fecha de cierre es peor que decir que falta. Los encuentros se derivan de los días y horarios
  * reales desde el día corriente y se cortan en la fecha de fin, así que una cursada terminada no

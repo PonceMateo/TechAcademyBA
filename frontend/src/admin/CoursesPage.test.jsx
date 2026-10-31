@@ -1025,7 +1025,7 @@ describe('alta de curso', () => {
 
 describe('comisión heredada sin período', () => {
   // CUR-103 llegó del cliente sin fechas: la tabla dice que no está definido en lugar de dejar la
-  // celda vacía, que se confundiría con un dato que no cargó (D62).
+  // celda vacía, que se confundiría con un dato que no cargó (D64).
   beforeEach(() => abrirCurso('/admin/cursos/CUR-103'))
 
   it('muestra Sin definir en la columna del período', () => {
@@ -1068,13 +1068,13 @@ describe('edición de comisión', () => {
     )
     expect(within(dialogo).getByLabelText(/Fecha de Fin de la Cursada/)).toHaveValue('2026-11-26')
     // El número lo calcula la API sobre el período guardado —34 martes y jueves— y el navegador lo
-    // muestra sin volver a contarlo (D62).
+    // muestra sin volver a contarlo (D64).
     expect(dialogo).toHaveTextContent('34 clases en el período guardado')
   })
 
   it('exige el período al editar una comisión que no lo tiene', async () => {
     // La comisión heredada se puede editar, pero no se puede guardar sin fechas: si no, quedaría sin
-    // período para siempre (D62).
+    // período para siempre (D64).
     cleanup()
     await abrirCurso('/admin/cursos/CUR-103')
     const user = userEvent.setup()

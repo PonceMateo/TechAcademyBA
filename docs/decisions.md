@@ -2083,7 +2083,7 @@ alcance de este change; queda a criterio del equipo agregarlo.
 
 ## Período de cursada de una comisión (change `hu-49-periodo-cursada-comision`)
 
-### D62 — La comisión declara su período, la cantidad de clases se deriva y el panel del alumno se corta en el fin
+### D64 — La comisión declara su período, la cantidad de clases se deriva y el panel del alumno se corta en el fin
 
 - **Fecha:** 2026-10-31
 - **Autor:** PonceMateo

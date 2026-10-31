@@ -6,7 +6,7 @@
 
 ## 1. Decisión y glosario, antes de tocar código
 
-- [x] 1.1 Registrar la decisión **D62** en `docs/decisions.md` con fecha 2026-10-31, autor `PonceMateo` y el nombre del change: columna `fecha_fin` nula con CHECK de coherencia (expand, D56), período obligatorio en el contrato y opcional en la base, conteo derivado con `clases_del_periodo`, validación cruzada en el servicio con mensaje de texto, tope de encuentros en el panel del alumno, y fuera de alcance del prorrateo y los feriados. Verificar que la entrada exista, cite el change y esté escrita antes de cualquier cambio en `backend/`.
+- [x] 1.1 Registrar la decisión **D64** en `docs/decisions.md` con fecha 2026-10-31, autor `PonceMateo` y el nombre del change: columna `fecha_fin` nula con CHECK de coherencia (expand, D56), período obligatorio en el contrato y opcional en la base, conteo derivado con `clases_del_periodo`, validación cruzada en el servicio con mensaje de texto, tope de encuentros en el panel del alumno, y fuera de alcance del prorrateo y los feriados. Verificar que la entrada exista, cite el change y esté escrita antes de cualquier cambio en `backend/`.
 - [x] 1.2 Actualizar `docs/glossary.md`: la entrada **Comisión** suma `fecha_inicio` y `fecha_fin` al equivalente técnico, y se agregan los términos **Período de cursada** y **Cantidad de clases** (derivada, no persistida, sin feriados). Verificar que el glosario ya no diga que la comisión no tiene fecha de fin y que nombre las dos columnas.
 
 ## 2. Modelo y migración

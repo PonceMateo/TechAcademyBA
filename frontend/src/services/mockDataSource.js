@@ -590,7 +590,7 @@ export function createMockDataSource() {
         fecha_inicio,
         fecha_fin,
         // La cuenta la hace el mismo helper que usan las filas del ejemplo, y es la que la API hace
-        // sobre las fechas y los días de cursada (D62).
+        // sobre las fechas y los días de cursada (D64).
         cantidad_clases: clasesDelPeriodo(fecha_inicio, fecha_fin, horarios),
         cupo_maximo: Number(cupo_maximo),
         arancel,

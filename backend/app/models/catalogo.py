@@ -55,7 +55,7 @@ EXPRESION_MINUTOS_EN_PASO = (
 #: La cursada va de 6:00 a 22:00, y las 22:00 se pueden usar como fin (no como inicio).
 EXPRESION_HORARIO_EN_RANGO = "inicio >= TIME '06:00' AND fin <= TIME '22:00'"
 
-#: Historia #49 (D62): el período se declara con sus dos fechas. El legado con `fecha_inicio`
+#: Historia #49 (D64): el período se declara con sus dos fechas. El legado con `fecha_inicio`
 #: sola se permite; lo que no se permite es un fin sin inicio o anterior al inicio.
 EXPRESION_PERIODO = "fecha_fin IS NULL OR (fecha_inicio IS NOT NULL AND fecha_fin >= fecha_inicio)"
 
@@ -138,7 +138,7 @@ class Comision(TimestampMixin, Base):
     porque ninguna historia Must ni Should los necesita. La baja lógica va con
     `activo`.
 
-    Historia #49 (D62): el período de cursada son `fecha_inicio` y `fecha_fin`, nulas en el
+    Historia #49 (D64): el período de cursada son `fecha_inicio` y `fecha_fin`, nulas en el
     legado. La cantidad de clases no es una columna: se deriva en `cantidad_clases` con los días
     de cursada, para que el alta, la edición y el prorrateo de la H/U 50 cuenten igual.
     """

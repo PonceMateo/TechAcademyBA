@@ -390,7 +390,7 @@ def test_editar_exige_rol_de_administracion(
 def test_editar_el_periodo_lo_guarda_y_no_toca_las_inscripciones(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
-    """D62: el período nuevo se persiste y las inscripciones quedan como estaban.
+    """D64: el período nuevo se persiste y las inscripciones quedan como estaban.
 
     Del lunes 6 de abril al viernes 7 de agosto de 2026 hay 36 clases de martes y jueves, que es
     el horario que manda `_datos`.

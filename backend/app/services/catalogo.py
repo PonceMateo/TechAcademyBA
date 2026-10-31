@@ -331,7 +331,7 @@ def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate)
     alta de inscripción (D51).
 
     El período no recalcula aranceles ni toca las inscripciones ni los pagos: solo se guarda el
-    calendario nuevo, y los importes ya calculados de cada inscripción quedan como estaban (D62).
+    calendario nuevo, y los importes ya calculados de cada inscripción quedan como estaban (D64).
     """
     if session.get(Docente, datos.docente_id) is None:
         raise DocenteNoEncontrado(datos.docente_id)

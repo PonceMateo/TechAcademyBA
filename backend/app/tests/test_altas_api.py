@@ -819,7 +819,7 @@ def test_la_carrera_de_dos_altas_del_mismo_curso_es_409(
 def test_el_alta_guarda_el_periodo_y_calcula_la_cantidad_de_clases(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
-    """D62: el período se persiste y `cantidad_clases` es derivada, no una columna.
+    """D64: el período se persiste y `cantidad_clases` es derivada, no una columna.
 
     Del lunes 2 de marzo al viernes 3 de julio de 2026 hay 36 clases de lunes y miércoles.
     """

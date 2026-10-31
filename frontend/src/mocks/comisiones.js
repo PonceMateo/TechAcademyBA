@@ -20,7 +20,7 @@ import { markAsExample } from './placeholderNotice'
  *
  * **El período lo tienen cuatro de las cinco comisiones (historia #49).** La de Marketing Digital
  * es la que llega sin fechas del cliente y se queda así a propósito: es el caso de la comisión
- * heredada, que la tabla muestra como `Sin definir` y que la edición obliga a completar (D62). La
+ * heredada, que la tabla muestra como `Sin definir` y que la edición obliga a completar (D64). La
  * cantidad de clases no se escribe a mano: sale de las fechas y los días de cursada con
  * `clasesDelPeriodo`, que es la misma cuenta que hace el backend.
  */
@@ -33,7 +33,7 @@ export const CATALOGO_TOTAL_COMISIONES = 10
  * **Es propio de la demo, no de la pantalla.** El sistema no cuenta clases en el navegador: la
  * cantidad la devuelve la API, que la deriva de las fechas y los días de cursada de la comisión. Acá
  * existe para que el ejemplo pueda responder lo mismo cuando se crea o se edita una comisión sin
- * backend; la pantalla se limita a mostrar el número que llega (D62).
+ * backend; la pantalla se limita a mostrar el número que llega (D64).
  *
  * Los dos extremos se cuentan y se miran los días de la semana del horario, no las filas: dos rangos
  * del mismo día no se modelan (historia #48). Las fechas se leen al mediodía UTC para que el huso del

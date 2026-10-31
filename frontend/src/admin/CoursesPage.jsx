@@ -81,7 +81,7 @@ const COLUMNAS = [
     titulo: 'PERÍODO',
     // Las dos fechas del período de cursada (historia #49). La comisión heredada del catálogo del
     // cliente no tiene período: se lee `Sin definir`, que es lo que informa la API, en lugar de una
-    // celda vacía que se confunde con un dato que no cargó (D62).
+    // celda vacía que se confunde con un dato que no cargó (D64).
     render: (fila) =>
       fila.fecha_inicio && fila.fecha_fin
         ? `${formatFechaCorta(fila.fecha_inicio)} – ${formatFechaCorta(fila.fecha_fin)}`
@@ -119,7 +119,7 @@ const CAMPOS_COMISION_VACIOS = {
   modalidad: '',
   sede: '',
   // Las dos fechas del período de cursada (historia #49) viajan como `AAAA-MM-DD`, que es lo que
-  // devuelve y espera el `<input type="date">` y lo que la API guarda (D62).
+  // devuelve y espera el `<input type="date">` y lo que la API guarda (D64).
   fecha_inicio: '',
   fecha_fin: '',
 }
@@ -132,7 +132,7 @@ const CAMPOS_CURSO_VACIOS = { nombre: '', descripcion: '' }
  * Curso, número, modalidad, sede y código **no** están, porque el contrato de la edición no los
  * admite (D51): no son un olvido de la pantalla. El período de cursada sí se edita, y es
  * **obligatorio aunque la comisión no lo tenga**: la comisión heredada del catálogo del cliente se
- * puede editar, pero guardarla sin fechas la dejaría sin período para siempre (D62).
+ * puede editar, pero guardarla sin fechas la dejaría sin período para siempre (D64).
  */
 const CAMPOS_EDICION_COMISION_VACIOS = {
   docente: '',
@@ -882,7 +882,7 @@ export function CoursesPage() {
           />
 
           {/* La cantidad la calcula la API con las fechas guardadas: el navegador no la cuenta
-              (D62). Al guardar, el número que vuelve es el del período nuevo. */}
+              (D64). Al guardar, el número que vuelve es el del período nuevo. */}
           {comisionEditando?.cantidad_clases != null && (
             <p className="text-xs text-slate-500 sm:col-span-2">
               {comisionEditando.cantidad_clases}{' '}

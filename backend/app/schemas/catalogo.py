@@ -151,7 +151,7 @@ class ComisionCreate(BaseModel):
     Las dos fechas del período son **obligatorias** (historia #49): la columna admite nulos para
     el legado, pero toda alta nueva declara cuándo empieza y cuándo termina la cursada. La
     coherencia entre ellas y el conteo de clases los valida el servicio, que es el que puede
-    devolver el mensaje en es-AR por el `detail` del `422` (D62).
+    devolver el mensaje en es-AR por el `detail` del `422` (D64).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -187,7 +187,7 @@ class ComisionUpdate(BaseModel):
 
     El período también es obligatorio: una comisión heredada sin fechas no se puede guardar
     hasta completarlas, y editar las fechas no recalcula aranceles ni toca las inscripciones
-    (D62).
+    (D64).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -221,7 +221,7 @@ class ComisionOut(BaseModel):
 
     `fecha_inicio`, `fecha_fin` y `cantidad_clases` son el período (historia #49). Las fechas son
     nulas solo en las comisiones heredadas, y `cantidad_clases` es **derivada** —la property del
-    modelo— porque una columna se desincroniza apenas se editan los horarios o el período (D62).
+    modelo— porque una columna se desincroniza apenas se editan los horarios o el período (D64).
     """
 
     model_config = ConfigDict(from_attributes=True)

@@ -149,7 +149,7 @@ def obtener_detalle(
         categoria=inscripcion.categoria,
         porcentaje_beca=inscripcion.porcentaje_beca,
         acceso=_acceso(session, inscripcion),
-        # Las dos fechas del período van juntas o ninguna (D62): la comisión heredada informa que
+        # Las dos fechas del período van juntas o ninguna (D64): la comisión heredada informa que
         # todavía no está definida en lugar de completarla con una fecha de ejemplo.
         cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=comision.fecha_fin),
         proximos_encuentros=_proximos_encuentros(session, comision, hoy or date.today()),

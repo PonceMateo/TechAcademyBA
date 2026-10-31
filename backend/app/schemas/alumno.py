@@ -92,7 +92,7 @@ class ComisionCursadaOut(BaseModel):
 class CronogramaOut(BaseModel):
     """Período de cursada. Las dos fechas viajan juntas o ninguna.
 
-    Desde la historia #49 `comision` tiene `fecha_inicio` y `fecha_fin` (D62): toda comisión nueva
+    Desde la historia #49 `comision` tiene `fecha_inicio` y `fecha_fin` (D64): toda comisión nueva
     las trae y una heredada las trae nulas hasta que alguien la edite. El contrato informa las dos
     juntas o ninguna, y no completa una con una fecha de ejemplo.
     """
