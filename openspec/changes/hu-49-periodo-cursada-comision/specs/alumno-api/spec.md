@@ -48,6 +48,11 @@ revelar si la comisión existe.
 - **WHEN** el alumno consulta el detalle de una comisión cuya fecha de fin ya pasó
 - **THEN** la respuesta informa el período completo y no informa ningún encuentro próximo
 
+#### Scenario: La cursada terminada lo dice en la pantalla
+
+- **WHEN** el alumno abre el detalle de una comisión cuyo período ya terminó y la respuesta no trae encuentros
+- **THEN** la pantalla informa la fecha en que terminó la cursada y no dice que faltan los días de cursada
+
 #### Scenario: El tema de la clase todavía no está cargado
 
 - **WHEN** los próximos encuentros se derivan de los horarios y no hay tema cargado para esa fecha

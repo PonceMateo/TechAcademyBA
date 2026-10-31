@@ -147,6 +147,72 @@ describe('navegación desde la tarjeta', () => {
   })
 })
 
+describe('próximos encuentros vacíos', () => {
+  /**
+   * Los dos casos en que la lista viene vacía, que el contrato distingue por las fechas del
+   * período: la comisión sin días de cursada cargados y la cursada que ya terminó (historia #49).
+   */
+  function detalleCon({ horarios, cronograma }) {
+    return async (codigo) => ({
+      comision: {
+        codigo,
+        nombre: 'Desarrollo Web Full Stack',
+        docente_nombre: 'Lic. Laura Benítez',
+        horario: 'Lun y Mié 18:30-21:30hs',
+        horarios,
+        arancel: 62000,
+        sede_nombre: 'Sede Constituciones',
+      },
+      categoria: 'BECADO_PARCIAL',
+      porcentaje_beca: 50,
+      acceso: { estado: 'HABILITADO', causa: null },
+      cronograma,
+      proximos_encuentros: [],
+    })
+  }
+
+  it('dice cuándo terminó la cursada en lugar de que faltan los días de cursada', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerDetalleInscripcion: detalleCon({
+        horarios: [
+          { dia: 'LUN', inicio: '18:30', fin: '21:30' },
+          { dia: 'MIE', inicio: '18:30', fin: '21:30' },
+        ],
+        cronograma: { inicio: '2026-03-02', fin: '2026-06-30' },
+      }),
+    })
+    renderAppAs('ALUMNO', '/alumno/cursos/CUR-102')
+    await screen.findByRole('heading', { name: 'Desarrollo Web Full Stack · CUR-102' })
+
+    const encuentros = within(
+      screen.getByRole('heading', { name: 'Próximos encuentros' }).closest('section'),
+    )
+    expect(encuentros.getByText('La cursada terminó el 30/06/2026.')).toBeInTheDocument()
+    expect(encuentros.queryByText(/días de cursada cargados/)).not.toBeInTheDocument()
+  })
+
+  it('informa que faltan los días de cursada cuando la comisión todavía no tiene período', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerDetalleInscripcion: detalleCon({
+        horarios: [],
+        cronograma: { inicio: null, fin: null },
+      }),
+    })
+    renderAppAs('ALUMNO', '/alumno/cursos/CUR-102')
+    await screen.findByRole('heading', { name: 'Desarrollo Web Full Stack · CUR-102' })
+
+    const encuentros = within(
+      screen.getByRole('heading', { name: 'Próximos encuentros' }).closest('section'),
+    )
+    expect(
+      encuentros.getByText('La comisión todavía no tiene días de cursada cargados.'),
+    ).toBeInTheDocument()
+    expect(encuentros.queryByText(/La cursada terminó/)).not.toBeInTheDocument()
+  })
+})
+
 describe('detalle sin endpoint', () => {
   it('muestra que no está inscripto y no queda buscando', async () => {
     cleanup()

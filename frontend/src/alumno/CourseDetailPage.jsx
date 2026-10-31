@@ -39,6 +39,20 @@ const COLUMNAS_ENCUENTROS = [
   { clave: 'tema', titulo: 'TEMA', render: (fila) => fila.tema ?? '—' },
 ]
 const FIN_SIN_DEFINIR = 'Todavía no está definida'
+
+/**
+ * La fecha de hoy en `AAAA-MM-DD`, para compararla con las del contrato como texto.
+ *
+ * Es el único lugar de la pantalla que mira el calendario del navegador: el resto de las fechas
+ * llegan como cadenas del contrato y se comparan entre sí, sin pasar por `Date` (formato.js).
+ * Se compara con el día del alumno porque es su pantalla la que decide si la cursada ya terminó.
+ */
+function fechaDeHoy() {
+  const hoy = new Date()
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0')
+  const dia = String(hoy.getDate()).padStart(2, '0')
+  return `${hoy.getFullYear()}-${mes}-${dia}`
+}
 const NO_ENCONTRADA = 'No encontré esa cursada entre tus inscripciones.'
 const BUSCANDO = 'Buscando la cursada…'
 
@@ -119,6 +133,10 @@ function DetalleCursada({ codigo }) {
 
   const { comision, acceso, cronograma, proximos_encuentros: encuentros } = detalle
   const bloqueado = acceso.estado === ESTADO_HABILITACION.BLOQUEADO
+  // Sin encuentros hay dos causas distintas y el mensaje no puede ser el mismo: la comisión
+  // todavía no tiene días de cursada cargados, o la cursada ya terminó y el período lo dice
+  // (historia #49). Se compara contra el día del alumno, con el fin incluido.
+  const cursadaTerminada = cronograma.fin != null && cronograma.fin <= fechaDeHoy()
 
   return (
     <div className="space-y-4">
@@ -194,7 +212,9 @@ function DetalleCursada({ codigo }) {
         <Card titulo="Próximos encuentros">
           {encuentros.length === 0 ? (
             <p className="text-sm text-slate-500">
-              La comisión todavía no tiene días de cursada cargados.
+              {cursadaTerminada
+                ? `La cursada terminó el ${formatFechaCorta(cronograma.fin)}.`
+                : 'La comisión todavía no tiene días de cursada cargados.'}
             </p>
           ) : (
             <Table
