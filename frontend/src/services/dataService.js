@@ -78,7 +78,8 @@ export function buscarDocentes(texto) {
 
 /**
  * Alta de docente. El `cuil` es opcional y viaja en 11 dígitos o `null` (D57); la promesa **nunca
- * cae al ejemplo**: un alta que no llega a la base tiene que fallar y decirlo (D36).
+ * cae al ejemplo**: un alta que no llega a la base tiene que fallar y decirlo (D36). La respuesta
+ * trae `password_inicial` una única vez (HU #66); la pantalla la muestra y no la conserva.
  */
 export function crearDocente(datos) {
   return getDataSource().crearDocente(datos)

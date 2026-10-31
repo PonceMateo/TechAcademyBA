@@ -79,6 +79,31 @@ describe('la fuente real usa las rutas del contrato', () => {
       comisiones_asignadas: 1,
       comisiones: [{ id: 7, codigo: 'CUR101-1', nombre: 'Python Inicial' }],
     })
+    expect(fila.password_inicial).toBeUndefined()
+  })
+
+  it('conserva password_inicial solo en la respuesta del alta de docente (HU #66)', async () => {
+    responder(201, {
+      id: 9,
+      nombre: 'María',
+      apellido: 'González',
+      dni: '30.111.222',
+      cuil: null,
+      email: 'maria.gonzalez@techacademy.invalid',
+      telefono: null,
+      activo: true,
+      cantidad_comisiones: 0,
+      comisiones: [],
+      password_inicial: 'maria30111222',
+    })
+
+    const creado = await createApiDataSource().crearDocente({ nombre: 'María' })
+
+    expect(creado).toMatchObject({
+      nombre: 'María González',
+      email: 'maria.gonzalez@techacademy.invalid',
+      password_inicial: 'maria30111222',
+    })
   })
 
   it('edita un docente y restablece su contraseña con las rutas del padrón', async () => {
@@ -454,7 +479,9 @@ describe('el autoservicio del alumno', () => {
   })
 
   it('propaga el conflicto cuando el email ya pertenece a otra cuenta', async () => {
-    responder(409, { detail: 'El email agustina@mail.com ya está registrado en el padrón de alumnos.' })
+    responder(409, {
+      detail: 'El email agustina@mail.com ya está registrado en el padrón de alumnos.',
+    })
 
     await expect(
       createApiDataSource().actualizarPerfilAlumno({ email: 'agustina@mail.com', telefono: null }),

@@ -38,6 +38,7 @@ const DOCENTES = [
 
 /** La fila que devuelve la fuente después de un alta, con la forma que espera la tabla. */
 function docenteCreado(datos, extra = {}) {
+  const primerNombre = String(datos.nombre).split(' ')[0].toLowerCase()
   return {
     id: 99,
     nombre: `${datos.nombre} ${datos.apellido}`,
@@ -50,6 +51,7 @@ function docenteCreado(datos, extra = {}) {
     activo: true,
     comisiones: [],
     comisiones_asignadas: 0,
+    password_inicial: `${primerNombre}${String(datos.dni).replace(/\D/g, '')}`,
     ...extra,
   }
 }
@@ -442,18 +444,37 @@ describe('alta de docente', () => {
     expect(crear.mock.calls[0][0].telefono).toBe('+5491112345678')
   })
 
-  it('da de alta el docente y lo agrega al padrón con el nombre junto', async () => {
+  it('da de alta el docente y muestra las credenciales iniciales una sola vez', async () => {
     const user = userEvent.setup()
     await abrir(user)
     await completar(user)
 
     await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
 
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Nuevo Docente' })).not.toBeInTheDocument(),
-    )
+    const modal = await screen.findByRole('dialog', { name: 'Credenciales del docente' })
+    expect(screen.queryByRole('dialog', { name: 'Nuevo Docente' })).not.toBeInTheDocument()
+    expect(within(modal).getByText('ada.lovelace@techacademy.invalid')).toBeInTheDocument()
+    expect(within(modal).getByText('ada30111222')).toBeInTheDocument()
+    expect(within(modal).getByText(/cambiarla en su primer ingreso/)).toBeInTheDocument()
     expect(await screen.findByText('Docente Ada Lovelace dado de alta.')).toBeInTheDocument()
-    expect(await screen.findByText('ada.lovelace@techacademy.invalid')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Ada Lovelace')).toBeInTheDocument()
+  })
+
+  it('al cerrar el modal de credenciales la contraseña deja de estar visible', async () => {
+    stubDataSource({ crearDocente: vi.fn(async (datos) => docenteCreado(datos)) })
+    const user = userEvent.setup()
+    await abrir(user)
+    await completar(user)
+    await user.click(screen.getByRole('button', { name: 'Guardar Docente' }))
+
+    const modal = await screen.findByRole('dialog', { name: 'Credenciales del docente' })
+    await user.click(within(modal).getByRole('button', { name: 'Entendido' }))
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Credenciales del docente' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('ada30111222')).not.toBeInTheDocument()
+    expect(screen.getByRole('table')).not.toHaveTextContent('ada30111222')
   })
 
   it('deja el formulario abierto y muestra el motivo cuando la fuente rechaza el alta', async () => {
@@ -474,6 +495,9 @@ describe('alta de docente', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe un docente con ese DNI')
     expect(screen.getByRole('dialog', { name: 'Nuevo Docente' })).toBeInTheDocument()
     expect(screen.queryByText(/dado de alta\./)).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('dialog', { name: 'Credenciales del docente' }),
+    ).not.toBeInTheDocument()
     // Lo que el operador completó sigue ahí: reescribir el DNI a mano es el error más caro.
     expect(screen.getByLabelText(/^DNI/)).toHaveValue('30.111.222')
   })
@@ -684,7 +708,9 @@ describe('edición de docente (historia #11)', () => {
   it('muestra el motivo que devuelve la fuente y conserva lo que se escribió', async () => {
     stubDataSource({
       editarDocente: vi.fn(async () => {
-        throw new Error('El email ada@techacademy.invalid ya está registrado en el padrón de alumnos.')
+        throw new Error(
+          'El email ada@techacademy.invalid ya está registrado en el padrón de alumnos.',
+        )
       }),
     })
     const user = userEvent.setup()
@@ -718,7 +744,9 @@ describe('restablecimiento de contraseña del docente (historia #11)', () => {
     )
 
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Restablecer contraseña' })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole('dialog', { name: 'Restablecer contraseña' }),
+      ).not.toBeInTheDocument(),
     )
     expect(restablecer).toHaveBeenCalledWith(1, 'NuevaClave2026')
     expect(

@@ -14,8 +14,17 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from app.core.security import MAX_PASSWORD_BYTES
+
 _NON_ALPHANUMERIC = re.compile(r"[^0-9A-Z]+")
 _NON_DIGIT = re.compile(r"\D+")
+
+#: Parte del nombre que entra en la contraseña inicial. El DNI aporta hasta 8 dígitos, así que con
+#: 32 caracteres la contraseña nunca se acerca al límite de 72 bytes que procesa bcrypt.
+_MAX_NOMBRE_EN_PASSWORD = 32
+
+#: Caracteres que se conservan del primer nombre: letras sin tildes y dígitos, en minúsculas.
+_NON_ALPHANUMERIC_LOWER = re.compile(r"[^a-z0-9]+")
 
 
 def normalize_code(value: str) -> str:
@@ -59,6 +68,36 @@ def normalize_document(value: str | None) -> str | None:
         return None
     digits = _NON_DIGIT.sub("", value)
     return digits or None
+
+
+def generar_password_inicial(nombre: str, documento: str) -> str:
+    """Genera la contraseña inicial de un padrón: `<primer nombre><DNI>` (D45, D62).
+
+    El primer nombre va en minúsculas, sin tildes y sin signos; el documento, solo sus dígitos.
+    Así `Rocío Álvarez` con `30.111.222` recibe `rocio30111222`. Es la misma convención para el
+    alta de alumno y la de docente, y el usuario la cambia en su primer ingreso.
+
+    >>> generar_password_inicial("Juan Ignacio Pérez", "38.456.789")
+    'juan38456789'
+    >>> generar_password_inicial("Ángel", "30111222")
+    'angel30111222'
+    """
+    primer_nombre = nombre.strip().split()[0] if nombre.strip() else ""
+    descompuesto = unicodedata.normalize("NFKD", primer_nombre)
+    sin_tildes = "".join(char for char in descompuesto if not unicodedata.combining(char))
+    limpio = _NON_ALPHANUMERIC_LOWER.sub("", sin_tildes.lower())[:_MAX_NOMBRE_EN_PASSWORD]
+    digitos = normalize_document(documento) or ""
+    # El nombre es obligatorio en los dos contratos, así que el fallback no se alcanza desde la
+    # API; existe para que la función no devuelva solo el DNI si alguien la llama con vacío.
+    password = f"{limpio or 'usuario'}{digitos}"
+
+    # El DNI del contrato tiene 7 u 8 dígitos y el nombre se corta, así que hoy no se alcanza.
+    # La comprobación queda para que la convención no pueda producir una clave que bcrypt
+    # truncaría en silencio si mañana cambia el contrato.
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError("la contraseña inicial supera el límite de bcrypt")
+
+    return password
 
 
 #: Pesos del dígito verificador del CUIT, según la regla de AFIP. Son los mismos que usa el

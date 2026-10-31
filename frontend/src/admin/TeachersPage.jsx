@@ -53,6 +53,11 @@ import { formatDocumento, formatTelefono } from '../utils/formato'
  *
  * El control de clases dictadas se muestra deshabilitado con `Próximamente` para que el cliente vea
  * el hueco (D20).
+ *
+ * **El alta entrega una contraseña inicial propia (HU #66).** La fuente la devuelve solo en la
+ * respuesta del alta; la pantalla la muestra una única vez en un modal para que Secretaría se la
+ * entregue al docente y la borra al cerrarlo. No se envía por correo y no queda en el padrón, en la
+ * edición ni al recargar.
  */
 const COLUMNAS = [
   {
@@ -194,6 +199,7 @@ export function TeachersPage() {
   const [aviso, setAviso] = useState(null)
   const [fallo, setFallo] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  const [credenciales, setCredenciales] = useState(null)
   const [docenteEditando, setDocenteEditando] = useState(null)
   const [camposEdicion, setCamposEdicion] = useState(CAMPOS_VACIOS)
   const [erroresEdicion, setErroresEdicion] = useState({})
@@ -326,11 +332,22 @@ export function TeachersPage() {
       setDocentes((anteriores) => [...anteriores, creado])
       cerrarModal()
       setAviso(`Docente ${creado.nombre} dado de alta.`)
+      // HU #66: la contraseña inicial se muestra una sola vez, en un modal, para que Secretaría se
+      // la entregue al docente. No se envía por correo.
+      setCredenciales({
+        nombre: creado.nombre,
+        email: creado.email,
+        password: creado.password_inicial,
+      })
     } catch (error) {
       setFallo(error?.message ?? 'No se pudo guardar el docente.')
     } finally {
       setGuardando(false)
     }
+  }
+
+  function cerrarCredenciales() {
+    setCredenciales(null)
   }
 
   function abrirEdicion(docente) {
@@ -362,7 +379,6 @@ export function TeachersPage() {
     return (evento) =>
       setCamposEdicion((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
   }
-
 
   async function guardarEdicion() {
     const encontrados = validar(camposEdicion)
@@ -444,9 +460,7 @@ export function TeachersPage() {
       await restablecerPasswordDocente(docentePassword.id, nuevaPassword)
       const nombre = docentePassword.nombre
       cerrarPassword()
-      setAviso(
-        `Contraseña de ${nombre} restablecida. Deberá cambiarla en su próximo ingreso.`,
-      )
+      setAviso(`Contraseña de ${nombre} restablecida. Deberá cambiarla en su próximo ingreso.`)
     } catch (error) {
       setFalloPassword(error?.message ?? 'No se pudo restablecer la contraseña.')
     } finally {
@@ -488,7 +502,11 @@ export function TeachersPage() {
     <div className="space-y-4">
       <Card
         titulo="Padrón de Docentes"
-        acciones={<Button variante="secundario" onClick={() => setModalAbierto(true)}>+ Nuevo Docente</Button>}
+        acciones={
+          <Button variante="secundario" onClick={() => setModalAbierto(true)}>
+            + Nuevo Docente
+          </Button>
+        }
       >
         <div className="mb-4 max-w-sm">
           <Input
@@ -515,6 +533,45 @@ export function TeachersPage() {
           {aviso}
         </p>
       )}
+
+      <Modal
+        abierto={credenciales !== null}
+        titulo="Credenciales del docente"
+        onClose={cerrarCredenciales}
+        pie={<Button onClick={cerrarCredenciales}>Entendido</Button>}
+      >
+        {credenciales !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              Docente <span className="font-medium">{credenciales.nombre}</span> dado de alta.
+              Entregale estas credenciales:
+            </p>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Usuario
+                </dt>
+                <dd className="mt-1 break-all text-sm font-medium text-slate-900">
+                  {credenciales.email}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Contraseña inicial
+                </dt>
+                <dd className="mt-1">
+                  <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-900">
+                    {credenciales.password}
+                  </code>
+                </dd>
+              </div>
+            </dl>
+            <p className="text-sm text-slate-700">
+              El docente deberá cambiarla en su primer ingreso.
+            </p>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         abierto={modalAbierto}
@@ -593,7 +650,8 @@ export function TeachersPage() {
         )}
 
         <p className="mt-4 text-xs text-slate-500">
-          El docente se crea con una cuenta de acceso para ese mail.
+          El docente se crea con una cuenta de acceso para ese mail y una contraseña inicial que vas
+          a ver al confirmar.
         </p>
       </Modal>
 

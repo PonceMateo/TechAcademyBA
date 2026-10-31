@@ -105,9 +105,9 @@ function imputacionDelMock(store, item) {
 }
 
 /**
- * La contraseña inicial del alta de alumno (D45): `<primer nombre><DNI>`, en minúsculas y sin
- * tildes. Es la misma convención que aplica el backend; la fuente de ejemplo la replica para que
- * la pantalla muestre el mismo texto con las dos fuentes.
+ * La contraseña inicial de un alta (D45, D62): `<primer nombre><DNI>`, en minúsculas y sin
+ * tildes. Es la misma convención que aplica el backend para alumnos y docentes; la fuente de
+ * ejemplo la replica para que la pantalla muestre el mismo texto con las dos fuentes.
  */
 function passwordInicial(nombre, documento) {
   const primerNombre = String(nombre).trim().split(/\s+/)[0] ?? ''
@@ -117,7 +117,7 @@ function passwordInicial(nombre, documento) {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
   const digitos = String(documento).replace(/\D/g, '')
-  return `${sinTildes || 'alumno'}${digitos}`
+  return `${sinTildes || 'usuario'}${digitos}`
 }
 
 /**
@@ -420,14 +420,15 @@ export function createMockDataSource() {
     },
 
     /**
-     * Alta de docente de ejemplo: agrega la fila al store y la devuelve con la misma forma que la
-     * fuente real.
+     * Alta de docente de ejemplo: devuelve la fila con la misma forma que la fuente real y la
+     * contraseña inicial que esa fuente generaría (HU #66). No se guarda en el store: las filas
+     * permanentes del padrón no llevan credenciales.
      *
      * El CUIL es opcional (D57): si la pantalla no lo manda, la fila queda en `null`. El ejemplo
      * guarda lo que recibe, no un CUIL inventado.
      */
     async crearDocente({ nombre, apellido, dni, email, telefono, cuil = null }) {
-      return filaDeDocente({
+      const fila = filaDeDocente({
         id: siguienteId(store.docentes),
         nombre,
         apellido,
@@ -438,6 +439,7 @@ export function createMockDataSource() {
         activo: true,
         catedra: null,
       })
+      return { ...fila, password_inicial: passwordInicial(nombre, dni) }
     },
 
     /**
