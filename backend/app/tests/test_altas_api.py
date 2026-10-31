@@ -14,7 +14,7 @@ Lo que estos tests afirma por debajo de la respuesta:
   presencial o híbrida **sin sede se registra**, porque la sede es opcional en toda modalidad
   (historia #8), y la que la lleva en `Virtual` se rechaza con 422;
 - el rechazo del DNI repetido dice **DNI** y el del email repetido dice **email**;
-- la cuenta creada por el alta entra al sistema con la contraseña de demostración.
+- la cuenta creada por el alta entra al sistema con la contraseña inicial y cambio obligatorio.
 """
 
 from __future__ import annotations
@@ -38,10 +38,6 @@ from app.tests.factories import (
     horarios,
     token_de_prueba,
 )
-
-#: Contraseña de las cuentas de demostración. La misma que la del seed, y la que el alta de
-#: docente deja: es la forma de acceso durante esta fase.
-CONTRASENA = "Demo2026!"
 
 
 @pytest.fixture
@@ -395,7 +391,11 @@ def test_listado_de_comisiones_devuelve_las_vacantes_derivadas(
 def test_alta_de_docente_crea_el_docente_y_su_cuenta(
     api_client: TestClient, admin: Usuario, db_session: Session
 ) -> None:
-    """Historia #9: el docente se crea con acceso por su mail, y las dos filas o ninguna."""
+    """Historia #9 y HU #66: el docente se crea con acceso por su mail, y las dos filas o ninguna.
+
+    La contraseña inicial sigue la convención `<primer nombre><DNI>` y la cuenta nace con cambio
+    obligatorio, igual que el alta de alumno (D45, D62).
+    """
     api_client.headers.update(encabezado_de_autorizacion(token_de_prueba(admin)))
 
     respuesta = api_client.post(
@@ -414,12 +414,12 @@ def test_alta_de_docente_crea_el_docente_y_su_cuenta(
     assert cuerpo["cuil"] is None, "D57: el CUIL es opcional"
     assert cuerpo["telefono"] == "+5491140000001"
     assert cuerpo["cantidad_comisiones"] == 0
+    assert cuerpo["password_inicial"] == "rita30111222"
 
-    # Y la cuenta existe con la contraseña de demostración: el criterio de #9 pide que el
-    # docente pueda entrar a su panel.
-    usuario = autenticar(db_session, "rita.molina@techacademy.invalid", CONTRASENA)
+    usuario = autenticar(db_session, "rita.molina@techacademy.invalid", cuerpo["password_inicial"])
     assert usuario.rol == "DOCENTE"
-    assert usuario.must_change_password is False, "D18: sin cambio pendiente"
+    assert usuario.must_change_password is True, "HU #66: cambio pendiente en el primer ingreso"
+    assert usuario.password_hash != cuerpo["password_inicial"], "la base guarda solo el hash"
 
 
 def test_el_alta_de_docente_acepta_un_cuil_valido(cliente_admin: TestClient) -> None:

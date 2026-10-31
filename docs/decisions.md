@@ -2081,6 +2081,87 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/alumno/CourseDetailPage.jsx`, `frontend/src/alumno/navegacion.js`,
   `frontend/src/App.jsx`, `frontend/src/mocks/inscripciones.js`.
 
+## Credenciales iniciales propias para docentes (change `hu-66-credenciales-docente`)
+
+### D62 — El alta de docente entrega una contraseña inicial propia y las cuentas existentes no se tocan
+
+- **Fecha:** 2026-10-31
+- **Autor:** Santiago Torrens
+- **Decisión:** el alta de docente deja de usar la contraseña de demostración de `CONTRASEÑA_DEMO`.
+  Genera una contraseña inicial con la misma convención de D45 —`<primer nombre><DNI>`, primer
+  nombre en minúsculas y sin tildes, DNI normalizado a dígitos—, guarda solo su hash bcrypt y crea
+  la cuenta con `must_change_password = true`. `María González` con `30.111.222` recibe
+  `maria30111222`.
+- **Helper compartido:** `generar_password_inicial` se muda de `app/services/alumnos.py` a
+  `app/services/normalization.py`, que ya reúne las normalizaciones puras del dominio. El alta de
+  alumno la sigue importando desde `alumnos.py`, así que su contrato y sus pruebas no cambian, y el
+  alta de docente la usa del mismo lugar. El fallback de nombre vacío pasa a `usuario`, porque el
+  helper ya no es exclusivo del padrón de alumnos; los dos contratos exigen nombre no vacío, así que
+  el caso no se alcanza desde la API.
+- **Entrega única:** `POST /docentes` responde `DocenteCreadoOut`, que extiende `DocenteOut` con
+  `password_inicial`. `GET /docentes`, `PUT /docentes/{id}` y `POST /docentes/{id}/password` siguen
+  devolviendo `DocenteOut` y no exponen la contraseña ni el hash. El frontend la guarda en un estado
+  efímero, la muestra en el modal de credenciales y la borra al cerrarlo: no queda en el listado, en
+  la edición ni al recargar. **No se envía ningún correo ni se usa SMTP.**
+- **Primer ingreso sin rutas nuevas:** el docente entra con `POST /auth/login`, lee su sesión con
+  `GET /auth/me` y cambia la contraseña con `POST /auth/change-password`. Mientras
+  `must_change_password` siga en `true`, `require_roles` responde `403` en las rutas de rol (D45).
+  No se agregan endpoints ni pantallas de autenticación; se reutilizan `SessionContext`,
+  `RequireRole` y `ChangePasswordPage`.
+- **Docentes existentes (D52):** el cambio está solo en `crear_docente`. No hay migración de datos,
+  ni `UPDATE` masivo, ni regeneración de contraseñas: las cuentas creadas antes de la HU 66
+  conservan su hash, su `must_change_password`, sus sesiones y el restablecimiento administrativo de
+  la HU 11, que ya vuelve a exigir el cambio.
+- **Por qué:** una contraseña compartida y pública convierte el alta en una cuenta insegura, y el
+  flujo de cambio obligatorio ya existe desde la HU 13. Regenerar las cuentas históricas habría
+  invalidado credenciales ya entregadas y sesiones vigentes sin que nadie lo pidiera.
+- **Dónde:** `backend/app/services/normalization.py`, `backend/app/services/alumnos.py`,
+  `backend/app/services/padron.py`, `backend/app/schemas/padron.py`, `backend/app/api/padron.py`,
+  `backend/app/core/security.py`, `backend/app/tests/test_altas_api.py`,
+  `backend/app/tests/test_docente_credenciales.py`, `frontend/src/admin/TeachersPage.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js` y sus pruebas.
+
+## Edición del perfil del docente (change `editar-perfil-docente`)
+
+### D63 — El autoservicio del docente es un recurso `/docente` sin identificador y sincroniza el email con la cuenta
+
+- **Fecha:** 2026-10-31
+- **Autor:** Santiago Torrens
+- **Decisión:** el docente edita su email y su teléfono desde `Mi Perfil` con `GET` y `PUT
+  /docente/mi-perfil`, bajo `require_roles(Rol.DOCENTE)`. La ruta es **singular y no recibe ningún
+  identificador**: el legajo sale de `usuario.docente` de la cuenta autenticada, así que no existe
+  un parámetro que cambiar para alcanzar el perfil de otro docente. Es la misma decisión de D60
+  para el alumno.
+- **Contrato de dos campos:** `PerfilDocenteUpdate` es `extra="forbid"` con `email` y `telefono`.
+  Nombre, apellido, DNI y CUIL no están declarados, así que un cuerpo que los intente mandar es un
+  `422` y nunca llega al servicio. El teléfono reutiliza `TelefonoOpcional`, que se mueve de
+  `schemas/alumno.py` a `schemas/validators.py` para compartirlo con la HU 43.
+- **Unicidad y transacción:** el email se valida con `ensure_email_available` (M1) excluyendo la
+  propia fila del docente y la propia cuenta, de modo que conservar el email actual no es un
+  duplicado. `docente.email`, `docente.telefono` y `usuario.email` se escriben y confirman en una
+  sola transacción, con el patrón de D52; un `IntegrityError` por `uq_docente_email` o
+  `uq_usuario_email` se traduce al mismo `409` del chequeo previo. Después del cambio, el login usa
+  el email nuevo y el anterior deja de resolver la cuenta mientras no exista otra cuenta legítima
+  con él.
+- **Contraseña sin rutas nuevas:** la tarjeta `Seguridad` del perfil reutiliza
+  `SessionContext.changePassword` y `POST /auth/change-password`; la confirmación se valida en el
+  formulario y el backend sigue verificando la actual y guardando solo el hash. El cambio
+  obligatorio del primer ingreso (HU 66, D45) no se modifica y `ChangePasswordPage` sigue siendo su
+  pantalla.
+- **Perfil con datos reales:** la respuesta trae nombre, apellido, DNI, CUIL, email, teléfono y las
+  comisiones asignadas. `Especialidad` y `Sede de referencia` salen de la pantalla porque el padrón
+  no tiene esas columnas; el estado de la comisión se deriva de `activo` (M2) y no se inventa.
+  `SessionContext.updateSession` refleja el email guardado en la sesión en memoria, sin una segunda
+  llamada a `GET /auth/me`; al recargar, la sesión se relee de la base.
+- **Dónde:** `backend/app/api/docente.py`, `backend/app/schemas/docente.py`,
+  `backend/app/services/docente.py`, `backend/app/api/router.py`,
+  `backend/app/schemas/validators.py`, `backend/app/schemas/alumno.py`,
+  `backend/app/tests/test_docente_perfil.py`, `frontend/src/docente/TeacherProfilePage.jsx`,
+  `frontend/src/auth/SessionContext.jsx`, `frontend/src/services/dataService.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js` y sus
+  pruebas. Sin migración: las columnas ya existían.
+
 ## Período de cursada de una comisión (change `hu-49-periodo-cursada-comision`)
 
 ### D64 — La comisión declara su período, la cantidad de clases se deriva y el panel del alumno se corta en el fin

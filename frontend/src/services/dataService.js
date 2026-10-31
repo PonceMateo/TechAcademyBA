@@ -78,7 +78,8 @@ export function buscarDocentes(texto) {
 
 /**
  * Alta de docente. El `cuil` es opcional y viaja en 11 dígitos o `null` (D57); la promesa **nunca
- * cae al ejemplo**: un alta que no llega a la base tiene que fallar y decirlo (D36).
+ * cae al ejemplo**: un alta que no llega a la base tiene que fallar y decirlo (D36). La respuesta
+ * trae `password_inicial` una única vez (HU #66); la pantalla la muestra y no la conserva.
  */
 export function crearDocente(datos) {
   return getDataSource().crearDocente(datos)
@@ -234,9 +235,18 @@ export function obtenerAsistenciaComision(comisionCodigo) {
   return getDataSource().obtenerAsistenciaComision(comisionCodigo)
 }
 
-/** Ficha del docente con sus comisiones (10.5). */
+/** Ficha del docente con sus comisiones (10.5 y HU 90). */
 export function obtenerPerfilDocente() {
   return getDataSource().obtenerPerfilDocente()
+}
+
+/**
+ * Guardado de los datos de contacto del docente (HU 90). Recibe `{ email, telefono }` y devuelve el
+ * perfil guardado; un email que ya usa otra persona de cualquier padrón falla con el conflicto y la
+ * pantalla lo muestra sin borrar lo ingresado.
+ */
+export function actualizarPerfilDocente(datos) {
+  return getDataSource().actualizarPerfilDocente(datos)
 }
 
 /**

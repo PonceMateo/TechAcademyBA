@@ -22,23 +22,11 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.alumnos import AccesoAlumnoOut
-from app.schemas.validators import EmailConForma, TelefonoE164
-
-
-def _vacio_a_none(valor: object) -> object:
-    """Convierte el texto vacío —o de solo espacios— en "no informado"."""
-    if isinstance(valor, str) and valor.strip() == "":
-        return None
-    return valor
-
-
-#: Teléfono opcional donde borrar el dato es mandar vacío o `null`, no un `422`.
-TelefonoOpcional = Annotated[TelefonoE164 | None, BeforeValidator(_vacio_a_none)]
+from app.schemas.validators import EmailConForma, TelefonoOpcional
 
 
 class HorarioCursadaOut(BaseModel):

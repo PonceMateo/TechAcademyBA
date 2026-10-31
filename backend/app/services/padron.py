@@ -1,4 +1,4 @@
-"""Reglas de negocio del padrón de docentes (historias #9 y #11).
+"""Reglas de negocio del padrón de docentes (historias #9, #11 y #66).
 
 Vive en `services` y no en el router por D1, y confirma la transacción por la misma razón que
 `app/services/catalogo.py`: `get_db` cierra la sesión sin confirmar.
@@ -8,33 +8,35 @@ cuenta sin docente es un estado que el CHECK `rol_vinculo_coherente` impide, y u
 cuenta no cumple el criterio de #9 ("el docente se crea con acceso por su mail"). Con una sola
 transacción, o quedan las dos o no queda ninguna.
 
-**La contraseña es la de demostración y la cuenta nace sin cambio pendiente.** Es la decisión de
-esta fase, coherente con D18, y vale la pena decir por qué no es un descuido: el flujo de cambio
-de contraseña **no existe**, así que marcar la cuenta como pendiente mandaría al docente a un
-cartel que textualmente dice que el flujo todavía no está disponible
-(`frontend/src/components/session/AvisoCambioContrasena.jsx`). Una cuenta que crea la secretaría
-con una contraseña que la secretaría conoce no tiene nada que cambiar. **Cuando exista el flujo,
-esto se revierte** y la cuenta nace con `must_change_password = True`, como dice el modelo.
+**La contraseña inicial es propia y la cuenta nace pendiente de cambio (HU #66).** Se genera con la
+misma convención del alta de alumno —`<primer nombre><DNI>`, minúsculas y sin tildes— (D45, D62),
+se guarda solo su hash y el administrador la ve una única vez en la respuesta de `POST /docentes`.
+El docente la cambia en su primer ingreso y, mientras siga pendiente, `require_roles` le responde
+`403` en las rutas de rol. **No se envía ningún correo.**
+
+**Las cuentas creadas antes de la HU 66 no se tocan:** no se regeneran contraseñas, no se actualiza
+`must_change_password` de forma masiva y el restablecimiento administrativo de #11 sigue igual.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.security import CONTRASEÑA_DEMO, MAX_PASSWORD_BYTES, hashear_password
+from app.core.security import MAX_PASSWORD_BYTES, hashear_password
 from app.models.catalogo import Comision
 from app.models.enums import Rol
 from app.models.padron import Docente, Usuario
 from app.schemas.padron import DocenteCreate, DocenteUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available
-from app.services.normalization import normalize_document, normalize_name
+from app.services.normalization import generar_password_inicial, normalize_document, normalize_name
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,18 @@ _DNI_CON_SEPARADORES = re.compile(r"^[0-9.\s-]+$")
 #: versiones de PostgreSQL y el nombre no.
 INDICE_DNI = "uq_docente_dni_norm"
 INDICE_EMAIL = "uq_docente_email"
+
+
+@dataclass(frozen=True)
+class AltaDocente:
+    """Resultado del alta: el docente y la contraseña inicial que hay que entregar (HU #66).
+
+    La contraseña en claro **no se persiste**: viaja en esta respuesta y el administrador se la
+    entrega al docente. La base guarda solo el hash, igual que en el alta de alumno (D45, D62).
+    """
+
+    docente: Docente
+    password_inicial: str
 
 #: El CUIL es único (D57). Un DNI de 7 dígitos y el mismo con un cero adelante —`1112222` y
 #: `01112222`— son DNIs distintos y el mismo CUIL, así que el choque existe y hay que nombrarlo.
@@ -82,15 +96,21 @@ class DocenteDuplicado(Exception):
         super().__init__(f"Ya hay un docente registrado con ese {campo}.")
 
 
-def crear_docente(session: Session, datos: DocenteCreate) -> Docente:
+def crear_docente(session: Session, datos: DocenteCreate) -> AltaDocente:
     """Crea el docente y su cuenta de acceso, en una sola transacción.
 
     La unicidad cruzada de correo entre los tres padrones la sigue sosteniendo
     `ensure_email_available` (M1): tres índices únicos son tres índices por tabla y no impiden
     que una dirección esté en dos padrones a la vez. Ese chequeo **no** excluye a nadie porque
     el docente es nuevo: su fila todavía no existe, y la del `usuario` se crea después.
+
+    Devuelve el docente junto con la contraseña inicial en claro, que la ruta muestra una única
+    vez al administrador. La base guarda solo su hash y la cuenta queda pendiente de cambio
+    (HU #66, D45, D62).
     """
     ensure_email_available(session, datos.email)
+
+    password_inicial = generar_password_inicial(datos.nombre, datos.dni)
 
     docente = Docente(
         nombre=datos.nombre,
@@ -114,16 +134,16 @@ def crear_docente(session: Session, datos: DocenteCreate) -> Docente:
         Usuario(
             email=datos.email,
             nombre=f"{datos.nombre} {datos.apellido}",
-            password_hash=hashear_password(CONTRASEÑA_DEMO),
+            password_hash=hashear_password(password_inicial),
             rol=Rol.DOCENTE.value,
-            # Ver el docstring del módulo: el flujo de cambio de contraseña no existe.
-            must_change_password=False,
+            # El docente la cambia en su primer ingreso (HU #66).
+            must_change_password=True,
             is_active=True,
             docente_id=docente.id,
         )
     )
     session.commit()
-    return docente
+    return AltaDocente(docente=docente, password_inicial=password_inicial)
 
 
 def obtener_docente(session: Session, docente_id: int) -> Docente:

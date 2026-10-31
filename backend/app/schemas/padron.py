@@ -1,4 +1,4 @@
-"""Contrato de entrada y salida del padrón de docentes (historias #9 y #11).
+"""Contrato de entrada y salida del padrón de docentes (historias #9, #11 y #66).
 
 **El CUIL es opcional y forma parte del contrato** (D57, que amplía D33). `DocenteCreate` lo
 declara después del DNI y lo valida contra ese DNI: 11 dígitos, prefijo `20`, `23`, `24` o `27` y
@@ -109,3 +109,15 @@ class DocenteOut(BaseModel):
     activo: bool
     cantidad_comisiones: int
     comisiones: list[ComisionDeDocenteOut] = Field(default_factory=list)
+
+
+class DocenteCreadoOut(DocenteOut):
+    """Respuesta de `POST /docentes`: la fila del padrón más la contraseña inicial (HU #66).
+
+    `password_inicial` viaja **solo en el alta**, y en claro una única vez, para que el
+    administrador se la entregue al docente. No se envía por correo y la base guarda solo el hash.
+    `GET /docentes`, `PUT /docentes/{id}` y el restablecimiento de contraseña siguen devolviendo
+    `DocenteOut` y no la exponen.
+    """
+
+    password_inicial: str
