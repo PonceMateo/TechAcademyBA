@@ -7,8 +7,8 @@ import { readStoredToken } from '../auth/tokenStorage'
  * **Toda lectura que falla se propaga como `DataSourceError`; no hay datos de ejemplo en su
  * lugar.** Los endpoints que existen son los del catálogo, el padrón de docentes, el alta y la
  * consulta del padrón de alumnos, las empresas, las cobranzas y las inscripciones de un alumno.
- * Los de habilitación y clases todavía no están escritos, así que las pantallas que los usan
- * degradan a su estado vacío (D42).
+ * La habilitación sigue siendo provisional (M33); el recurso de clases ya cuenta con sus
+ * endpoints.
  *
  * **Un error nunca se disfraza de dato válido:** ni un 404, ni un 500, ni un error de red. Un 404
  * es solo otro fallo —el endpoint o el registro pedido no existe— y sube tal cual, con su `status`,

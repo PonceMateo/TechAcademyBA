@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { useSession } from '../auth/SessionContext'
 import { Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
@@ -45,7 +46,14 @@ const COLUMNAS = [
   {
     clave: 'codigo',
     titulo: 'CÓDIGO',
-    render: (fila) => <span className="font-medium">{fila.codigo}</span>,
+    render: (fila) => (
+      <Link
+        to={`/docente/alumnos/${fila.codigo}`}
+        className="foco-acento texto-acento rounded font-medium underline"
+      >
+        {fila.codigo}
+      </Link>
+    ),
   },
   { clave: 'curso', titulo: 'CURSO', render: (fila) => fila.nombre_curso },
   { clave: 'docente', titulo: 'DOCENTE', render: (fila) => fila.docente_nombre },

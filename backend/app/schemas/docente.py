@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.alumnos import AlumnoOut
 from app.schemas.validators import EmailConForma, TelefonoOpcional
 
 
@@ -23,6 +24,27 @@ class ComisionDocenteOut(BaseModel):
     nombre_curso: str
     horario: str
     estado: str
+
+
+class ComisionAsignadaDocenteOut(BaseModel):
+    """Comisión que el docente puede operar desde su espacio."""
+
+    codigo: str
+    nombre_curso: str
+    docente_nombre: str
+    horario: str
+    proxima_clase: str | None = None
+    habilitados: int = 0
+    bloqueados: int = 0
+
+
+class PadronComisionDocenteOut(BaseModel):
+    """Padrón de una comisión que el docente tiene asignada."""
+
+    codigo: str
+    nombre_curso: str
+    horario: str
+    alumnos: list[AlumnoOut] = Field(default_factory=list)
 
 
 class PerfilDocenteOut(BaseModel):

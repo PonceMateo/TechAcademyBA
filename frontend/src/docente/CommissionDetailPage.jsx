@@ -5,6 +5,7 @@ import { TONO } from '../components/ui/paleta'
 import {
   guardarLinkClase,
   listarEmailsHabilitados,
+  obtenerLinkClase,
   obtenerPadronComision,
 } from '../services/dataService'
 
@@ -56,6 +57,8 @@ export function CommissionDetailPage() {
   const { codigo } = useParams()
   const [padron, setPadron] = useState(null)
   const [url, setUrl] = useState('')
+  const [linkGuardado, setLinkGuardado] = useState('')
+  const [editandoLink, setEditandoLink] = useState(true)
   const [error, setError] = useState(null)
   const [aviso, setAviso] = useState(null)
   const [copiados, setCopiados] = useState(null)
@@ -64,6 +67,27 @@ export function CommissionDetailPage() {
     obtenerPadronComision(codigo)
       .then(setPadron)
       .catch(() => setPadron(null))
+  }, [codigo])
+
+  useEffect(() => {
+    let vigente = true
+    obtenerLinkClase(codigo)
+      .then((resultado) => {
+        if (vigente) {
+          setError(null)
+          setUrl(resultado?.link ?? '')
+          setLinkGuardado(resultado?.link ?? '')
+          setEditandoLink(!resultado?.link)
+        }
+      })
+      .catch((error) => {
+        if (vigente) {
+          setError(error?.message ?? 'No se pudo consultar el link.')
+        }
+      })
+    return () => {
+      vigente = false
+    }
   }, [codigo])
 
   if (padron === null) {
@@ -78,17 +102,24 @@ export function CommissionDetailPage() {
   const habilitados = padron.alumnos.filter((alumno) => alumno.acceso.estado === 'HABILITADO')
 
   async function guardar() {
-    const resultado = await guardarLinkClase({ comisionCodigo: codigo, url })
+    try {
+      const resultado = await guardarLinkClase({ comisionCodigo: codigo, url })
 
-    if (!resultado.ok) {
+      if (!resultado?.ok) {
+        setAviso(null)
+        setError(resultado?.error ?? 'No se pudo guardar el link.')
+        return
+      }
+
+      setError(null)
+      setUrl(resultado.link ?? url)
+      setLinkGuardado(resultado.link ?? url)
+      setEditandoLink(false)
+      setAviso('Link de la clase cargado. Queda disponible para los alumnos habilitados.')
+    } catch (error) {
       setAviso(null)
-      setError(resultado.error)
-      return
+      setError(error?.message ?? 'No se pudo guardar el link.')
     }
-
-    setError(null)
-    setUrl(resultado.link)
-    setAviso('Link de la clase cargado. Queda disponible para los alumnos habilitados.')
   }
 
   async function copiar() {
@@ -176,6 +207,7 @@ export function CommissionDetailPage() {
               etiqueta="Link de la clase"
               type="url"
               valor={url}
+              disabled={!editandoLink}
               onChange={(evento) => {
                 setUrl(evento.target.value)
                 setError(null)
@@ -184,8 +216,26 @@ export function CommissionDetailPage() {
               error={error}
             />
           </div>
-          <Button onClick={guardar}>Guardar link de la clase</Button>
+          {editandoLink ? (
+            <Button onClick={guardar}>Guardar link de la clase</Button>
+          ) : (
+            <Button variante="secundario" onClick={() => setEditandoLink(true)}>
+              Editar link
+            </Button>
+          )}
         </div>
+        {linkGuardado && (
+          <p className="mt-3 text-sm">
+            <a
+              href={linkGuardado}
+              target="_blank"
+              rel="noreferrer"
+              className="texto-acento foco-acento underline"
+            >
+              Abrir link de la clase
+            </a>
+          </p>
+        )}
       </Card>
     </div>
   )

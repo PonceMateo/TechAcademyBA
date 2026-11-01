@@ -22,6 +22,7 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
+from app.schemas.docente import ComisionAsignadaDocenteOut
 from app.schemas.padron import (
     DocenteCreadoOut,
     DocenteCreate,
@@ -29,7 +30,7 @@ from app.schemas.padron import (
     DocenteUpdate,
     RestablecerPasswordRequest,
 )
-from app.services import padron
+from app.services import docente, padron
 from app.services.auth import PasswordInvalida
 from app.services.emails import EmailAlreadyRegistered
 
@@ -37,6 +38,19 @@ router = APIRouter(prefix="/docentes", tags=["padron"])
 
 #: Todas las rutas del padrón son de Administración.
 _solo_admin = require_roles(Rol.ADMIN)
+_solo_docente = require_roles(Rol.DOCENTE)
+
+
+@router.get(
+    "/mis-comisiones",
+    response_model=list[ComisionAsignadaDocenteOut],
+    summary="Consultar mis comisiones",
+)
+def listar_mis_comisiones(
+    session: Annotated[Session, Depends(get_db)],
+    usuario: Annotated[Usuario, Depends(_solo_docente)],
+) -> list[ComisionAsignadaDocenteOut]:
+    return docente.listar_comisiones_asignadas(session, usuario)
 
 
 @router.get("", response_model=list[DocenteOut], summary="Consultar el padrón de docentes")
