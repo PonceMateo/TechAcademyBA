@@ -27,7 +27,6 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
-from app.schemas.docente import PadronComisionDocenteOut
 from app.schemas.catalogo import (
     ComisionCreate,
     ComisionOut,
@@ -37,6 +36,7 @@ from app.schemas.catalogo import (
     CursoUpdate,
     SedeOut,
 )
+from app.schemas.docente import PadronComisionDocenteOut
 from app.services import catalogo, docente
 
 router = APIRouter(tags=["catalogo"])

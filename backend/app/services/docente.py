@@ -25,12 +25,12 @@ from app.schemas.alumnos import AlumnoOut
 from app.schemas.docente import (
     ComisionAsignadaDocenteOut,
     ComisionDocenteOut,
+    PadronComisionDocenteOut,
     PerfilDocenteOut,
     PerfilDocenteUpdate,
-    PadronComisionDocenteOut,
 )
-from app.services.emails import EmailAlreadyRegistered, ensure_email_available
 from app.services import habilitacion
+from app.services.emails import EmailAlreadyRegistered, ensure_email_available
 
 
 class SinDocenteAsociado(Exception):
