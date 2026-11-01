@@ -189,11 +189,32 @@ describe('vista de cursos', () => {
     expect(screen.getByRole('button', { name: '+ Nuevo Curso' })).toBeInTheDocument()
   })
 
-  it('deja ver el buscador sin que filtre', () => {
-    // El campo se ve deshabilitado y con la leyenda: el hueco queda a la vista y no promete una
-    // búsqueda que todavía no existe.
-    expect(screen.getByLabelText(/Buscar curso/)).toBeDisabled()
-    expect(screen.getByText(/todavía no está disponible/)).toBeInTheDocument()
+  it('muestra el buscador habilitado', () => {
+    const input = screen.getByLabelText(/Buscar curso/)
+    expect(input).not.toBeDisabled()
+  })
+
+  it('filtra el grid por nombre, sin distinguir mayúsculas', async () => {
+    const user = userEvent.setup()
+    const input = screen.getByLabelText(/Buscar curso/)
+    await user.type(input, 'python')
+    expect(screen.getByText('Python Inicial')).toBeInTheDocument()
+    expect(screen.queryByText('Java Backend Spring')).not.toBeInTheDocument()
+  })
+
+  it('muestra mensaje cuando no hay cursos coincidentes', async () => {
+    const user = userEvent.setup()
+    const input = screen.getByLabelText(/Buscar curso/)
+    await user.type(input, 'zzzz')
+    expect(screen.getByText('No se encontraron cursos.')).toBeInTheDocument()
+  })
+
+  it('restaura el catálogo al vaciar la búsqueda', async () => {
+    const user = userEvent.setup()
+    const input = screen.getByLabelText(/Buscar curso/)
+    await user.type(input, 'python')
+    await user.clear(input)
+    expect(screen.getByText('Java Backend Spring')).toBeInTheDocument()
   })
 
   it('pone el curso recién creado en el catálogo con cero comisiones', async () => {
@@ -269,8 +290,33 @@ describe('vista de comisiones del curso', () => {
     expect(within(screen.getByRole('table')).queryByText('$52.000')).not.toBeInTheDocument()
   })
 
-  it('deja el buscador a la vista sin que filtre', () => {
-    expect(screen.getByLabelText(/Buscar comisión/)).toBeDisabled()
+  it('muestra el buscador habilitado', () => {
+    const input = screen.getByLabelText(/Buscar comisión/)
+    expect(input).not.toBeDisabled()
+  })
+
+  it('filtra la tabla por código, docente u horario', async () => {
+    const user = userEvent.setup()
+    const input = screen.getByLabelText(/Buscar comisión/)
+    await user.type(input, 'Martín')
+    const filas = filasDeComisiones()
+    expect(filas).toHaveLength(1)
+    expect(filas[0]).toHaveTextContent('CUR-101')
+  })
+
+  it('muestra mensaje cuando no hay comisiones coincidentes', async () => {
+    const user = userEvent.setup()
+    const input = screen.getByLabelText(/Buscar comisión/)
+    await user.type(input, 'zzzz')
+    expect(screen.getByText('No se encontraron comisiones.')).toBeInTheDocument()
+  })
+
+  it('restaura la tabla al vaciar la búsqueda', async () => {
+    const user = userEvent.setup()
+    const input = screen.getByLabelText(/Buscar comisión/)
+    await user.type(input, 'zzzz')
+    await user.clear(input)
+    expect(filasDeComisiones().length).toBeGreaterThan(0)
   })
 
   it('vuelve al catálogo', async () => {

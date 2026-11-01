@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { MODALIDAD } from '../domain/enums'
-import { normalizeCode } from '../domain/normalize'
+import { normalizeCode, normalizeWords } from '../domain/normalize'
 import {
   obtenerResumenCatalogo,
   crearComision,
@@ -177,10 +177,85 @@ function erroresDelPeriodo(campos) {
  * todavía no se escribió, y un campo que se ve igual que los demás y no acepta el foco obliga a
  * probarlo para enterarse (D20).
  */
-const LEYENDA_BUSCADOR = 'la búsqueda todavía no está disponible'
+
 
 /** Lo que la tabla dice de la comisión que no tiene período, en vez de dejar la celda vacía. */
 const PERIODO_SIN_DEFINIR = 'Sin definir'
+
+/**
+ * Coincidencia por prefijo de palabra para un campo.
+ *
+ * Devuelve el índice de la primera palabra del campo que coincide con la primera palabra de la
+ * consulta, o `null` si no todas las palabras de la consulta son prefijo de palabras consecutivas
+ * del campo, en orden (criterio D48).
+ */
+function posicionEnCampo(texto, palabras) {
+  const campo = normalizeWords(texto)
+  if (!campo.length || !palabras.length) return null
+  let posicion = 0
+  let primera = null
+  for (const palabra of palabras) {
+    const indice = campo.findIndex((item, i) => i >= posicion && item.startsWith(palabra))
+    if (indice === -1) return null
+    if (primera === null) primera = indice
+    posicion = indice + 1
+  }
+  return primera
+}
+
+function claveCoincidenciaCurso(curso, palabras) {
+  // Nombre y descripción: coincidencia por prefijo de palabra (criterio D48).
+  for (const campo of [
+    { prioridad: 0, texto: curso.nombre },
+    { prioridad: 2, texto: curso.descripcion ?? '' },
+  ]) {
+    const posicion = posicionEnCampo(campo.texto, palabras)
+    if (posicion !== null) return [campo.prioridad, posicion, curso.id]
+  }
+  // Código: subcadena (contains) sobre el código normalizado, para que «001» o «1»
+  // encuentren «CUR001» aunque no sean prefijo de la palabra completa.
+  const codigoNormalizado = normalizeCode(curso.codigo)
+  const consultaNormalizada = normalizeCode(palabras.join(''))
+  if (consultaNormalizada && codigoNormalizado.includes(consultaNormalizada)) {
+    return [1, 0, curso.id]
+  }
+  return null
+}
+
+function claveCoincidenciaComision(comision, palabras) {
+  const campos = [
+    { prioridad: 0, texto: comision.codigo },
+    { prioridad: 1, texto: comision.docente_nombre ?? '' },
+    { prioridad: 2, texto: comision.dias_horarios ?? '' },
+  ]
+  for (const campo of campos) {
+    const posicion = posicionEnCampo(campo.texto, palabras)
+    if (posicion !== null) return [campo.prioridad, posicion, comision.id]
+  }
+  return null
+}
+
+function compararClaves(izquierda, derecha) {
+  const largo = Math.max(izquierda.length, derecha.length)
+  for (let i = 0; i < largo; i += 1) {
+    const a = izquierda[i] ?? 0
+    const b = derecha[i] ?? 0
+    if (a !== b) return a - b
+  }
+  return 0
+}
+
+function filtrarPorPrefijo(registros, texto, claveDe) {
+  const aguja = texto.trim()
+  if (aguja === '') return registros
+  const palabras = normalizeWords(aguja)
+  if (palabras.length === 0) return registros
+  return registros
+    .map((registro) => ({ registro, clave: claveDe(registro, palabras) }))
+    .filter(({ clave }) => clave !== null)
+    .sort((izquierda, derecha) => compararClaves(izquierda.clave, derecha.clave))
+    .map(({ registro }) => registro)
+}
 
 export function CoursesPage() {
   // `undefined` es la vista del catálogo; con parámetro, la vista de ese curso.
@@ -230,6 +305,8 @@ export function CoursesPage() {
   const [aviso, setAviso] = useState(null)
   const [fallo, setFallo] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  const [busquedaCursos, setBusquedaCursos] = useState('')
+  const [busquedaComisiones, setBusquedaComisiones] = useState('')
 
   useEffect(() => {
     listarComisiones().then(setComisiones)
@@ -277,6 +354,14 @@ export function CoursesPage() {
           (comision) => normalizeCode(comision.curso.codigo) === normalizeCode(cursoDeRuta.codigo),
         )
 
+  const cursosFiltrados = useMemo(
+    () => filtrarPorPrefijo(cursos, busquedaCursos, claveCoincidenciaCurso),
+    [cursos, busquedaCursos],
+  )
+  const comisionesFiltradas = useMemo(
+    () => filtrarPorPrefijo(comisionesDelCurso, busquedaComisiones, claveCoincidenciaComision),
+    [comisionesDelCurso, busquedaComisiones],
+  )
   // "Hace falta mostrarlo" y "es Presencial o Híbrido" son hoy la misma condición: la sede es
   // opcional en toda modalidad, así que no hay nada que exigir. El campo aparece recién cuando la
   // modalidad elegida sea una de esas dos, y no mientras el selector siga en `Seleccionar…`.
@@ -702,9 +787,11 @@ export function CoursesPage() {
     if (codigoDeRuta === undefined) {
       contenido = (
         <VistaCursos
-          cursos={cursos}
+          cursos={cursosFiltrados}
           comisionesPorCurso={comisionesPorCurso}
           resumen={resumen}
+          busqueda={busquedaCursos}
+          onBusquedaChange={setBusquedaCursos}
           onNuevoCurso={() => setModalCurso(true)}
           onNuevaComision={abrirModalComision}
           onInscribir={() => abrirModalInscripcion()}
@@ -720,9 +807,11 @@ export function CoursesPage() {
       contenido = (
         <VistaComisiones
           curso={cursoDeRuta}
-          comisiones={comisionesDelCurso}
+          comisiones={comisionesFiltradas}
           columnas={columnasComisiones}
           resumen={resumen}
+          busqueda={busquedaComisiones}
+          onBusquedaChange={setBusquedaComisiones}
           onVolver={() => navegar('/admin/cursos')}
           onNuevaComision={abrirModalComision}
           onInscribir={() => abrirModalInscripcion()}
@@ -1147,6 +1236,8 @@ function VistaCursos({
   cursos,
   comisionesPorCurso,
   resumen,
+  busqueda,
+  onBusquedaChange,
   onNuevoCurso,
   onNuevaComision,
   onInscribir,
@@ -1169,14 +1260,22 @@ function VistaCursos({
         </div>
       }
     >
-      <BuscadorPendiente
-        id="buscar-curso"
-        etiqueta="Buscar curso"
-        placeholder="Buscar por nombre, código o descripción…"
-      />
+      <div className="mb-4 max-w-sm">
+        <Input
+          id="buscar-curso"
+          etiqueta="Buscar curso"
+          valor={busqueda}
+          placeholder="Buscar por nombre, código o descripción…"
+          onChange={(evento) => onBusquedaChange(evento.target.value)}
+        />
+      </div>
 
       {cursos.length === 0 ? (
-        <p className="text-sm text-slate-500">Todavía no hay cursos en el catálogo.</p>
+        busqueda.trim() !== '' ? (
+          <p className="text-sm text-slate-500">No se encontraron cursos.</p>
+        ) : (
+          <p className="text-sm text-slate-500">Todavía no hay cursos en el catálogo.</p>
+        )
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {cursos.map((curso) => (
@@ -1297,6 +1396,8 @@ function VistaComisiones({
   comisiones,
   columnas,
   resumen,
+  busqueda,
+  onBusquedaChange,
   onVolver,
   onNuevaComision,
   onInscribir,
@@ -1318,16 +1419,26 @@ function VistaComisiones({
         </div>
       }
     >
-      <BuscadorPendiente
-        id="buscar-comision"
-        etiqueta="Buscar comisión"
-        placeholder="Buscar por código, docente u horario…"
-      />
+      <div className="mb-4 max-w-sm">
+        <Input
+          id="buscar-comision"
+          etiqueta="Buscar comisión"
+          valor={busqueda}
+          placeholder="Buscar por código, docente u horario…"
+          onChange={(evento) => onBusquedaChange(evento.target.value)}
+        />
+      </div>
 
       <Table
         columnas={columnas}
         filas={comisiones}
-        vacio={<p className="text-sm text-slate-500">Este curso todavía no tiene comisiones.</p>}
+        vacio={
+          comisiones.length === 0 && busqueda.trim() !== '' ? (
+            <p className="text-sm text-slate-500">No se encontraron comisiones.</p>
+          ) : (
+            <p className="text-sm text-slate-500">Este curso todavía no tiene comisiones.</p>
+          )
+        }
       />
     </Card>
   )
@@ -1348,28 +1459,6 @@ function CursoInexistente({ onVolver }) {
         Ese curso no está en el catálogo. Puede que el enlace sea de antes de que lo cambiaran.
       </p>
     </Card>
-  )
-}
-
-/**
- * El buscador, visible y sin función.
- *
- * `readOnly` va con `disabled` porque un control con `value` y sin `onChange` es un campo que
- * React avisa que no se puede editar; deshabilitado ya está.
- */
-function BuscadorPendiente({ id, etiqueta, placeholder }) {
-  return (
-    <div className="mb-4 max-w-sm">
-      <Input
-        id={id}
-        etiqueta={etiqueta}
-        valor=""
-        placeholder={placeholder}
-        disabled
-        readOnly
-        leyenda={LEYENDA_BUSCADOR}
-      />
-    </div>
   )
 }
 
