@@ -8,7 +8,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.models.clases import AuditLog
-from app.models.enums import EstadoAsistencia, EstadoHabilitacion
+from app.models.enums import CategoriaInscripcion, EstadoAsistencia, EstadoHabilitacion
+from app.services import clases
 from app.tests.conftest import assert_rechazado
 from app.tests.factories import (
     crear_alumno,
@@ -18,6 +19,8 @@ from app.tests.factories import (
     crear_inscripcion,
     crear_override,
     crear_usuario_admin,
+    crear_usuario_alumno,
+    crear_usuario_docente,
 )
 
 
@@ -31,6 +34,49 @@ def test_clase_sin_link_es_valida(db_session: Session) -> None:
     """El link se carga después; una clase sin link todavía es una clase."""
     clase = crear_clase(db_session, link_virtual=None)
     assert clase.link_virtual is None
+
+
+def test_el_link_se_puede_consultar_por_el_docente_de_la_comision(db_session: Session) -> None:
+    docente = crear_usuario_docente(db_session)
+    comision = crear_comision(db_session, docente=docente.docente)
+    crear_clase(db_session, comision=comision, link_virtual="https://zoom.us/j/987654321")
+
+    assert (
+        clases.obtener_link(db_session, comision.codigo, docente)
+        == "https://zoom.us/j/987654321"
+    )
+
+
+def test_el_link_no_se_puede_consultar_por_un_alumno_bloqueado(db_session: Session) -> None:
+    alumno = crear_usuario_alumno(db_session)
+    comision = crear_comision(db_session)
+    crear_inscripcion(
+        db_session,
+        alumno=alumno.alumno,
+        comision=comision,
+        categoria=CategoriaInscripcion.PARTICULAR.value,
+    )
+    crear_clase(db_session, comision=comision, link_virtual="https://zoom.us/j/987654321")
+
+    with pytest.raises(clases.NoAutorizado):
+        clases.obtener_link(db_session, comision.codigo, alumno)
+
+
+def test_el_link_se_puede_consultar_por_un_alumno_habilitado(db_session: Session) -> None:
+    alumno = crear_usuario_alumno(db_session)
+    comision = crear_comision(db_session)
+    crear_inscripcion(
+        db_session,
+        alumno=alumno.alumno,
+        comision=comision,
+        categoria=CategoriaInscripcion.BECADO_TOTAL.value,
+    )
+    crear_clase(db_session, comision=comision, link_virtual="https://zoom.us/j/987654321")
+
+    assert (
+        clases.obtener_link(db_session, comision.codigo, alumno)
+        == "https://zoom.us/j/987654321"
+    )
 
 
 @pytest.mark.parametrize("link", ["zoom.us/j/987", "no-es-una-url", "https://", "ftp://a.com"])

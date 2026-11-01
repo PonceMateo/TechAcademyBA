@@ -6,12 +6,14 @@ from datetime import date
 from urllib.parse import urlparse
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import Comision
 from app.models.clases import Clase
-from app.models.enums import Rol
+from app.models.enums import EstadoHabilitacion, EstadoInscripcion, Rol
+from app.models.inscripciones import Inscripcion
 from app.models.padron import Usuario
+from app.services import habilitacion
 
 
 class ComisionNoEncontrada(Exception):
@@ -19,7 +21,7 @@ class ComisionNoEncontrada(Exception):
 
 
 class NoAutorizado(Exception):
-    """El usuario no puede cargar el link de esa comisión."""
+    """El usuario no puede consultar o cargar el link de esa comisión."""
 
 
 class UrlInvalida(Exception):
@@ -35,10 +37,14 @@ def _validar_url(url: str) -> None:
 
 
 def _resolver_comision(session: Session, codigo: str) -> Comision:
-    comision = session.scalar(select(Comision).where(Comision.codigo == codigo))
-    if comision is None:
-        raise ComisionNoEncontrada("La comisión no existe.")
-    return comision
+    buscado = (codigo or "").strip().upper()
+    comisiones = session.scalars(
+        select(Comision).options(selectinload(Comision.curso))
+    ).all()
+    for comision in comisiones:
+        if comision.codigo.strip().upper() == buscado:
+            return comision
+    raise ComisionNoEncontrada("La comisión no existe.")
 
 
 def _autorizar(usuario: Usuario, comision: Comision) -> None:
@@ -49,8 +55,32 @@ def _autorizar(usuario: Usuario, comision: Comision) -> None:
     raise NoAutorizado("No podés cargar el link de una comisión ajena.")
 
 
-def obtener_link(session: Session, codigo: str) -> str | None:
+def _autorizar_lectura(session: Session, usuario: Usuario, comision: Comision) -> None:
+    if usuario.rol == Rol.ADMIN.value:
+        return
+    if usuario.rol == Rol.DOCENTE.value and comision.docente_id == usuario.docente_id:
+        return
+    if usuario.rol != Rol.ALUMNO.value or usuario.alumno_id is None:
+        raise NoAutorizado("No podés consultar el link de una comisión ajena.")
+
+    inscripcion = session.scalar(
+        select(Inscripcion).where(
+            Inscripcion.alumno_id == usuario.alumno_id,
+            Inscripcion.comision_id == comision.id,
+            Inscripcion.estado == EstadoInscripcion.ACTIVA.value,
+        )
+    )
+    if (
+        inscripcion is None
+        or habilitacion.derivar_estado(session, inscripcion)[0]
+        != EstadoHabilitacion.HABILITADO.value
+    ):
+        raise NoAutorizado("No podés consultar el link de una comisión ajena.")
+
+
+def obtener_link(session: Session, codigo: str, usuario: Usuario) -> str | None:
     comision = _resolver_comision(session, codigo)
+    _autorizar_lectura(session, usuario, comision)
     clase = session.scalar(
         select(Clase)
         .where(Clase.comision_id == comision.id)

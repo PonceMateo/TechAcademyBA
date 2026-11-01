@@ -149,7 +149,31 @@ describe('carga del link de la clase', () => {
       ).toBeInTheDocument(),
     )
     expect(screen.getByLabelText('Link de la clase')).toHaveValue('https://zoom.us/j/99887766')
+    expect(screen.getByLabelText('Link de la clase')).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Abrir link de la clase' })).toHaveAttribute(
+      'href',
+      'https://zoom.us/j/99887766',
+    )
+    expect(screen.getByRole('button', { name: 'Editar link' })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('habilita la edición sin cambiar el link guardado hasta volver a guardar', async () => {
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText('Link de la clase'), 'https://zoom.us/j/99887766')
+    await user.click(screen.getByRole('button', { name: 'Guardar link de la clase' }))
+    await screen.findByRole('button', { name: 'Editar link' })
+
+    await user.click(screen.getByRole('button', { name: 'Editar link' }))
+    const campo = screen.getByLabelText('Link de la clase')
+    expect(campo).toBeEnabled()
+    await user.clear(campo)
+
+    expect(screen.getByRole('link', { name: 'Abrir link de la clase' })).toHaveAttribute(
+      'href',
+      'https://zoom.us/j/99887766',
+    )
   })
 
   it('aclara que el chip de solo lectura no cubre el campo del link', () => {

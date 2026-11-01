@@ -19,13 +19,15 @@ router = APIRouter(prefix="/clases", tags=["clases"])
 @router.get("/link", response_model=LinkClaseOut, summary="Consultar el link de la clase")
 def obtener_link(
     session: Annotated[Session, Depends(get_db)],
-    _usuario: Annotated[Usuario, Depends(get_current_user)],
+    usuario: Annotated[Usuario, Depends(get_current_user)],
     comision: Annotated[str, Query()],
 ) -> LinkClaseOut:
     try:
-        link = clases.obtener_link(session, comision)
+        link = clases.obtener_link(session, comision, usuario)
     except clases.ComisionNoEncontrada as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except clases.NoAutorizado as error:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(error)) from error
     return LinkClaseOut(ok=True, link=link)
 
 

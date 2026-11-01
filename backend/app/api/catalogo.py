@@ -27,6 +27,7 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
+from app.schemas.docente import PadronComisionDocenteOut
 from app.schemas.catalogo import (
     ComisionCreate,
     ComisionOut,
@@ -36,12 +37,29 @@ from app.schemas.catalogo import (
     CursoUpdate,
     SedeOut,
 )
-from app.services import catalogo
+from app.services import catalogo, docente
 
 router = APIRouter(tags=["catalogo"])
 
 #: Todas las rutas del catálogo son de Administración.
 _solo_admin = require_roles(Rol.ADMIN)
+_solo_docente = require_roles(Rol.DOCENTE)
+
+
+@router.get(
+    "/comisiones/{codigo}/alumnos",
+    response_model=PadronComisionDocenteOut,
+    summary="Consultar el padrón de una comisión asignada",
+)
+def obtener_padron_comision(
+    codigo: str,
+    session: Annotated[Session, Depends(get_db)],
+    usuario: Annotated[Usuario, Depends(_solo_docente)],
+) -> PadronComisionDocenteOut:
+    try:
+        return docente.obtener_padron_comision(session, usuario, codigo)
+    except docente.ComisionNoEncontrada as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
 
 @router.get("/cursos", response_model=list[CursoOut], summary="Consultar el catálogo de cursos")
