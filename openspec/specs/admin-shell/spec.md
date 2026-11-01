@@ -193,10 +193,14 @@ La pantalla SHALL abrir además el modal `Crear Nuevo Curso`, con los campos `No
 el catálogo no tiene forma de crecer, y el selector de curso de la comisión se armaba con las
 comisiones existentes, así que un curso nuevo no podía abrir su primera comisión.
 
-Ambas vistas SHALL mostrar su campo de búsqueda con el control deshabilitado y una leyenda que
-explique que todavía no filtra. Los buscadores SHALL NOT filtrar el contenido de la vista: la
-funcionalidad de búsqueda queda para otro change y el campo deshabilitado existe para dejar el hueco
-a la vista, igual que los controles marcados `Próximamente`.
+Ambas vistas SHALL mostrar un campo de búsqueda habilitado. La vista de cursos SHALL filtrar el grid
+por nombre o descripción por prefijo de palabra, sin distinguir mayúsculas ni acentos, y por código
+por subcadena. La
+vista de comisiones SHALL filtrar la tabla por código, docente o horario, solo dentro del curso
+abierto. WHEN el campo queda vacío, la vista SHALL volver a mostrar el contenido completo. WHEN la
+búsqueda no tiene coincidencias, la vista de cursos SHALL mostrar `No se encontraron cursos` y la
+vista de comisiones SHALL mostrar `No se encontraron comisiones`. Los resultados SHALL reordenarse
+por relevancia de la coincidencia, con desempate por identificador.
 
 WHEN el código de la ruta no corresponde a ningún curso del catálogo, el sistema SHALL informar que
 el curso no existe y ofrecer el regreso a la vista de cursos. El sistema SHALL NOT mostrar una tabla
@@ -235,78 +239,132 @@ distinguir el motivo por el texto del mensaje: no hay otro campo del formulario 
 de numeración solo aparece ante dos altas simultáneas del mismo curso.
 
 #### Scenario: El usuario revisa el listado de comisiones
+
 - **WHEN** el usuario abre un curso del catálogo desde la vista de cursos
 - **THEN** ve el bloque `Comisiones Activas` de ese curso con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES` en ese orden, y las comisiones de ese curso con su arancel formateado
 
 #### Scenario: El usuario abre la vista de cursos
+
 - **WHEN** un usuario de Secretaría abre `Cursos y Comisiones`
-- **THEN** ve el chip `10 en el catálogo`, las acciones `+ Nuevo Curso` y `+ Nueva Comisión`, el buscador deshabilitado y el grid con una tarjeta por curso del catálogo, cada una con nombre, código, descripción y cantidad de comisiones
+- **THEN** ve el chip `10 en el catálogo`, las acciones `+ Nuevo Curso` y `+ Nueva Comisión`, el buscador habilitado y el grid con una tarjeta por curso del catálogo, cada una con nombre, código, descripción y cantidad de comisiones
 
 #### Scenario: El usuario compara el conteo de un curso con su tabla
+
 - **WHEN** el usuario mira la cantidad de comisiones de una tarjeta y abre ese curso
 - **THEN** la tabla de ese curso tiene exactamente las mismas filas que la cantidad anunciada en la tarjeta
 
 #### Scenario: El usuario abre un curso
+
 - **WHEN** el usuario pulsa una tarjeta del curso o su botón `Abrir comisiones`
 - **THEN** ve la tabla de comisiones de ese curso, con el nombre y el código del curso a la vista, y la dirección de la pantalla es la de ese curso
 
 #### Scenario: El usuario vuelve al catálogo
+
 - **WHEN** el usuario pulsa `Volver a cursos` desde la vista de un curso
 - **THEN** ve de nuevo el grid de cursos del catálogo
 
 #### Scenario: El usuario crea una comisión dentro de un curso
+
 - **WHEN** el usuario abre un curso y pulsa `+ Nueva Comisión`
 - **THEN** el modal abre con `Curso / Programa` ya elegido con ese curso y bloqueado, y la pantalla **no** ofrece `+ Nuevo Curso`
 
 #### Scenario: El usuario crea una comisión desde la vista de cursos
+
 - **WHEN** el usuario pulsa `+ Nueva Comisión` en la vista de cursos
 - **THEN** el modal abre con `Curso / Programa` vacío y editable, ofreciendo cualquier curso del catálogo
 
 #### Scenario: El usuario busca la comisión cerrada por cupo
+
 - **WHEN** el usuario abre el curso de `CUR-104` Diseño UX/UI Avanzado
 - **THEN** ve `VACANTES` con valor 0 y el chip `LLENO` en rojo junto a la fila
 
 #### Scenario: El usuario compara las vacantes con el cupo
+
 - **WHEN** el usuario recorre la columna `VACANTES` de los datos de ejemplo
 - **THEN** ve que `CUR-103` y `CUR-110` conservan su cupo completo como vacantes y que solo `CUR-104` aparece cerrada por cupo
 
 #### Scenario: El usuario abre el modal de alta
+
 - **WHEN** el usuario pulsa `+ Nueva Comisión`
 - **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, con los botones `Cancelar` y `Guardar Comisión`, no muestra ningún campo para el código de la comisión porque el sistema lo genera, y tampoco muestra `Sede`: el modal abre con `Modalidad` en `Seleccionar…` y el campo aparece recién cuando la modalidad elegida sea `Presencial` o `Híbrido`
 
 #### Scenario: La fila de horarios empieza vacía
+
 - **WHEN** el usuario abre el modal de alta de una comisión
 - **THEN** la fila `Días y Horarios` ocupa el ancho completo, muestra `Sin horarios definidos` y el botón `Agregar horarios`
 
 #### Scenario: El usuario carga los horarios y ve el resumen
+
 - **WHEN** el usuario agrega lunes y miércoles de 19:00 a 21:00 y martes de 18:15 a 21:30 y confirma el selector
 - **THEN** la fila muestra dos chips de solo lectura —`Lun y Mié 19-21hs` y `Mar 18:15-21:30hs`— con flex-wrap y sin truncar, y el botón pasa a llamarse `Modificar horarios`
 
 #### Scenario: El usuario intenta guardar sin horarios
+
 - **WHEN** el usuario deja la fila `Días y Horarios` sin ningún horario y pulsa `Guardar Comisión` o `Guardar Cambios`
 - **THEN** el formulario muestra el error `Agregá al menos un horario` bajo el campo y no crea ni actualiza la comisión
 
 #### Scenario: El choque de horario se muestra bajo el campo
+
 - **WHEN** la fuente rechaza el guardado con un choque de horario del docente
 - **THEN** el motivo aparece bajo `Días y Horarios` con la comisión en conflicto, su día y su rango, y el formulario de comisión sigue abierto
 
 #### Scenario: Otro conflicto del guardado se muestra en el mismo lugar
+
 - **WHEN** la fuente rechaza el guardado con un `409` que no es de horario, por ejemplo el de dos altas simultáneas del mismo curso
 - **THEN** el motivo aparece bajo el mismo campo `Días y Horarios`, y la pantalla no cierra el formulario ni confirma el guardado
 
 #### Scenario: El usuario elige modalidad virtual
+
 - **WHEN** el usuario selecciona modalidad `Virtual` y confirma sin elegir sede
 - **THEN** el sistema acepta la carga y el campo `Sede` no está renderizado en el modal, porque la sede es opcional en toda modalidad y no corresponde mostrarla para `Virtual`
 
 #### Scenario: El usuario elige modalidad presencial sin sede
+
 - **WHEN** el usuario selecciona modalidad `Presencial` o `Híbrido`, deja `Sede` vacío y confirma
 - **THEN** el sistema guarda la comisión y la confirma, porque el campo `Sede` es opcional y su ausencia no impide el alta. El nombre del escenario conserva el de la regla anterior: ya no se rechaza el alta por falta de sede
 
+#### Scenario: El usuario busca un curso por nombre, código o descripción
+
+- **WHEN** el usuario escribe en el buscador de la vista de cursos
+- **THEN** el grid muestra solo los cursos cuyo nombre o descripción tiene una palabra que empieza con el texto, o cuyo código contiene el texto, sin distinguir mayúsculas ni acentos, y reordena los resultados por relevancia de la coincidencia
+
+#### Scenario: La búsqueda de cursos no tiene resultados
+
+- **WHEN** el usuario escribe un texto que no coincide con ningún curso
+- **THEN** la vista de cursos muestra `No se encontraron cursos`
+
+#### Scenario: El usuario vacía la búsqueda de cursos
+
+- **WHEN** el usuario borra el texto del buscador de la vista de cursos
+- **THEN** vuelve a mostrarse el grid completo del catálogo
+
+#### Scenario: El usuario busca una comisión por código, docente u horario
+
+- **WHEN** el usuario escribe en el buscador de la vista de comisiones
+- **THEN** la tabla muestra solo las comisiones del curso abierto cuyo código, docente o horario tiene una palabra que empieza con el texto, sin distinguir mayúsculas ni acentos, y reordena los resultados por relevancia de la coincidencia
+
+#### Scenario: La búsqueda de comisiones no tiene resultados
+
+- **WHEN** el usuario escribe un texto que no coincide con ninguna comisión del curso
+- **THEN** la vista de comisiones muestra `No se encontraron comisiones`
+
+#### Scenario: El usuario vacía la búsqueda de comisiones
+
+- **WHEN** el usuario borra el texto del buscador de la vista de comisiones
+- **THEN** vuelve a mostrarse la tabla completa del curso
+
+#### Scenario: La búsqueda de comisiones no sale del curso
+
+- **WHEN** el usuario busca desde la vista de comisiones de un curso
+- **THEN** solo se filtran las comisiones de ese curso, aunque existan comisiones de otros cursos
+
 #### Scenario: El usuario busca en el catálogo
+
 - **WHEN** el usuario escribe en el buscador de cualquiera de las dos vistas
-- **THEN** el campo no acepta la escritura y su leyenda explica que la búsqueda todavía no está disponible, y el contenido de la vista no cambia
+- **THEN** el campo acepta la escritura, filtra el contenido de la vista por prefijo de palabra sin distinguir mayúsculas ni acentos, y muestra el mensaje de sin resultados cuando no hay coincidencias
 
 #### Scenario: La ruta apunta a un curso que no existe
+
 - **WHEN** el usuario abre la dirección de un curso que no está en el catálogo
 - **THEN** ve que el curso no existe y puede volver al catálogo, en lugar de una tabla de comisiones vacía
 

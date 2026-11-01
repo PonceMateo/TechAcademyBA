@@ -2200,3 +2200,15 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `backend/app/schemas/alumno.py`, `frontend/src/admin/CoursesPage.jsx`,
   `frontend/src/mocks/comisiones.js`, `frontend/src/services/mockDataSource.js`,
   `frontend/src/alumno/CourseDetailPage.jsx`.
+
+---
+
+## Búsqueda del catálogo de cursos y comisiones (change `hu-67-68-buscar-curso-comision`)
+
+### D65 — La búsqueda del catálogo se resuelve en el cliente, por prefijo de palabra y con normalización en JavaScript
+
+- **Fecha:** 2026-11-01
+- **Autor:** Mateo Ponce
+- **Decisión:** los buscadores de las vistas de cursos y comisiones se habilitan y filtran en el cliente sobre los datos ya cargados. La coincidencia para nombre y descripción es por **prefijo de palabra**, normalizada con `normalizeWords` (sin tildes, en mayúscula), sin distinguir mayúsculas ni acentos. El código del curso se busca por **subcadena** (contains) sobre el código normalizado, para que «001» o «1» encuentren «CUR001». Comisiones filtran por código, docente o horario dentro del curso abierto, por prefijo de palabra. Una consulta vacía restaura el contenido completo y una sin coincidencias muestra `No se encontraron cursos` / `No se encontraron comisiones`. Los resultados se reordenan por relevancia de la coincidencia, con desempate por `id`.
+- **Por qué:** el catálogo es acotado (≈10 comisiones, pocos cursos) y `CoursesPage` ya carga todo, así que no hace falta endpoint ni migración. Se mantiene el criterio de la H/U 10 (D48) sin moverlo al servidor; si el volumen crece, la búsqueda se puede mover a `?q=` sin cambiar la UI.
+- **Dónde:** `frontend/src/admin/CoursesPage.jsx`, `frontend/src/domain/normalize.js`, `frontend/src/admin/CoursesPage.test.jsx`.
