@@ -34,21 +34,25 @@ Everything runs in containers with `docker compose`, not local Python or Node. C
 
 ## Sources of truth
 
-1. **GitHub Projects** (`TechAcademyBA`, project #1, owner `PonceMateo`): only live backlog source (text, priority, epic, estimation, status: `Backlog`, `Ready`, `In progress`, `In review`, `Done`).
+1. **GitHub Projects** (`TechAcademyBA`, project #1, owner `PonceMateo`): only live backlog source (text, priority, epic, estimation, status: `Backlog`, `Ready`, `In progress`, `In review`, `Done`). Read it only through the script:
 
    ```
-   gh project item-list 1 --owner PonceMateo --limit 100 --format json --jq '.items[] | [.content.number, .content.title, .status, .priority] | @tsv'
-   gh issue view <number> --json title,body,state
+   node .opencode/commands/backlog.mjs                      # active backlog (no Done). Default.
+   node .opencode/commands/backlog.mjs --all                # full backlog including Done
+   node .opencode/commands/backlog.mjs --status ready,backlog   # filter by board column(s)
+   node .opencode/commands/backlog.mjs --story 28           # one story: board row + issue body
    ```
 
-   - Copy first command exactly, filter rows after. Never dump full JSON: brings body of each issue.
-   - Always `--limit 100`: without it cuts to 30 and looks like stories missing.
-   - Each story is issue `H/U <n> · <title>`; issue number is not story number. Priority is MoSCoW.
+   - Output is TSV with header, sorted by story number descending. Columns: `story` (number from the `H/U <n> ·` title; `#<n>` when the title has none and the issue number is used instead), `title`, `status`, `priority` (MoSCoW), `estimate`, `issue` (GitHub issue number as `#<n>`).
+   - `--status` takes one or more columns, comma-separated, case-insensitive. Quote names with spaces: `--status "In progress"`.
+   - `--story <n>` looks up by story number and reads the issue using the issue number from that row. For rows without an `H/U` title use `--story "#<n>"` (quoted, `#` is a comment in some shells).
+   - Never run `gh project item-list` directly: the script already handles limits, parsing and quoting for every shell.
+   - Default mode hides `Done`. If a story is missing from the list, run `--all` before concluding it doesn't exist.
+   - Story number and issue number differ: use the `story` column to identify stories.
    - Story done when `Status` is `Done`, not when issue is closed.
-   - In PowerShell 5.1 do not put double quotes inside `--jq`: loses them and `jq` fails.
    - If board inaccessible, ask user for access; if prefers to continue, use whatever is in repo and say so.
-   - For a story, find row by title (`H/U 28 ·`) in list and use that row's issue number with `gh issue view`. Never assume they match.
-   - Never run `gh project item-list` without `--jq` from command above.
+
+   - Do not replace the script with ad-hoc `node -e` commands. If it fails, fix the script.
 2. **Problem context** (`docs/requirements/`): business model.
 3. **PPTX mockup:** negotiated scope and two MVP paths.
 4. **Secondary reference:** Figma (screens and style, zero data), client's Excel (is the problem, not the solution) and story CSV (frozen, not read or updated).
