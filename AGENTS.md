@@ -65,7 +65,7 @@ Add to board, never to CSV: issue `H/U <n> · <title>` with description and acce
 
 - **Direct change** if observable behavior does not change: bugfix restoring spec, typos, styles, internal refactor, tests of existing code, config and dependencies.
 - **OpenSpec proposal** (`/opsx-propose`) if contract changes: new or modified story, business rule, data model, API, security or permissions.
-  - **Mandatory archive:** if you used SDD/OpenSpec, archive the change with `openspec archive <change>` (or `/opsx-archive`) when done, to sync deltas to `openspec/specs/` and move to `archive/`. No active changes left; unarchived delta = not applied.
+  - **Mandatory archive:** if you used SDD/OpenSpec, when done, **ask the user** (yes/no) if he wants to archive the change with `openspec archive <change>` (or `/opsx-archive`), to sync deltas to `openspec/specs/` and move to `archive/`. No active changes left; unarchived delta = not applied.
 - **When in doubt**, ask in one line a team member.
 
 ## Sessions and context
