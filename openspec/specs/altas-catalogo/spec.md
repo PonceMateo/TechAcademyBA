@@ -51,8 +51,10 @@ quedar disponible en el catálogo (historia #1).
 El sistema SHALL exponer la consulta de comisiones y su alta. La consulta
 `GET /comisiones` SHALL devolver las comisiones con su código derivado, su curso, su
 docente, sus horarios de cursada, su texto de días y horarios, su cupo máximo, su arancel
-y su modalidad. El alta `POST /comisiones` SHALL aceptar el curso, el docente, los
-horarios de cursada, el arancel, el cupo máximo, la modalidad y la sede opcional.
+y su modalidad, además de su período de cursada —fecha de inicio y fecha de fin— y la
+cantidad de clases derivada de él. El alta `POST /comisiones` SHALL aceptar el curso, el
+docente, los horarios de cursada, el arancel, el cupo máximo, la modalidad, la sede
+opcional y el período de cursada.
 
 Los horarios SHALL venir como una lista no vacía de rangos, y cada rango SHALL traer el
 día de la semana (`LUN` a `DOM`), la hora de inicio y la hora de fin en formato `HH:MM`.
@@ -60,6 +62,25 @@ Un mismo día SHALL aparecer a lo sumo una vez. El alta **SHALL NOT aceptar
 `dias_horarios` como texto libre**: un cuerpo que lo traiga SHALL responder `422`. El
 texto `dias_horarios` de la respuesta SHALL ser el resumen que el sistema deriva de los
 horarios guardados, y la respuesta SHALL traer además los horarios estructurados.
+
+El período de cursada SHALL ser **obligatorio** en el alta y sus dos fechas SHALL viajar
+como fecha sin hora en formato `YYYY-MM-DD`; el sistema SHALL NOT completarlas con una
+fecha por defecto ni con un valor de ejemplo. La fecha de fin SHALL ser igual o posterior
+a la de inicio: una comisión de un solo día es válida. WHEN la fecha de fin sea anterior a
+la de inicio, el sistema SHALL rechazar el alta con `422` y el mensaje «La fecha de fin no
+puede ser anterior a la de inicio.», que el formulario muestra en el campo de la fecha de
+fin porque valida antes de enviar. El período SHALL contener al menos una clase según los
+días de cursada de la comisión; WHEN no la contenga, el sistema SHALL rechazar el alta con
+`422` y el mensaje «El período no contiene ninguna clase: revisá las fechas o los días de
+cursada.».
+
+La cantidad total de clases SHALL derivarse contando los días comprendidos entre la fecha
+de inicio y la de fin, **ambas incluidas**, que caigan en alguno de los días de cursada de
+la comisión. SHALL NOT persistirse como columna y SHALL acompañar a la comisión en las
+respuestas del alta y de la consulta, junto con las dos fechas del período. WHEN la
+comisión se haya creado antes de que el período existiera y no tenga fechas cargadas, la
+consulta SHALL informar el período como no definido y la cantidad de clases como no
+definida, sin inventar valores.
 
 WHEN los minutos de un inicio o de un fin no sean múltiplos de 15, WHEN una hora esté
 fuera del rango de 6:00 a 22:00, WHEN el fin no sea estrictamente posterior al inicio o
@@ -77,19 +98,20 @@ participar del chequeo, y una comisión sin docente asignado SHALL NO ser cheque
 El `docente_id` SHALL ser obligatorio en el alta, aunque la columna de la comisión admita
 ausencia para poder asignar el docente más adelante. WHEN falte el docente, el sistema
 SHALL rechazar el alta e indicar que el docente es obligatorio. WHEN falte el cupo, los
-horarios o el arancel, el sistema SHALL rechazar el alta e indicar los campos faltantes.
-WHEN el cupo máximo sea cero, negativo o no numérico, el sistema SHALL rechazarlo e
-informar que el cupo debe ser un entero positivo. WHEN el arancel sea negativo o no
-numérico, el sistema SHALL rechazarlo e informar el error. `sede_id` SHALL ser **opcional
-en toda modalidad**; WHEN la modalidad sea Virtual y la comisión informe una sede, el
-sistema SHALL rechazar el alta con `422`. El número de la comisión SHALL ser el máximo de
-los números de ese curso más uno, y la respuesta SHALL devolver el código derivado con la
-forma del código del curso más el número. WHEN la numeración ya ocupada por otra comisión
-del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 y #8).
+horarios, el arancel o alguna de las dos fechas del período, el sistema SHALL rechazar el
+alta e indicar los campos faltantes. WHEN el cupo máximo sea cero, negativo o no numérico,
+el sistema SHALL rechazarlo e informar que el cupo debe ser un entero positivo. WHEN el
+arancel sea negativo o no numérico, el sistema SHALL rechazarlo e informar el error.
+`sede_id` SHALL ser **opcional en toda modalidad**; WHEN la modalidad sea Virtual y la
+comisión informe una sede, el sistema SHALL rechazar el alta con `422`. El número de la
+comisión SHALL ser el máximo de los números de ese curso más uno, y la respuesta SHALL
+devolver el código derivado con la forma del código del curso más el número. WHEN la
+numeración ya ocupada por otra comisión del mismo curso colisione, la API SHALL informar
+el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Alta de comisión correcta
-- **WHEN** se envía una comisión con curso, docente, horarios de cursada, cupo máximo, arancel y modalidad
-- **THEN** el sistema responde con la comisión creada, su código derivado y sus horarios, y la comisión queda asociada al curso
+- **WHEN** se envía una comisión con curso, docente, horarios de cursada, período de cursada, cupo máximo, arancel y modalidad
+- **THEN** el sistema responde con la comisión creada, su código derivado, sus horarios y la cantidad de clases calculada, y la comisión queda asociada al curso
 
 #### Scenario: La respuesta trae los horarios estructurados
 - **WHEN** se consulta el listado o se recibe la respuesta del alta
@@ -104,7 +126,7 @@ del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 
 - **THEN** el sistema no la crea e indica que el docente es obligatorio
 
 #### Scenario: Comisión con campos faltantes
-- **WHEN** se envía una comisión sin cupo máximo, sin horarios o sin arancel
+- **WHEN** se envía una comisión sin cupo máximo, sin horarios, sin arancel o sin alguna de las dos fechas del período
 - **THEN** el sistema no la crea e indica los campos faltantes
 
 #### Scenario: Sin horarios
@@ -122,6 +144,22 @@ del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 
 #### Scenario: Dos horarios que se pisan dentro de la comisión
 - **WHEN** se envía una comisión con dos rangos del mismo día que se pisan, por ejemplo 19:00-21:00 y 20:00-22:00
 - **THEN** el sistema responde `422` y no crea la comisión
+
+#### Scenario: Fecha de fin anterior a la de inicio
+- **WHEN** se envía una comisión con una fecha de fin anterior a la de inicio
+- **THEN** el sistema responde `422` con el mensaje «La fecha de fin no puede ser anterior a la de inicio.» y no crea la comisión
+
+#### Scenario: Período sin ninguna clase
+- **WHEN** se envía una comisión cuyas fechas de inicio y de fin no contienen ninguno de sus días de cursada
+- **THEN** el sistema responde `422` con el mensaje «El período no contiene ninguna clase: revisá las fechas o los días de cursada.» y no crea la comisión
+
+#### Scenario: Los dos extremos del período cuentan
+- **WHEN** la fecha de inicio o la fecha de fin de la comisión caen en un día de cursada
+- **THEN** esa clase se cuenta dentro del total, porque el rango se cuenta con sus dos extremos incluidos
+
+#### Scenario: Comisión heredada sin período
+- **WHEN** se consulta una comisión creada antes de que el período existiera, que no tiene fechas cargadas
+- **THEN** la respuesta informa el período y la cantidad de clases como no definidos, sin completarlos con valores de ejemplo
 
 #### Scenario: Choque de horario con otra comisión del mismo docente
 - **WHEN** el docente tiene otra comisión vigente, en otro curso, el martes de 19:00 a 21:00, y se crea una comisión suya del martes de 20:00 a 22:00
@@ -165,23 +203,16 @@ del mismo curso colisione, la API SHALL informar el conflicto (historias #2, #5 
 
 #### Scenario: Listado de comisiones
 - **WHEN** se consulta el listado de comisiones
-- **THEN** cada fila trae el código derivado, el nombre del curso, el docente, los horarios y su texto derivado, el cupo máximo y el arancel
+- **THEN** cada fila trae el código derivado, el nombre del curso, el docente, los horarios y su texto derivado, el período de cursada con su cantidad de clases, el cupo máximo y el arancel
+
 ### Requirement: Consulta y alta de docentes
 
-El sistema SHALL exponer la consulta del padrón de docentes y su alta. La consulta
-`GET /docentes` SHALL devolver los docentes con sus datos personales y la cantidad de
-comisiones asignadas. El alta `POST /docentes` SHALL aceptar nombre, apellido, DNI, email,
-teléfono opcional y `cuil` opcional. El CUIL SHALL tener 11 dígitos después de quitar guiones,
-SHALL usar el prefijo `20`, `23`, `24` o `27` y SHALL tener los 8 dígitos del medio iguales al DNI
-del docente, completado con ceros a la izquierda cuando el DNI tenga 7 dígitos. La API SHALL NOT
-calcular ni validar el dígito verificador. Un CUIL parcial o con una estructura inválida SHALL
-responder `422`. WHEN el DNI o el email informados ya estén registrados, el sistema SHALL rechazar
-el alta e informar **cuál de los dos datos se repitió**, porque el criterio de la historia pide saber
-qué colisionó. WHEN el alta es exitosa, el sistema SHALL crear en **una sola transacción** el docente
-y su cuenta de acceso con rol de docente, de modo que el docente quede creado y accesible por su
-email o no quede ninguno de los dos. La cuenta creada SHALL quedar sin cambio de contraseña
-pendiente, de manera coherente con las cuentas de demostración, porque el flujo de cambio de
-contraseña todavía no existe (historia #9).
+`GET /docentes` SHALL devolver el padrón y `POST /docentes` SHALL aceptar nombre, apellido, DNI,
+email, teléfono y `cuil` opcionales con las validaciones vigentes, creando en una transacción
+el docente y su cuenta. Esta SHALL nacer con una contraseña inicial generada, guardada solo como
+hash, y cambio obligatorio. La respuesta del alta SHALL incluir `password_inicial`; ningún otro
+endpoint SHALL exponerla. WHEN el DNI o el email ya existan, SHALL rechazar el alta e informar cuál
+se repitió.
 
 #### Scenario: Alta de docente correcta
 
@@ -204,24 +235,44 @@ contraseña todavía no existe (historia #9).
 - **THEN** el sistema rechaza el alta con `422` y no crea el docente
 
 #### Scenario: DNI de docente repetido
+
 - **WHEN** se envía un DNI que ya está registrado
 - **THEN** el sistema rechaza el alta e informa que el DNI está repetido
 
 #### Scenario: Email de docente repetido
+
 - **WHEN** se envía un email que ya está registrado
 - **THEN** el sistema rechaza el alta e informa que el email está repetido
 
 #### Scenario: Alta con email tomado en el otro padrón
+
 - **WHEN** se envía un email que ya está registrado en el padrón de alumnos
 - **THEN** el sistema rechaza el alta e informa que el email ya está en uso
 
 #### Scenario: Docente creado y cuenta en la misma operación
+
 - **WHEN** el alta de docente es exitosa
-- **THEN** quedan creados el docente y su cuenta de acceso, y la cuenta accede a su panel
+- **THEN** quedan creados el docente y su cuenta de acceso, y la cuenta accede a su panel después de cambiar la contraseña inicial
 
 #### Scenario: Listado del padrón de docentes
+
 - **WHEN** se consulta el padrón de docentes
-- **THEN** cada fila trae los datos personales del docente y la cantidad de comisiones que tiene asignadas
+- **THEN** cada fila trae los datos personales del docente y la cantidad de comisiones que tiene asignadas, sin contraseña ni hash
+
+#### Scenario: Contraseña inicial del alta de docente
+
+- **WHEN** se da de alta a `María González` con DNI `30.111.222`
+- **THEN** la respuesta incluye `password_inicial` con `maria30111222`, la base guarda solo el hash bcrypt y la cuenta nace con `must_change_password` en `true`
+
+#### Scenario: La contraseña inicial se entrega una sola vez
+
+- **WHEN** se consulta el listado, se edita el docente o se restablece su contraseña
+- **THEN** ninguna de esas respuestas incluye `password_inicial`, la contraseña en claro ni el hash
+
+#### Scenario: Los docentes anteriores conservan su credencial
+
+- **WHEN** el alta de la HU 66 convive con docentes creados antes de la entrega
+- **THEN** esas cuentas conservan su contraseña y su `must_change_password`, y no se regeneran ni se actualizan de forma masiva
 
 ### Requirement: Consulta de sedes
 

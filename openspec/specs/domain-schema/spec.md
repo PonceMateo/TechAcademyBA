@@ -135,10 +135,12 @@ email sea único dentro de cada padrón y además único frente al padrón del o
 modo que una misma dirección de correo no identifique a dos personas. WHEN se cargue un
 email con formato inválido SHALL rechazarse el alta (historias #9 y #13).
 
-El alta de un alumno SHALL admitir que el documento sea un pasaporte y que el alumno no
-tenga DNI, porque el instituto inscribe alumnos del exterior. Los datos adicionales que
-un alumno extranjero requiere no forman parte de este change: su definición se discute
-con el cliente.
+El esquema SHALL admitir que `alumno.documento` y `alumno.tipo_documento` sean nulos y que
+el tipo de documento sea `PASAPORTE`, porque el instituto inscribe alumnos del exterior. El
+alta de esta entrega (HU 13) SHALL aceptar **solo DNI** y SHALL NOT admitir pasaporte ni
+documento nulo. El alta con pasaporte y sin DNI queda diferida a la HU 47, que está en
+`Won't`, y a la aprobación del equipo. Los datos adicionales que un alumno extranjero
+requiere no forman parte de este change: su definición se discute con el cliente.
 
 #### Scenario: Alta de docente con CUIL
 - **WHEN** se da de alta un docente con nombre, apellido, DNI, CUIL, email y teléfono cuyos datos no están registrados
@@ -165,20 +167,20 @@ con el cliente.
 - **THEN** el sistema rechaza el alta e informa el dato duplicado
 
 #### Scenario: Alta de alumno
-- **WHEN** se completa DNI o pasaporte, nombre, email y teléfono de un alumno cuyos datos no están registrados
-- **THEN** el alumno se crea en el padrón
+- **WHEN** se completa un DNI, nombre, email y teléfono de un alumno cuyos datos no están registrados
+- **THEN** el alumno se crea en el padrón con `tipo_documento = DNI`
 
 #### Scenario: Documento de alumno duplicado
-- **WHEN** se intenta registrar un alumno con un DNI o pasaporte ya registrado
-- **THEN** el sistema rechaza el alta y muestra el alumno existente
+- **WHEN** se intenta registrar un alumno con un DNI ya registrado
+- **THEN** el sistema rechaza el alta e informa que el documento está repetido. **La historia pide mostrar el alumno existente**; esta entrega solo nombra el campo repetido, y esa desviación queda pendiente de aprobación
 
 #### Scenario: Alumno del exterior sin DNI
-- **WHEN** se da de alta un alumno con pasaporte y sin DNI, y con un email no registrado
-- **THEN** el sistema crea el alumno en el padrón y lo admite como identificador del legajo
+- **WHEN** se intenta dar de alta un alumno con pasaporte y sin DNI, y con un email no registrado
+- **THEN** **Diferido a la HU 47.** El esquema admite el pasaporte y el documento nulo, pero el contrato de esta entrega acepta solo DNI, así que el alta no se puede intentar
 
 #### Scenario: Email con formato inválido
-- **WHEN** se intenta guardar un docente con un email de formato incorrecto
-- **THEN** el sistema rechaza el alta e indica el error de formato. **La mitad del alumno no aplica**: el alta de alumno no forma parte de este change y `alumno.email` es una columna sin validador de formato, así que esa validación queda para el change del alta de alumno
+- **WHEN** se intenta guardar un docente o un alumno con un email de formato incorrecto
+- **THEN** el sistema rechaza el alta e indica el error de formato. La regla del alumno se aplica a través de la capability `padron-alumnos`, que reutiliza la misma validación del alta de docente
 
 ### Requirement: Inscripciones con categoría arancelaria
 

@@ -347,47 +347,127 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 
 ### Requirement: Padrón de docentes
 
-The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, con un campo de búsqueda por nombre, apellido, DNI o email, y la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila válida. Las filas del maquetado son, en este orden: Profe Martín con `Programación`, 1 comisión asignada y estado `Activa`; Lic. Laura Benítez con `Desarrollo Web`, 1 comisión asignada y `Activa`; Santi Ads con `Marketing`, 2 comisiones asignadas y `Activa`; Dr. Marcelo Ríos con `Datos`, 1 comisión asignada y `Activa`; e Ing. González con `Programación`, 1 comisión asignada y `Activa`. La columna `ESTADO` SHALL renderizar `Activa` en verde. El maquetado SHALL NOT mostrar columnas de documento, correo ni teléfono de los docentes, porque los datos del cliente no registran esos datos y no deben inventarse.
+The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden
+literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`,
+`COMISIONES ASIGNADAS` y `ESTADO`, con un campo de búsqueda por nombre, apellido, DNI o email, y
+la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y
+SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila
+válida. Las filas del maquetado son, en este orden: Profe Martín con `Programación` y estado
+`Activa`; Lic. Laura Benítez con `Desarrollo Web` y `Activa`; Santi Ads con `Marketing` y
+`Activa`; Dr. Marcelo Ríos con `Datos` y `Activa`; e Ing. González con `Programación` y `Activa`.
+La columna `ESTADO` SHALL renderizar `Activa` en verde.
 
-Esta pantalla es una adición intencional: el prototipo no la incluye y el alta de docente está dentro del alcance mínimo. La acción `+ Nuevo Docente` SHALL abrir el modal `Nuevo Docente`, con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y `Teléfono`, y sin ningún campo de CUIL porque el contrato del alta no lo admite.
+El campo de búsqueda SHALL filtrar automáticamente mientras el administrador escribe, sin exigir
+que presione `Enter`, y SHALL aceptar coincidencias por el comienzo de las palabras del nombre o
+del apellido, respetando el orden de las palabras de la consulta. La comparación SHALL ignorar
+mayúsculas, minúsculas y tildes, y el DNI SHALL poder informarse con o sin puntos, espacios o
+guiones, con coincidencia desde el inicio de sus dígitos. El email SHALL admitir un fragmento
+desde el inicio de su valor. Una búsqueda de una sola letra SHALL
+mostrar solo a los docentes cuyo nombre o apellido tiene una palabra que empieza con esa letra, y
+SHALL NOT mostrar a los que solo la contienen en el medio. Una sola letra SHALL disparar la
+consulta: no hay mínimo de caracteres. La pantalla SHALL ordenar los resultados por campo —nombre,
+después DNI y al final email— y, dentro del nombre, por la posición de la primera palabra que
+coincide, priorizando el inicio del nombre sobre las palabras posteriores o el apellido. La
+pantalla SHALL esperar aproximadamente 300 ms desde la última tecla antes de consultar a la fuente
+y SHALL descartar la respuesta de cualquier consulta anterior que llegue después de una más
+reciente. WHEN el campo queda vacío, la pantalla SHALL volver al listado habitual de docentes
+activos.
 
-La columna `ACCIONES` SHALL mostrar los botones `Editar` y `Restablecer contraseña` en cada fila. El
-sistema SHALL abrir el modal `Editar Docente` con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y
-`Teléfono` precargados con los valores actuales y sin ningún campo de CUIL, con los botones `Cancelar`
-y `Guardar Cambios`. Un guardado aceptado SHALL actualizar la fila y mostrar una confirmación; un
-rechazo SHALL dejar el modal abierto con el motivo que informa la fuente.
+La columna `COMISIONES ASIGNADAS` SHALL mostrar las comisiones que devuelve la fuente para el
+docente, con el código y el nombre del curso de cada una. WHEN el docente no tiene comisiones,
+SHALL mostrar `Sin comisión`. WHEN la búsqueda no tiene coincidencias, la pantalla SHALL mostrar
+`No se encontraron docentes`. La pantalla SHALL NOT inventar comisiones ni datos personales para
+completar una fila.
 
-El sistema SHALL abrir además el modal `Restablecer contraseña` con los campos de contraseña nueva y
-confirmación, y SHALL avisar que el docente deberá cambiarla en su próximo ingreso. WHEN las dos
-contraseñas no coincidan o la nueva tenga menos de 8 caracteres, la pantalla SHALL rechazar el envío
-sin llamar a la fuente. Un restablecimiento aceptado SHALL cerrar el modal y confirmar la operación.
+La pantalla SHALL mostrar solo docentes activos. Los docentes dados de baja SHALL NOT aparecer en
+el listado ni en los resultados de búsqueda.
 
-El control de clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás.
+La acción `+ Nuevo Docente` SHALL abrir el modal `Nuevo Docente`, con los campos `Nombre`,
+`Apellido`, `DNI`, `Mail` y `Teléfono`, y sin ningún campo de CUIL porque el contrato del alta no
+lo admite. El sistema SHALL NOT renderizar un formulario de edición de docente. El control de
+clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem
+deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás. Estos comportamientos
+del alta y del control deshabilitado SHALL conservarse sin cambios.
 
 #### Scenario: El usuario abre el padrón de docentes
+
 - **WHEN** un usuario de Secretaría abre `Docentes`
-- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, los cinco docentes del maquetado, sus datos de contacto, sus especialidades, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
+- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS` y `ESTADO`, los docentes activos que devuelve la fuente, sus datos de contacto, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
 
 #### Scenario: El usuario localiza a un docente por CUIL
+
 - **WHEN** el usuario recorre la fila de un docente
 - **THEN** ve su CUIL visible junto al DNI cuando el docente lo tiene, y la fila no lo exige porque el CUIL es único pero opcional en el modelo, así que un docente cargado sin ese dato sigue siendo una fila válida del padrón
 
 #### Scenario: El usuario compara las cargas de los docentes
+
 - **WHEN** el usuario recorre la columna `COMISIONES ASIGNADAS`
 - **THEN** ve que Santi Ads tiene 2 comisiones asignadas y los otros cuatro docentes tienen 1 cada uno
 
 #### Scenario: El usuario busca un docente
+
 - **WHEN** el usuario escribe un nombre en el buscador
 - **THEN** el listado del maquetado se filtra por ese texto
 
+#### Scenario: El usuario busca mientras escribe
+
+- **WHEN** el usuario escribe `perez` en el buscador y no presiona `Enter`
+- **THEN** después de la pausa de 300 ms la pantalla consulta a la fuente y muestra los docentes cuyo nombre o apellido tiene una palabra que empieza con ese texto, sin distinguir mayúsculas ni tildes
+
+#### Scenario: El usuario busca una sola letra
+
+- **WHEN** el usuario escribe `a` en el buscador
+- **THEN** la pantalla consulta a la fuente con una sola letra, sin exigir un mínimo de caracteres, y muestra solo los docentes cuyo nombre o apellido tiene una palabra que empieza con `a`, y no a los que solo contienen esa letra en el medio de una palabra
+
+#### Scenario: La coincidencia en el nombre se muestra primero
+
+- **WHEN** el usuario busca `al` y existen `Rita Alonso` y `Alfonso Pérez`
+- **THEN** la pantalla muestra primero a `Alfonso Pérez`, porque la coincidencia está al inicio de la primera palabra de su nombre
+
+#### Scenario: El usuario respeta el orden de las palabras
+
+- **WHEN** el usuario escribe `ana gom`
+- **THEN** la pantalla muestra a `Ana Gómez`; WHEN escribe `gom ana` SHALL NOT mostrarlo
+
+#### Scenario: El usuario busca un DNI con separadores
+
+- **WHEN** el usuario escribe `30.111.222` o `30111` en el buscador
+- **THEN** la pantalla muestra el docente cuyo DNI empieza con esos dígitos, con o sin separadores y aunque el número esté incompleto
+
+#### Scenario: El usuario vacía el buscador
+
+- **WHEN** el usuario borra todo el texto del buscador
+- **THEN** la pantalla vuelve a mostrar el listado habitual de docentes activos
+
 #### Scenario: La búsqueda no arroja resultados
-- **WHEN** el usuario busca un dato que no existe en el padrón
-- **THEN** el maquetado informa que no se encontraron resultados
+
+- **WHEN** el usuario busca un dato que no coincide con ningún docente activo
+- **THEN** la pantalla muestra `No se encontraron docentes`
+
+#### Scenario: El usuario recorre las comisiones asignadas
+
+- **WHEN** el usuario recorre la columna `COMISIONES ASIGNADAS`
+- **THEN** ve el código y el nombre del curso de cada comisión del docente, o `Sin comisión` cuando no tiene ninguna
+
+#### Scenario: Llega una respuesta vieja
+
+- **WHEN** una consulta anterior termina después de una consulta más reciente
+- **THEN** la pantalla conserva los resultados de la consulta más reciente y descarta la respuesta vieja
+
+#### Scenario: El usuario busca un docente dado de baja
+
+- **WHEN** el usuario busca por el nombre, DNI o email de un docente con `activo = false`
+- **THEN** la pantalla no lo muestra, porque el padrón visible solo incluye docentes activos
+
+#### Scenario: El usuario abre el alta de docente
+
+- **WHEN** el usuario pulsa `+ Nuevo Docente`
+- **THEN** se abre el modal `Nuevo Docente` con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y `Teléfono`, sin CUIL, con la misma identidad visual y sin cambios en el alta
 
 #### Scenario: El usuario busca edición o control de clases
 
 - **WHEN** el usuario revisa la pantalla buscando editar a un docente o controlar las clases que dicta
-- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, la columna `ACCIONES` ofrece `Editar` y `Restablecer contraseña`, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, no hay control de edición, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
 
 #### Scenario: El usuario edita los datos de un docente
 
@@ -413,28 +493,115 @@ El control de clases dictadas por el profesor queda fuera del alcance mínimo: l
 
 - **WHEN** el usuario abre `Editar Docente`
 - **THEN** ve nombre, apellido, DNI, mail y teléfono, y no ve ningún campo de CUIL
+
 ### Requirement: Alumnos, categorías arancelarias y cuentas corporativas
 
-The system SHALL mostrar el bloque `Padrón de Alumnos Regulares` con un campo de búsqueda de placeholder `Buscar por DNI o Nombre…` y una tabla cuyas columnas, con estos rótulos literales y en este orden, son `DNI`, `NOMBRE`, `EMAIL`, `COMISIÓN ASIGNADA`, `CATEGORÍA ARANCELARIA` y `ACCESO PLATAFORMA`. La columna `CATEGORÍA ARANCELARIA` SHALL mostrar `PARTICULAR` en gris, `BECADO PARCIAL` en violeta acompañado del porcentaje de descuento, `BECADO TOTAL` en magenta y `CORPORATIVO` en celeste. La columna `ACCESO PLATAFORMA` SHALL mostrar `HABILITADO` en verde o `BLOQUEADO` en rojo y, cuando el acceso esté bloqueado, SHALL mostrar la causa del bloqueo junto al estado.
+The system SHALL mostrar el bloque `Padrón de Alumnos Regulares` con una acción
+`+ Nuevo Alumno`, un campo de búsqueda de placeholder `Buscar por DNI o Nombre…`
+**deshabilitado** con la leyenda `Próximamente`, y una tabla cuyas columnas, con estos
+rótulos literales y en este orden, son `DNI`, `NOMBRE`, `EMAIL`, `COMISIÓN ASIGNADA`,
+`CATEGORÍA ARANCELARIA` y `ACCESO PLATAFORMA`. La columna `CATEGORÍA ARANCELARIA` SHALL
+mostrar `PARTICULAR` en gris, `BECADO PARCIAL` en violeta acompañado del porcentaje de
+descuento, `BECADO TOTAL` en magenta y `CORPORATIVO` en celeste. La columna `ACCESO
+PLATAFORMA` SHALL mostrar `HABILITADO` en verde o `BLOQUEADO` en rojo y, cuando el acceso
+esté bloqueado, SHALL mostrar la causa del bloqueo junto al estado.
 
-Las filas del maquetado son, en este orden: Juan Ignacio Pérez, documento `38.456.789`, `juan.perez@gmail.com`, `CUR-101` Python Inicial, `PARTICULAR` y `HABILITADO`; Camila Rodríguez, documento `40.112.233`, `cami_rod@hotmail.com`, `CUR-102` Desarrollo Web Full Stack, `BECADO PARCIAL` con 50% de descuento y `HABILITADO`; Matías Fernández, documento `39.887.665`, `mati.fdez@yahoo.com.ar`, `CUR-104` Diseño UX/UI Avanzado, `PARTICULAR` y `HABILITADO`; Nicolás Castro, documento `Sin DNI (alumno exterior)`, `nicocastro_uy@gmail.com`, `CUR-106` Machine Learning Aplicado, `PARTICULAR` y `HABILITADO`; Agustina Benítez, documento `41.332.114`, `agus.benitez@gmail.com`, `CUR-101` Python Inicial, `BECADO PARCIAL` con 50% de descuento y `BLOQUEADO` por `comprobante ilegible`; y Valeria Rossi, documento `36.778.990`, `valerossi@gmail.com`, `CUR-104` Diseño UX/UI Avanzado, `PARTICULAR` y `BLOQUEADO` por `debe saldo`. La columna `DNI` SHALL renderizar el documento exactamente como lo registra el cliente, incluido el texto `Sin DNI (alumno exterior)` del alumno de Uruguay. Los dos accesos bloqueados del maquetado son los dos casos que el cliente tiene sin resolver y ninguno se corrige por la interfaz.
+La acción `+ Nuevo Alumno` SHALL abrir un modal titulado `Nuevo Alumno` con los campos
+`DNI`, `Nombre`, `Email` y `Teléfono`, en ese orden, y los botones `Cancelar` y `Guardar
+Alumno`. El modal SHALL reutilizar el diseño y los componentes del modal de Docentes y
+SHALL NOT modificar colores, tipografías, navegación ni estilos globales. El formulario
+SHALL NOT pedir `tipo_documento`: esta entrega registra solo DNI.
 
-La misma pantalla SHALL mostrar el bloque `Cuentas Corporativas Vinculadas` con una tabla cuyas columnas, en este orden literal, son `RAZÓN SOCIAL`, `CUIT`, `PREFERENCIA FACTURA` y `NÓMINA DE EMPLEADOS`, donde la preferencia de factura se renderiza como badge `A` o `B`. Las filas del maquetado son, en este orden: `Tech Solutions S.A.` con CUIT `30-71665544-9`, preferencia de factura `A` y nómina `Grupo 5 (Data Analytics) y Grupo 2 (Python Inicial), segunda tanda de empleados`; y `Banco Federal (Capacitaciones)` con CUIT `30-50001234-4`, preferencia de factura `A` y nómina `10 personas, falta enviar la nómina`. El alta de cuenta corporativa pertenece a esta misma pantalla y no a una pantalla separada de empresas.
+WHEN el alta es exitosa, la pantalla SHALL cerrar el modal de alta, abrir un modal superpuesto
+con las credenciales e incorporar al padrón el alumno que devuelve la fuente. El modal SHALL
+mostrar el nombre del alumno, el usuario —el email— y la contraseña inicial que devuelve el alta,
+reutilizando los componentes visuales existentes y conservando la identidad visual del sistema, y
+SHALL poder cerrarse con su botón de cierre o con su acción de cierre. La contraseña inicial SHALL
+NOT incorporarse a la fila del padrón ni pedirse de nuevo a la fuente. WHEN el alta es rechazada, la
+pantalla SHALL mantener el formulario abierto con lo que el operador completó y SHALL
+mostrar el motivo que devuelve la fuente, sin confirmar el alta. WHEN la fuente no puede
+registrar el alta, la pantalla SHALL fallar y SHALL NOT mostrar una confirmación.
+
+Las filas del maquetado son, en este orden: Juan Ignacio Pérez, documento `38.456.789`,
+`juan.perez@gmail.com`, `CUR-101` Python Inicial, `PARTICULAR` y `HABILITADO`; Camila
+Rodríguez, documento `40.112.233`, `cami_rod@hotmail.com`, `CUR-102` Desarrollo Web Full
+Stack, `BECADO PARCIAL` con 50% de descuento y `HABILITADO`; Matías Fernández, documento
+`39.887.665`, `mati.fdez@yahoo.com.ar`, `CUR-104` Diseño UX/UI Avanzado, `PARTICULAR` y
+`HABILITADO`; Nicolás Castro, documento `Sin DNI (alumno exterior)`,
+`nicocastro_uy@gmail.com`, `CUR-106` Machine Learning Aplicado, `PARTICULAR` y `HABILITADO`;
+Agustina Benítez, documento `41.332.114`, `agus.benitez@gmail.com`, `CUR-101` Python
+Inicial, `BECADO PARCIAL` con 50% de descuento y `BLOQUEADO` por `comprobante ilegible`; y
+Valeria Rossi, documento `36.778.990`, `valerossi@gmail.com`, `CUR-104` Diseño UX/UI
+Avanzado, `PARTICULAR` y `BLOQUEADO` por `debe saldo`. La columna `DNI` SHALL renderizar el
+documento exactamente como lo registra el cliente, incluido el texto `Sin DNI (alumno
+exterior)` del alumno de Uruguay. Los dos accesos bloqueados del maquetado son los dos casos
+que el cliente tiene sin resolver y ninguno se corrige por la interfaz.
+
+En el modo por omisión, las filas SHALL ser las que devuelve `GET /alumnos`. WHEN un alumno
+todavía no tiene inscripción, la fila SHALL mostrar `Sin comisión` en `COMISIÓN ASIGNADA`,
+`—` en `CATEGORÍA ARANCELARIA` y `—` en `ACCESO PLATAFORMA`. La pantalla SHALL NOT inventar
+una comisión, una categoría ni un estado de habilitación para completar la fila.
+
+La misma pantalla SHALL mostrar el bloque `Cuentas Corporativas Vinculadas` con una tabla
+cuyas columnas, en este orden literal, son `RAZÓN SOCIAL`, `CUIT`, `PREFERENCIA FACTURA` y
+`NÓMINA DE EMPLEADOS`, donde la preferencia de factura se renderiza como badge `A` o `B`.
+Las filas del maquetado son, en este orden: `Tech Solutions S.A.` con CUIT
+`30-71665544-9`, preferencia de factura `A` y nómina `Grupo 5 (Data Analytics) y Grupo 2
+(Python Inicial), segunda tanda de empleados`; y `Banco Federal (Capacitaciones)` con CUIT
+`30-50001234-4`, preferencia de factura `A` y nómina `10 personas, falta enviar la nómina`.
+El alta de cuenta corporativa pertenece a esta misma pantalla y no a una pantalla separada
+de empresas.
 
 #### Scenario: El usuario abre el padrón de alumnos
 - **WHEN** un usuario de Secretaría abre `Alumnos e Inscripciones`
-- **THEN** ve el bloque `Padrón de Alumnos Regulares` con el buscador `Buscar por DNI o Nombre…` y la tabla con las columnas `DNI`, `NOMBRE`, `EMAIL`, `COMISIÓN ASIGNADA`, `CATEGORÍA ARANCELARIA` y `ACCESO PLATAFORMA`, con las seis filas del maquetado
+- **THEN** ve el bloque `Padrón de Alumnos Regulares` con la acción `+ Nuevo Alumno`, el buscador deshabilitado con `Próximamente`, y la tabla con las columnas `DNI`, `NOMBRE`, `EMAIL`, `COMISIÓN ASIGNADA`, `CATEGORÍA ARANCELARIA` y `ACCESO PLATAFORMA`
+
+#### Scenario: El usuario abre el modal de alta
+- **WHEN** el usuario pulsa `+ Nuevo Alumno`
+- **THEN** se abre el modal `Nuevo Alumno` con los campos `DNI`, `Nombre`, `Email` y `Teléfono`, los botones `Cancelar` y `Guardar Alumno`, y ningún campo de tipo de documento
+
+#### Scenario: Alta de alumno correcta
+- **WHEN** el usuario completa DNI, nombre, email y teléfono de un alumno no registrado y pulsa `Guardar Alumno`
+- **THEN** el modal de alta se cierra, se abre el modal de credenciales, la pantalla incorpora el alumno creado al padrón y el modal muestra el nombre, el usuario y la contraseña inicial
+
+#### Scenario: El usuario cierra el modal de credenciales
+- **WHEN** el usuario pulsa la acción de cierre del modal de credenciales o su botón de cerrar
+- **THEN** el modal se cierra y la pantalla queda en el padrón, sin un bloque de credenciales fijo dentro de la página
+
+#### Scenario: Alta rechazada por dato duplicado
+- **WHEN** la fuente rechaza el alta porque el DNI o el email ya están registrados
+- **THEN** el modal sigue abierto con lo que el operador completó, muestra el motivo que devuelve la fuente y no confirma el alta
+
+#### Scenario: Alta que no llega a la base
+- **WHEN** la fuente no puede registrar el alta
+- **THEN** la pantalla no muestra ninguna confirmación y muestra el motivo de la falla
+
+#### Scenario: El formulario valida antes de enviar
+- **WHEN** el usuario deja vacío el DNI, el nombre o el email, o informa un DNI que no tiene 7 u 8 dígitos o un email con formato inválido
+- **THEN** el formulario muestra el error en el campo correspondiente y no envía el alta
+
+#### Scenario: Alumno sin inscripción en la tabla
+- **WHEN** el padrón devuelve un alumno que todavía no tiene inscripción
+- **THEN** la fila muestra `Sin comisión` en `COMISIÓN ASIGNADA`, `—` en `CATEGORÍA ARANCELARIA` y `—` en `ACCESO PLATAFORMA`, sin inventar datos
+
+#### Scenario: El buscador está deshabilitado
+- **WHEN** el usuario intenta escribir en `Buscar por DNI o Nombre…`
+- **THEN** el campo no filtra ni navega y muestra la leyenda `Próximamente`, porque la búsqueda es la historia #16
+
+#### Scenario: La búsqueda no arroja resultados
+- **WHEN** el usuario intenta buscar un DNI o un nombre que no existe en el padrón
+- **THEN** el campo está deshabilitado, no filtra ni informa resultados y muestra la leyenda `Próximamente`. El escenario conserva el nombre de la regla anterior, que ya no aplica porque la búsqueda es la historia #16
 
 #### Scenario: El usuario revisa las categorías
-- **WHEN** el usuario recorre la columna `CATEGORÍA ARANCELARIA`
+- **WHEN** el usuario recorre la columna `CATEGORÍA ARANCELARIA` con los datos de ejemplo
 - **THEN** encuentra `PARTICULAR` en gris, `BECADO PARCIAL` en violeta con su porcentaje de descuento visible, `BECADO TOTAL` en magenta y `CORPORATIVO` en celeste
 
 #### Scenario: El usuario revisa los bloqueos reales
-- **WHEN** el usuario mira las filas de Agustina Benítez y de Valeria Rossi
+- **WHEN** el usuario mira las filas de Agustina Benítez y de Valeria Rossi en los datos de ejemplo
 - **THEN** ve `BLOQUEADO` en rojo junto a las causas `comprobante ilegible` y `debe saldo`, respectivamente
 
 #### Scenario: El usuario busca al alumno del exterior
-- **WHEN** el usuario recorre la columna `DNI`
+- **WHEN** el usuario recorre la columna `DNI` con los datos de ejemplo
 - **THEN** ve el valor `Sin DNI (alumno exterior)` en la fila de Nicolás Castro, tal como lo registra el cliente, sin un documento numérico inventado
 
 #### Scenario: El usuario revisa las cuentas corporativas
@@ -444,28 +611,85 @@ La misma pantalla SHALL mostrar el bloque `Cuentas Corporativas Vinculadas` con 
 #### Scenario: El usuario busca la nómina faltante
 - **WHEN** el usuario lee la columna `NÓMINA DE EMPLEADOS`
 - **THEN** ve que la fila de Banco Federal aclara que falta enviar la nómina y que la de Tech Solutions S.A. describe la segunda tanda de empleados
+#### Scenario: El usuario da de alta una empresa
+- **WHEN** el usuario pulsa `+ Nueva Empresa`, completa razón social, un CUIT válido, marca o no `Requiere Factura A` y confirma
+- **THEN** el modal se cierra y la empresa aparece en la tabla `Cuentas Corporativas Vinculadas` con su badge de preferencia de factura
 
-#### Scenario: La búsqueda no arroja resultados
-- **WHEN** el usuario busca un DNI o un nombre que no existe en el padrón
-- **THEN** el maquetado informa que no se encontraron resultados
+#### Scenario: Razón social vacía en el alta
+- **WHEN** el usuario confirma el alta sin razón social
+- **THEN** el formulario no se envía e indica que la razón social es obligatoria
+
+#### Scenario: El backend rechaza el alta
+- **WHEN** el backend rechaza el alta, por ejemplo por un CUIT ya registrado o con dígito verificador inválido
+- **THEN** el modal permanece abierto y muestra el motivo tal como lo devuelve la fuente, identificando la empresa existente cuando el rechazo es por duplicado
 
 ### Requirement: Cobranzas: registro de pago manual e historial de ingresos
 
-The system SHALL mostrar el bloque `Registrar Cobranza Manual` como un formulario embebido en la pantalla y no como ventana modal, con los campos en este orden literal: `Fecha Pago`, `Importe Cobrado (AR$)`, `Medio de Pago` como selección, `Titular del Comprobante`, `Alumno a Imputar Pago` como selección con búsqueda, `Estado Inicial` como selección, la casilla `El titular solicita Factura tipo A con CUIT vinculada` y el botón `Registrar Cobro`. El formulario SHALL hacer explícito que el pagador y el beneficiario son cosas distintas: el `Titular del Comprobante` puede ser un tercero o una empresa ajena al padrón y el pago se imputa al `Alumno a Imputar Pago`, que es quien queda reflejado en su legajo.
+The system SHALL mostrar el bloque `Registrar Cobranza Manual` como un formulario embebido en la
+pantalla y no como ventana modal, con los campos en este orden literal: `Fecha Pago`,
+`Importe Cobrado (AR$)`, `Medio de Pago` como selección, `Titular del Comprobante`,
+`Alumno a Imputar Pago` como selección con búsqueda, `Estado Inicial` como selección, la casilla
+`El titular solicita Factura tipo A con CUIT vinculada` y el botón `Registrar Cobro`. WHEN el
+alumno elegido tiene más de una inscripción activa, la pantalla SHALL mostrar un selector
+`Comisión a Imputar`; con una sola SHALL informar cuál se usará; sin ninguna SHALL bloquear el
+registro imputado e informar el motivo. WHEN la casilla de Factura A está marcada, la pantalla
+SHALL pedir el `CUIT del Titular` y SHALL NOT emitir una factura.
 
-El sistema SHALL usar un único conjunto de rótulos de medio de pago, tomado del dominio, tanto en la selección del formulario como en la columna `MEDIO` del historial: `Transferencia`, `Efectivo`, `Cheque`, `Tarjeta`, `Billetera` y `Otro`. Esta normalización es intencional: el prototipo rotula los medios de forma distinta en el formulario y en la tabla, y se resuelve a favor del vocabulario del dominio.
+El sistema SHALL usar un único conjunto de rótulos de medio de pago, tomado del dominio, tanto en
+la selección del formulario como en la columna `MEDIO` del historial: `Transferencia`, `Efectivo`,
+`Cheque`, `Tarjeta`, `Billetera` y `Otro`.
 
-The system SHALL mostrar el bloque `Historial de Ingresos Registrados` con una tabla cuyas columnas, en este orden literal, son `FECHA`, `TITULAR DEL PAGO`, `ALUMNO IMPUTADO`, `MEDIO`, `FACTURA A`, `IMPORTE` y `ESTADO GESTIÓN`. La columna `ESTADO GESTIÓN` SHALL distinguir `ACREDITADO` en verde, `OBSERVADO` en ámbar y `RECHAZADO` en rojo, y la columna `FACTURA A` SHALL renderizarse como badge `A` o `B`.
-
-Las filas del maquetado son, en este orden: el 10/05/2026, titular Juan Ignacio Pérez, alumno imputado Juan Ignacio Pérez, `Transferencia`, factura `B`, `$45.000`, `ACREDITADO`; el 11/05/2026, titular Camila Rodríguez, alumno imputado Camila Rodríguez, `Transferencia`, factura `B`, `$31.000`, `ACREDITADO`; el 12/05/2026, titular Tech Solutions S.A., alumno imputado Tech Solutions S.A., `Transferencia`, factura `A`, `$240.000`, `ACREDITADO`; el 16/05/2026, titular Banco Federal, sin alumnos imputados, `Cheque`, factura `A`, `$390.000`, `OBSERVADO`; el 19/05/2026, titular un familiar de Agustina Benítez, alumno imputado Agustina Benítez, `Transferencia`, factura `B`, importe vacío, `OBSERVADO`; y el 21/05/2026, titular Valeria Rossi, alumno imputado Valeria Rossi, `Efectivo`, factura `B`, `$26.000`, `OBSERVADO`.
-
-Dos filas del historial son los casos que el cliente tiene sin resolver y el maquetado SHALL representarlos sin limpiarlos. La fila del 19/05/2026 es el caso de pagador distinto del alumno: el comprobante que envió la familia de Agustina Benítez llegó ilegible, por eso el titular es un tercero, el alumno imputado es Agustina Benítez y el importe queda vacío porque nunca pudo leerse. La fila del 16/05/2026 no tiene alumno imputado porque el cheque sigue pendiente de acreditación y la empresa todavía no envió la nómina de sus empleados.
-
-El acreditamiento automático de pagos queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem deshabilitado con la etiqueta `Próximamente` y sin pantalla detrás.
+The system SHALL mostrar el bloque `Historial de Ingresos Registrados` con una tabla cuyas
+columnas, en este orden literal, son `FECHA`, `TITULAR DEL PAGO`, `ALUMNO IMPUTADO`, `MEDIO`,
+`FACTURA A`, `IMPORTE` y `ESTADO GESTIÓN`. La columna `FACTURA A` SHALL mostrar `A` solo cuando
+se solicitó Factura A y `—` en los demás casos; SHALL NOT mostrar `B` por defecto. La columna
+`ESTADO GESTIÓN` SHALL distinguir `ACREDITADO` en verde, `OBSERVADO` en ámbar y `RECHAZADO` en
+rojo. El historial SHALL recuperarse de `GET /cobranzas` y SHALL refrescarse después de un alta
+exitosa. SHALL permitir buscar por nombre del titular con coincidencias parciales.
 
 #### Scenario: El usuario registra una cobranza
-- **WHEN** el usuario completa `Fecha Pago`, `Importe Cobrado (AR$)` y `Medio de Pago`, elige el alumno a imputar y pulsa `Registrar Cobro`
-- **THEN** el maquetado agrega una fila al `Historial de Ingresos Registrados` con esos datos
+- **WHEN** el usuario completa fecha, importe, medio, elige la inscripción y pulsa `Registrar Cobro`
+- **THEN** el pago se guarda en PostgreSQL, el historial se recarga y la fila aparece con esos datos
+
+#### Scenario: El backend rechaza el alta
+- **WHEN** el backend responde con un error
+- **THEN** la pantalla muestra el motivo, no agrega la fila y no confirma el registro
+
+#### Scenario: Fecha futura
+- **WHEN** el usuario ingresa una fecha posterior a hoy
+- **THEN** la pantalla no envía el formulario e informa que la fecha no puede ser futura
+
+#### Scenario: Alumno con varias inscripciones
+- **WHEN** el usuario elige un alumno con más de una inscripción activa
+- **THEN** la pantalla muestra el selector de comisión y exige elegir una antes de registrar
+
+#### Scenario: Alumno sin inscripciones
+- **WHEN** el usuario elige un alumno sin inscripciones activas
+- **THEN** la pantalla informa que no hay inscripción disponible y no registra el pago imputado
+
+#### Scenario: Solicitud de Factura A
+- **WHEN** el usuario marca la casilla de Factura A
+- **THEN** aparece el campo CUIT del titular y el historial muestra `A` si el alta prospera
+
+#### Scenario: El usuario busca la acreditación automática
+- **WHEN** el usuario busca la acreditación automática de pagos
+- **THEN** encuentra un ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+
+#### Scenario: Falta la justificación
+- **WHEN** el usuario intenta continuar sin escribir la justificación
+- **THEN** el modal no avanza a la confirmación y señala que la justificación es obligatoria
+
+#### Scenario: Confirmación antes de guardar
+- **WHEN** el usuario escribe la justificación y pide continuar
+- **THEN** el modal muestra la confirmación con el estado actual, el estado nuevo y la justificación, y solo guarda al confirmarla
+
+#### Scenario: La actualización se refleja en el historial
+- **WHEN** el backend responde con éxito
+- **THEN** la fila muestra el estado nuevo con su color y su causa, y la acción sigue disponible con los destinos válidos de ese estado
+
+#### Scenario: La actualización falla
+- **WHEN** el backend rechaza el cambio
+- **THEN** el modal muestra el mensaje de error y la fila conserva su estado anterior
 
 #### Scenario: El titular del comprobante no es el alumno
 - **WHEN** el usuario carga un pago cuyo `Titular del Comprobante` es un tercero o una empresa que no está en el padrón
@@ -477,7 +701,7 @@ El acreditamiento automático de pagos queda fuera del alcance mínimo: la panta
 
 #### Scenario: El usuario revisa el historial
 - **WHEN** un usuario de Secretaría abre `Historial de Ingresos Registrados`
-- **THEN** ve las columnas `FECHA`, `TITULAR DEL PAGO`, `ALUMNO IMPUTADO`, `MEDIO`, `FACTURA A`, `IMPORTE` y `ESTADO GESTIÓN`, con las seis filas del maquetado y `ACREDITADO`, `OBSERVADO` y `RECHAZADO` en colores distintos
+- **THEN** ve las columnas `FECHA`, `TITULAR DEL PAGO`, `ALUMNO IMPUTADO`, `MEDIO`, `FACTURA A`, `IMPORTE`, `ESTADO GESTIÓN` y `ACCIONES`, con las seis filas del maquetado y `ACREDITADO`, `OBSERVADO` y `RECHAZADO` en colores distintos
 
 #### Scenario: El usuario revisa el comprobante ilegible
 - **WHEN** el usuario mira la fila del 19/05/2026
@@ -491,9 +715,13 @@ El acreditamiento automático de pagos queda fuera del alcance mínimo: la panta
 - **WHEN** el usuario abre la selección `Medio de Pago` y luego mira la columna `MEDIO` del historial
 - **THEN** ve el mismo conjunto de rótulos en ambos lugares y no encuentra etiquetas divergentes como `Cheque Corp`
 
-#### Scenario: El usuario busca la acreditación automática
-- **WHEN** el usuario busca la acreditación automática de pagos
-- **THEN** encuentra un ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+#### Scenario: Editar el estado de una cobranza observada
+- **WHEN** el usuario abre una fila `OBSERVADO` y pulsa `Editar estado`
+- **THEN** se abre un modal con el titular, el alumno imputado, el importe, la fecha y el estado actual, un selector que ofrece `ACREDITADO` y `RECHAZADO`, y un campo de justificación
+
+#### Scenario: Corregir una cobranza acreditada por error
+- **WHEN** el usuario abre una fila `ACREDITADO` y pulsa `Editar estado`
+- **THEN** el modal ofrece `OBSERVADO` y `RECHAZADO` como únicos estados de destino y no ofrece `ACREDITADO`
 
 ### Requirement: Habilitación de accesos y acciones excepcionales
 
@@ -659,3 +887,79 @@ estos valen cero —`19-22hs`— y con minutos cuando no —`18:15-21:30hs`—.
 
 - **WHEN** una comisión tiene más de un grupo de días con distinto rango y se la ve en la tabla de Administración
 - **THEN** la celda `HORARIO` muestra una sola línea con ellipsis, el texto completo en el tooltip y el badge `+1`, que abre un popover con la lista completa de los dos grupos
+
+### Requirement: Credenciales iniciales del alta de docente
+
+Después de un alta de docente exitosa, la pantalla `Docentes` SHALL cerrar el formulario, actualizar
+el listado y abrir un modal con nombre, email, contraseña inicial, el aviso de cambio obligatorio y
+el botón `Entendido`. La contraseña SHALL mostrarse solo después del alta exitosa y SHALL
+desaparecer al cerrar el modal: no SHALL quedar en el listado, la edición ni al recargar. Un alta
+rechazada SHALL mantener el formulario abierto y SHALL NOT mostrar credenciales.
+
+#### Scenario: El alta exitosa muestra las credenciales
+
+- **WHEN** el administrador confirma un alta de docente que la fuente acepta
+- **THEN** el formulario se cierra, el listado se actualiza y aparece el modal `Credenciales del docente` con el nombre, el email de acceso, la contraseña inicial generada y el aviso de que deberá cambiarla en su primer ingreso
+
+#### Scenario: Cerrar el modal oculta la contraseña
+
+- **WHEN** el administrador pulsa `Entendido`
+- **THEN** el modal se cierra y la contraseña inicial deja de estar visible en la pantalla
+
+#### Scenario: La contraseña no queda en el padrón
+
+- **WHEN** el administrador recorre el listado, abre la edición del docente o recarga la página después del alta
+- **THEN** la contraseña inicial no aparece en la fila, ni en el formulario de edición, ni después de recargar
+
+#### Scenario: Un alta rechazada no muestra credenciales
+
+- **WHEN** la fuente rechaza el alta con un DNI o un email duplicado
+- **THEN** el formulario queda abierto con lo que el administrador escribió, se muestra el motivo del rechazo y no aparece el modal de credenciales
+
+#### Scenario: Las dos fuentes de datos se comportan igual
+
+- **WHEN** la pantalla se usa en modo API o en modo de ejemplo
+- **THEN** el modal recibe el email y la contraseña inicial con la misma forma en los dos modos, y la contraseña se genera con la convención `<primer nombre><DNI>`
+
+### Requirement: Acciones de edición, contraseña y baja en el padrón de alumnos
+
+La pantalla `Alumnos e Inscripciones` SHALL ofrecer por cada fila las acciones **Editar**,
+**Restablecer contraseña** y **Eliminar alumno**, reutilizando los componentes `Button`, `Modal`
+e `Input` existentes y sin cambiar colores, tipografías ni navegación. Las operaciones SHALL pasar
+por `src/services/` y SHALL actualizar los datos visibles al terminar.
+
+#### Scenario: Editar desde la fila
+- **WHEN** el administrador elige **Editar**
+- **THEN** se abre un modal con DNI, nombre, email y teléfono precargados y, al guardar, la fila muestra los datos actualizados
+
+#### Scenario: Rechazo de un dato duplicado
+- **WHEN** la edición se rechaza por DNI o email repetido
+- **THEN** el modal queda abierto con lo cargado y muestra el motivo informado por la fuente
+
+#### Scenario: Restablecer la contraseña
+- **WHEN** el administrador elige **Restablecer contraseña** y confirma una nueva contraseña válida
+- **THEN** el modal se cierra y la pantalla informa que la contraseña fue restablecida, sin mostrarla en claro
+
+#### Scenario: Confirmar la baja
+- **WHEN** el administrador elige **Eliminar alumno**
+- **THEN** se abre un modal de confirmación con el nombre del alumno y las opciones de cancelar o confirmar
+
+#### Scenario: Cancelar la baja
+- **WHEN** el administrador cancela la confirmación
+- **THEN** el alumno sigue visible y no se modifica ningún registro
+
+#### Scenario: Baja confirmada
+- **WHEN** el administrador confirma la baja
+- **THEN** la fila desaparece del listado y la pantalla muestra un mensaje de confirmación
+
+#### Scenario: Aviso de reactivación al intentar un alta duplicada
+- **WHEN** el alta de un alumno choca con un DNI o email de un alumno dado de baja
+- **THEN** la pantalla muestra un modal que indica que el alumno fue dado de baja antes y ofrece **Reactivar alumno**
+
+#### Scenario: Reactivación confirmada desde el modal
+- **WHEN** el administrador confirma **Reactivar alumno**
+- **THEN** el alumno vuelve al listado de activos y la pantalla muestra las nuevas credenciales iniciales
+
+#### Scenario: Reactivación cancelada desde el modal
+- **WHEN** el administrador cancela el aviso de reactivación
+- **THEN** no se modifica ningún dato y el formulario de alta conserva lo cargado

@@ -224,35 +224,39 @@ The system SHALL representar `Notas y Certificación` únicamente como un ítem 
 
 ### Requirement: Perfil del docente
 
-The system SHALL mostrar una tarjeta de identidad con el avatar formado por las iniciales de la
-cuenta de la sesión, el nombre de esa cuenta, el chip `DOCENTE · PERMISOS REDUCIDOS` y la nota
-`Los cambios administrativos deben solicitarse a Secretaría BA.`; y un bloque de datos de
-contacto en modo de solo lectura que, además del nombre, muestre únicamente `Especialidad` con
-el valor `Programación` y `Sede de referencia` con el valor `Sede Constituciones`. El bloque de
-contacto SHALL NOT mostrar correo institucional ni teléfono, porque la fuente del cliente no los
-registra para los docentes y no deben inventarse. La tarjeta de identidad SHALL NOT mostrar un
-avatar ni un nombre literales del maquetado.
-
-The system SHALL mostrar el bloque `Comisiones asignadas` con las columnas `CÓDIGO`, `CURSO`,
-`HORARIO` y `ESTADO`, con la fila `CUR-101`, Python Inicial, `Mar y Jue · 19 a 21 hs` y estado
-`Activa` renderizado en verde. La pantalla SHALL ser completamente de solo lectura: el sistema
-SHALL NOT renderizar botones de guardado ni campos editables.
+El sistema SHALL mostrar una tarjeta de identidad con el avatar de la cuenta de la sesión, su
+nombre y la nota de Secretaría. El bloque de datos personales SHALL mostrar `Nombre`, `Apellido`,
+`DNI` y `CUIL` en solo lectura y `Email` y `Teléfono` editables con guardado real. La pantalla
+SHALL incluir una tarjeta `Seguridad` que reutilice `POST /auth/change-password` y SHALL mostrar
+`Comisiones asignadas` con `CÓDIGO`, `CURSO`, `HORARIO` y `ESTADO`.
 
 #### Scenario: El docente abre su perfil
 - **WHEN** el docente abre `Mi Perfil`
-- **THEN** ve la tarjeta de identidad con el avatar y el nombre de la cuenta de la sesión —no un avatar ni un nombre literales del maquetado—, el chip `DOCENTE · PERMISOS REDUCIDOS` y la nota `Los cambios administrativos deben solicitarse a Secretaría BA.`
+- **THEN** ve la tarjeta de identidad con el avatar y el nombre de la cuenta de la sesión y la nota `Los cambios administrativos deben solicitarse a Secretaría BA.`, sin chip de permisos
 
 #### Scenario: El docente revisa sus datos de contacto
-- **WHEN** el docente baja al bloque de datos de contacto
-- **THEN** ve `Especialidad` con `Programación` y `Sede de referencia` con `Sede Constituciones`, y no encuentra correo ni teléfono
+- **WHEN** el docente baja al bloque de datos personales
+- **THEN** ve `Nombre`, `Apellido`, `DNI` y `CUIL` como campos deshabilitados y `Email` y `Teléfono` como campos editables con el valor guardado
+
+#### Scenario: El docente edita su email y su teléfono
+- **WHEN** el docente cambia el email o el teléfono y guarda
+- **THEN** la pantalla muestra el aviso de éxito y los valores que devolvió la API, y la sesión refleja el email nuevo
+
+#### Scenario: El guardado falla
+- **WHEN** el email ya pertenece a otra persona o el formato es inválido
+- **THEN** la pantalla muestra el error, conserva lo ingresado y no confirma el cambio
+
+#### Scenario: El docente cambia su contraseña desde el perfil
+- **WHEN** el docente completa contraseña actual, nueva y confirmación y confirma el cambio
+- **THEN** la pantalla muestra el aviso de éxito y la contraseña anterior deja de funcionar
 
 #### Scenario: El docente revisa sus comisiones
 - **WHEN** el docente baja al bloque `Comisiones asignadas`
-- **THEN** ve las columnas `CÓDIGO`, `CURSO`, `HORARIO` y `ESTADO`, con la fila `CUR-101` / Python Inicial / `Mar y Jue · 19 a 21 hs` y el estado `Activa` en verde
+- **THEN** ve las columnas `CÓDIGO`, `CURSO`, `HORARIO` y `ESTADO`, con sus comisiones reales y el estado `Activa` en verde
 
 #### Scenario: El docente intenta editar su perfil
-- **WHEN** el docente intenta modificar un dato de contacto
-- **THEN** la pantalla no ofrece campos editables ni botón de guardado, y los datos se muestran solo como lectura
+- **WHEN** el docente intenta modificar `Nombre`, `Apellido`, `DNI` o `CUIL`
+- **THEN** los campos están deshabilitados y la API rechaza el intento con `422`, mientras `Email`, `Teléfono` y la contraseña sí se pueden editar
 
 ### Requirement: Control de acceso al shell del docente
 

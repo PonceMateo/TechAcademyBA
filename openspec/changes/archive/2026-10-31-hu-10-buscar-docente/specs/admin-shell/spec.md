@@ -125,3 +125,28 @@ del alta y del control deshabilitado SHALL conservarse sin cambios.
 
 - **WHEN** el usuario revisa la pantalla buscando editar a un docente o controlar las clases que dicta
 - **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, no hay control de edición, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+
+#### Scenario: El usuario edita los datos de un docente
+
+- **WHEN** el usuario pulsa `Editar`, cambia nombre, apellido, DNI, mail o teléfono y guarda
+- **THEN** el modal se cierra, la fila muestra los nuevos datos y la pantalla confirma que el docente se actualizó
+
+#### Scenario: El usuario edita con un DNI o mail duplicado
+
+- **WHEN** el usuario intenta guardar un DNI o un mail que ya pertenece a otro registro
+- **THEN** el modal queda abierto, muestra el motivo que devuelve la fuente y la fila conserva sus datos anteriores
+
+#### Scenario: El usuario restablece la contraseña de un docente
+
+- **WHEN** el usuario pulsa `Restablecer contraseña`, define una contraseña válida y confirma
+- **THEN** el modal se cierra y la pantalla informa que el docente deberá cambiarla en su próximo ingreso
+
+#### Scenario: Las contraseñas no coinciden
+
+- **WHEN** el usuario escribe dos contraseñas distintas en el modal de restablecimiento
+- **THEN** la pantalla no envía la operación y muestra que las contraseñas no coinciden
+
+#### Scenario: El modal de edición no pide CUIL
+
+- **WHEN** el usuario abre `Editar Docente`
+- **THEN** ve nombre, apellido, DNI, mail y teléfono, y no ve ningún campo de CUIL

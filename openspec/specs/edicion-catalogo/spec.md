@@ -59,14 +59,21 @@ sus comisiones y el historial asociado SHALL NOT modificarse.
 ### Requirement: Edición de una comisión
 
 El sistema SHALL exponer `PUT /comisiones/{id}` solo para Administración. La edición SHALL aceptar el
-docente, los horarios de cursada, el arancel y el cupo máximo, y SHALL NOT aceptar el curso, el
-número, la modalidad, la sede ni un código: un campo fuera de ese conjunto SHALL responder `422`.
-La edición **SHALL NOT aceptar `dias_horarios` como texto libre**: los horarios se envían como la
-lista estructurada de día, inicio y fin, en el mismo formato del alta.
+docente, los horarios de cursada, el arancel, el cupo máximo y el período de cursada —fecha de inicio
+y fecha de fin—, y SHALL NOT aceptar el curso, el número, la modalidad, la sede ni un código: un campo
+fuera de ese conjunto SHALL responder `422`. La edición **SHALL NOT aceptar `dias_horarios` como
+texto libre**: los horarios se envían como la lista estructurada de día, inicio y fin, en el mismo
+formato del alta.
 
 Los horarios SHALL validarse igual que en el alta: minutos múltiplos de 15, horas entre 6:00 y
 22:00, fin estrictamente posterior al inicio, un solo rango por día y ningún par de rangos que se
 pise dentro de la comisión; cualquiera de esas reglas rotas SHALL responder `422`.
+
+El período SHALL ser **obligatorio** en la edición, con las mismas reglas del alta: la fecha de fin
+SHALL ser igual o posterior a la de inicio y el período SHALL contener al menos una clase según los
+días de cursada de la comisión. WHEN falte alguna de las dos fechas, WHEN la fecha de fin sea
+anterior a la de inicio o WHEN el período no contenga ninguna clase, el sistema SHALL responder
+`422` y la comisión SHALL conservar el período que tenía.
 
 WHEN los horarios guardados se pisan con los de otra comisión **vigente** del mismo docente, en
 cualquier curso, el sistema SHALL rechazar la edición con `409` e informar la comisión en conflicto
@@ -84,14 +91,38 @@ WHEN el nuevo cupo sea menor que esa cantidad, el sistema SHALL rechazar la edic
 informar cuántos inscriptos hay. Las inscripciones `EN_ESPERA`, `BAJA` y `COMPLETADA` SHALL NOT contar
 como ocupantes del cupo. Las inscripciones y los pagos ya registrados SHALL NOT modificarse.
 
+La edición del período SHALL NOT modificar las inscripciones ni los pagos, y ningún importe de
+inscripción ya calculado SHALL cambiar por editar las fechas. El arancel de la comisión SHALL ser
+el que se envía en la misma edición, sin recalcularse a partir del período.
+
 La respuesta SHALL devolver la comisión actualizada con su código derivado, sus horarios
-estructurados, el texto de días y horarios derivado de ellos y sus vacantes recalculadas a partir del
-nuevo cupo y de las inscripciones activas.
+estructurados, el texto de días y horarios derivado de ellos, el período con la cantidad de clases
+derivada de él y sus vacantes recalculadas a partir del nuevo cupo y de las inscripciones activas.
 
 #### Scenario: Edición exitosa
 
 - **WHEN** se modifican el docente, los horarios, el arancel o el cupo de una comisión con valores válidos y se guarda
 - **THEN** los cambios quedan persistidos, la respuesta trae la comisión con sus horarios y sus vacantes recalculadas, y las inscripciones y pagos siguen asociados a la misma comisión
+
+#### Scenario: Edición del período con valores válidos
+
+- **WHEN** se cambian la fecha de inicio y la fecha de fin de una comisión por otras que contienen al menos un día de cursada
+- **THEN** el sistema guarda las dos fechas y la respuesta informa la cantidad de clases recalculada para el período nuevo
+
+#### Scenario: Editar el período no recalcula aranceles
+
+- **WHEN** se edita el período de una comisión que tiene inscripciones y pagos registrados
+- **THEN** las inscripciones y los pagos quedan iguales, ningún importe de inscripción cambia y el arancel de la comisión es el que se envió en la edición
+
+#### Scenario: Período inválido en la edición
+
+- **WHEN** se envía una edición con la fecha de fin anterior a la de inicio, con una sola de las dos fechas o con un período que no contiene ninguna clase
+- **THEN** el sistema responde `422` y la comisión conserva el período que tenía
+
+#### Scenario: Comisión heredada que se edita por primera vez
+
+- **WHEN** se edita una comisión creada antes de que el período existiera, sin informar las dos fechas
+- **THEN** el sistema responde `422` y no la guarda, porque la edición exige el período
 
 #### Scenario: La edición no choca consigo misma
 

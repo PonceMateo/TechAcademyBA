@@ -119,3 +119,15 @@ de empresas.
 #### Scenario: El usuario busca la nómina faltante
 - **WHEN** el usuario lee la columna `NÓMINA DE EMPLEADOS`
 - **THEN** ve que la fila de Banco Federal aclara que falta enviar la nómina y que la de Tech Solutions S.A. describe la segunda tanda de empleados
+#### Scenario: El usuario da de alta una empresa
+- **WHEN** el usuario pulsa `+ Nueva Empresa`, completa razón social, un CUIT válido, marca o no `Requiere Factura A` y confirma
+- **THEN** el modal se cierra y la empresa aparece en la tabla `Cuentas Corporativas Vinculadas` con su badge de preferencia de factura
+
+#### Scenario: Razón social vacía en el alta
+- **WHEN** el usuario confirma el alta sin razón social
+- **THEN** el formulario no se envía e indica que la razón social es obligatoria
+
+#### Scenario: El backend rechaza el alta
+- **WHEN** el backend rechaza el alta, por ejemplo por un CUIT ya registrado o con dígito verificador inválido
+- **THEN** el modal permanece abierto y muestra el motivo tal como lo devuelve la fuente, identificando la empresa existente cuando el rechazo es por duplicado
+
