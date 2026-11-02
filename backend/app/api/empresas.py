@@ -20,8 +20,7 @@ from app.models.enums import Rol
 from app.models.padron import Usuario
 from app.schemas.empresas import EmpresaCreate, EmpresaOut
 from app.schemas.nomina import NominaCreate, NominaOut
-from app.services import empresas
-from app.services import nomina
+from app.services import empresas, nomina
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
 
