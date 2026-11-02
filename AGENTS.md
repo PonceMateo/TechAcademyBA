@@ -71,7 +71,7 @@ Add to board, never to CSV: issue `H/U <n> · <title>` with description and acce
 ## Sessions and context
 
 - When starting planning, ask **once only** (Yes / No) if wants exhaustive question session to calibrate scope (optional; explain without jargon). Warn it consumes many tokens; recommend only if initial request vague or ambiguous. If request clear, recommend no.
-  - **Yes:** load `grill-me`, do not write or open branch until user confirms shared understanding. **No:** proceed.
+  - **Yes:** load `grilling`, do not write or open branch until user confirms shared understanding. **No:** proceed.
 - After grill, recommend opening new session for apply; if prefers to stay in same, run `/compact` first.
 - Do not read entire files over 200 lines: use CodeGraph, Grep or Read with offset/limit.
 
