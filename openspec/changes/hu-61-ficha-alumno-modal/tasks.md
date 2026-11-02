@@ -22,11 +22,11 @@
 
 ## 4. Pestañas, estado e importes de cada inscripción
 
-- [ ] 4.1 Renderizar una pestaña por inscripción con comisión, categoría —y porcentaje si es beca parcial—, empresa si es corporativa, estado de habilitación con su causa en las `ACTIVA` y el estado de la inscripción en las demás; verificar con un alumno de dos inscripciones, una habilitada y otra bloqueada, y con una inscripción `COMPLETADA`
-- [ ] 4.2 Mostrar en cada pestaña total pagado, pendiente de acreditación y saldo pendiente; para corporativo, «A cargo de la empresa», y para beca total, exento; verificar los cuatro casos en `StudentsPage.test.jsx`
-- [ ] 4.3 Mostrar el mensaje informativo cuando el alumno no tiene inscripciones y no renderizar pestañas; verificar con un test de alumno sin inscripciones
-- [ ] 4.4 Permitir cambiar la categoría desde la pestaña abierta con el formulario y el `PATCH` de la HU 64, refrescando el detalle; verificar que la otra pestaña conserva su categoría
-- [ ] 4.5 Correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx` y `docker compose run --rm frontend npm run lint`
+- [x] 4.1 Renderizar una pestaña por inscripción con comisión, categoría —y porcentaje si es beca parcial—, empresa si es corporativa, estado de habilitación con su causa en las `ACTIVA` y el estado de la inscripción en las demás; verificar con un alumno de dos inscripciones, una habilitada y otra bloqueada, y con una inscripción `COMPLETADA`
+- [x] 4.2 Mostrar en cada pestaña total pagado, pendiente de acreditación y saldo pendiente; para corporativo, «A cargo de la empresa», y para beca total, exento; verificar los cuatro casos en `StudentsPage.test.jsx`
+- [x] 4.3 Mostrar el mensaje informativo cuando el alumno no tiene inscripciones y no renderizar pestañas; verificar con un test de alumno sin inscripciones
+- [x] 4.4 Permitir cambiar la categoría desde la pestaña abierta con el formulario y el `PATCH` de la HU 64, refrescando el detalle; verificar que la otra pestaña conserva su categoría
+- [x] 4.5 Correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx` y `docker compose run --rm frontend npm run lint`
 
 ## 5. Acciones desde el menú y padrón sin columna de acciones
 

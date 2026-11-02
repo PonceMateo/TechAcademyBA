@@ -173,6 +173,8 @@ export function StudentsPage() {
   const [empresaCategoria, setEmpresaCategoria] = useState('')
   const [falloCategoria, setFalloCategoria] = useState(null)
   const [guardandoCategoria, setGuardandoCategoria] = useState(false)
+  // Cambiar la categoría desde la ficha recarga solo el detalle de la ficha (HU 61).
+  const [fichaVersion, setFichaVersion] = useState(0)
 
   useEffect(() => {
     // El filtro va al servicio, no sobre el arreglo ya cargado: el mismo criterio tiene que
@@ -546,6 +548,7 @@ export function StudentsPage() {
         empresa_id: empresaId,
       })
       cerrarModalCategoria()
+      setFichaVersion((version) => version + 1)
       setMensaje(`Categoría actualizada en ${comision}.`)
     } catch (error) {
       setFalloCategoria(error?.message ?? 'No se pudo actualizar la categoría.')
@@ -780,10 +783,12 @@ export function StudentsPage() {
         <FichaAlumnoModal
           key={alumnoFicha.id}
           alumno={alumnoFicha}
+          version={fichaVersion}
           onClose={() => setAlumnoFicha(null)}
           onEditar={abrirEdicion}
           onRestablecerPassword={abrirPassword}
           onEliminar={abrirBaja}
+          onCambiarCategoria={abrirFormularioCategoria}
         />
       )}
 

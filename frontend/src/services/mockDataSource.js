@@ -408,17 +408,21 @@ function buscarPorTexto(registros, texto, campos) {
 }
 
 export function createMockDataSource() {
+  // Copia profunda: una copia superficial deja compartidos los objetos anidados —las inscripciones
+  // de un alumno, las imputaciones de una cobranza— y una pantalla que cambia una categoría
+  // ensuciaba el módulo de ejemplo para la fuente siguiente, que es lo que hacía depender a los
+  // tests del orden en que corrían.
   const store = {
-    comisiones: copiar(COMISIONES),
+    comisiones: structuredClone(COMISIONES),
     cursos: cursosDelCatalogo(COMISIONES),
-    docentes: copiar(DOCENTES),
-    alumnos: copiar(ALUMNOS),
-    empresas: copiar(EMPRESAS),
-    sedes: copiar(SEDES),
-    cobranzas: copiar(COBRANZAS),
-    asistencias: copiar(ASISTENCIAS),
-    links: copiar(LINKS_DE_CLASE),
-    inscripciones: copiar(INSCRIPCIONES),
+    docentes: structuredClone(DOCENTES),
+    alumnos: structuredClone(ALUMNOS),
+    empresas: structuredClone(EMPRESAS),
+    sedes: structuredClone(SEDES),
+    cobranzas: structuredClone(COBRANZAS),
+    asistencias: structuredClone(ASISTENCIAS),
+    links: structuredClone(LINKS_DE_CLASE),
+    inscripciones: structuredClone(INSCRIPCIONES),
   }
 
   /** El padrón de una comisión: los alumnos que tiene, con el acceso que ya viene derivado (D9). */

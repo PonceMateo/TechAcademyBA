@@ -374,6 +374,157 @@ describe('ficha del alumno en modal (HU 61)', () => {
     ).toBeInTheDocument()
     expect(within(ficha).queryByText(/CUR-\d{3}/)).not.toBeInTheDocument()
   })
+
+  it('muestra una pestaña por inscripción con su categoría y su empresa', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    const pestanas = await within(ficha).findAllByRole('tab')
+    expect(pestanas.map((pestana) => pestana.textContent)).toEqual([
+      'CUR-101 · Python Inicial',
+      'CUR-106 · Machine Learning Aplicado',
+    ])
+    expect(within(ficha).getByRole('tabpanel')).toHaveTextContent('Particular')
+
+    await user.click(within(ficha).getByRole('tab', { name: /CUR-106/ }))
+
+    const panel = within(ficha).getByRole('tabpanel')
+    expect(panel).toHaveTextContent('Corporativo')
+    expect(panel).toHaveTextContent('Tech Solutions S.A.')
+    expect(panel).toHaveTextContent('A cargo de la empresa')
+  })
+
+  it('muestra el bloqueo con su causa en la inscripción activa y el estado en la terminada', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerAlumno: async () => ({
+        id: 1,
+        nombre: 'Juan Ignacio Pérez',
+        documento: '38.456.789',
+        email: 'juan.perez@gmail.com',
+        telefono: null,
+        inscripciones: [
+          {
+            id: 11,
+            estado: 'ACTIVA',
+            comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+            categoria: 'PARTICULAR',
+            porcentaje_beca: null,
+            empresa: null,
+            acceso: { estado: 'BLOQUEADO', causa: 'debe saldo', forzado: false },
+            arancel: 45000,
+            monto_requerido: 45000,
+            total_pagado: 20000,
+            total_observado: 0,
+            saldo_pendiente: 25000,
+          },
+          {
+            id: 12,
+            estado: 'COMPLETADA',
+            comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+            categoria: 'PARTICULAR',
+            porcentaje_beca: null,
+            empresa: null,
+            acceso: null,
+            arancel: 52000,
+            monto_requerido: 52000,
+            total_pagado: 0,
+            total_observado: 0,
+            saldo_pendiente: 52000,
+          },
+        ],
+      }),
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    expect(await within(ficha).findByText('BLOQUEADO')).toBeInTheDocument()
+    expect(within(ficha).getByText('debe saldo')).toBeInTheDocument()
+
+    await user.click(within(ficha).getByRole('tab', { name: /CUR-106/ }))
+
+    const panel = within(ficha).getByRole('tabpanel')
+    expect(panel).toHaveTextContent('Estado de la inscripción: COMPLETADA')
+    expect(panel).not.toHaveTextContent('BLOQUEADO')
+    // La deuda de una cursada terminada existe y se informa.
+    expect(panel).toHaveTextContent('$52.000,00')
+  })
+
+  it('muestra el total pagado, lo pendiente de acreditación y el saldo con centavos', async () => {
+    await abrirFichaConMouse('Valeria Rossi')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    const panel = await within(ficha).findByRole('tabpanel')
+    expect(panel).toHaveTextContent('Total pagado$0,00')
+    expect(panel).toHaveTextContent('Pendiente de acreditación$26.000,00')
+    expect(panel).toHaveTextContent('Saldo pendiente$52.000,00')
+  })
+
+  it('exime la beca total y descuenta la beca parcial', async () => {
+    await abrirFichaConMouse('Matías Fernández')
+    let ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(await within(ficha).findByRole('tabpanel')).toHaveTextContent('Exento')
+
+    cleanup()
+    resetDataSource()
+    stubBackend()
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Camila Rodríguez')
+
+    await abrirFichaConMouse('Camila Rodríguez')
+    ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    const panel = await within(ficha).findByRole('tabpanel')
+    expect(panel).toHaveTextContent('Becado parcial 50%')
+    expect(panel).toHaveTextContent('Saldo pendiente$0,00')
+  })
+
+  it('informa cuando el alumno no tiene inscripciones y no dibuja pestañas', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 9,
+          nombre: 'Nuevo Alumno',
+          documento: '30.111.222',
+          tipo_documento: 'DNI',
+          email: 'nuevo@techacademy.invalid',
+          telefono: null,
+          activo: true,
+        },
+      ],
+      obtenerAlumno: async () => ({ id: 9, nombre: 'Nuevo Alumno', inscripciones: [] }),
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Nuevo Alumno')
+
+    await abrirFichaConMouse('Nuevo Alumno')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(await within(ficha).findByText(/todavía no tiene inscripciones/)).toBeInTheDocument()
+    expect(within(ficha).queryByRole('tablist')).not.toBeInTheDocument()
+  })
+
+  it('cambia la categoría desde la pestaña sin tocar la otra inscripción', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('button', { name: 'Categoría' }))
+    const formulario = await screen.findByRole('dialog', { name: 'Asignar categoría' })
+    await user.selectOptions(within(formulario).getByLabelText('Categoría'), 'BECADO_PARCIAL')
+    await user.type(within(formulario).getByLabelText(/Porcentaje de descuento/), '40')
+    await user.click(within(formulario).getByRole('button', { name: 'Guardar' }))
+
+    expect(
+      await screen.findByText('Categoría actualizada en CUR-101 Python Inicial.'),
+    ).toBeInTheDocument()
+    expect(await within(ficha).findByText('Becado parcial 40%')).toBeInTheDocument()
+
+    await user.click(within(ficha).getByRole('tab', { name: /CUR-106/ }))
+    expect(within(ficha).getByRole('tabpanel')).toHaveTextContent('Corporativo')
+  })
 })
 
 describe('alta de alumno', () => {
