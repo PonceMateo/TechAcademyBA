@@ -18,11 +18,13 @@ import {
   actualizarCategoriaInscripcion,
   buscarAlumnoReactivable,
   buscarAlumnos,
+  cargarNominaEmpresa,
   crearAlumno,
   crearEmpresa,
   editarAlumno,
   eliminarAlumno,
   listarEmpresas,
+  listarComisiones,
   reactivarAlumno,
   restablecerPasswordAlumno,
 } from '../services/dataService'
@@ -160,6 +162,12 @@ const COLUMNAS_EMPRESAS = [
 
 const CAMPOS_ALUMNO_VACIOS = { documento: '', nombre: '', email: '', telefono: '' }
 const CAMPOS_EMPRESA_VACIOS = { razon_social: '', cuit: '', requiere_factura_a: false }
+const EMPLEADO_NOMINA_VACIO = {
+  documento: '',
+  nombre: '',
+  email: '',
+  telefono: '',
+}
 
 export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
@@ -200,6 +208,13 @@ export function StudentsPage() {
   const [erroresEmpresa, setErroresEmpresa] = useState({})
   const [falloEmpresa, setFalloEmpresa] = useState(null)
   const [guardandoEmpresa, setGuardandoEmpresa] = useState(false)
+  const [comisiones, setComisiones] = useState([])
+  const [modalNominaAbierto, setModalNominaAbierto] = useState(false)
+  const [empresaNomina, setEmpresaNomina] = useState(null)
+  const [comisionNomina, setComisionNomina] = useState('')
+  const [empleadosNomina, setEmpleadosNomina] = useState([{ ...EMPLEADO_NOMINA_VACIO }])
+  const [falloNomina, setFalloNomina] = useState(null)
+  const [guardandoNomina, setGuardandoNomina] = useState(false)
 
   const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false)
   const [alumnoCategoria, setAlumnoCategoria] = useState(null)
@@ -221,6 +236,12 @@ export function StudentsPage() {
     listarEmpresas()
       .then(setEmpresas)
       .catch(() => setEmpresas([]))
+  }, [])
+
+  useEffect(() => {
+    listarComisiones()
+      .then(setComisiones)
+      .catch(() => setComisiones([]))
   }, [])
 
   function cambiarAlumno(campo) {
@@ -607,6 +628,90 @@ export function StudentsPage() {
     }
   }
 
+  function abrirModalNomina(empresa) {
+    setEmpresaNomina(empresa)
+    setComisionNomina('')
+    setEmpleadosNomina([{ ...EMPLEADO_NOMINA_VACIO }])
+    setFalloNomina(null)
+    setModalNominaAbierto(true)
+  }
+
+  function cerrarModalNomina() {
+    setModalNominaAbierto(false)
+    setEmpresaNomina(null)
+    setComisionNomina('')
+    setEmpleadosNomina([{ ...EMPLEADO_NOMINA_VACIO }])
+    setFalloNomina(null)
+  }
+
+  function cambiarEmpleado(indice, campo, valor) {
+    setEmpleadosNomina((anteriores) =>
+      anteriores.map((empleado, posicion) =>
+        posicion === indice ? { ...empleado, [campo]: valor } : empleado,
+      ),
+    )
+  }
+
+  function validarNomina() {
+    const errores = []
+    if (!comisionNomina) {
+      errores.push('Seleccioná una comisión.')
+    }
+
+    const documentos = new Set()
+    empleadosNomina.forEach((empleado, indice) => {
+      const fila = indice + 1
+      const documentoNormalizado = empleado.documento.replace(/[.\s-]/g, '')
+      if (!dniConForma(empleado.documento)) {
+        errores.push(`Empleado ${fila}: ingresá un DNI válido.`)
+      } else if (documentos.has(documentoNormalizado)) {
+        errores.push(`Empleado ${fila}: el DNI está repetido en la nómina.`)
+      } else {
+        documentos.add(documentoNormalizado)
+      }
+      if (!empleado.nombre.trim()) errores.push(`Empleado ${fila}: ingresá el nombre completo.`)
+      if (!emailConForma(empleado.email)) errores.push(`Empleado ${fila}: ingresá un email válido.`)
+    })
+    return errores
+  }
+
+  async function guardarNomina() {
+    const errores = validarNomina()
+    if (errores.length > 0) {
+      setFalloNomina(errores.join(' '))
+      return
+    }
+
+    const empleados = empleadosNomina.map((empleado) => ({
+      documento: empleado.documento,
+      nombre: empleado.nombre,
+      email: empleado.email,
+      telefono: empleado.telefono || null,
+    }))
+
+    setGuardandoNomina(true)
+    setFalloNomina(null)
+    try {
+      const resultado = await cargarNominaEmpresa(empresaNomina.id, {
+        comision_id: Number(comisionNomina),
+        empleados,
+      })
+      setEmpresas((anteriores) =>
+        anteriores.map((empresa) =>
+          empresa.id === empresaNomina.id
+            ? { ...empresa, nomina_empleados: `${resultado.cantidad} personas cargadas` }
+            : empresa,
+        ),
+      )
+      cerrarModalNomina()
+      setMensaje(`Nómina cargada: ${resultado.cantidad} empleados inscriptos.`)
+    } catch (error) {
+      setFalloNomina(error?.message ?? 'No se pudo cargar la nómina.')
+    } finally {
+      setGuardandoNomina(false)
+    }
+  }
+
   const columnasAlumnos = [
     ...COLUMNAS_ALUMNOS,
     {
@@ -660,6 +765,19 @@ export function StudentsPage() {
     comisionFiltro === ''
       ? alumnos
       : alumnos.filter((alumno) => alumno.comision?.codigo === comisionFiltro)
+
+  const columnasEmpresas = [
+    ...COLUMNAS_EMPRESAS,
+    {
+      clave: 'acciones',
+      titulo: 'ACCIONES',
+      render: (fila) => (
+        <Button variante="secundario" tamano="chico" onClick={() => abrirModalNomina(fila)}>
+          Cargar nómina
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-4">
@@ -832,7 +950,7 @@ export function StudentsPage() {
         {/* El alta de cuenta corporativa vive en esta misma pantalla, no en una pantalla
             separada de empresas: es lo que dice el spec y evita un ítem de más. */}
         <Table
-          columnas={COLUMNAS_EMPRESAS}
+          columnas={columnasEmpresas}
           filas={empresas}
           vacio={<p className="text-sm text-slate-500">No hay cuentas corporativas registradas.</p>}
         />
@@ -894,6 +1012,131 @@ export function StudentsPage() {
             {falloEmpresa}
           </p>
         )}
+      </Modal>
+
+      <Modal
+        abierto={modalNominaAbierto}
+        titulo={`Cargar nómina · ${empresaNomina?.razon_social ?? ''}`}
+        onClose={cerrarModalNomina}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarModalNomina}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarNomina} disabled={guardandoNomina}>
+              {guardandoNomina ? 'Guardando…' : 'Guardar nómina'}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <label className="text-sm text-slate-700">
+            Comisión de curso formal
+            <select
+              className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+              value={comisionNomina}
+              onChange={(evento) => setComisionNomina(evento.target.value)}
+            >
+              <option value="">Seleccionar…</option>
+              {comisiones.map((comision) => (
+                <option key={comision.id} value={String(comision.id)}>
+                  {comision.codigo} · {comision.curso?.nombre ?? comision.nombre_curso}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Empleados a inscribir</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  La empresa cubre la inscripción. Cargá los datos de cada persona; los campos
+                  marcados con * son obligatorios.
+                </p>
+              </div>
+              <Button
+                variante="secundario"
+                tamano="chico"
+                onClick={() =>
+                  setEmpleadosNomina((anteriores) => [
+                    ...anteriores,
+                    { ...EMPLEADO_NOMINA_VACIO },
+                  ])
+                }
+              >
+                + Agregar empleado
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {empleadosNomina.map((empleado, indice) => (
+                <div
+                  key={indice}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Empleado {indice + 1}
+                    </p>
+                    {empleadosNomina.length > 1 && (
+                      <Button
+                        variante="secundario"
+                        tamano="chico"
+                        onClick={() =>
+                          setEmpleadosNomina((anteriores) =>
+                            anteriores.filter((_, posicion) => posicion !== indice),
+                          )
+                        }
+                      >
+                        Quitar
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input
+                      id={`nomina-documento-${indice}`}
+                      etiqueta="DNI *"
+                      valor={empleado.documento}
+                      onChange={(evento) =>
+                        cambiarEmpleado(indice, 'documento', evento.target.value)
+                      }
+                    />
+                    <Input
+                      id={`nomina-nombre-${indice}`}
+                      etiqueta="Nombre completo *"
+                      valor={empleado.nombre}
+                      onChange={(evento) =>
+                        cambiarEmpleado(indice, 'nombre', evento.target.value)
+                      }
+                    />
+                    <Input
+                      id={`nomina-email-${indice}`}
+                      etiqueta="Email *"
+                      type="email"
+                      valor={empleado.email}
+                      onChange={(evento) => cambiarEmpleado(indice, 'email', evento.target.value)}
+                    />
+                    <Input
+                      id={`nomina-telefono-${indice}`}
+                      etiqueta="Teléfono"
+                      type="tel"
+                      valor={empleado.telefono}
+                      onChange={(evento) =>
+                        cambiarEmpleado(indice, 'telefono', evento.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {falloNomina !== null && (
+            <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {falloNomina}
+            </p>
+          )}
+        </div>
       </Modal>
 
       <Modal

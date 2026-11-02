@@ -212,6 +212,22 @@ describe('toda lectura que falla se propaga', () => {
       'Ya existe un curso con ese nombre: CUR001 — Python Inicial.',
     )
   })
+
+  it('traduce los errores de validación de FastAPI a un mensaje legible', async () => {
+    responder(422, {
+      detail: [
+        {
+          loc: ['body', 'empleados', 0, 'telefono'],
+          msg: 'El teléfono debe tener el formato internacional.',
+          type: 'value_error',
+        },
+      ],
+    })
+
+    await expect(createApiDataSource().listarAlumnos()).rejects.toThrow(
+      'Revisá los datos: empleados → 0 → telefono: El teléfono debe tener el formato internacional.',
+    )
+  })
 })
 
 describe('el alta de alumno', () => {
