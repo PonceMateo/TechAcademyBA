@@ -30,9 +30,9 @@
 
 ## 5. Acciones desde el menú y padrón sin columna de acciones
 
-- [ ] 5.1 Quitar la columna `ACCIONES` de la tabla del padrón y verificar en `StudentsPage.test.jsx` que ya no se renderiza ni queda una acción de categoría en la fila
-- [ ] 5.2 Conectar **Editar**, **Restablecer contraseña** y **Eliminar** del menú ⋮ con los modales existentes, refrescando la ficha y la fila al terminar y cerrando la ficha al confirmar la baja; verificar cada recorrido, incluido un rechazo por dato duplicado
-- [ ] 5.3 Verificar que una confirmación abierta desde la ficha se apila encima y que Escape cierra solo la de arriba, y correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx`
+- [x] 5.1 Quitar la columna `ACCIONES` de la tabla del padrón y verificar en `StudentsPage.test.jsx` que ya no se renderiza ni queda una acción de categoría en la fila
+- [x] 5.2 Conectar **Editar**, **Restablecer contraseña** y **Eliminar** del menú ⋮ con los modales existentes, refrescando la ficha y la fila al terminar y cerrando la ficha al confirmar la baja; verificar cada recorrido, incluido un rechazo por dato duplicado
+- [x] 5.3 Verificar que una confirmación abierta desde la ficha se apila encima y que Escape cierra solo la de arriba, y correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx`
 
 ## 6. Verificación integrada
 

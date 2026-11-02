@@ -24,7 +24,6 @@ import {
   eliminarAlumno,
   listarEmpresas,
   listarComisiones,
-  obtenerAlumno,
   reactivarAlumno,
   restablecerPasswordAlumno,
 } from '../services/dataService'
@@ -164,10 +163,7 @@ export function StudentsPage() {
   const [guardandoNomina, setGuardandoNomina] = useState(false)
 
   const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false)
-  const [alumnoCategoria, setAlumnoCategoria] = useState(null)
   const [inscripcionCategoria, setInscripcionCategoria] = useState(null)
-  const [inscripcionesCategoria, setInscripcionesCategoria] = useState([])
-  const [modalElegirInscripcionAbierto, setModalElegirInscripcionAbierto] = useState(false)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('PARTICULAR')
   const [porcentajeCategoria, setPorcentajeCategoria] = useState('')
   const [empresaCategoria, setEmpresaCategoria] = useState('')
@@ -336,6 +332,10 @@ export function StudentsPage() {
             : fila,
         ),
       )
+      // La ficha abierta muestra los datos nuevos sin volver a abrirse.
+      setAlumnoFicha((actual) =>
+        actual !== null && actual.id === actualizado.id ? actualizado : actual,
+      )
       cerrarEdicion()
       setMensaje(`Los datos de ${actualizado.nombre} se actualizaron correctamente.`)
     } catch (error) {
@@ -406,8 +406,11 @@ export function StudentsPage() {
     setFalloBaja(null)
     try {
       const nombre = alumnoAEliminar.nombre
-      await eliminarAlumno(alumnoAEliminar.id)
-      setAlumnos((anteriores) => anteriores.filter((fila) => fila.id !== alumnoAEliminar.id))
+      const id = alumnoAEliminar.id
+      await eliminarAlumno(id)
+      setAlumnos((anteriores) => anteriores.filter((fila) => fila.id !== id))
+      // La ficha del alumno dado de baja se cierra: ya no hay fila a la que volver.
+      setAlumnoFicha((actual) => (actual !== null && actual.id === id ? null : actual))
       cerrarBaja()
       setMensaje(`Alumno ${nombre} dado de baja correctamente.`)
     } catch (error) {
@@ -475,53 +478,21 @@ export function StudentsPage() {
   }
 
   /**
-   * La acción Categoría opera sobre **una inscripción** (HU 64). El padrón ya no trae la categoría,
-   * así que primero se pide el detalle del alumno: con una inscripción se abre el formulario, con
-   * varias se pide elegir y sin ninguna se avisa que hay que inscribirlo primero.
+   * La acción Categoría opera sobre **una inscripción** (HU 64 y 61). La ficha abre el formulario
+   * de la pestaña abierta; el padrón ya no ofrece la acción en la fila.
    */
-  async function abrirModalCategoria(alumno) {
-    setFalloCategoria(null)
-    let detalle
-    try {
-      detalle = await obtenerAlumno(alumno.id)
-    } catch (error) {
-      setMensaje(error?.message ?? 'No se pudieron consultar las inscripciones del alumno.')
-      return
-    }
-
-    const inscripciones = detalle.inscripciones ?? []
-    if (inscripciones.length === 0) {
-      setMensaje(
-        `${alumno.nombre} no tiene inscripciones. Inscribilo en una comisión antes de asignarle una categoría.`,
-      )
-      return
-    }
-
-    setAlumnoCategoria(alumno)
-    setInscripcionesCategoria(inscripciones)
-    if (inscripciones.length > 1) {
-      setModalElegirInscripcionAbierto(true)
-      return
-    }
-    abrirFormularioCategoria(inscripciones[0])
-  }
-
   function abrirFormularioCategoria(inscripcion) {
     setInscripcionCategoria(inscripcion)
     setCategoriaSeleccionada(inscripcion.categoria)
     setPorcentajeCategoria(inscripcion.porcentaje_beca ?? '')
     setEmpresaCategoria(inscripcion.empresa?.id != null ? String(inscripcion.empresa.id) : '')
     setFalloCategoria(null)
-    setModalElegirInscripcionAbierto(false)
     setModalCategoriaAbierto(true)
   }
 
   function cerrarModalCategoria() {
     setModalCategoriaAbierto(false)
-    setModalElegirInscripcionAbierto(false)
-    setAlumnoCategoria(null)
     setInscripcionCategoria(null)
-    setInscripcionesCategoria([])
     setFalloCategoria(null)
   }
 
@@ -682,49 +653,9 @@ export function StudentsPage() {
     }
   }
 
-  const columnasAlumnos = [
-    ...COLUMNAS_ALUMNOS,
-    {
-      clave: 'acciones',
-      titulo: 'ACCIONES',
-      render: (fila) => (
-        <div className="flex flex-wrap items-center gap-1">
-          <Button
-            variante="secundario"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirModalCategoria(fila)}
-          >
-            Categoría
-          </Button>
-          <Button
-            variante="secundario"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirEdicion(fila)}
-          >
-            Editar
-          </Button>
-          <Button
-            variante="secundario"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirPassword(fila)}
-          >
-            Restablecer contraseña
-          </Button>
-          <Button
-            variante="peligro"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirBaja(fila)}
-          >
-            Eliminar alumno
-          </Button>
-        </div>
-      ),
-    },
-  ]
+  // El padrón no tiene columna de acciones: editar, restablecer la contraseña, eliminar y cambiar la
+  // categoría viven en la ficha del alumno (HU 61).
+  const columnasAlumnos = COLUMNAS_ALUMNOS
 
   const columnasEmpresas = [
     ...COLUMNAS_EMPRESAS,
@@ -1093,32 +1024,6 @@ export function StudentsPage() {
               {falloNomina}
             </p>
           )}
-        </div>
-      </Modal>
-
-      <Modal
-        abierto={modalElegirInscripcionAbierto}
-        titulo="Elegir inscripción"
-        onClose={cerrarModalCategoria}
-        pie={
-          <Button variante="secundario" onClick={cerrarModalCategoria}>
-            Cancelar
-          </Button>
-        }
-      >
-        <div className="grid gap-2">
-          <p className="text-sm text-slate-700">
-            {`${alumnoCategoria?.nombre ?? 'El alumno'} tiene ${inscripcionesCategoria.length} inscripciones. Elegí a cuál le asignás la categoría.`}
-          </p>
-          {inscripcionesCategoria.map((inscripcion) => (
-            <Button
-              key={inscripcion.id}
-              variante="secundario"
-              onClick={() => abrirFormularioCategoria(inscripcion)}
-            >
-              {`${inscripcion.comision.codigo} ${inscripcion.comision.nombre} · ${inscripcion.estado}`}
-            </Button>
-          ))}
         </div>
       </Modal>
 

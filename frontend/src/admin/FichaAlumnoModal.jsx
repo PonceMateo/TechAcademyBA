@@ -208,7 +208,9 @@ export function FichaAlumnoModal({
     }
   }, [alumno, version])
 
-  const datos = datosDeLectura(detalle ?? alumno)
+  // Los datos personales salen de la fila del padrón, que es la que la edición actualiza; el
+  // detalle aporta las inscripciones y los importes.
+  const datos = datosDeLectura(alumno)
   const inscripciones = detalle?.inscripciones ?? []
   // El índice no puede apuntar fuera de la lista cuando una recategorización recarga el detalle.
   const indiceActivo = Math.min(pestana, Math.max(inscripciones.length - 1, 0))
