@@ -686,9 +686,15 @@ export function createMockDataSource() {
       return copiar(
         store.alumnos
           .filter((alumno) => alumno.activo !== false)
-          .map(
-            ({ inscripciones, comision, categoria, porcentaje_beca, acceso, ...datos }) => datos,
-          ),
+          .map((alumno) => ({
+            id: alumno.id,
+            nombre: alumno.nombre,
+            documento: alumno.documento,
+            tipo_documento: alumno.tipo_documento,
+            email: alumno.email,
+            telefono: alumno.telefono,
+            activo: alumno.activo,
+          })),
       )
     },
 
@@ -747,7 +753,18 @@ export function createMockDataSource() {
     },
 
     async actualizarCategoriaInscripcion(inscripcionId, datos) {
-      const inscripcion = (store.inscripciones || []).find((i) => i.id === inscripcionId)
+      // El ejemplo guarda la inscripción principal desnormalizada en el alumno y, desde la HU 64,
+      // una lista `inscripciones` para el caso de dos categorías. Se aceptan las dos formas.
+      let inscripcion = (store.inscripciones || []).find((i) => i.id === inscripcionId)
+      if (!inscripcion) {
+        for (const alumno of store.alumnos) {
+          const encontrada = (alumno.inscripciones || []).find((i) => i.id === inscripcionId)
+          if (encontrada) {
+            inscripcion = encontrada
+            break
+          }
+        }
+      }
       if (!inscripcion) {
         throw new Error('La inscripción no existe.')
       }

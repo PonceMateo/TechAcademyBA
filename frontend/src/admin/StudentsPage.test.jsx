@@ -18,9 +18,6 @@ const COLUMNAS_ALUMNOS = [
   'NOMBRE',
   'EMAIL',
   'TELÉFONO',
-  'COMISIÓN ASIGNADA',
-  'CATEGORÍA ARANCELARIA',
-  'ACCESO PLATAFORMA',
   'ACCIONES',
 ]
 
@@ -154,44 +151,11 @@ describe('padrón de alumnos', () => {
     expect(filaDe('Alumno Normalizado').cells[0]).toHaveTextContent('30.111.222')
   })
 
-  it('muestra la categoría con su color', () => {
-    expect(filaDe('Juan Ignacio Pérez').cells[5].textContent).toContain('PARTICULAR')
-    expect(filaDe('Juan Ignacio Pérez').cells[5].querySelector('.text-slate-700')).not.toBeNull()
-    expect(filaDe('Agustina Benítez').cells[5].textContent).toContain('BECADO PARCIAL')
-    expect(filaDe('Agustina Benítez').cells[5].querySelector('.text-violet-800')).not.toBeNull()
-  })
-
-  it('muestra el porcentaje de descuento del becado parcial', () => {
-    expect(filaDe('Camila Rodríguez').cells[5]).toHaveTextContent('50% de descuento')
-    expect(filaDe('Agustina Benítez').cells[5]).toHaveTextContent('50% de descuento')
-  })
-
-  it('deja las categorías con colores distintos entre sí', () => {
-    // BECADO TOTAL y CORPORATIVO son del enum y del spec, pero el padrón del maquetado no tiene
-    // filas de esas dos. Lo verificable acá es que las dos que aparecen no comparten color.
-    const colorDe = (nombre) => {
-      const insignia = filaDe(nombre).cells[5].querySelector('[data-ui="badge"]')
-      return insignia.className
-    }
-
-    expect(colorDe('Juan Ignacio Pérez')).toContain('text-slate-700')
-    expect(colorDe('Agustina Benítez')).toContain('text-violet-800')
-    expect(colorDe('Juan Ignacio Pérez')).not.toBe(colorDe('Agustina Benítez'))
-  })
-
-  it('muestra HABILITADO en verde para los cuatro accesos al día', () => {
-    const habilitados = screen.getAllByText('HABILITADO')
-
-    expect(habilitados).toHaveLength(4)
-    for (const habilitado of habilitados) {
-      expect(habilitado.className).toContain('text-green-800')
-    }
-  })
-
   it('mantiene los botones de acciones en una sola línea', () => {
     const botones = within(filaDe('Juan Ignacio Pérez')).getAllByRole('button')
 
     expect(botones.map((boton) => boton.textContent)).toEqual([
+      'Categoría',
       'Editar',
       'Restablecer contraseña',
       'Eliminar alumno',
@@ -199,16 +163,71 @@ describe('padrón de alumnos', () => {
     botones.forEach((boton) => expect(boton).toHaveClass('whitespace-nowrap'))
   })
 
-  it('muestra cada bloqueo con su causa al lado del estado', () => {
-    const bloqueos = screen.getAllByText('BLOQUEADO')
+  // HU 64: la categoría ya no vive en la fila del padrón. La acción abre una inscripción, y con
+  // dos pide elegir para no tocar la otra.
+  it('pide elegir la inscripción cuando el alumno tiene dos categorías', async () => {
+    const user = userEvent.setup()
 
-    expect(bloqueos).toHaveLength(2)
-    for (const bloqueo of bloqueos) {
-      expect(bloqueo.className).toContain('text-red-800')
-    }
+    await user.click(within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Categoría' }))
 
-    expect(filaDe('Agustina Benítez').cells[6]).toHaveTextContent('comprobante ilegible')
-    expect(filaDe('Valeria Rossi').cells[6]).toHaveTextContent('debe saldo')
+    const selector = await screen.findByRole('dialog', { name: 'Elegir inscripción' })
+    expect(selector).toHaveTextContent('2 inscripciones')
+    expect(within(selector).getByRole('button', { name: /CUR-101/ })).toBeInTheDocument()
+    expect(within(selector).getByRole('button', { name: /CUR-106/ })).toBeInTheDocument()
+  })
+
+  it('aplica la categoría solo a la inscripción elegida', async () => {
+    const user = userEvent.setup()
+    await user.click(within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Categoría' }))
+
+    const selector = await screen.findByRole('dialog', { name: 'Elegir inscripción' })
+    await user.click(within(selector).getByRole('button', { name: /CUR-106/ }))
+
+    const formulario = await screen.findByRole('dialog', { name: 'Asignar categoría' })
+    expect(within(formulario).getByLabelText('Categoría')).toHaveValue('CORPORATIVO')
+    await user.selectOptions(within(formulario).getByLabelText('Categoría'), 'BECADO_PARCIAL')
+    await user.type(within(formulario).getByLabelText(/Porcentaje de descuento/), '40')
+    await user.click(within(formulario).getByRole('button', { name: 'Guardar' }))
+
+    expect(
+      await screen.findByText('Categoría actualizada en CUR-106 Machine Learning Aplicado.'),
+    ).toBeInTheDocument()
+  })
+
+  it('abre el formulario directo cuando el alumno tiene una sola inscripción', async () => {
+    const user = userEvent.setup()
+
+    await user.click(within(filaDe('Camila Rodríguez')).getByRole('button', { name: 'Categoría' }))
+
+    const formulario = await screen.findByRole('dialog', { name: 'Asignar categoría' })
+    expect(within(formulario).getByLabelText('Categoría')).toHaveValue('BECADO_PARCIAL')
+    expect(screen.queryByRole('dialog', { name: 'Elegir inscripción' })).not.toBeInTheDocument()
+  })
+
+  it('avisa cuando el alumno no tiene ninguna inscripción', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 9,
+          nombre: 'Nuevo Alumno',
+          documento: '30.111.222',
+          tipo_documento: 'DNI',
+          email: 'nuevo@techacademy.invalid',
+          telefono: null,
+          activo: true,
+        },
+      ],
+      obtenerAlumno: async () => ({ id: 9, inscripciones: [] }),
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Nuevo Alumno')
+    const user = userEvent.setup()
+
+    await user.click(within(filaDe('Nuevo Alumno')).getByRole('button', { name: 'Categoría' }))
+
+    expect(await screen.findByText(/no tiene inscripciones/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Asignar categoría' })).not.toBeInTheDocument()
   })
 
   it('informa que la búsqueda no arrojó resultados', async () => {
@@ -228,7 +247,7 @@ describe('padrón de alumnos', () => {
     expect(screen.getByText('Valeria Rossi')).toBeInTheDocument()
   })
 
-  it('deja Sin comisión y guiones en la fila del alumno sin inscripción', async () => {
+  it('deja el guion del teléfono vacío y no agrega columnas de inscripción', async () => {
     cleanup()
     stubDataSource({
       buscarAlumnos: async () => [
@@ -240,10 +259,6 @@ describe('padrón de alumnos', () => {
           email: 'nuevo@techacademy.invalid',
           telefono: null,
           activo: true,
-          comision: null,
-          categoria: null,
-          porcentaje_beca: null,
-          acceso: null,
         },
       ],
     })
@@ -253,9 +268,7 @@ describe('padrón de alumnos', () => {
 
     const fila = filaDe('Nuevo Alumno')
     expect(fila.cells[3]).toHaveTextContent('—')
-    expect(fila.cells[4]).toHaveTextContent('Sin comisión')
-    expect(fila.cells[5]).toHaveTextContent('—')
-    expect(fila.cells[6]).toHaveTextContent('—')
+    expect(fila.cells).toHaveLength(5)
   })
 
   it('muestra el teléfono del alumno en formato nacional', async () => {

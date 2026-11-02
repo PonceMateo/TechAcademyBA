@@ -22,9 +22,9 @@
 
 ## 4. Padrón de alumnos sin datos de inscripción
 
-- [ ] 4.1 Dejar la tabla con las columnas `DNI`, `NOMBRE`, `EMAIL`, `TELÉFONO` y `ACCIONES`, quitando comisión, categoría y acceso; verificar en `StudentsPage.test.jsx` que la fila no los renderiza
-- [ ] 4.2 Hacer que la acción **Categoría** abra directo con una inscripción, pida elegir con varias y avise cuando no hay ninguna, aplicando el cambio solo a la elegida; verificar con un test de alumno con dos inscripciones donde la otra queda intacta
-- [ ] 4.3 Correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx` y `docker compose run --rm frontend npm run lint`
+- [x] 4.1 Dejar la tabla con las columnas `DNI`, `NOMBRE`, `EMAIL`, `TELÉFONO` y `ACCIONES`, quitando comisión, categoría y acceso; verificar en `StudentsPage.test.jsx` que la fila no los renderiza
+- [x] 4.2 Hacer que la acción **Categoría** abra directo con una inscripción, pida elegir con varias y avise cuando no hay ninguna, aplicando el cambio solo a la elegida; verificar con un test de alumno con dos inscripciones donde la otra queda intacta
+- [x] 4.3 Correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx` y `docker compose run --rm frontend npm run lint`
 
 ## 5. Alta de inscripción con categoría en Comisiones
 

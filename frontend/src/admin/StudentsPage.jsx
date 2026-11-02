@@ -7,12 +7,10 @@ import {
   Card,
   Input,
   Modal,
-  StatusIndicator,
   Table,
 } from '../components/ui'
 import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
-import { CATEGORIA_INSCRIPCION } from '../domain/enums'
 import { dniConForma, emailConForma } from '../domain/validacion'
 import {
   actualizarCategoriaInscripcion,
@@ -25,6 +23,7 @@ import {
   eliminarAlumno,
   listarEmpresas,
   listarComisiones,
+  obtenerAlumno,
   reactivarAlumno,
   restablecerPasswordAlumno,
 } from '../services/dataService'
@@ -63,33 +62,10 @@ import {
  * consulta llega al servidor cuando el endpoint la resuelve.
  */
 
-/** Las cuatro categorías del enum con el color que las distingue en pantalla. */
-const CATEGORIAS = new Map([
-  [CATEGORIA_INSCRIPCION.PARTICULAR, { etiqueta: 'PARTICULAR', tono: TONO.GRIS }],
-  [CATEGORIA_INSCRIPCION.BECADO_PARCIAL, { etiqueta: 'BECADO PARCIAL', tono: TONO.VIOLETA }],
-  [CATEGORIA_INSCRIPCION.BECADO_TOTAL, { etiqueta: 'BECADO TOTAL', tono: TONO.MAGENTA }],
-  [CATEGORIA_INSCRIPCION.CORPORATIVO, { etiqueta: 'CORPORATIVO', tono: TONO.CELESTE }],
-])
-
 /** Lo que el cliente escribe en la planilla cuando el alumno no tiene documento (D30). */
 const SIN_DOCUMENTO = 'Sin DNI (alumno exterior)'
 
-/** Lo que la fila muestra cuando el alumno todavía no tiene inscripción (D43). */
-const SIN_COMISION = 'Sin comisión'
 const SIN_DATO = '—'
-
-function columnaCategoria(categoria, porcentajeBeca) {
-  const definicion = CATEGORIAS.get(categoria)
-
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <Badge tono={definicion?.tono ?? TONO.GRIS}>{definicion?.etiqueta ?? categoria}</Badge>
-      {definicion?.etiqueta === 'BECADO PARCIAL' && (
-        <span className="text-xs text-violet-800">{porcentajeBeca}% de descuento</span>
-      )}
-    </span>
-  )
-}
 
 const COLUMNAS_ALUMNOS = [
   {
@@ -107,37 +83,6 @@ const COLUMNAS_ALUMNOS = [
     clave: 'telefono',
     titulo: 'TELÉFONO',
     render: (fila) => (fila.telefono ? formatTelefono(fila.telefono) : SIN_DATO),
-  },
-  {
-    clave: 'comision',
-    titulo: 'COMISIÓN ASIGNADA',
-    render: (fila) =>
-      fila.comision === null || fila.comision === undefined ? (
-        <span className="text-slate-500">{SIN_COMISION}</span>
-      ) : (
-        <span>
-          <span className="font-medium">{fila.comision.codigo}</span>{' '}
-          <span className="text-slate-500">{fila.comision.nombre}</span>
-        </span>
-      ),
-  },
-  {
-    clave: 'categoria',
-    titulo: 'CATEGORÍA ARANCELARIA',
-    render: (fila) =>
-      fila.categoria === null || fila.categoria === undefined
-        ? SIN_DATO
-        : columnaCategoria(fila.categoria, fila.porcentaje_beca),
-  },
-  {
-    clave: 'acceso',
-    titulo: 'ACCESO PLATAFORMA',
-    render: (fila) =>
-      fila.acceso === null || fila.acceso === undefined ? (
-        SIN_DATO
-      ) : (
-        <StatusIndicator estado={fila.acceso.estado} causa={fila.acceso.causa} forzado={fila.acceso.forzado} />
-      ),
   },
 ]
 
@@ -173,7 +118,6 @@ export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
   const [consulta, setConsulta] = useState('')
-  const [comisionFiltro, setComisionFiltro] = useState('')
   const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
   const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
   const [erroresAlumno, setErroresAlumno] = useState({})
@@ -218,6 +162,9 @@ export function StudentsPage() {
 
   const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false)
   const [alumnoCategoria, setAlumnoCategoria] = useState(null)
+  const [inscripcionCategoria, setInscripcionCategoria] = useState(null)
+  const [inscripcionesCategoria, setInscripcionesCategoria] = useState([])
+  const [modalElegirInscripcionAbierto, setModalElegirInscripcionAbierto] = useState(false)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('PARTICULAR')
   const [porcentajeCategoria, setPorcentajeCategoria] = useState('')
   const [empresaCategoria, setEmpresaCategoria] = useState('')
@@ -380,16 +327,7 @@ export function StudentsPage() {
       setAlumnos((anteriores) =>
         anteriores.map((fila) =>
           fila.id === actualizado.id
-            ? {
-                ...fila,
-                ...actualizado,
-                // La respuesta de edición no calcula comisión, categoría ni acceso: se conserva
-                // lo que la fila ya mostraba para no borrar datos de otras historias.
-                comision: fila.comision,
-                categoria: fila.categoria,
-                porcentaje_beca: fila.porcentaje_beca,
-                acceso: fila.acceso,
-              }
+            ? { ...fila, ...actualizado }
             : fila,
         ),
       )
@@ -531,28 +469,65 @@ export function StudentsPage() {
     setFalloEmpresa(null)
   }
 
-  function abrirModalCategoria(alumno) {
-    setAlumnoCategoria(alumno)
-    setCategoriaSeleccionada(alumno.categoria ?? 'PARTICULAR')
-    setPorcentajeCategoria(alumno.porcentaje_beca ?? '')
-    setEmpresaCategoria('')
+  /**
+   * La acción Categoría opera sobre **una inscripción** (HU 64). El padrón ya no trae la categoría,
+   * así que primero se pide el detalle del alumno: con una inscripción se abre el formulario, con
+   * varias se pide elegir y sin ninguna se avisa que hay que inscribirlo primero.
+   */
+  async function abrirModalCategoria(alumno) {
     setFalloCategoria(null)
+    let detalle
+    try {
+      detalle = await obtenerAlumno(alumno.id)
+    } catch (error) {
+      setMensaje(error?.message ?? 'No se pudieron consultar las inscripciones del alumno.')
+      return
+    }
+
+    const inscripciones = detalle.inscripciones ?? []
+    if (inscripciones.length === 0) {
+      setMensaje(
+        `${alumno.nombre} no tiene inscripciones. Inscribilo en una comisión antes de asignarle una categoría.`,
+      )
+      return
+    }
+
+    setAlumnoCategoria(alumno)
+    setInscripcionesCategoria(inscripciones)
+    if (inscripciones.length > 1) {
+      setModalElegirInscripcionAbierto(true)
+      return
+    }
+    abrirFormularioCategoria(inscripciones[0])
+  }
+
+  function abrirFormularioCategoria(inscripcion) {
+    setInscripcionCategoria(inscripcion)
+    setCategoriaSeleccionada(inscripcion.categoria)
+    setPorcentajeCategoria(inscripcion.porcentaje_beca ?? '')
+    setEmpresaCategoria(inscripcion.empresa?.id != null ? String(inscripcion.empresa.id) : '')
+    setFalloCategoria(null)
+    setModalElegirInscripcionAbierto(false)
     setModalCategoriaAbierto(true)
   }
 
   function cerrarModalCategoria() {
     setModalCategoriaAbierto(false)
+    setModalElegirInscripcionAbierto(false)
     setAlumnoCategoria(null)
+    setInscripcionCategoria(null)
+    setInscripcionesCategoria([])
     setFalloCategoria(null)
   }
 
   async function guardarCategoria() {
-    if (alumnoCategoria === null || alumnoCategoria.inscripcion_id == null) {
-      setFalloCategoria('El alumno no tiene inscripción.')
+    if (inscripcionCategoria === null) {
+      setFalloCategoria('Elegí la inscripción a la que le asignás la categoría.')
       return
     }
     setGuardandoCategoria(true)
     setFalloCategoria(null)
+    const comision = `${inscripcionCategoria.comision.codigo} ${inscripcionCategoria.comision.nombre}`
     try {
       const porcentaje =
         categoriaSeleccionada === 'BECADO_PARCIAL' && porcentajeCategoria !== ''
@@ -562,24 +537,13 @@ export function StudentsPage() {
         categoriaSeleccionada === 'CORPORATIVO' && empresaCategoria !== ''
           ? Number(empresaCategoria)
           : null
-      await actualizarCategoriaInscripcion(alumnoCategoria.inscripcion_id, {
+      await actualizarCategoriaInscripcion(inscripcionCategoria.id, {
         categoria: categoriaSeleccionada,
         porcentaje_beca: porcentaje,
         empresa_id: empresaId,
       })
-      setAlumnos((anteriores) =>
-        anteriores.map((alumno) =>
-          alumno.id === alumnoCategoria.id
-            ? {
-                ...alumno,
-                categoria: categoriaSeleccionada,
-                porcentaje_beca: porcentaje,
-              }
-            : alumno,
-        ),
-      )
       cerrarModalCategoria()
-      setMensaje('Categoría actualizada.')
+      setMensaje(`Categoría actualizada en ${comision}.`)
     } catch (error) {
       setFalloCategoria(error?.message ?? 'No se pudo actualizar la categoría.')
     } finally {
@@ -719,16 +683,14 @@ export function StudentsPage() {
       titulo: 'ACCIONES',
       render: (fila) => (
         <div className="flex flex-wrap items-center gap-1">
-          {fila.inscripcion_id != null && (
-            <Button
-              variante="secundario"
-              tamano="chico"
-              className="whitespace-nowrap"
-              onClick={() => abrirModalCategoria(fila)}
-            >
-              Categoría
-            </Button>
-          )}
+          <Button
+            variante="secundario"
+            tamano="chico"
+            className="whitespace-nowrap"
+            onClick={() => abrirModalCategoria(fila)}
+          >
+            Categoría
+          </Button>
           <Button
             variante="secundario"
             tamano="chico"
@@ -757,14 +719,6 @@ export function StudentsPage() {
       ),
     },
   ]
-
-  const comisionesDisponibles = Array.from(
-    new Set(alumnos.map((alumno) => alumno.comision?.codigo).filter(Boolean)),
-  )
-  const alumnosFiltrados =
-    comisionFiltro === ''
-      ? alumnos
-      : alumnos.filter((alumno) => alumno.comision?.codigo === comisionFiltro)
 
   const columnasEmpresas = [
     ...COLUMNAS_EMPRESAS,
@@ -808,29 +762,11 @@ export function StudentsPage() {
             placeholder="Buscar por DNI o Nombre…"
           />
           </div>
-          <div className="max-w-xs">
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="filtro-comision">
-              Filtrar por comisión
-            </label>
-            <select
-              id="filtro-comision"
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
-              value={comisionFiltro}
-              onChange={(evento) => setComisionFiltro(evento.target.value)}
-            >
-              <option value="">Todas</option>
-              {comisionesDisponibles.map((codigo) => (
-                <option key={codigo} value={codigo}>
-                  {codigo}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <Table
           columnas={columnasAlumnos}
-          filas={alumnosFiltrados}
+          filas={alumnos}
           vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
         />
       </Card>
@@ -1140,6 +1076,32 @@ export function StudentsPage() {
       </Modal>
 
       <Modal
+        abierto={modalElegirInscripcionAbierto}
+        titulo="Elegir inscripción"
+        onClose={cerrarModalCategoria}
+        pie={
+          <Button variante="secundario" onClick={cerrarModalCategoria}>
+            Cancelar
+          </Button>
+        }
+      >
+        <div className="grid gap-2">
+          <p className="text-sm text-slate-700">
+            {`${alumnoCategoria?.nombre ?? 'El alumno'} tiene ${inscripcionesCategoria.length} inscripciones. Elegí a cuál le asignás la categoría.`}
+          </p>
+          {inscripcionesCategoria.map((inscripcion) => (
+            <Button
+              key={inscripcion.id}
+              variante="secundario"
+              onClick={() => abrirFormularioCategoria(inscripcion)}
+            >
+              {`${inscripcion.comision.codigo} ${inscripcion.comision.nombre} · ${inscripcion.estado}`}
+            </Button>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal
         abierto={modalCategoriaAbierto}
         titulo="Asignar categoría"
         onClose={cerrarModalCategoria}
@@ -1155,6 +1117,11 @@ export function StudentsPage() {
         }
       >
         <div className="grid gap-4">
+          {inscripcionCategoria !== null && (
+            <p className="text-sm text-slate-700">
+              {`${inscripcionCategoria.comision.codigo} ${inscripcionCategoria.comision.nombre}`}
+            </p>
+          )}
           <label className="text-sm text-slate-700">
             Categoría
             <select
