@@ -614,14 +614,16 @@ function EditorDistribucion({
                     <option value="">Seleccionar…</option>
                     {fila.inscripciones.map((inscripcion) => (
                       <option key={inscripcion.id} value={String(inscripcion.id)}>
-                        {inscripcion.comision.codigo} — {inscripcion.comision.nombre}
+                        {inscripcion.comision.codigo} — {inscripcion.comision.nombre} ·{' '}
+                        {inscripcion.categoria} · {inscripcion.estado}
                       </option>
                     ))}
                   </select>
                 ) : fila.inscripciones.length === 1 ? (
                   <p className="text-sm text-slate-700">
                     {fila.inscripciones[0].comision.codigo} —{' '}
-                    {fila.inscripciones[0].comision.nombre}
+                    {fila.inscripciones[0].comision.nombre} · {fila.inscripciones[0].categoria} ·{' '}
+                    {fila.inscripciones[0].estado}
                   </p>
                 ) : null}
               </Campo>
@@ -1205,14 +1207,16 @@ export function PaymentsPage() {
                     <option value="">Seleccionar…</option>
                     {inscripciones.map((inscripcion) => (
                       <option key={inscripcion.id} value={String(inscripcion.id)}>
-                        {inscripcion.comision.codigo} — {inscripcion.comision.nombre}
+                        {inscripcion.comision.codigo} — {inscripcion.comision.nombre} ·{' '}
+                        {inscripcion.categoria} · {inscripcion.estado}
                       </option>
                     ))}
                   </select>
                 ) : inscripciones.length === 1 ? (
                   <p className="text-sm text-slate-700">
                     Se imputará a {inscripciones[0].comision.codigo} —{' '}
-                    {inscripciones[0].comision.nombre}
+                    {inscripciones[0].comision.nombre} · {inscripciones[0].categoria} ·{' '}
+                    {inscripciones[0].estado}
                   </p>
                 ) : null}
               </Campo>
