@@ -1,6 +1,6 @@
 ---
 name: openspec-verify-change
-description: Verify implementation matches OpenSpec change artifacts. Use when the user wants to validate that implementation is complete, correct, and coherent before archiving. Also use when the user says "openspec verify" or "opsx verify".
+description: Verify implementation matches OpenSpec change artifacts. Use when validating that implementation is complete, correct, coherent before archiving. Also when user says "openspec verify" or "opsx verify".
 allowed-tools: Bash(openspec:*)
 license: MIT
 compatibility: Requires openspec CLI.
@@ -40,7 +40,7 @@ In both branches, never create the root as a side effect: do not run `openspec i
    Include the schema used for each change if available.
    Mark changes with incomplete tasks as "(In Progress)".
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/openspec-verify-change <other>`).
+   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-verify <other>`).
 
 2. **Check status to understand the schema**
    ```bash

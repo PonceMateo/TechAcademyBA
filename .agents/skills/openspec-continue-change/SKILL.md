@@ -1,6 +1,6 @@
 ---
 name: openspec-continue-change
-description: Continue working on an OpenSpec change by creating the next artifact. Use when the user wants to progress their change, create the next artifact, or continue their workflow. Also use when the user says "openspec continue" or "opsx continue".
+description: Continue an OpenSpec change by creating the next artifact. Use when progressing a change, creating next artifact, or continuing workflow. Also when user says "openspec continue" or "opsx continue".
 allowed-tools: Bash(openspec:*)
 license: MIT
 compatibility: Requires openspec CLI.
@@ -43,7 +43,7 @@ In both branches, never create the root as a side effect: do not run `openspec i
 
    Mark the most recently modified change as "(Recommended)" since it's likely what the user wants to continue.
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/openspec-continue-change <other>`).
+   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-continue <other>`).
 
 2. **Check current status**
    ```bash
