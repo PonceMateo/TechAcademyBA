@@ -177,6 +177,10 @@ export function crearEmpresa(datos) {
   return getDataSource().crearEmpresa(datos)
 }
 
+export function cargarNominaEmpresa(empresaId, datos) {
+  return getDataSource().cargarNominaEmpresa(empresaId, datos)
+}
+
 export function listarSedes() {
   return getDataSource().listarSedes()
 }

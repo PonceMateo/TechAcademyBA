@@ -932,6 +932,59 @@ export function createMockDataSource() {
       return { ...empresa }
     },
 
+    async cargarNominaEmpresa(empresaId, { comision_id, empleados }) {
+      const empresa = store.empresas.find((fila) => fila.id === Number(empresaId))
+      const comision = store.comisiones.find((fila) => fila.id === Number(comision_id))
+      if (!empresa || !comision) {
+        throw new Error('La empresa o la comisión no existe.')
+      }
+      const vacantes = comision.vacantes ?? comision.cupo_maximo - (comision.inscriptos ?? 0)
+      if (empleados.length > vacantes) {
+        throw new Error(`La nómina supera las vacantes disponibles: quedan ${vacantes}.`)
+      }
+
+      const documentos = empleados.map((empleado) => String(empleado.documento).replace(/\D/g, ''))
+      if (new Set(documentos).size !== documentos.length) {
+        throw new Error('La nómina contiene documentos repetidos.')
+      }
+
+      let creados = 0
+      let reutilizados = 0
+      for (const [indice, empleado] of empleados.entries()) {
+        const alumno = store.alumnos.find(
+          (fila) => String(fila.documento).replace(/\D/g, '') === documentos[indice],
+        )
+        if (alumno) {
+          reutilizados += 1
+        } else {
+          store.alumnos.push({
+            id: siguienteId(store.alumnos),
+            documento: empleado.documento,
+            nombre: empleado.nombre,
+            email: empleado.email,
+            telefono: empleado.telefono ?? null,
+            activo: true,
+            comision: { codigo: comision.codigo, nombre: comision.curso?.nombre ?? comision.curso },
+            categoria: 'CORPORATIVO',
+            porcentaje_beca: null,
+          })
+          creados += 1
+        }
+      }
+      comision.inscriptos = (comision.inscriptos ?? 0) + empleados.length
+      comision.vacantes = comision.cupo_maximo - comision.inscriptos
+      empresa.nomina_empleados = `${(empresa.nomina_empleados ? `${empresa.nomina_empleados}; ` : '')}${empleados.length} personas`
+      return {
+        contrato_id: siguienteId(store.contratos ?? []),
+        empresa_id: empresa.id,
+        comision_id: comision.id,
+        cantidad: empleados.length,
+        alumnos_creados: creados,
+        alumnos_reutilizados: reutilizados,
+        inscripciones_creadas: empleados.length,
+      }
+    },
+
     async listarSedes() {
       return copiar(store.sedes)
     },

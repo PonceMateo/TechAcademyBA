@@ -45,6 +45,7 @@ const PATHS = Object.freeze({
   alumnos: '/alumnos',
   inscripcionesDeAlumno: '/alumnos/:alumnoId/inscripciones',
   empresas: '/empresas',
+  nominaEmpresa: '/empresas/:empresaId/nomina',
   sedes: '/sedes',
   cobranzas: '/cobranzas',
   habilitacion: '/habilitaciones/consulta',
@@ -113,7 +114,20 @@ async function request(path, { method = 'GET', body, query, params } = {}) {
 async function leerDetalle(response) {
   try {
     const cuerpo = await response.json()
-    return typeof cuerpo?.detail === 'string' ? cuerpo.detail : null
+    if (typeof cuerpo?.detail === 'string') return cuerpo.detail
+    if (!Array.isArray(cuerpo?.detail)) return null
+
+    const errores = cuerpo.detail
+      .map((error) => {
+        const ubicacion = Array.isArray(error?.loc)
+          ? error.loc.filter((parte) => parte !== 'body').join(' → ')
+          : ''
+        const mensaje = error?.msg ?? 'Dato inválido.'
+        return ubicacion ? `${ubicacion}: ${mensaje}` : mensaje
+      })
+      .filter(Boolean)
+
+    return errores.length > 0 ? `Revisá los datos: ${errores.join(' ')}` : null
   } catch {
     return null
   }
@@ -321,6 +335,14 @@ export function createApiDataSource() {
 
     async crearEmpresa(datos) {
       return request(PATHS.empresas, { method: 'POST', body: datos })
+    },
+
+    async cargarNominaEmpresa(empresaId, datos) {
+      return request(PATHS.nominaEmpresa, {
+        method: 'POST',
+        params: { empresaId },
+        body: datos,
+      })
     },
 
     async listarCobranzas(q = '') {

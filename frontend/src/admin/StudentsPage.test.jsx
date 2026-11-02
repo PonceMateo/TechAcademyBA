@@ -24,7 +24,13 @@ const COLUMNAS_ALUMNOS = [
   'ACCIONES',
 ]
 
-const COLUMNAS_EMPRESAS = ['RAZÓN SOCIAL', 'CUIT', 'PREFERENCIA FACTURA', 'NÓMINA DE EMPLEADOS']
+const COLUMNAS_EMPRESAS = [
+  'RAZÓN SOCIAL',
+  'CUIT',
+  'PREFERENCIA FACTURA',
+  'NÓMINA DE EMPLEADOS',
+  'ACCIONES',
+]
 
 const ALTA = {
   documento: '30.111.222',
@@ -714,6 +720,21 @@ describe('cuentas corporativas', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByText('10 personas, falta enviar la nómina')).toBeInTheDocument()
+  })
+
+  it('abre la carga de nómina para una empresa', async () => {
+    const user = userEvent.setup()
+
+    await user.click(screen.getAllByRole('button', { name: 'Cargar nómina' })[0])
+
+    expect(
+      screen.getByRole('dialog', { name: /Cargar nómina · Tech Solutions/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Empleados a inscribir')).toBeInTheDocument()
+    expect(screen.getByText(/La empresa cubre la inscripción/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Categoría *')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Descuento (%) *')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar nómina' })).toBeInTheDocument()
   })
 })
 

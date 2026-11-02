@@ -2212,3 +2212,20 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Decisión:** los buscadores de las vistas de cursos y comisiones se habilitan y filtran en el cliente sobre los datos ya cargados. La coincidencia para nombre y descripción es por **prefijo de palabra**, normalizada con `normalizeWords` (sin tildes, en mayúscula), sin distinguir mayúsculas ni acentos. El código del curso se busca por **subcadena** (contains) sobre el código normalizado, para que «001» o «1» encuentren «CUR001». Comisiones filtran por código, docente o horario dentro del curso abierto, por prefijo de palabra. Una consulta vacía restaura el contenido completo y una sin coincidencias muestra `No se encontraron cursos` / `No se encontraron comisiones`. Los resultados se reordenan por relevancia de la coincidencia, con desempate por `id`.
 - **Por qué:** el catálogo es acotado (≈10 comisiones, pocos cursos) y `CoursesPage` ya carga todo, así que no hace falta endpoint ni migración. Se mantiene el criterio de la H/U 10 (D48) sin moverlo al servidor; si el volumen crece, la búsqueda se puede mover a `?q=` sin cambiar la UI.
 - **Dónde:** `frontend/src/admin/CoursesPage.jsx`, `frontend/src/domain/normalize.js`, `frontend/src/admin/CoursesPage.test.jsx`.
+
+### D66 — La carga de nómina corporativa crea el contrato formal y sus inscripciones en una transacción
+
+- **Fecha:** 2026-11-02
+- **Autor:** Agustin Torres
+- **Decisión:** la HU 19 expone `POST /empresas/{empresa_id}/nomina`. El cuerpo identifica la comisión
+  y contiene la lista completa de empleados, limitada a becado parcial o total. El servicio crea un
+  contrato `CURSO_FORMAL`, reutiliza alumnos por `documento_norm`, crea los que no existen y guarda
+  cada `NominaEmpleado` junto con su `Inscripcion` en una única transacción. La comisión se bloquea
+  durante el cálculo de vacantes y una nómina que no entra se rechaza completa. Una charla no puede
+  usar este endpoint.
+- **Por qué:** la nómina pertenece al contrato y no directamente a la empresa; crear el contrato en
+  la misma operación evita una relación incompleta y permite que la aceptación de la HU 19 sea
+  atómica. Reutilizar `documento_norm` conserva la identidad del padrón y la restricción única de
+  inscripción evita duplicados.
+- **Dónde:** `backend/app/schemas/nomina.py`, `backend/app/services/nomina.py`,
+  `backend/app/api/empresas.py`, `frontend/src/admin/StudentsPage.jsx` y sus fuentes de datos.

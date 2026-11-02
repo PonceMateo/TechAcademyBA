@@ -19,11 +19,37 @@ from app.core.database import get_db
 from app.models.enums import Rol
 from app.models.padron import Usuario
 from app.schemas.empresas import EmpresaCreate, EmpresaOut
+from app.schemas.nomina import NominaCreate, NominaOut
 from app.services import empresas
+from app.services import nomina
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
 
 _solo_admin = require_roles(Rol.ADMIN)
+
+
+@router.post(
+    "/{empresa_id}/nomina",
+    response_model=NominaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Cargar la nómina de una empresa",
+)
+def cargar_nomina(
+    empresa_id: int,
+    cuerpo: NominaCreate,
+    session: Annotated[Session, Depends(get_db)],
+    _admin: Annotated[Usuario, Depends(_solo_admin)],
+) -> NominaOut:
+    try:
+        return nomina.cargar_nomina(session, empresa_id, cuerpo)
+    except nomina.EmpresaNoEncontrada as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except nomina.ComisionNoEncontrada as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except nomina.CupoInsuficiente as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except nomina.NominaInvalida as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
 
 
 @router.get("", response_model=list[EmpresaOut], summary="Consultar las empresas")
