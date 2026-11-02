@@ -78,12 +78,39 @@ class AccesoAlumnoOut(BaseModel):
     forzado: bool = False
 
 
+class EmpresaInscripcionOut(BaseModel):
+    """La empresa de una inscripción corporativa, dentro del detalle (HU 64)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    razon_social: str
+
+
+class InscripcionDetalleOut(BaseModel):
+    """Una inscripción del alumno con su categoría, su empresa y su acceso (HU 64).
+
+    `acceso` viene `null` cuando la inscripción no está `ACTIVA`: una cursada terminada, dada de
+    baja o en espera no tiene estado de habilitación que derivar.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    estado: str
+    comision: ComisionAsignadaOut
+    categoria: str
+    porcentaje_beca: Decimal | None = None
+    empresa: EmpresaInscripcionOut | None = None
+    acceso: AccesoAlumnoOut | None = None
+
+
 class AlumnoOut(BaseModel):
     """Fila de `GET /alumnos` y respuesta de `POST /alumnos`.
 
-    `comision`, `categoria`, `porcentaje_beca` y `acceso` salen en `null` mientras el alumno no
-    tenga inscripción: pertenecen a historias posteriores y no se inventan datos para llenar la
-    tabla (D43). La pantalla los muestra como `Sin comisión` y `—`.
+    Solo los datos del alumno (HU 64): la categoría arancelaria vive en la inscripción, así que el
+    padrón no la informa y el detalle `GET /alumnos/{id}` es el contrato que la expone. Mostrar acá
+    la comisión y la categoría de una sola inscripción afirmaba datos que no eran del alumno.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -95,11 +122,12 @@ class AlumnoOut(BaseModel):
     email: str
     telefono: str | None
     activo: bool
-    inscripcion_id: int | None = None
-    comision: ComisionAsignadaOut | None = None
-    categoria: str | None = None
-    porcentaje_beca: Decimal | None = None
-    acceso: AccesoAlumnoOut | None = None
+
+
+class AlumnoDetalleOut(AlumnoOut):
+    """Respuesta de `GET /alumnos/{id}`: el alumno y **todas** sus inscripciones (HU 64)."""
+
+    inscripciones: list[InscripcionDetalleOut] = Field(default_factory=list)
 
 
 class AlumnoCreadoOut(AlumnoOut):

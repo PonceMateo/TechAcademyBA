@@ -8,13 +8,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class InscripcionCreate(BaseModel):
-    """Cuerpo de `POST /inscripciones`."""
+    """Cuerpo de `POST /inscripciones`.
+
+    La categoría se elige al inscribir (HU 64): beca parcial pide el porcentaje y corporativo pide
+    la empresa, con las mismas reglas que el `PATCH`. Los dos campos son opcionales en el esquema
+    porque dependen de la categoría; la combinación la valida el servicio.
+    """
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     alumno_id: int = Field(gt=0)
     comision_id: int = Field(gt=0)
     categoria: str = Field(default="PARTICULAR", min_length=1, max_length=20)
+    porcentaje_beca: int | None = Field(default=None, ge=1, le=99)
+    empresa_id: int | None = Field(default=None, gt=0)
 
 
 class InscripcionOut(BaseModel):
@@ -49,8 +56,13 @@ class ComisionDisponibleOut(BaseModel):
 
 
 class InscripcionDisponibleOut(BaseModel):
-    """Inscripción activa de un alumno para imputar una cobranza (HU 21)."""
+    """Inscripción activa de un alumno para imputar una cobranza (HU 21 y HU 64).
+
+    `categoria` viaja para que el selector de Cobranzas distinga dos inscripciones del mismo
+    alumno sin adivinar por la comisión.
+    """
 
     id: int
     estado: str
+    categoria: str
     comision: ComisionDisponibleOut

@@ -2229,3 +2229,34 @@ alcance de este change; queda a criterio del equipo agregarlo.
   inscripción evita duplicados.
 - **Dónde:** `backend/app/schemas/nomina.py`, `backend/app/services/nomina.py`,
   `backend/app/api/empresas.py`, `frontend/src/admin/StudentsPage.jsx` y sus fuentes de datos.
+
+---
+
+## Categoría arancelaria por inscripción (change `hu-64-categoria-por-inscripcion`)
+
+### D67 — El padrón no expone datos de inscripción y el detalle del alumno es el único contrato
+
+- **Fecha:** 2026-11-02
+- **Autor:** Mateo Ponce
+- **Decisión:** `GET /alumnos` devuelve solo los datos del alumno: deja de informar
+  `inscripcion_id`, `comision`, `categoria`, `porcentaje_beca` y `acceso`, y el listado ya no deriva
+  habilitación. El detalle `GET /alumnos/{id}` es el único contrato que expone las inscripciones con
+  comisión, categoría, porcentaje, empresa y acceso derivado, y se declara **después** de
+  `/alumnos/reactivable` para que el path param no se coma esa ruta. `POST /inscripciones` acepta
+  `porcentaje_beca` y `empresa_id` con las mismas reglas que el `PATCH`, a través de una validación
+  compartida en `app/services/inscripciones.py`.
+- **Por qué:** la categoría se define por inscripción desde la HU 15, pero el padrón armaba un
+  resumen por alumno tomando su primera inscripción y lo mostraba como si fuera única. Con una
+  inscripción corporativa y otra particular, la tabla afirmaba una categoría que no pertenecía a la
+  fila y el estado de habilitación de una cursada tapaba el de la otra. Un solo detalle deja que la
+  ficha de la HU 61 lo extienda en lugar de duplicar contratos.
+- **Consecuencias:** el forzado de habilitación por inscripción queda **fuera de alcance** de este
+  change: `POST /habilitaciones/override` no existe y la acción sigue operando contra el alumno. Su
+  endpoint y su regla por sección son la H/U 30, en `Ready`. El arancel no se persiste en la
+  inscripción; el saldo se deriva con el arancel actual (HU 61).
+- **Dónde:** `backend/app/api/alumnos.py`, `backend/app/services/alumnos.py`,
+  `backend/app/schemas/alumnos.py`, `backend/app/api/inscripciones.py`,
+  `backend/app/services/inscripciones.py`, `backend/app/schemas/inscripciones.py`,
+  `frontend/src/admin/StudentsPage.jsx`, `frontend/src/admin/AccessPage.jsx`,
+  `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/PaymentsPage.jsx`,
+  `frontend/src/services/`.

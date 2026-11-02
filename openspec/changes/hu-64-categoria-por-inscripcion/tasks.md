@@ -2,17 +2,17 @@
 
 ## 1. Decisión y contrato de inscripciones en el backend
 
-- [ ] 1.1 Registrar en `docs/decisions.md` la decisión de contrato de este cambio —`GET /alumnos` sin datos de inscripción, `GET /alumnos/{id}` como único detalle, alta de inscripción con categoría, y el forzado por inscripción pendiente en la H/U 30— con fecha y autor, y verificar que la entrada queda antes de tocar el código
-- [ ] 1.2 Extraer en `backend/app/services/inscripciones.py` una validación compartida de categoría, porcentaje de beca y empresa, y usarla en el alta y en `PATCH`; verificar que `test_inscripciones.py` y `test_inscripciones_api.py` siguen en verde
-- [ ] 1.3 Extender `backend/app/schemas/inscripciones.py` con `porcentaje_beca` y `empresa_id` en el alta y guardarlos en la inscripción; verificar con tests nuevos de alta particular, beca parcial válida, porcentaje fuera de rango, corporativo con empresa, corporativo sin empresa y empresa inexistente
-- [ ] 1.4 Sumar `categoria` a `InscripcionDisponibleOut` y verificar que `GET /alumnos/{id}/inscripciones` la devuelve en `test_inscripciones_api.py`
-- [ ] 1.5 Correr `docker compose run --rm backend pytest app/tests/test_inscripciones.py app/tests/test_inscripciones_api.py -q` y confirmar que pasa
+- [x] 1.1 Registrar en `docs/decisions.md` la decisión de contrato de este cambio —`GET /alumnos` sin datos de inscripción, `GET /alumnos/{id}` como único detalle, alta de inscripción con categoría, y el forzado por inscripción pendiente en la H/U 30— con fecha y autor, y verificar que la entrada queda antes de tocar el código
+- [x] 1.2 Extraer en `backend/app/services/inscripciones.py` una validación compartida de categoría, porcentaje de beca y empresa, y usarla en el alta y en `PATCH`; verificar que `test_inscripciones.py` y `test_inscripciones_api.py` siguen en verde
+- [x] 1.3 Extender `backend/app/schemas/inscripciones.py` con `porcentaje_beca` y `empresa_id` en el alta y guardarlos en la inscripción; verificar con tests nuevos de alta particular, beca parcial válida, porcentaje fuera de rango, corporativo con empresa, corporativo sin empresa y empresa inexistente
+- [x] 1.4 Sumar `categoria` a `InscripcionDisponibleOut` y verificar que `GET /alumnos/{id}/inscripciones` la devuelve en `test_inscripciones_api.py`
+- [x] 1.5 Correr `docker compose run --rm backend pytest app/tests/test_inscripciones.py app/tests/test_inscripciones_api.py -q` y confirmar que pasa
 
 ## 2. Padrón y detalle del alumno en el backend
 
-- [ ] 2.1 Quitar `inscripcion_id`, `comision`, `categoria`, `porcentaje_beca` y `acceso` de `AlumnoOut` y simplificar `listar_alumnos` para no derivar habilitación; verificar con `test_alumnos_api.py` y `test_alumnos_gestion.py` actualizados al contrato nuevo
-- [ ] 2.2 Implementar `GET /alumnos/{id}` con todas sus inscripciones —comisión, categoría, porcentaje, empresa y acceso derivado— cargando comisión, curso y empresa sin N+1 y **declarándola después de `GET /alumnos/reactivable`**, para que el path param no se coma esa ruta; verificar con tests de alumno con dos categorías, alumno sin inscripciones, corporativa con empresa, inscripción no activa sin acceso, `GET /alumnos/reactivable` con `200`, `404`, `403` y `401`
-- [ ] 2.3 Correr `docker compose run --rm backend pytest app/tests/test_alumnos_api.py app/tests/test_alumnos_gestion.py app/tests/test_cobranzas_api.py -q` y `docker compose run --rm backend ruff check .`
+- [x] 2.1 Quitar `inscripcion_id`, `comision`, `categoria`, `porcentaje_beca` y `acceso` de `AlumnoOut` y simplificar `listar_alumnos` para no derivar habilitación; verificar con `test_alumnos_api.py` y `test_alumnos_gestion.py` actualizados al contrato nuevo
+- [x] 2.2 Implementar `GET /alumnos/{id}` con todas sus inscripciones —comisión, categoría, porcentaje, empresa y acceso derivado— cargando comisión, curso y empresa sin N+1 y **declarándola después de `GET /alumnos/reactivable`**, para que el path param no se coma esa ruta; verificar con tests de alumno con dos categorías, alumno sin inscripciones, corporativa con empresa, inscripción no activa sin acceso, `GET /alumnos/reactivable` con `200`, `404`, `403` y `401`
+- [x] 2.3 Correr `docker compose run --rm backend pytest app/tests/test_alumnos_api.py app/tests/test_alumnos_gestion.py app/tests/test_cobranzas_api.py -q` y `docker compose run --rm backend ruff check .`
 
 ## 3. Servicios y datos de ejemplo del frontend
 
