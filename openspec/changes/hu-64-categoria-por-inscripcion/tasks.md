@@ -28,9 +28,9 @@
 
 ## 5. Alta de inscripción con categoría en Comisiones
 
-- [ ] 5.1 Agregar al modal de inscripción los campos de categoría, porcentaje de beca y empresa, con la validación local antes de enviar; verificar en `CoursesPage.test.jsx` los casos particular, beca parcial con y sin porcentaje y corporativo con y sin empresa
-- [ ] 5.2 Conectar `+ Nueva Empresa` con el alta de empresa existente, conservando alumno, comisión y categoría y dejando seleccionada la empresa creada; verificar con un test de ese recorrido
-- [ ] 5.3 Verificar que un `409` de cupo completo o inscripción duplicada deja el modal abierto con el motivo, y correr `docker compose run --rm frontend npm run test -- src/admin/CoursesPage.test.jsx`
+- [x] 5.1 Agregar al modal de inscripción los campos de categoría, porcentaje de beca y empresa, con la validación local antes de enviar; verificar en `CoursesPage.test.jsx` los casos particular, beca parcial con y sin porcentaje y corporativo con y sin empresa
+- [x] 5.2 Conectar `+ Nueva Empresa` con el alta de empresa existente, conservando alumno, comisión y categoría y dejando seleccionada la empresa creada; verificar con un test de ese recorrido
+- [x] 5.3 Verificar que un `409` de cupo completo o inscripción duplicada deja el modal abierto con el motivo, y correr `docker compose run --rm frontend npm run test -- src/admin/CoursesPage.test.jsx`
 
 ## 6. Accesos con una sección por inscripción
 
