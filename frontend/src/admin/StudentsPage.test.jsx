@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
@@ -13,7 +13,7 @@ import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../te
  * pagó" y "no se pudo leer el comprobante".
  */
 
-const COLUMNAS_ALUMNOS = ['DNI', 'NOMBRE', 'EMAIL', 'TELÉFONO']
+const COLUMNAS_ALUMNOS = ['DNI', 'NOMBRE', 'EMAIL', 'TELÉFONO', 'ACCIONES']
 
 const COLUMNAS_EMPRESAS = [
   'RAZÓN SOCIAL',
@@ -159,13 +159,23 @@ describe('padrón de alumnos', () => {
     expect(filaDe('Alumno Normalizado').cells[0]).toHaveTextContent('30.111.222')
   })
 
-  it('no tiene columna de acciones: las acciones viven en la ficha', () => {
+  it('tiene una sola acción por fila: Ver ficha ↗', async () => {
+    const user = userEvent.setup()
+    const fila = filaDe('Juan Ignacio Pérez')
+
     expect(
       within(tablaAlumnos())
         .getAllByRole('columnheader')
         .map((th) => th.textContent),
     ).toEqual(COLUMNAS_ALUMNOS)
-    expect(within(filaDe('Juan Ignacio Pérez')).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(fila).getAllByRole('button').map((boton) => boton.textContent)).toEqual([
+      'Ver ficha ↗',
+    ])
+
+    await user.click(within(fila).getByRole('button', { name: 'Ver ficha ↗' }))
+
+    // El click en el botón abre una sola ficha: no dispara además el de la fila.
+    expect(await screen.findAllByRole('dialog', { name: 'Ficha del alumno' })).toHaveLength(1)
   })
 
   it('informa que la búsqueda no arrojó resultados', async () => {
@@ -206,7 +216,7 @@ describe('padrón de alumnos', () => {
 
     const fila = filaDe('Nuevo Alumno')
     expect(fila.cells[3]).toHaveTextContent('—')
-    expect(fila.cells).toHaveLength(4)
+    expect(fila.cells).toHaveLength(5)
   })
 
   it('muestra el teléfono del alumno en formato nacional', async () => {
@@ -242,6 +252,11 @@ describe('ficha del alumno en modal (HU 61)', () => {
     const user = userEvent.setup()
     await user.click(within(filaDe(nombre)).getByText(nombre))
     return user
+  }
+
+  /** El valor de una fila etiqueta/valor de la ficha. */
+  function valorDe(ficha, etiqueta) {
+    return within(ficha).getByText(etiqueta).parentElement
   }
 
   it('abre la ficha con el mouse y muestra los datos en modo lectura', async () => {
@@ -313,23 +328,51 @@ describe('ficha del alumno en modal (HU 61)', () => {
     expect(within(ficha).queryByText(/CUR-\d{3}/)).not.toBeInTheDocument()
   })
 
-  it('muestra una pestaña por inscripción con su categoría y su empresa', async () => {
+  it('elige la comisión con un selector y no con chips', async () => {
     const user = await abrirFichaConMouse('Juan Ignacio Pérez')
     const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
 
-    const pestanas = await within(ficha).findAllByRole('tab')
-    expect(pestanas.map((pestana) => pestana.textContent)).toEqual([
-      'CUR-101 · Python Inicial',
-      'CUR-106 · Machine Learning Aplicado',
+    const selector = await within(ficha).findByRole('combobox', {
+      name: /Seleccionar comisión/,
+    })
+    // La primera inscripción viene elegida y no hay pestañas.
+    expect(selector).toHaveTextContent('CUR-101 Python Inicial')
+    expect(within(ficha).queryByRole('tab')).not.toBeInTheDocument()
+
+    await user.click(selector)
+
+    expect(within(ficha).getAllByRole('option').map((opcion) => opcion.textContent)).toEqual([
+      'CUR-101 Python Inicial',
+      'CUR-106 Machine Learning Aplicado',
     ])
-    expect(within(ficha).getByRole('tabpanel')).toHaveTextContent('Particular')
 
-    await user.click(within(ficha).getByRole('tab', { name: /CUR-106/ }))
+    await user.click(within(ficha).getByRole('option', { name: 'CUR-106 Machine Learning Aplicado' }))
 
-    const panel = within(ficha).getByRole('tabpanel')
-    expect(panel).toHaveTextContent('Corporativo')
-    expect(panel).toHaveTextContent('Tech Solutions S.A.')
-    expect(panel).toHaveTextContent('A cargo de la empresa')
+    expect(within(ficha).getByText('Corporativo')).toBeInTheDocument()
+    expect(within(ficha).getByText('Tech Solutions S.A.')).toBeInTheDocument()
+    expect(within(ficha).getByText('A cargo de la empresa')).toBeInTheDocument()
+  })
+
+  it('muestra la categoría con su lápiz y el mismo flujo de edición', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    expect(await within(ficha).findByText('Particular')).toBeInTheDocument()
+    const lapiz = within(ficha).getByRole('button', { name: 'Editar categoría' })
+    expect(lapiz).toHaveAttribute('title', 'Editar categoría')
+
+    await user.click(lapiz)
+
+    const formulario = await screen.findByRole('dialog', { name: 'Asignar categoría' })
+    expect(within(formulario).getByLabelText('Categoría')).toHaveValue('PARTICULAR')
+    await user.selectOptions(within(formulario).getByLabelText('Categoría'), 'BECADO_PARCIAL')
+    await user.type(within(formulario).getByLabelText(/Porcentaje de descuento/), '40')
+    await user.click(within(formulario).getByRole('button', { name: 'Guardar' }))
+
+    expect(
+      await screen.findByText('Categoría actualizada en CUR-101 Python Inicial.'),
+    ).toBeInTheDocument()
+    expect(await within(ficha).findByText('Becado parcial 40%')).toBeInTheDocument()
   })
 
   it('muestra el bloqueo con su causa en la inscripción activa y el estado en la terminada', async () => {
@@ -382,44 +425,88 @@ describe('ficha del alumno en modal (HU 61)', () => {
     expect(await within(ficha).findByText('BLOQUEADO')).toBeInTheDocument()
     expect(within(ficha).getByText('debe saldo')).toBeInTheDocument()
 
-    await user.click(within(ficha).getByRole('tab', { name: /CUR-106/ }))
+    await user.click(within(ficha).getByRole('combobox', { name: /Seleccionar comisión/ }))
+    await user.click(within(ficha).getByRole('option', { name: /CUR-106/ }))
 
-    const panel = within(ficha).getByRole('tabpanel')
-    expect(panel).toHaveTextContent('Estado de la inscripción: COMPLETADA')
-    expect(panel).not.toHaveTextContent('BLOQUEADO')
+    expect(within(ficha).getByText('Estado de la inscripción: COMPLETADA')).toBeInTheDocument()
+    expect(within(ficha).queryByText('BLOQUEADO')).not.toBeInTheDocument()
     // La deuda de una cursada terminada existe y se informa.
-    expect(panel).toHaveTextContent('$52.000,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('$52.000,00')
   })
 
-  it('muestra el total pagado, lo pendiente de acreditación y el saldo con centavos', async () => {
+  it('muestra el arancel, lo pagado y el saldo con centavos', async () => {
     await abrirFichaConMouse('Valeria Rossi')
     const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Arancel a abonar')
 
-    const panel = await within(ficha).findByRole('tabpanel')
-    expect(panel).toHaveTextContent('Total pagado$0,00')
-    expect(panel).toHaveTextContent('Pendiente de acreditación$26.000,00')
-    expect(panel).toHaveTextContent('Saldo pendiente$52.000,00')
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('$52.000,00')
+    expect(valorDe(ficha, 'Total pagado')).toHaveTextContent('$0,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('$52.000,00')
   })
 
-  it('exime la beca total y descuenta la beca parcial', async () => {
+  it('avisa lo observado en el saldo solo cuando hay comprobantes observados', async () => {
+    const user = await abrirFichaConMouse('Valeria Rossi')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    const indicador = await within(ficha).findByRole('button', {
+      name: 'Comprobantes observados',
+    })
+    expect(within(ficha).queryByRole('tooltip')).not.toBeInTheDocument()
+
+    await user.hover(indicador)
+
+    const ayuda = within(ficha).getByRole('tooltip')
+    expect(ayuda).toHaveTextContent('Incluye $26.000,00 en comprobantes observados')
+    expect(indicador).toHaveAttribute('aria-describedby', ayuda.id)
+  })
+
+  it('no muestra el aviso de observados cuando no hay nada observado', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Arancel a abonar')
+
+    expect(
+      within(ficha).queryByRole('button', { name: 'Comprobantes observados' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('exime la beca total: arancel y pagado en cero, saldo exento', async () => {
     await abrirFichaConMouse('Matías Fernández')
-    let ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
-    expect(await within(ficha).findByRole('tabpanel')).toHaveTextContent('Exento')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Becado total')
 
-    cleanup()
-    resetDataSource()
-    stubBackend()
-    renderAppAs('ADMIN', '/admin/alumnos')
-    await screen.findByText('Camila Rodríguez')
-
-    await abrirFichaConMouse('Camila Rodríguez')
-    ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
-    const panel = await within(ficha).findByRole('tabpanel')
-    expect(panel).toHaveTextContent('Becado parcial 50%')
-    expect(panel).toHaveTextContent('Saldo pendiente$0,00')
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('$0,00')
+    expect(valorDe(ficha, 'Total pagado')).toHaveTextContent('$0,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('Exento')
+    expect(
+      within(ficha).queryByRole('button', { name: 'Comprobantes observados' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('informa cuando el alumno no tiene inscripciones y no dibuja pestañas', async () => {
+  it('descuenta la beca parcial del arancel', async () => {
+    await abrirFichaConMouse('Camila Rodríguez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Becado parcial 50%')
+
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('$26.000,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('$0,00')
+  })
+
+  it('deja el arancel corporativo en guion y el saldo a cargo de la empresa', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('combobox', { name: /Seleccionar comisión/ }))
+    await user.click(within(ficha).getByRole('option', { name: /CUR-106/ }))
+
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('—')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('A cargo de la empresa')
+    expect(
+      within(ficha).queryByRole('button', { name: 'Comprobantes observados' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('informa cuando el alumno no tiene inscripciones y no dibuja el selector', async () => {
     cleanup()
     stubDataSource({
       buscarAlumnos: async () => [
@@ -442,26 +529,73 @@ describe('ficha del alumno en modal (HU 61)', () => {
 
     const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
     expect(await within(ficha).findByText(/todavía no tiene inscripciones/)).toBeInTheDocument()
-    expect(within(ficha).queryByRole('tablist')).not.toBeInTheDocument()
+    expect(within(ficha).queryByRole('combobox')).not.toBeInTheDocument()
   })
 
-  it('cambia la categoría desde la pestaña sin tocar la otra inscripción', async () => {
+  it('cierra con un click en el fondo y no con uno adentro', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    const fondo = ficha.parentElement
+
+    fireEvent.mouseDown(ficha)
+    fireEvent.mouseUp(ficha)
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+
+    fireEvent.mouseDown(fondo)
+    fireEvent.mouseUp(fondo)
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Ficha del alumno' })).not.toBeInTheDocument(),
+    )
+  })
+
+  it('no cierra si el arrastre empezó adentro y terminó en el fondo', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    fireEvent.mouseDown(ficha)
+    fireEvent.mouseUp(ficha.parentElement)
+
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+  })
+
+  it('con el desplegable abierto, Escape cierra solo el desplegable', async () => {
     const user = await abrirFichaConMouse('Juan Ignacio Pérez')
     const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
 
-    await user.click(await within(ficha).findByRole('button', { name: 'Categoría' }))
-    const formulario = await screen.findByRole('dialog', { name: 'Asignar categoría' })
-    await user.selectOptions(within(formulario).getByLabelText('Categoría'), 'BECADO_PARCIAL')
-    await user.type(within(formulario).getByLabelText(/Porcentaje de descuento/), '40')
-    await user.click(within(formulario).getByRole('button', { name: 'Guardar' }))
+    await user.click(await within(ficha).findByRole('combobox', { name: /Seleccionar comisión/ }))
+    expect(within(ficha).getByRole('listbox')).toBeInTheDocument()
 
-    expect(
-      await screen.findByText('Categoría actualizada en CUR-101 Python Inicial.'),
-    ).toBeInTheDocument()
-    expect(await within(ficha).findByText('Becado parcial 40%')).toBeInTheDocument()
+    await user.keyboard('{Escape}')
 
-    await user.click(within(ficha).getByRole('tab', { name: /CUR-106/ }))
-    expect(within(ficha).getByRole('tabpanel')).toHaveTextContent('Corporativo')
+    expect(within(ficha).queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+  })
+
+  it('con el desplegable abierto, el click afuera no cierra el modal', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('combobox', { name: /Seleccionar comisión/ }))
+    // La capa del desplegable se queda con el primer click: cierra la lista, no el modal.
+    await user.click(within(ficha).getByRole('listbox').previousElementSibling)
+
+    expect(within(ficha).queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+  })
+
+  it('con el formulario de categoría encima, el click afuera no cierra la ficha', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('button', { name: 'Editar categoría' }))
+    await screen.findByRole('dialog', { name: 'Asignar categoría' })
+
+    fireEvent.mouseDown(ficha.parentElement)
+    fireEvent.mouseUp(ficha.parentElement)
+
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Asignar categoría' })).toBeInTheDocument()
   })
 })
 

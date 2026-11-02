@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Modal, StatusIndicator } from '../components/ui'
+import { Badge, Modal, Select, StatusIndicator } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { CATEGORIA_INSCRIPCION, ESTADO_HABILITACION } from '../domain/enums'
+import { CATEGORIA_INSCRIPCION } from '../domain/enums'
 import { formatDocumento, formatMonedaConCentavos, formatTelefono } from '../utils/formato'
 import { obtenerAlumno } from '../services/dataService'
 
@@ -13,18 +13,19 @@ import { obtenerAlumno } from '../services/dataService'
  * el momento de abrir: no hay ruta nueva, el saldo no queda viejo después de cobrar y el estado de
  * la ficha no sobrevive a un alumno para mostrarse sobre otro.
  *
- * **Una pestaña por inscripción, activa o no.** La categoría, la empresa y el acceso son de la
- * inscripción, no del alumno. En las `ACTIVA` se muestra el estado de habilitación con su causa; en
- * las demás, el estado de la inscripción, porque una cursada terminada no tiene bloqueo que
- * derivar. Los importes se muestran igual: la deuda de una cursada terminada existe.
+ * **Una comisión a la vez.** El selector elige entre las inscripciones del alumno, activas o no.
+ * La categoría, la empresa y el acceso son de la inscripción: en las `ACTIVA` se muestra el estado
+ * de habilitación con su causa —y si está forzado, se dice—; en las demás, el estado de la
+ * inscripción, porque una cursada terminada no tiene bloqueo que derivar.
  *
- * **El dinero sale de la misma regla que el estado.** El backend deriva el requerido con el arancel
- * actual y lo cuantiza a centavos; acá se muestra con centavos para que un saldo de `0,01` no se
- * lea como `$0` al lado de un acceso bloqueado. Una inscripción corporativa se muestra a cargo de
- * la empresa y una becada total, exenta.
+ * **El dinero se muestra, no se calcula.** «Arancel a abonar» es `monto_requerido` y «Saldo
+ * pendiente» es `saldo_pendiente`, los dos derivados por el backend con el arancel actual y
+ * cuantizados a centavos (D68 y D70). Lo observado no descuenta: se informa aparte con un
+ * indicador que solo aparece cuando hay algo observado. Una inscripción corporativa se muestra a
+ * cargo de la empresa y una becada total, exenta.
  *
  * **Los datos personales van en modo lectura.** Editar, restablecer la contraseña y eliminar viven
- * en el menú `⋮`; la categoría se cambia desde la pestaña abierta. La ficha solo abre esos modales.
+ * en el menú `⋮`; la categoría se cambia desde la comisión elegida. La ficha solo abre esos modales.
  *
  * **Un detalle que no llega no se inventa.** Mientras la consulta corre la ficha lo dice, y si
  * falla muestra el motivo: sin inscripciones, estados ni importes de relleno.
@@ -34,8 +35,6 @@ import { obtenerAlumno } from '../services/dataService'
 const SIN_DOCUMENTO = 'Sin DNI (alumno exterior)'
 
 const SIN_DATO = '—'
-
-const TEXTO_HABILITADO = 'El alumno cumple con la condición arancelaria.'
 
 const SIN_INSCRIPCIONES =
   'Este alumno todavía no tiene inscripciones. Inscribilo en una comisión para ver su categoría, su estado y su saldo.'
@@ -49,8 +48,8 @@ const TONOS_CATEGORIA = {
 
 const CAMPOS_DATOS = [
   { clave: 'documento', etiqueta: 'DNI' },
-  { clave: 'nombre', etiqueta: 'Nombre Completo' },
-  { clave: 'email', etiqueta: 'Email Registrado' },
+  { clave: 'nombre', etiqueta: 'Nombre completo' },
+  { clave: 'email', etiqueta: 'Email registrado' },
   { clave: 'telefono', etiqueta: 'Teléfono' },
 ]
 
@@ -77,93 +76,144 @@ function etiquetaCategoria(inscripcion) {
   return `${definicion.etiqueta}${conPorcentaje}`
 }
 
-/**
- * El saldo que muestra la pestaña: la empresa cuando es corporativo, `Exento` cuando el requerido
- * es cero por beca total y, si no, el saldo pendiente con centavos.
- */
-function saldoDe(inscripcion) {
-  if (inscripcion.saldo_pendiente === null || inscripcion.saldo_pendiente === undefined) {
-    return 'A cargo de la empresa'
-  }
-  if (Number(inscripcion.monto_requerido) === 0) {
-    return 'Exento'
-  }
-  return formatMonedaConCentavos(inscripcion.saldo_pendiente)
+/** Una fila etiqueta/valor de la ficha: la etiqueta en gris, el valor en peso medio a la derecha. */
+function Fila({ etiqueta, children }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-2 last:border-b-0">
+      <dt className="text-sm text-slate-500">{etiqueta}</dt>
+      <dd className="flex items-center gap-2 text-right text-sm font-medium text-slate-900">
+        {children}
+      </dd>
+    </div>
+  )
 }
 
-function PanelInscripcion({ inscripcion, onCambiarCategoria }) {
+/**
+ * El aviso de comprobantes observados: solo aparece cuando hay algo observado, y se muestra con
+ * hover y con el foco del teclado. El botón apunta al texto con `aria-describedby`.
+ */
+function IndicadorObservados({ observado }) {
+  const [visible, setVisible] = useState(false)
+  const idAyuda = 'ayuda-comprobantes-observados'
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="Comprobantes observados"
+        aria-describedby={idAyuda}
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        onFocus={() => setVisible(true)}
+        onBlur={() => setVisible(false)}
+        className="foco-acento inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-900 ring-1 ring-amber-600/30"
+      >
+        i
+      </button>
+      {visible && (
+        <span
+          id={idAyuda}
+          role="tooltip"
+          className="absolute top-full right-0 z-30 mt-1 w-64 rounded-md bg-slate-900 px-2 py-1 text-xs font-normal text-white"
+        >
+          {`Incluye ${formatMonedaConCentavos(observado)} en comprobantes observados`}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * El saldo que muestra la ficha: la empresa cuando es corporativo, `Exento` cuando el requerido
+ * es cero por beca total y, si no, el saldo con centavos que deriva el backend (D70).
+ */
+function saldoDe(inscripcion) {
+  const saldo = inscripcion.saldo_pendiente
+  const sinSaldo =
+    inscripcion.categoria === CATEGORIA_INSCRIPCION.CORPORATIVO ||
+    saldo === null ||
+    saldo === undefined
+  if (sinSaldo) {
+    return 'A cargo de la empresa'
+  }
+  if (inscripcion.categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL) {
+    return 'Exento'
+  }
+  return formatMonedaConCentavos(saldo)
+}
+
+function IconoEditar() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      className="h-3.5 w-3.5"
+    >
+      <path d="M13.6 3.4a1.8 1.8 0 0 1 2.6 2.6l-7.7 7.7-3.4.8.8-3.4 7.7-7.7Z" />
+    </svg>
+  )
+}
+
+function BloqueComision({ inscripcion, onCambiarCategoria }) {
   const definicion = TONOS_CATEGORIA[inscripcion.categoria] ?? {
     etiqueta: inscripcion.categoria,
     tono: TONO.GRIS,
   }
+  const esCorporativo = inscripcion.categoria === CATEGORIA_INSCRIPCION.CORPORATIVO
+  const esBecaTotal = inscripcion.categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL
+  const observado = Number(inscripcion.total_observado ?? 0)
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
-          <p className="text-sm text-slate-700">
-            {`${inscripcion.comision.codigo} ${inscripcion.comision.nombre}`}
-          </p>
-          <p className="flex items-center gap-2 text-sm text-slate-700">
-            Categoría
-            <Badge tono={definicion.tono}>{etiquetaCategoria(inscripcion)}</Badge>
-          </p>
-          {inscripcion.empresa !== null && inscripcion.empresa !== undefined && (
-            <p className="text-sm text-slate-700">
-              {`Empresa: ${inscripcion.empresa.razon_social}`}
-            </p>
-          )}
-        </div>
-        <Button variante="secundario" tamano="chico" onClick={() => onCambiarCategoria(inscripcion)}>
-          Categoría
-        </Button>
-      </div>
+    <dl className="mt-4">
+      <Fila etiqueta="Categoría arancelaria">
+        <Badge tono={definicion.tono}>{etiquetaCategoria(inscripcion)}</Badge>
+        <button
+          type="button"
+          aria-label="Editar categoría"
+          title="Editar categoría"
+          onClick={() => onCambiarCategoria(inscripcion)}
+          className="foco-acento rounded p-1 text-slate-500 hover:bg-slate-100"
+        >
+          <IconoEditar />
+        </button>
+      </Fila>
 
-      {inscripcion.acceso !== null && inscripcion.acceso !== undefined ? (
-        <div className="space-y-1">
+      {esCorporativo && inscripcion.empresa != null && (
+        <Fila etiqueta="Empresa">{inscripcion.empresa.razon_social}</Fila>
+      )}
+
+      <Fila etiqueta="Estado de habilitación">
+        {inscripcion.acceso !== null && inscripcion.acceso !== undefined ? (
           <StatusIndicator
             estado={inscripcion.acceso.estado}
             causa={inscripcion.acceso.causa}
-            habilitadoTexto={TEXTO_HABILITADO}
+            forzado={inscripcion.acceso.forzado === true}
           />
-          {inscripcion.acceso.estado === ESTADO_HABILITACION.BLOQUEADO &&
-            inscripcion.acceso.forzado === true && (
-              <p className="text-xs text-slate-600">
-                Bloqueo forzado manualmente: queda registrado con el usuario y la fecha.
-              </p>
-            )}
-        </div>
-      ) : (
-        <p className="text-sm text-slate-700">
-          {`Estado de la inscripción: ${inscripcion.estado}`}
-        </p>
-      )}
+        ) : (
+          <span>{`Estado de la inscripción: ${inscripcion.estado}`}</span>
+        )}
+      </Fila>
 
-      <dl className="grid gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-3">
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Total pagado
-          </dt>
-          <dd className="mt-1 text-slate-900 tabular-nums">
-            {formatMonedaConCentavos(inscripcion.total_pagado ?? 0)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Pendiente de acreditación
-          </dt>
-          <dd className="mt-1 text-slate-900 tabular-nums">
-            {formatMonedaConCentavos(inscripcion.total_observado ?? 0)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Saldo pendiente
-          </dt>
-          <dd className="mt-1 text-slate-900 tabular-nums">{saldoDe(inscripcion)}</dd>
-        </div>
-      </dl>
-    </div>
+      <Fila etiqueta="Arancel a abonar">
+        {esCorporativo || inscripcion.monto_requerido === null
+          ? SIN_DATO
+          : formatMonedaConCentavos(inscripcion.monto_requerido)}
+      </Fila>
+
+      <Fila etiqueta="Total pagado">
+        {formatMonedaConCentavos(inscripcion.total_pagado ?? 0)}
+      </Fila>
+
+      <Fila etiqueta="Saldo pendiente">
+        <span>{saldoDe(inscripcion)}</span>
+        {observado > 0 && !esCorporativo && !esBecaTotal && (
+          <IndicadorObservados observado={observado} />
+        )}
+      </Fila>
+    </dl>
   )
 }
 
@@ -180,7 +230,7 @@ export function FichaAlumnoModal({
   const [cargando, setCargando] = useState(true)
   const [fallo, setFallo] = useState(null)
   const [menuAbierto, setMenuAbierto] = useState(false)
-  const [pestana, setPestana] = useState(0)
+  const [comisionElegida, setComisionElegida] = useState(null)
 
   useEffect(() => {
     let vigente = true
@@ -212,9 +262,12 @@ export function FichaAlumnoModal({
   // detalle aporta las inscripciones y los importes.
   const datos = datosDeLectura(alumno)
   const inscripciones = detalle?.inscripciones ?? []
-  // El índice no puede apuntar fuera de la lista cuando una recategorización recarga el detalle.
-  const indiceActivo = Math.min(pestana, Math.max(inscripciones.length - 1, 0))
-  const inscripcionActiva = inscripciones[indiceActivo] ?? null
+  // La comisión elegida se guarda por id y no por índice: al recargar el detalle después de cambiar
+  // una categoría la lista puede cambiar de orden y el índice apuntaría a otra inscripción.
+  const inscripcionElegida =
+    inscripciones.find((inscripcion) => String(inscripcion.id) === comisionElegida) ??
+    inscripciones[0] ??
+    null
 
   function elegirAccion(accion) {
     setMenuAbierto(false)
@@ -222,26 +275,14 @@ export function FichaAlumnoModal({
   }
 
   return (
-    <Modal
-      abierto
-      titulo="Ficha del alumno"
-      onClose={onClose}
-      pie={
-        <Button variante="secundario" onClick={onClose}>
-          Cerrar
-        </Button>
-      }
-    >
+    <Modal abierto titulo="Ficha del alumno" onClose={onClose} cerrarAlClickAfuera>
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-4">
-          <dl className="grid flex-1 gap-3 sm:grid-cols-2">
+          <dl className="flex-1">
             {CAMPOS_DATOS.map((campo) => (
-              <div key={campo.clave}>
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {campo.etiqueta}
-                </dt>
-                <dd className="mt-1 text-sm text-slate-900">{datos[campo.clave]}</dd>
-              </div>
+              <Fila key={campo.clave} etiqueta={campo.etiqueta}>
+                {datos[campo.clave]}
+              </Fila>
             ))}
           </dl>
 
@@ -308,38 +349,22 @@ export function FichaAlumnoModal({
 
         {inscripciones.length > 0 && (
           <>
-            <div role="tablist" aria-label="Inscripciones del alumno" className="flex flex-wrap gap-2">
-              {inscripciones.map((inscripcion, indice) => (
-                <button
-                  key={inscripcion.id}
-                  type="button"
-                  role="tab"
-                  id={`pestana-inscripcion-${inscripcion.id}`}
-                  aria-selected={indice === indiceActivo}
-                  aria-controls={`panel-inscripcion-${inscripcion.id}`}
-                  onClick={() => setPestana(indice)}
-                  className={`foco-acento rounded-md border px-3 py-1.5 text-sm ${
-                    indice === indiceActivo
-                      ? 'border-slate-300 bg-white font-medium text-slate-900 shadow-sm'
-                      : 'border-transparent text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {`${inscripcion.comision.codigo} · ${inscripcion.comision.nombre}`}
-                </button>
-              ))}
-            </div>
+            <Select
+              id="comision-ficha"
+              etiqueta="Seleccionar comisión"
+              valor={inscripcionElegida !== null ? String(inscripcionElegida.id) : ''}
+              onChange={setComisionElegida}
+              opciones={inscripciones.map((inscripcion) => ({
+                valor: String(inscripcion.id),
+                etiqueta: `${inscripcion.comision.codigo} ${inscripcion.comision.nombre}`,
+              }))}
+            />
 
-            {inscripcionActiva !== null && (
-              <div
-                role="tabpanel"
-                id={`panel-inscripcion-${inscripcionActiva.id}`}
-                aria-labelledby={`pestana-inscripcion-${inscripcionActiva.id}`}
-              >
-                <PanelInscripcion
-                  inscripcion={inscripcionActiva}
-                  onCambiarCategoria={onCambiarCategoria}
-                />
-              </div>
+            {inscripcionElegida !== null && (
+              <BloqueComision
+                inscripcion={inscripcionElegida}
+                onCambiarCategoria={onCambiarCategoria}
+              />
             )}
           </>
         )}

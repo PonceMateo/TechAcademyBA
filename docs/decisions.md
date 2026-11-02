@@ -2302,3 +2302,28 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Consecuencias:** la suite tarda lo mismo; deja de reportar fallas que no existen. Si algún día
   un test tarda más de 15 s, conviene mirar por qué antes de subir el número otra vez.
 - **Dónde:** `frontend/vite.config.js`.
+
+### D70 — El saldo de la ficha se muestra, no se calcula; el click afuera es opt-in
+
+- **Fecha:** 2026-11-02
+- **Autor:** Mateo Ponce
+- **Decisión:** la ficha del alumno muestra `monto_requerido`, `total_pagado`,
+  `total_observado` y `saldo_pendiente` **tal como los devuelve `derivar_montos`**; el frontend no
+  recalcula ninguno. «Arancel a abonar» es `monto_requerido` —`$0` en beca total, `—` en
+  corporativo—; «Saldo pendiente» es `saldo_pendiente` —«Exento» en beca total, «A cargo de la
+  empresa» en corporativo— y el indicador de comprobantes observados aparece solo cuando
+  `total_observado > 0`. El `Modal` compartido gana la prop `cerrarAlClickAfuera`, con `false` por
+  omisión, y la ficha la activa: el click cierra solo si `mousedown` y `mouseup` ocurrieron sobre
+  el fondo y solo responde el modal de arriba de la pila.
+- **Por qué:** el saldo y el estado de habilitación salen del mismo requerido cuantizado (D68). Si
+  la ficha volviera a sumar cobranzas por su cuenta, la pantalla podría mostrar `$0` al lado de un
+  acceso bloqueado. El click afuera, en cambio, no puede ser el comportamiento de todos los
+  modales: el prototipo ya perdió altas por un click accidental en el fondo y los formularios
+  conservan ese comportamiento a propósito.
+- **Consecuencias:** una cobranza observada no baja el saldo y se informa aparte; el total pagado de
+  una inscripción corporativa suma solo lo imputado a esa inscripción, nunca lo imputado a la
+  empresa. Con el desplegable de comisiones abierto, `Escape` y el click afuera cierran primero el
+  desplegable.
+- **Dónde:** `frontend/src/admin/FichaAlumnoModal.jsx`, `frontend/src/admin/StudentsPage.jsx`,
+  `frontend/src/components/ui/Modal.jsx`, `frontend/src/components/ui/Table.jsx`,
+  `frontend/src/components/ui/Select.jsx`.

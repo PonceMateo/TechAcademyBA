@@ -653,9 +653,24 @@ export function StudentsPage() {
     }
   }
 
-  // El padrón no tiene columna de acciones: editar, restablecer la contraseña, eliminar y cambiar la
-  // categoría viven en la ficha del alumno (HU 61).
-  const columnasAlumnos = COLUMNAS_ALUMNOS
+  // El padrón tiene una sola acción por fila: abrir la ficha (HU 61). Editar, restablecer la
+  // contraseña, eliminar y cambiar la categoría viven adentro de la ficha.
+  const columnasAlumnos = [
+    ...COLUMNAS_ALUMNOS,
+    {
+      clave: 'acciones',
+      titulo: 'ACCIONES',
+      render: (fila) => (
+        <Button
+          variante="enlace"
+          tamano="chico"
+          onClick={() => setAlumnoFicha(fila)}
+        >
+          Ver ficha ↗
+        </Button>
+      ),
+    },
+  ]
 
   const columnasEmpresas = [
     ...COLUMNAS_EMPRESAS,

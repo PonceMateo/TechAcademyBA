@@ -65,7 +65,7 @@ export function Table({
             return (
               <Fragment key={claveDeFila(fila)}>
                 <tr
-                  className={`align-top transition hover:bg-slate-50/70 ${
+                  className={`align-top transition hover:bg-slate-100 ${
                     accionable
                       ? 'cursor-pointer focus-visible:bg-slate-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-400'
                       : ''

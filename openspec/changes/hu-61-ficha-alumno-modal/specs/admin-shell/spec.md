@@ -6,10 +6,16 @@
 
 The system SHALL mostrar el bloque `Padrón de Alumnos Regulares` con una acción
 `+ Nuevo Alumno`, un campo de búsqueda de placeholder `Buscar por DNI o Nombre…`, y una tabla
-cuyas columnas, con estos rótulos literales y en este orden, son `DNI`, `NOMBRE`, `EMAIL` y
-`TELÉFONO`. La tabla SHALL NOT mostrar `COMISIÓN ASIGNADA`, `CATEGORÍA ARANCELARIA`,
-`ACCESO PLATAFORMA` ni una columna de acciones: los datos de inscripción y las acciones viven en la
+cuyas columnas, con estos rótulos literales y en este orden, son `DNI`, `NOMBRE`, `EMAIL`,
+`TELÉFONO` y `ACCIONES`. La tabla SHALL NOT mostrar `COMISIÓN ASIGNADA`,
+`CATEGORÍA ARANCELARIA` ni `ACCESO PLATAFORMA`: los datos de inscripción y las acciones viven en la
 ficha del alumno y en la consulta de habilitación.
+
+La columna `ACCIONES` SHALL contener un único botón `Ver ficha ↗` por fila, con el acento de
+Secretaría y foco visible, que SHALL abrir la misma ficha que la fila. La fila SHALL ser clickeable
+y enfocable: un click en cualquier parte de la fila o `Enter` con la fila enfocada SHALL abrir la
+ficha, y el click sobre `Ver ficha ↗` SHALL abrir una sola ficha, sin disparar además el de la
+fila.
 
 La acción `+ Nuevo Alumno` SHALL abrir un modal titulado `Nuevo Alumno` con los campos
 `DNI`, `Nombre`, `Email` y `Teléfono`, en ese orden, y los botones `Cancelar` y `Guardar
@@ -149,11 +155,11 @@ de empresas.
 La pantalla `Alumnos e Inscripciones` SHALL ofrecer las acciones **Editar**, **Categoría**,
 **Restablecer contraseña** y **Eliminar alumno** en el menú ⋮ de la ficha del alumno, reutilizando
 los componentes `Button`, `Modal` e `Input` existentes y sin cambiar colores, tipografías ni
-navegación. La tabla SHALL NOT ofrecer una columna `ACCIONES`. Las operaciones SHALL pasar por
-`src/services/` y SHALL actualizar los datos visibles al terminar.
+navegación. La columna `ACCIONES` de la tabla SHALL tener solo `Ver ficha ↗`. Las operaciones SHALL
+pasar por `src/services/` y SHALL actualizar los datos visibles al terminar.
 
-La acción **Categoría** SHALL operar sobre la inscripción de la pestaña abierta en la ficha; sin
-pestañas, SHALL informar que primero hay que inscribir al alumno.
+La acción **Categoría** SHALL operar sobre la comisión elegida en el selector de la ficha; sin
+inscripciones, SHALL informar que primero hay que inscribir al alumno.
 
 #### Scenario: Editar desde la fila
 
@@ -192,13 +198,13 @@ pestañas, SHALL informar que primero hay que inscribir al alumno.
 
 #### Scenario: Categoría de un alumno con varias inscripciones
 
-- **WHEN** el administrador cambia la categoría desde una pestaña de un alumno con dos inscripciones
-- **THEN** solo esa inscripción cambia y la otra pestaña conserva su categoría
+- **WHEN** el administrador cambia la categoría de una comisión de un alumno con dos inscripciones
+- **THEN** solo esa inscripción cambia y la otra comisión conserva su categoría
 
 #### Scenario: Categoría de un alumno sin inscripciones
 
 - **WHEN** el administrador abre la ficha de un alumno sin inscripciones
-- **THEN** no hay pestañas y la ficha informa que primero hay que inscribirlo
+- **THEN** no hay selector de comisión y la ficha informa que primero hay que inscribirlo
 
 #### Scenario: Aviso de reactivación al intentar un alta duplicada
 
@@ -215,68 +221,131 @@ pestañas, SHALL informar que primero hay que inscribir al alumno.
 - **WHEN** el administrador cancela el aviso de reactivación
 - **THEN** no se modifica ningún dato y el formulario de alta conserva lo cargado
 
-#### Scenario: La tabla no tiene columna de acciones
+#### Scenario: La columna de acciones abre la ficha
 
 - **WHEN** el usuario mira la tabla del padrón
-- **THEN** no ve una columna `ACCIONES` y las acciones solo están en el menú de la ficha
+- **THEN** la última columna es `ACCIONES` con un solo botón `Ver ficha ↗`, y las demás acciones solo están en el menú de la ficha
 
 ## ADDED Requirements
 
 ### Requirement: Ficha del alumno en modal
 
-El padrón SHALL abrir un modal de ficha al pulsar una fila o al presionar Enter con la fila
-enfocada. La ficha SHALL mostrar los datos del alumno en modo lectura, un menú ⋮ de acciones y una
-pestaña por cada inscripción, activa o no, con su comisión, categoría, empresa, el estado de la
-inscripción —y, en las `ACTIVA`, el estado de habilitación con su causa— e importes. SHALL cerrarse
-con Escape, con su botón de cierre y al completar una baja, y SHALL devolver el foco a la fila que
-la abrió.
+El padrón SHALL abrir la ficha al pulsar una fila, al presionar `Enter` con la fila enfocada o con
+el botón `Ver ficha ↗`, y SHALL mostrar el DNI, el nombre completo, el email registrado y el
+teléfono en modo lectura, en filas etiqueta/valor, con un menú ⋮ de acciones. En lugar de pestañas
+SHALL ofrecer un selector desplegable `Seleccionar comisión`, con una opción por inscripción
+rotulada `<código> <curso>` y la primera seleccionada.
 
 #### Scenario: Abrir la ficha con el mouse
 
 - **WHEN** el administrador pulsa una fila del padrón
-- **THEN** se abre el modal con el DNI, el nombre, el email y el teléfono del alumno en modo lectura
+- **THEN** se abre el modal con el DNI, el nombre, el email y el teléfono del alumno en modo lectura, en filas etiqueta/valor
 
 #### Scenario: Abrir la ficha con el teclado
 
 - **WHEN** el administrador enfoca una fila y presiona Enter
 - **THEN** se abre la misma ficha, sin navegar a otra pantalla
 
+#### Scenario: Abrir la ficha desde la columna de acciones
+
+- **WHEN** el administrador pulsa `Ver ficha ↗` en la fila
+- **THEN** se abre una sola ficha, sin que el click de la fila la abra por segunda vez
+
 #### Scenario: Menú de acciones
 
 - **WHEN** el administrador abre el menú ⋮ de la ficha
 - **THEN** ve **Editar**, **Eliminar** y **Restablecer contraseña**, con el comportamiento ya desarrollado
 
-#### Scenario: Pestañas por inscripción
+#### Scenario: Selector de comisión
 
 - **WHEN** el alumno tiene una inscripción particular y otra corporativa
-- **THEN** la ficha muestra dos pestañas, cada una con su comisión, su categoría —con el porcentaje si es beca parcial— y su estado de habilitación con la causa cuando está bloqueada
-
-#### Scenario: Pestaña de una inscripción corporativa
-
-- **WHEN** el administrador abre la pestaña de una inscripción corporativa
-- **THEN** ve la razón social de la empresa y el arancel a cargo de la empresa, en lugar de un saldo del alumno
-
-#### Scenario: Pestaña de una inscripción terminada
-
-- **WHEN** el administrador abre la pestaña de una inscripción `COMPLETADA`
-- **THEN** ve el estado de la inscripción en lugar de un estado de habilitación, sin causa de bloqueo, y los importes siguen informándose
-
-#### Scenario: Dinero de la inscripción
-
-- **WHEN** el administrador abre la pestaña de una inscripción particular con pagos
-- **THEN** ve el total pagado, lo pendiente de acreditación y el saldo pendiente para cubrir esa inscripción
+- **THEN** el selector ofrece `CUR-101 Python Inicial` y `CUR-106 Machine Learning Aplicado`, con la primera seleccionada, y al elegir la segunda cambia el bloque de la comisión
 
 #### Scenario: Alumno sin inscripciones
 
 - **WHEN** el alumno no tiene ninguna inscripción
-- **THEN** la ficha muestra un mensaje informativo en lugar de las pestañas
+- **THEN** la ficha muestra un mensaje informativo y no dibuja el selector de comisión
+
+### Requirement: Cierre del modal de la ficha
+
+La ficha SHALL cerrarse con Escape, con su botón de cierre, con un click en el fondo y al completar
+una baja, y SHALL devolver el foco a la fila que la abrió. El click en el fondo SHALL cerrarla solo
+si el `mousedown` y el `mouseup` ocurrieron sobre el fondo, y SHALL NOT cambiar el comportamiento de
+los demás modales. Con un modal apilado o el selector abierto, Escape y el click afuera SHALL
+cerrar solo lo de arriba.
 
 #### Scenario: Cerrar la ficha
 
-- **WHEN** el administrador presiona Escape o usa el botón de cierre de la ficha
+- **WHEN** el administrador presiona Escape, usa el botón de cierre o hace click en el fondo
 - **THEN** el modal se cierra y el foco vuelve a la fila del padrón que lo abrió
+
+#### Scenario: Arrastrar desde adentro hacia el fondo
+
+- **WHEN** el administrador empieza a seleccionar texto dentro de la ficha y suelta el mouse sobre el fondo
+- **THEN** la ficha permanece abierta
+
+#### Scenario: Escape con el selector abierto
+
+- **WHEN** el administrador presiona Escape con el desplegable de comisiones abierto
+- **THEN** se cierra solo el desplegable y la ficha sigue abierta
+
+#### Scenario: Click afuera con un modal apilado
+
+- **WHEN** el administrador hace click en el fondo con el formulario de categoría abierto sobre la ficha
+- **THEN** no se cierra la ficha y el formulario de arriba sigue abierto
 
 #### Scenario: No se puede leer el detalle
 
 - **WHEN** la consulta del detalle falla
 - **THEN** la ficha muestra el motivo de la falla y no inventa inscripciones, estados ni importes
+
+### Requirement: Categoría y estado de la comisión en la ficha
+
+El bloque de la comisión elegida SHALL mostrar en filas etiqueta/valor la categoría arancelaria con
+su insignia —y el porcentaje si es beca parcial— junto a un botón `Editar categoría` que abre el
+mismo formulario; la empresa solo en corporativo; y el estado de habilitación con su insignia y su
+causa cuando está bloqueado, identificándolo como forzado cuando lo fue. Una inscripción no activa
+SHALL mostrar su estado de inscripción en lugar de un estado de habilitación.
+
+#### Scenario: Comisión de una inscripción corporativa
+
+- **WHEN** el administrador elige una inscripción corporativa
+- **THEN** ve la razón social de la empresa, `Arancel a abonar` en `—` y `Saldo pendiente` en `A cargo de la empresa`, sin indicador de observados
+
+#### Scenario: Comisión de una inscripción terminada
+
+- **WHEN** el administrador elige una inscripción `COMPLETADA`
+- **THEN** ve el estado de la inscripción en lugar de un estado de habilitación, sin causa de bloqueo, y los importes siguen informándose
+
+#### Scenario: Editar la categoría desde la ficha
+
+- **WHEN** el administrador pulsa el lápiz de la categoría y guarda otra categoría
+- **THEN** se abre el mismo formulario de categoría y la ficha muestra la categoría nueva sin tocar las demás inscripciones
+
+### Requirement: Importes de la comisión en la ficha
+
+`Arancel a abonar` SHALL mostrar `monto_requerido` —`$0` en beca total y `—` en corporativo—,
+`Total pagado` lo acreditado a esa inscripción y `Saldo pendiente` `saldo_pendiente` —`Exento` en
+beca total y `A cargo de la empresa` en corporativo—, sin recalcular nada en el frontend. La fila
+del saldo SHALL mostrar, solo cuando `total_observado` es mayor que cero, un indicador enfocable que
+anuncia `Incluye $X en comprobantes observados`.
+
+#### Scenario: Dinero de la inscripción
+
+- **WHEN** el administrador elige una inscripción particular con pagos
+- **THEN** ve el arancel a abonar, el total pagado y el saldo pendiente para cubrir esa inscripción, con centavos
+
+#### Scenario: Beca total
+
+- **WHEN** el administrador elige una inscripción de beca total
+- **THEN** `Arancel a abonar` y `Total pagado` muestran `$0,00` y `Saldo pendiente` muestra `Exento`, sin indicador de observados
+
+#### Scenario: Comprobantes observados
+
+- **WHEN** la inscripción tiene comprobantes observados y el administrador enfoca o pasa el mouse por el indicador del saldo
+- **THEN** ve `Incluye $X en comprobantes observados` con el total observado que devuelve la fuente
+
+#### Scenario: Sin comprobantes observados
+
+- **WHEN** la inscripción no tiene comprobantes observados
+- **THEN** la fila del saldo no muestra el indicador
