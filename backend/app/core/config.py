@@ -67,6 +67,17 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173"]
     )
 
+    # --- Comprobantes de alumnos (HU 52) -----------------------------------
+    # `local` guarda en el volumen privado del contenedor y es el default de desarrollo.
+    # `supabase` firma la subida y la descarga contra Supabase Storage; en producción es el
+    # único backend válido, porque el sistema de archivos de la Function no persiste.
+    storage_backend: str = "local"
+    storage_local_dir: str = "/var/lib/techacademy/comprobantes"
+    storage_bucket: str = ""
+    storage_url_expira_segundos: int = 300
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+
     # --- Correo (D17) -------------------------------------------------------
     # El único backend disponible registra el envío en el log. El proveedor real se
     # elige en el change siguiente; la interfaz no cambia.

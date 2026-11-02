@@ -289,6 +289,29 @@ export function listarPagosAlumno() {
   return getDataSource().listarPagosAlumno()
 }
 
+/** Comprobantes enviados por el alumno autenticado (HU 52), con su estado. */
+export function listarComprobantesAlumno() {
+  return getDataSource().listarComprobantesAlumno()
+}
+
+/**
+ * Envía un comprobante de pago: valida los metadatos, sube el archivo y confirma la verificación.
+ * Devuelve el comprobante en `PENDIENTE_REVISION`; **no acredita el pago**.
+ */
+export function enviarComprobante(datos, archivo) {
+  return getDataSource().enviarComprobante(datos, archivo)
+}
+
+/** Comprobantes de alumnos pendientes de revisión, para Secretaría. */
+export function listarComprobantesPendientes() {
+  return getDataSource().listarComprobantesPendientes()
+}
+
+/** Descarga autenticada del adjunto de un comprobante. Devuelve un `Blob`. */
+export function descargarArchivoComprobante(id) {
+  return getDataSource().descargarArchivoComprobante(id)
+}
+
 /**
  * Ficha del alumno autenticado (11.5 y HU 43). `documento` y `nombre` son de solo lectura: los
  * cambia la secretaría, y el contrato del guardado ni siquiera los acepta.

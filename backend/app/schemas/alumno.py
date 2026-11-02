@@ -55,6 +55,9 @@ class InscripcionAlumnoOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    #: Identificador de la inscripción. Lo usa el envío de comprobantes (HU 52) para elegir a
+    #: cuál de las cursadas propias se imputa el pago.
+    inscripcion_id: int
     codigo: str
     nombre_curso: str
     docente_nombre: str | None = None

@@ -62,8 +62,21 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       EMAIL_FROM: ${EMAIL_FROM:-no-reply@techacademy.invalid}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-TechAcademy BA}
+
+      # HU 52: los comprobantes de los alumnos son privados. En desarrollo viven en un
+      # volumen dedicado, fuera de la carpeta pública; en producción el backend usa
+      # Supabase Storage con URL firmada (ver `.env.example`).
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_LOCAL_DIR: ${STORAGE_LOCAL_DIR:-/var/lib/techacademy/comprobantes}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      STORAGE_URL_EXPIRA_SEGUNDOS: ${STORAGE_URL_EXPIRA_SEGUNDOS:-300}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
     volumes:
       - ./backend:/app
+      # El almacenamiento de comprobantes no puede quedar dentro de `/app` (se versionaría) ni
+      # en una carpeta pública: el volumen persiste entre reinicios y solo lo lee el backend.
+      - comprobantes_data:/var/lib/techacademy/comprobantes
       # La suite corre con `backend/` como raíz de trabajo, igual que en CI, así que para
       # leer la configuración de despliegue tiene que ver el archivo de la raíz del repo.
       # Es el mismo criterio que usa la prueba de tooling que lo verifica.
@@ -128,3 +141,4 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  comprobantes_data:
