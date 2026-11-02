@@ -13,6 +13,7 @@ import {
   SEDES,
 } from '../mocks'
 import {
+  CATEGORIA_INSCRIPCION,
   ESTADO_COBRANZA,
   TIPO_FACTURA,
   TITULAR_SIN_IDENTIFICAR,
@@ -117,6 +118,88 @@ function imputacionDelMock(store, item) {
  * tildes. Es la misma convención que aplica el backend para alumnos y docentes; la fuente de
  * ejemplo la replica para que la pantalla muestre el mismo texto con las dos fuentes.
  */
+
+/** Imputaciones de una inscripción en el ejemplo: una cobranza guarda una o varias. */
+function imputacionesDeInscripcion(store, inscripcionId) {
+  const filas = []
+
+  for (const cobranza of store.cobranzas) {
+    const imputaciones =
+      cobranza.imputaciones ?? (cobranza.imputacion ? [cobranza.imputacion] : [])
+
+    for (const imputacion of imputaciones) {
+      if (imputacion.destino !== DESTINO_IMPUTACION.ALUMNO) {
+        continue
+      }
+      // La inscripción principal del ejemplo usa el id del alumno; las demás llevan el suyo.
+      const destino = imputacion.inscripcion_id ?? imputacion.id
+      if (Number(destino) !== Number(inscripcionId)) {
+        continue
+      }
+      // El comprobante ilegible no tiene importe legible: no suma nada, pero sigue observado.
+      const monto = Number(imputacion.monto ?? cobranza.importe ?? 0)
+      if (monto > 0) {
+        filas.push({ estado: cobranza.estado, monto })
+      }
+    }
+  }
+
+  return filas
+}
+
+function redondearCentavos(valor) {
+  return Math.round(valor * 100) / 100
+}
+
+/**
+ * Importes derivados de una inscripción (HU 61), con la misma regla que el backend: el requerido
+ * sale del arancel ajustado por la beca parcial, se cuantiza a centavos, es cero en beca total y
+ * nulo en corporativo; lo observado no descuenta y el saldo nunca es negativo.
+ */
+function montosDeInscripcion(store, inscripcion) {
+  const comision = store.comisiones.find(
+    (candidata) => candidata.codigo === inscripcion.comision.codigo,
+  )
+  const arancel = Number(comision?.arancel ?? inscripcion.arancel ?? 0)
+  const categoria = inscripcion.categoria ?? CATEGORIA_INSCRIPCION.PARTICULAR
+
+  let requerido = null
+  if (categoria !== CATEGORIA_INSCRIPCION.CORPORATIVO) {
+    if (categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL) {
+      requerido = 0
+    } else if (
+      categoria === CATEGORIA_INSCRIPCION.BECADO_PARCIAL &&
+      inscripcion.porcentaje_beca != null
+    ) {
+      requerido = redondearCentavos(
+        (arancel * (100 - inscripcion.porcentaje_beca)) / 100,
+      )
+    } else {
+      requerido = arancel
+    }
+  }
+
+  const imputaciones = imputacionesDeInscripcion(store, inscripcion.id)
+  const pagado = redondearCentavos(
+    imputaciones
+      .filter((imputacion) => imputacion.estado === ESTADO_COBRANZA.ACREDITADO)
+      .reduce((suma, imputacion) => suma + imputacion.monto, 0),
+  )
+  const observado = redondearCentavos(
+    imputaciones
+      .filter((imputacion) => imputacion.estado === ESTADO_COBRANZA.OBSERVADO)
+      .reduce((suma, imputacion) => suma + imputacion.monto, 0),
+  )
+
+  return {
+    arancel,
+    monto_requerido: requerido,
+    total_pagado: pagado,
+    total_observado: observado,
+    saldo_pendiente: requerido === null ? null : Math.max(redondearCentavos(requerido - pagado), 0),
+  }
+}
+
 function passwordInicial(nombre, documento) {
   const primerNombre = String(nombre).trim().split(/\s+/)[0] ?? ''
   const sinTildes = primerNombre
@@ -706,30 +789,48 @@ export function createMockDataSource() {
     },
 
     /**
-     * Detalle del alumno con **todas** sus inscripciones (HU 64).
+     * Detalle del alumno con **todas** sus inscripciones y sus importes (HU 64 y 61).
      *
      * El ejemplo guarda la inscripción principal desnormalizada en el alumno —es lo que muestran las
      * pantallas que ya existían— y una lista `inscripciones` para el caso de dos categorías. Si el
-     * alumno no tiene la lista, el detalle arma una sola inscripción con esos datos.
+     * alumno no tiene la lista, el detalle arma una sola inscripción con esos datos. Los importes se
+     * derivan del arancel y de las cobranzas del ejemplo, con la misma regla que el backend.
      */
     async obtenerAlumno(id) {
       const alumno = store.alumnos.find((candidato) => candidato.id === Number(id))
       if (!alumno) {
         throw new Error('El alumno no existe.')
       }
-      const { inscripciones, comision, categoria, porcentaje_beca, acceso, ...datos } = alumno
+      const {
+        inscripciones,
+        comision,
+        categoria,
+        porcentaje_beca,
+        arancel,
+        acceso,
+        ...datos
+      } = alumno
       const detalle = inscripciones ?? [
         {
           id: alumno.id,
           estado: 'ACTIVA',
           comision,
+          arancel,
           categoria,
           porcentaje_beca: porcentaje_beca ?? null,
           empresa: null,
           acceso,
         },
       ]
-      return { ...datos, inscripciones: detalle.length > 0 ? copiar(detalle) : [] }
+      return {
+        ...datos,
+        inscripciones: copiar(
+          detalle.map((inscripcion) => ({
+            ...inscripcion,
+            ...montosDeInscripcion(store, inscripcion),
+          })),
+        ),
+      }
     },
 
     async crearInscripcion({ alumno_id, comision_id }) {

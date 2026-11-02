@@ -15,7 +15,9 @@ import { markAsExample } from './placeholderNotice'
  *
  * `CUR-102` y `CUR-106` aparecen como comisión de alumnos pero no están en `comisiones.js`: el
  * spec obliga a mostrar cinco comisiones y son un subconjunto de las diez del cliente. La
- * referencia va desnormalizada a propósito, como la devolvería el padrón.
+ * referencia va desnormalizada a propósito, como la devolvería el padrón. Por eso cada alumno lleva
+ * también el `arancel` de su inscripción: la ficha de la HU 61 deriva el saldo de la inscripción con
+ * ese arancel, y el catálogo de ejemplo no tiene esas dos comisiones para consultarlo.
  */
 export const ALUMNOS = markAsExample([
   {
@@ -25,6 +27,7 @@ export const ALUMNOS = markAsExample([
     tipo_documento: TIPO_DOCUMENTO.DNI,
     email: 'juan.perez@gmail.com',
     comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+    arancel: 45000,
     categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
     porcentaje_beca: null,
     acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
@@ -36,6 +39,7 @@ export const ALUMNOS = markAsExample([
         id: 11,
         estado: 'ACTIVA',
         comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+        arancel: 45000,
         categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
         porcentaje_beca: null,
         empresa: null,
@@ -45,6 +49,7 @@ export const ALUMNOS = markAsExample([
         id: 12,
         estado: 'ACTIVA',
         comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+        arancel: 52000,
         categoria: CATEGORIA_INSCRIPCION.CORPORATIVO,
         porcentaje_beca: null,
         empresa: { id: 1, razon_social: 'Tech Solutions S.A.' },
@@ -63,6 +68,7 @@ export const ALUMNOS = markAsExample([
     // ella. Para los demás no se inventa uno.
     telefono: '011 4788-1122',
     comision: { codigo: 'CUR-102', nombre: 'Desarrollo Web Full Stack' },
+    arancel: 52000,
     categoria: CATEGORIA_INSCRIPCION.BECADO_PARCIAL,
     porcentaje_beca: 50,
     acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
@@ -74,7 +80,10 @@ export const ALUMNOS = markAsExample([
     tipo_documento: TIPO_DOCUMENTO.DNI,
     email: 'mati.fdez@yahoo.com.ar',
     comision: { codigo: 'CUR-104', nombre: 'Diseño UX/UI Avanzado' },
-    categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
+    arancel: 52000,
+    // Matías cubre el caso de la beca total: la comisión tiene arancel, pero la inscripción está
+    // exenta y no debe saldo.
+    categoria: CATEGORIA_INSCRIPCION.BECADO_TOTAL,
     porcentaje_beca: null,
     acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
   },
@@ -88,6 +97,7 @@ export const ALUMNOS = markAsExample([
     tipo_documento: null,
     email: 'nicocastro_uy@gmail.com',
     comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+    arancel: 52000,
     categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
     porcentaje_beca: null,
     acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
@@ -98,6 +108,7 @@ export const ALUMNOS = markAsExample([
         id: 41,
         estado: 'FINALIZADA',
         comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+        arancel: 52000,
         categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
         porcentaje_beca: null,
         empresa: null,
@@ -114,6 +125,7 @@ export const ALUMNOS = markAsExample([
     tipo_documento: TIPO_DOCUMENTO.DNI,
     email: 'agus.benitez@gmail.com',
     comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+    arancel: 45000,
     categoria: CATEGORIA_INSCRIPCION.BECADO_PARCIAL,
     porcentaje_beca: 50,
     acceso: { estado: ESTADO_HABILITACION.BLOQUEADO, causa: 'comprobante ilegible' },
@@ -126,6 +138,7 @@ export const ALUMNOS = markAsExample([
     tipo_documento: TIPO_DOCUMENTO.DNI,
     email: 'valerossi@gmail.com',
     comision: { codigo: 'CUR-104', nombre: 'Diseño UX/UI Avanzado' },
+    arancel: 52000,
     categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
     porcentaje_beca: null,
     acceso: { estado: ESTADO_HABILITACION.BLOQUEADO, causa: 'debe saldo' },

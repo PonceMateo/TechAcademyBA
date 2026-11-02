@@ -9,9 +9,9 @@
 
 ## 2. Servicios y datos de ejemplo del frontend
 
-- [ ] 2.1 Ajustar `obtenerAlumno(id)` y los mapeos de `src/services/` para recibir los importes, y verificar la forma de la respuesta en `apiDataSource.test.js`
-- [ ] 2.2 Agregar a los mocks imputaciones de ejemplo que cubran una inscripción particular con saldo, una beca parcial, una beca total y una corporativa, y verificar que `mocks.test.js` valida los importes
-- [ ] 2.3 Verificar que `dataService.test.jsx` refleja el detalle con importes y correr `docker compose run --rm frontend npm run test -- src/services`
+- [x] 2.1 Ajustar `obtenerAlumno(id)` y los mapeos de `src/services/` para recibir los importes, y verificar la forma de la respuesta en `apiDataSource.test.js`
+- [x] 2.2 Agregar a los mocks imputaciones de ejemplo que cubran una inscripción particular con saldo, una beca parcial, una beca total y una corporativa, y verificar que `mocks.test.js` valida los importes
+- [x] 2.3 Verificar que `dataService.test.jsx` refleja el detalle con importes y correr `docker compose run --rm frontend npm run test -- src/services`
 
 ## 3. Ficha del alumno en modal
 

@@ -6,6 +6,7 @@ import {
   MEDIO_PAGO,
   TIPO_FACTURA,
 } from '../domain/enums'
+import { DESTINO_IMPUTACION } from './cobranzas'
 import { normalizeCode, normalizeCuit, normalizeDocumento } from '../domain/normalize'
 import {
   ALUMNOS,
@@ -199,6 +200,42 @@ describe('categorías arancelarias y estado de acceso', () => {
       (inscripcion) => inscripcion.categoria === CATEGORIA_INSCRIPCION.CORPORATIVO,
     )
     expect(corporativa.empresa.razon_social).toBeTruthy()
+  })
+
+  // HU 61: la ficha deriva el saldo del arancel de la inscripción, y el ejemplo no tiene en el
+  // catálogo las comisiones CUR-102 ni CUR-106. Sin arancel, la pestaña no puede mostrar la deuda.
+  it('deja el arancel de cada inscripción para poder derivar el saldo', () => {
+    for (const alumno of ALUMNOS) {
+      expect(alumno.arancel).toBeGreaterThan(0)
+      for (const inscripcion of alumno.inscripciones ?? []) {
+        expect(inscripcion.arancel).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('cubre una inscripción particular, una beca parcial, una beca total y una corporativa', () => {
+    const categorias = new Set([
+      ...ALUMNOS.map((alumno) => alumno.categoria),
+      ...ALUMNOS.flatMap((alumno) => (alumno.inscripciones ?? []).map((i) => i.categoria)),
+    ])
+
+    expect(categorias).toEqual(new Set(Object.values(CATEGORIA_INSCRIPCION)))
+  })
+
+  it('imputa cada cobranza de alumno a una inscripción del padrón', () => {
+    const inscripciones = new Set(
+      ALUMNOS.flatMap((alumno) => [
+        alumno.id,
+        ...(alumno.inscripciones ?? []).map((inscripcion) => inscripcion.id),
+      ]),
+    )
+
+    for (const cobranza of COBRANZAS) {
+      if (cobranza.imputacion?.destino !== DESTINO_IMPUTACION.ALUMNO) {
+        continue
+      }
+      expect(inscripciones).toContain(cobranza.imputacion.inscripcion_id)
+    }
   })
 })
 
