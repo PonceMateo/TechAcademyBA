@@ -375,7 +375,14 @@ describe('ficha del alumno en modal (HU 61)', () => {
     expect(await within(ficha).findByText('Becado parcial 40%')).toBeInTheDocument()
   })
 
-  it('muestra el bloqueo con su causa en la inscripción activa y el estado en la terminada', async () => {
+  it('muestra el bloqueo con su causa y el (i) de bloqueo solo cuando está bloqueado', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    expect(await within(ficha).findByText('BLOQUEADO')).toBeInTheDocument()
+    expect(within(ficha).getByText('debe saldo')).toBeInTheDocument()
+    expect(within(ficha).getByRole('button', { name: 'Motivo del bloqueo' })).toBeInTheDocument()
+  })
     cleanup()
     stubDataSource({
       obtenerAlumno: async () => ({

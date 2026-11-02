@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Badge, Modal, Select, StatusIndicator } from '../components/ui'
+import { Badge, Modal, Select, StatusIndicator, Tooltip } from '../components/ui'
+import { textoCausa } from './causasBloqueo'
 import { TONO } from '../components/ui/paleta'
 import { CATEGORIA_INSCRIPCION } from '../domain/enums'
 import { formatDocumento, formatMonedaConCentavos, formatTelefono } from '../utils/formato'
@@ -93,33 +94,15 @@ function Fila({ etiqueta, children }) {
  * hover y con el foco del teclado. El botón apunta al texto con `aria-describedby`.
  */
 function IndicadorObservados({ observado }) {
-  const [visible, setVisible] = useState(false)
-  const idAyuda = 'ayuda-comprobantes-observados'
-
   return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="Comprobantes observados"
-        aria-describedby={idAyuda}
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
-        onFocus={() => setVisible(true)}
-        onBlur={() => setVisible(false)}
-        className="foco-acento inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-900 ring-1 ring-amber-600/30"
-      >
-        i
-      </button>
-      {visible && (
-        <span
-          id={idAyuda}
-          role="tooltip"
-          className="absolute top-full right-0 z-30 mt-1 w-64 rounded-md bg-slate-900 px-2 py-1 text-xs font-normal text-white"
-        >
-          {`Incluye ${formatMonedaConCentavos(observado)} en comprobantes observados`}
-        </span>
-      )}
-    </span>
+    <Tooltip
+      id="ayuda-comprobantes-observados"
+      label="Comprobantes observados"
+      content={`Incluye ${formatMonedaConCentavos(observado)} en comprobantes observados`}
+      tonoBoton="ambar"
+    >
+      i
+    </Tooltip>
   )
 }
 
@@ -187,11 +170,33 @@ function BloqueComision({ inscripcion, onCambiarCategoria }) {
 
       <Fila etiqueta="Estado de habilitación">
         {inscripcion.acceso !== null && inscripcion.acceso !== undefined ? (
-          <StatusIndicator
-            estado={inscripcion.acceso.estado}
-            causa={inscripcion.acceso.causa}
-            forzado={inscripcion.acceso.forzado === true}
-          />
+          <>
+            <StatusIndicator
+              estado={inscripcion.acceso.estado}
+              causa={inscripcion.acceso.causa}
+              forzado={inscripcion.acceso.forzado === true}
+            />
+            {inscripcion.acceso.estado === 'BLOQUEADO' && (
+              <Tooltip
+                id="ayuda-bloqueado"
+                label="Motivo del bloqueo"
+                content={
+                  (() => {
+                    const causa = inscripcion.acceso.causa ?? 'desconocido'
+                    let texto = textoCausa(causa)
+                    if (inscripcion.acceso.forzado === true) {
+                      const razon = inscripcion.acceso.motivo ?? 'no especificado'
+                      texto += ` Forzado por Secretaría: ${razon}.`
+                    }
+                    return texto
+                  })()
+                }
+                tonoBoton="rojo"
+              >
+                i
+              </Tooltip>
+            )}
+          </>
         ) : (
           <span>{`Estado de la inscripción: ${inscripcion.estado}`}</span>
         )}

@@ -2288,6 +2288,29 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `backend/app/schemas/alumnos.py`, `frontend/src/admin/StudentsPage.jsx`,
   `frontend/src/components/ui/Table.jsx`, `frontend/src/services/`.
 
+---
+
+## Ficha del alumno — tooltip y observados (change `hu-61-ficha-alumno-modal`)
+
+### D71 — El tooltip de observados se renderiza fuera del scroll del modal
+
+- **Fecha:** 2026-11-02
+- **Autor:** Mateo Ponce
+- **Decisión:** el indicador de comprobantes observados usa un componente `Tooltip` compartido con
+  portal (`createPortal`) sobre `document.body`, `position: fixed`, `pointer-events: none` en el
+  cuerpo y `pointer-events: auto` en el botón, con cierre por `blur`, `Escape` y `mouseleave`, y
+  un `aria-describedby` al botón. No hay componente de tooltip existente en `components/ui`; se
+  crea `components/ui/Tooltip.jsx` y se reutiliza en el indicador de observados y en el de bloqueado.
+- **Por qué:** el tooltip anterior estaba `absolute` dentro del `dl` del modal; al aparecer al
+  borde inferior del contenido activaba el scrollbar (`overflow-y-auto`), el botón se desplazaba,
+  se perdía `hover`, el tooltip desaparecía, el scrollbar se ocultaba, el botón volvía y el ciclo
+  se repetía. Un portal fija la posición al viewport y no participa del layout del modal.
+- **Consecuencias:** el tooltip puede tapar contenido de la ventana o quedar cortado por el borde
+  del viewport; se limita con `max-w-xs`, `flip` por JS simple y se muestra siempre a la derecha
+  del botón. El `Escape` cierra primero el desplegable (D70) y luego el tooltip; con el tooltip
+  abierto y otro modal encima, `Escape` cierra el tooltip sin tocar el modal de atrás.
+- **Dónde:** `frontend/src/components/ui/Tooltip.jsx`, `frontend/src/admin/FichaAlumnoModal.jsx`.
+
 ### D69 — La suite del frontend tiene un tope de 15 s por test
 
 - **Fecha:** 2026-11-02

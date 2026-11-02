@@ -34,12 +34,7 @@ export function StatusIndicator({ estado, causa = null, habilitadoTexto = null, 
       className="inline-flex flex-col items-start gap-1"
     >
       <Badge tono={TONOS_POR_ESTADO[estado] ?? TONO.GRIS}>{estado}</Badge>
-      {bloqueado ? (
-        <span className="text-xs text-red-700">
-          {causa}
-          {forzado ? ' (forzado)' : ''}
-        </span>
-      ) : (
+      {bloqueado ? null : (
         habilitadoTexto !== null && (
           <span className="text-xs text-slate-500">{habilitadoTexto}</span>
         )
