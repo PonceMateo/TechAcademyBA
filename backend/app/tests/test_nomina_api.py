@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.models.enums import CategoriaInscripcion
 from app.models.inscripciones import Inscripcion
