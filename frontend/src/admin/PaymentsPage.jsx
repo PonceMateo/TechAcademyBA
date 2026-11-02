@@ -9,6 +9,7 @@ import {
   TRANSICIONES_ESTADO_COBRANZA,
 } from '../domain/enums'
 import { normalizeDocumento, normalizeWords } from '../domain/normalize'
+import { cuitValido } from '../domain/validacion'
 import {
   actualizarEstadoCobranza,
   agregarImputaciones,
@@ -18,6 +19,7 @@ import {
   registrarCobranza,
 } from '../services/dataService'
 import { formatFechaCorta, formatMoneda } from '../utils/formato'
+import { ComprobantesAlumnoCard } from './ComprobantesAlumnoCard'
 
 /**
  * Cobranzas e ingresos (9.6).
@@ -150,19 +152,6 @@ function fechaDeHoy() {
 
 function esFechaFutura(fecha) {
   return fecha !== '' && fecha > fechaDeHoy()
-}
-
-/** Dígito verificador de CUIT, con la misma regla que el backend (historia #18). */
-function cuitValido(valor) {
-  const digitos = String(valor).replace(/\D/g, '')
-  if (digitos.length !== 11) {
-    return false
-  }
-  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
-  const suma = pesos.reduce((total, peso, indice) => total + Number(digitos[indice]) * peso, 0)
-  const resto = suma % 11
-  const verificador = resto === 0 ? '0' : resto === 1 ? '9' : String(11 - resto)
-  return digitos[10] === verificador
 }
 
 /**
@@ -1356,6 +1345,8 @@ export function PaymentsPage() {
           }
         />
       </Card>
+
+      <ComprobantesAlumnoCard />
 
       <Modal
         abierto={cobranzaEnEdicion !== null}
