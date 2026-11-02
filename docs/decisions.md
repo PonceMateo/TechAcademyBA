@@ -2287,3 +2287,18 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Dónde:** `backend/app/services/habilitacion.py`, `backend/app/services/alumnos.py`,
   `backend/app/schemas/alumnos.py`, `frontend/src/admin/StudentsPage.jsx`,
   `frontend/src/components/ui/Table.jsx`, `frontend/src/services/`.
+
+### D69 — La suite del frontend tiene un tope de 15 s por test
+
+- **Fecha:** 2026-11-02
+- **Autor:** Mateo Ponce
+- **Decisión:** `frontend/vite.config.js` fija `testTimeout: 15000`. El tope por omisión de Vitest
+  es de 5 s.
+- **Por qué:** los tests de pantalla usan `userEvent` y tardan entre uno y dos segundos cada uno.
+  Con la suite completa corriendo en paralelo —37 archivos— varios se pasaban de 5 s y fallaban
+  por tiempo sin que hubiera nada roto: pasaban al correrlos solos y fallaban de forma
+  intermitente en la suite. Un tope más alto no esconde una falla, porque el test sigue fallando si
+  la lógica se cuelga.
+- **Consecuencias:** la suite tarda lo mismo; deja de reportar fallas que no existen. Si algún día
+  un test tarda más de 15 s, conviene mirar por qué antes de subir el número otra vez.
+- **Dónde:** `frontend/vite.config.js`.
