@@ -46,7 +46,7 @@
 ## 8. Verificación integrada
 
 - [x] 8.1 Correr la suite completa del backend y del frontend más el build: `docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run lint`, `docker compose run --rm frontend npm run test` y `docker compose run --rm frontend npm run build`
-- [ ] 8.2 Recorrer con los datos de ejemplo: inscribir al alumno de dos categorías en otra comisión, ver las dos secciones en Accesos, cambiar la categoría de una sola y confirmar que el padrón no muestra comisión, categoría ni acceso
+- [x] 8.2 Recorrer con los datos de ejemplo: inscribir al alumno de dos categorías en otra comisión, ver las dos secciones en Accesos, cambiar la categoría de una sola y confirmar que el padrón no muestra comisión, categoría ni acceso
 
 ## Workflow follow-up
 
