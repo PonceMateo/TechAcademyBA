@@ -2,10 +2,10 @@
 
 ## 1. Decisión e importes en el backend
 
-- [ ] 1.1 Registrar en `docs/decisions.md` la decisión de calcular estado y saldo con una sola función de derivación y de mostrar el saldo contra el arancel actual, con fecha y autor, antes de tocar el código
-- [ ] 1.2 Extraer `derivar_montos` en `backend/app/services/habilitacion.py` —requerido, acreditado, observado— cuantizando el requerido a centavos con `ROUND_HALF_UP`, y hacer que `derivar_estado` decida contra ese mismo valor; verificar que `test_imputaciones_api.py` y los tests de habilitación siguen en verde y agregar el caso de arancel 12345.67 con beca 33.33%
-- [ ] 1.3 Sumar al detalle del alumno `arancel`, `monto_requerido`, `total_pagado`, `total_observado` y `saldo_pendiente` por inscripción, con beca total en cero y corporativo en nulo; verificar con tests de particular con pago parcial, beca parcial, beca total, corporativo, cobro observado, sobrepago y cambio de arancel
-- [ ] 1.4 Verificar que dos inscripciones del mismo alumno informan importes separados, y correr `docker compose run --rm backend pytest app/tests/test_alumnos_api.py app/tests/test_imputaciones_api.py -q` más `docker compose run --rm backend ruff check .`
+- [x] 1.1 Registrar en `docs/decisions.md` la decisión de calcular estado y saldo con una sola función de derivación y de mostrar el saldo contra el arancel actual, con fecha y autor, antes de tocar el código
+- [x] 1.2 Extraer `derivar_montos` en `backend/app/services/habilitacion.py` —requerido, acreditado, observado— cuantizando el requerido a centavos con `ROUND_HALF_UP`, y hacer que `derivar_estado` decida contra ese mismo valor; verificar que `test_imputaciones_api.py` y los tests de habilitación siguen en verde y agregar el caso de arancel 12345.67 con beca 33.33%
+- [x] 1.3 Sumar al detalle del alumno `arancel`, `monto_requerido`, `total_pagado`, `total_observado` y `saldo_pendiente` por inscripción, con beca total en cero y corporativo en nulo; verificar con tests de particular con pago parcial, beca parcial, beca total, corporativo, cobro observado, sobrepago y cambio de arancel
+- [x] 1.4 Verificar que dos inscripciones del mismo alumno informan importes separados, y correr `docker compose run --rm backend pytest app/tests/test_alumnos_api.py app/tests/test_imputaciones_api.py -q` más `docker compose run --rm backend ruff check .`
 
 ## 2. Servicios y datos de ejemplo del frontend
 

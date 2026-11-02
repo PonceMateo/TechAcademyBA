@@ -2260,3 +2260,30 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/admin/StudentsPage.jsx`, `frontend/src/admin/AccessPage.jsx`,
   `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/PaymentsPage.jsx`,
   `frontend/src/services/`.
+
+---
+
+## Ficha del alumno en modal e importes por inscripción (change `hu-61-ficha-alumno-modal`)
+
+### D68 — Una sola regla de dinero para el estado y para el saldo, contra el arancel actual
+
+- **Fecha:** 2026-11-02
+- **Autor:** Mateo Ponce
+- **Decisión:** se extrae `derivar_montos(session, inscripcion)` en
+  `backend/app/services/habilitacion.py` —arancel, requerido, acreditado y observado— y
+  `derivar_estado` decide contra ese mismo requerido. El requerido se cuantiza a centavos con
+  `ROUND_HALF_UP` antes de compararlo con lo acreditado y de calcular el saldo. El detalle
+  `GET /alumnos/{id}` suma por inscripción `arancel`, `monto_requerido`, `total_pagado`,
+  `total_observado` y `saldo_pendiente`. El saldo nunca es negativo y es nulo en corporativo; en
+  beca total, requerido y saldo son cero.
+- **Por qué:** la pantalla muestra `$0,00` con dos decimales. Si el estado comparaba fracciones y el
+  saldo se calculaba aparte, un arancel con centavos y una beca de dos decimales podían dejar un
+  saldo de fracciones que se leía como cero mientras el acceso seguía bloqueado. Escribir el
+  criterio de beca y de cobros observados dos veces garantizaba que divergieran.
+- **Consecuencias:** el saldo se deriva con el arancel **actual** de la comisión: no hay precio
+  guardado en la inscripción, así que editar el arancel de la comisión cambia el saldo de todas sus
+  inscripciones. Lo observado no descuenta y se informa aparte. La habilitación solo se deriva para
+  inscripciones `ACTIVA`; una `COMPLETADA` muestra su estado de inscripción y conserva sus importes.
+- **Dónde:** `backend/app/services/habilitacion.py`, `backend/app/services/alumnos.py`,
+  `backend/app/schemas/alumnos.py`, `frontend/src/admin/StudentsPage.jsx`,
+  `frontend/src/components/ui/Table.jsx`, `frontend/src/services/`.

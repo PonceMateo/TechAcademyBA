@@ -88,10 +88,12 @@ class EmpresaInscripcionOut(BaseModel):
 
 
 class InscripcionDetalleOut(BaseModel):
-    """Una inscripción del alumno con su categoría, su empresa y su acceso (HU 64).
+    """Una inscripción con su categoría, su empresa, su acceso y sus importes (HU 64 y 61).
 
     `acceso` viene `null` cuando la inscripción no está `ACTIVA`: una cursada terminada, dada de
-    baja o en espera no tiene estado de habilitación que derivar.
+    baja o en espera no tiene estado de habilitación que derivar. Los importes se informan siempre,
+    porque la deuda de una cursada terminada existe. `monto_requerido` y `saldo_pendiente` son
+    nulos en corporativo, donde el arancel queda a cargo de la empresa.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -103,6 +105,11 @@ class InscripcionDetalleOut(BaseModel):
     porcentaje_beca: Decimal | None = None
     empresa: EmpresaInscripcionOut | None = None
     acceso: AccesoAlumnoOut | None = None
+    arancel: Decimal
+    monto_requerido: Decimal | None = None
+    total_pagado: Decimal = Decimal(0)
+    total_observado: Decimal = Decimal(0)
+    saldo_pendiente: Decimal | None = None
 
 
 class AlumnoOut(BaseModel):

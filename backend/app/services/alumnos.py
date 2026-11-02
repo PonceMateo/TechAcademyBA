@@ -43,7 +43,7 @@ from app.models.padron import Alumno, Usuario
 from app.schemas.alumnos import AlumnoCreate, AlumnoUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available, find_patron_registrado
-from app.services.habilitacion import derivar_estado
+from app.services.habilitacion import derivar_estado, derivar_montos
 from app.services.normalization import generar_password_inicial, normalize_document
 
 logger = logging.getLogger(__name__)
@@ -258,18 +258,26 @@ def obtener_detalle(session: Session, alumno_id: int) -> Alumno:
                 if inscripcion.empresa is not None
                 else None
             ),
-            acceso=_acceso_de(session, inscripcion),
+            arancel=montos.arancel,
+            monto_requerido=montos.requerido,
+            total_pagado=montos.acreditado,
+            total_observado=montos.observado,
+            saldo_pendiente=montos.saldo,
+            acceso=_acceso_de(session, inscripcion, montos),
         )
         for inscripcion in inscripciones
+        for montos in (derivar_montos(session, inscripcion),)
     ]
     return alumno
 
 
-def _acceso_de(session: Session, inscripcion: Inscripcion) -> SimpleNamespace | None:
+def _acceso_de(
+    session: Session, inscripcion: Inscripcion, montos: SimpleNamespace
+) -> SimpleNamespace | None:
     """Estado, causa y forzado de una inscripción activa; `None` si no está activa (HU 64)."""
     if inscripcion.estado != EstadoInscripcion.ACTIVA.value:
         return None
-    estado, causa, forzado = derivar_estado(session, inscripcion)
+    estado, causa, forzado = derivar_estado(session, inscripcion, montos)
     return SimpleNamespace(estado=estado, causa=causa, forzado=forzado)
 
 
