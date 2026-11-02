@@ -8,7 +8,14 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.security import hashear_password
 from app.models.catalogo import Comision
-from app.models.enums import CategoriaInscripcion, EstadoContrato, EstadoInscripcion, Rol, TipoContrato, TipoDocumento
+from app.models.enums import (
+    CategoriaInscripcion,
+    EstadoContrato,
+    EstadoInscripcion,
+    Rol,
+    TipoContrato,
+    TipoDocumento,
+)
 from app.models.inscripciones import ContratoCorporativo, Empresa, Inscripcion, NominaEmpleado
 from app.models.padron import Alumno, Usuario
 from app.schemas.nomina import NominaCreate
@@ -130,7 +137,9 @@ def cargar_nomina(session: Session, empresa_id: int, datos: NominaCreate):
             )
             if existente is not None:
                 raise NominaInvalida(
-                    f"El empleado con documento {empleado.documento} ya está inscripto en la comisión."
+                    "El empleado con documento "
+                    f"{empleado.documento} "
+                    "ya está inscripto en la comisión."
                 )
 
             session.add(
@@ -154,7 +163,9 @@ def cargar_nomina(session: Session, empresa_id: int, datos: NominaCreate):
         session.commit()
     except IntegrityError as error:
         session.rollback()
-        raise NominaInvalida("La nómina no pudo guardarse porque contiene datos repetidos.") from error
+        raise NominaInvalida(
+            "La nómina no pudo guardarse porque contiene datos repetidos."
+        ) from error
     except Exception:
         session.rollback()
         raise
