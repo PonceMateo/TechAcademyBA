@@ -299,6 +299,83 @@ describe('padrón de alumnos', () => {
   })
 })
 
+describe('ficha del alumno en modal (HU 61)', () => {
+  async function abrirFichaConMouse(nombre) {
+    const user = userEvent.setup()
+    await user.click(within(filaDe(nombre)).getByText(nombre))
+    return user
+  }
+
+  it('abre la ficha con el mouse y muestra los datos en modo lectura', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(within(ficha).getByText('38.456.789')).toBeInTheDocument()
+    expect(within(ficha).getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(within(ficha).getByText('juan.perez@gmail.com')).toBeInTheDocument()
+    expect(within(ficha).getByText('—')).toBeInTheDocument()
+    // No hay campos editables: la ficha es de lectura.
+    expect(within(ficha).queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('abre la misma ficha con Enter sobre la fila enfocada', async () => {
+    const user = userEvent.setup()
+    const fila = filaDe('Camila Rodríguez')
+    fila.focus()
+
+    await user.keyboard('{Enter}')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(within(ficha).getByText('Camila Rodríguez')).toBeInTheDocument()
+    expect(within(ficha).getByText('011 4788-1122')).toBeInTheDocument()
+  })
+
+  it('cierra con Escape y devuelve el foco a la fila que la abrió', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const fila = filaDe('Juan Ignacio Pérez')
+    await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Ficha del alumno' })).not.toBeInTheDocument(),
+    )
+    expect(fila).toHaveFocus()
+  })
+
+  it('ofrece Editar, Restablecer contraseña y Eliminar en el menú ⋮', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(within(ficha).getByRole('button', { name: 'Acciones del alumno' }))
+
+    expect(within(ficha).getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Editar',
+      'Restablecer contraseña',
+      'Eliminar',
+    ])
+  })
+
+  it('muestra el motivo y no inventa inscripciones cuando el detalle falla', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(
+      await within(ficha).findByText('No pudimos conectar con el servidor.'),
+    ).toBeInTheDocument()
+    expect(within(ficha).queryByText(/CUR-\d{3}/)).not.toBeInTheDocument()
+  })
+})
+
 describe('alta de alumno', () => {
   it('abre el modal con los campos del spec y sin tipo de documento', async () => {
     await abrirModal()

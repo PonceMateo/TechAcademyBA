@@ -15,10 +15,10 @@
 
 ## 3. Ficha del alumno en modal
 
-- [ ] 3.1 Agregar a `src/components/ui/Table.jsx` el soporte opcional de fila clickeable y enfocable con Enter y espacio, sin cambiar las tablas que no lo usan; verificar con un test del componente en `componentes.test.jsx`
-- [ ] 3.2 Abrir la ficha al pulsar una fila o presionar Enter, con DNI, nombre, email y teléfono en modo lectura y el menú ⋮; verificar en `StudentsPage.test.jsx` que ambos caminos abren el mismo modal y que Escape lo cierra devolviendo el foco a la fila
-- [ ] 3.3 Mostrar el estado de carga y el motivo cuando la consulta del detalle falla, sin inventar inscripciones ni importes; verificar con un test de fallo de la fuente
-- [ ] 3.4 Correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx src/components/ui/componentes.test.jsx` y `docker compose run --rm frontend npm run lint`
+- [x] 3.1 Agregar a `src/components/ui/Table.jsx` el soporte opcional de fila clickeable y enfocable con Enter y espacio, sin cambiar las tablas que no lo usan; verificar con un test del componente en `componentes.test.jsx`
+- [x] 3.2 Abrir la ficha al pulsar una fila o presionar Enter, con DNI, nombre, email y teléfono en modo lectura y el menú ⋮; verificar en `StudentsPage.test.jsx` que ambos caminos abren el mismo modal y que Escape lo cierra devolviendo el foco a la fila
+- [x] 3.3 Mostrar el estado de carga y el motivo cuando la consulta del detalle falla, sin inventar inscripciones ni importes; verificar con un test de fallo de la fuente
+- [x] 3.4 Correr `docker compose run --rm frontend npm run test -- src/admin/StudentsPage.test.jsx src/components/ui/componentes.test.jsx` y `docker compose run --rm frontend npm run lint`
 
 ## 4. Pestañas, estado e importes de cada inscripción
 

@@ -118,6 +118,35 @@ describe('Table', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.getByText('No se encontraron resultados')).toBeInTheDocument()
   })
+
+  it('abre la fila con click, Enter y espacio cuando la pantalla la vuelve accionable', async () => {
+    const user = userEvent.setup()
+    const alAbrir = vi.fn()
+    render(
+      <Table
+        columnas={COLUMNAS}
+        filas={[{ id: 1, codigo: 'CUR-101', arancel: 45000 }]}
+        onFila={alAbrir}
+        etiquetaDeFila={(fila) => `Abrir ${fila.codigo}`}
+      />,
+    )
+
+    const fila = screen.getByRole('row', { name: 'Abrir CUR-101' })
+    expect(fila).toHaveAttribute('tabindex', '0')
+
+    await user.click(fila)
+    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
+
+    expect(alAbrir).toHaveBeenCalledTimes(3)
+    expect(alAbrir).toHaveBeenCalledWith({ id: 1, codigo: 'CUR-101', arancel: 45000 })
+  })
+
+  it('deja las filas sin foco ni click cuando la pantalla no las vuelve accionables', () => {
+    render(<Table columnas={COLUMNAS} filas={[{ id: 1, codigo: 'CUR-101', arancel: 45000 }]} />)
+
+    expect(screen.getByRole('row', { name: 'CUR-101 $45.000' })).not.toHaveAttribute('tabindex')
+  })
 })
 
 describe('Modal', () => {

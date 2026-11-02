@@ -11,6 +11,7 @@ import {
 } from '../components/ui'
 import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
+import { FichaAlumnoModal } from './FichaAlumnoModal'
 import { dniConForma, emailConForma } from '../domain/validacion'
 import {
   actualizarCategoriaInscripcion,
@@ -118,6 +119,8 @@ export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
   const [consulta, setConsulta] = useState('')
+  // La fila cuya ficha está abierta (HU 61). La ficha pide el detalle al abrirse.
+  const [alumnoFicha, setAlumnoFicha] = useState(null)
   const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
   const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
   const [erroresAlumno, setErroresAlumno] = useState({})
@@ -768,8 +771,21 @@ export function StudentsPage() {
           columnas={columnasAlumnos}
           filas={alumnos}
           vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
+          onFila={setAlumnoFicha}
+          etiquetaDeFila={(fila) => `Abrir la ficha de ${fila.nombre}`}
         />
       </Card>
+
+      {alumnoFicha !== null && (
+        <FichaAlumnoModal
+          key={alumnoFicha.id}
+          alumno={alumnoFicha}
+          onClose={() => setAlumnoFicha(null)}
+          onEditar={abrirEdicion}
+          onRestablecerPassword={abrirPassword}
+          onEliminar={abrirBaja}
+        />
+      )}
 
       <Modal
         abierto={credenciales !== null}
