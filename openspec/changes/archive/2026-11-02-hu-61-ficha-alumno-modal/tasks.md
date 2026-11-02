@@ -37,7 +37,7 @@
 ## 6. Verificación integrada
 
 - [x] 6.1 Correr la suite completa y el build: `docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run lint`, `docker compose run --rm frontend npm run test` y `docker compose run --rm frontend npm run build`
-- [ ] 6.2 Recorrer con los datos de ejemplo: abrir la ficha con mouse y con teclado, ver las pestañas de un alumno con dos categorías, comprobar el saldo contra la imputación del historial, cambiar la categoría de una pestaña y confirmar que el padrón no tiene columna de acciones
+- [x] 6.2 Recorrer con los datos de ejemplo: abrir la ficha con mouse y con teclado, ver las pestañas de un alumno con dos categorías, comprobar el saldo contra la imputación del historial, cambiar la categoría de una pestaña y confirmar que el padrón no tiene columna de acciones
 
 ## Workflow follow-up
 
