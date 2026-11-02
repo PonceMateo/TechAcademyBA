@@ -16,11 +16,33 @@ import {
   listarAlumnos,
   listarComisiones,
   listarCursos,
+  obtenerAlumno,
   obtenerPerfilAlumno,
   reactivarAlumno,
   restablecerPasswordAlumno,
   restablecerPasswordDocente,
 } from './dataService'
+
+describe('detalle del alumno (HU 64)', () => {
+  it('devuelve una entrada por inscripción con su categoría', async () => {
+    const detalle = await obtenerAlumno(1)
+
+    expect(detalle.inscripciones).toHaveLength(2)
+    expect(detalle.inscripciones.map((inscripcion) => inscripcion.categoria)).toEqual([
+      'PARTICULAR',
+      'CORPORATIVO',
+    ])
+    expect(detalle.inscripciones[1].empresa.razon_social).toBe('Tech Solutions S.A.')
+  })
+
+  it('deja el padrón sin datos de inscripción', async () => {
+    const [alumno] = await listarAlumnos()
+
+    expect(alumno).not.toHaveProperty('comision')
+    expect(alumno).not.toHaveProperty('categoria')
+    expect(alumno).not.toHaveProperty('acceso')
+  })
+})
 
 /**
  * La frontera de datos (8.2).

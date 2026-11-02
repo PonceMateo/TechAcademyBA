@@ -355,6 +355,15 @@ describe('los POST nunca caen al ejemplo', () => {
 })
 
 describe('cobranzas manuales (HU 21)', () => {
+  it('pide el detalle del alumno por su id (HU 64)', async () => {
+    const fetchMock = responder(200, { id: 7, inscripciones: [] })
+
+    const detalle = await createApiDataSource().obtenerAlumno(7)
+
+    expect(detalle.id).toBe(7)
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7$/)
+  })
+
   const ALTA = {
     fecha: '2026-06-01',
     importe: 45000,

@@ -28,6 +28,29 @@ export const ALUMNOS = markAsExample([
     categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
     porcentaje_beca: null,
     acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
+    // HU 64: el mismo alumno está cubierto por el paquete de una empresa en un curso y cursa otro
+    // por su cuenta. La categoría, la beca y el acceso son de cada inscripción, no del alumno; los
+    // campos de arriba describen la inscripción principal para las pantallas que ya la mostraban.
+    inscripciones: [
+      {
+        id: 11,
+        estado: 'ACTIVA',
+        comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+        categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
+        porcentaje_beca: null,
+        empresa: null,
+        acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
+      },
+      {
+        id: 12,
+        estado: 'ACTIVA',
+        comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+        categoria: CATEGORIA_INSCRIPCION.CORPORATIVO,
+        porcentaje_beca: null,
+        empresa: { id: 1, razon_social: 'Tech Solutions S.A.' },
+        acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
+      },
+    ],
   },
   {
     id: 2,

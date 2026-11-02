@@ -184,6 +184,22 @@ describe('categorías arancelarias y estado de acceso', () => {
       }
     }
   })
+
+  // HU 64: la demo tiene que poder mostrar dos categorías del mismo alumno, porque es el caso que
+  // el padrón no podía representar cuando la categoría era una sola por alumno.
+  it('tiene un alumno con una inscripción corporativa y otra particular', () => {
+    const conDosCategorias = ALUMNOS.filter((alumno) => (alumno.inscripciones?.length ?? 0) > 1)
+
+    expect(conDosCategorias).toHaveLength(1)
+    const categorias = new Set(conDosCategorias[0].inscripciones.map((i) => i.categoria))
+    expect(categorias).toEqual(
+      new Set([CATEGORIA_INSCRIPCION.PARTICULAR, CATEGORIA_INSCRIPCION.CORPORATIVO]),
+    )
+    const corporativa = conDosCategorias[0].inscripciones.find(
+      (inscripcion) => inscripcion.categoria === CATEGORIA_INSCRIPCION.CORPORATIVO,
+    )
+    expect(corporativa.empresa.razon_social).toBeTruthy()
+  })
 })
 
 describe('cobranzas', () => {

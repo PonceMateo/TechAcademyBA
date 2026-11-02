@@ -107,6 +107,15 @@ export function listarAlumnos() {
   return getDataSource().listarAlumnos()
 }
 
+/**
+ * Detalle del alumno con **todas** sus inscripciones (HU 64): comisión, categoría, porcentaje de
+ * beca, empresa y acceso derivado. Es el contrato que expone la categoría arancelaria; el padrón
+ * trae solo los datos personales.
+ */
+export function obtenerAlumno(id) {
+  return getDataSource().obtenerAlumno(id)
+}
+
 export function actualizarCategoriaInscripcion(inscripcionId, datos) {
   return getDataSource().actualizarCategoriaInscripcion(inscripcionId, datos)
 }

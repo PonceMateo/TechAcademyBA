@@ -681,7 +681,42 @@ export function createMockDataSource() {
     },
 
     async listarAlumnos() {
-      return copiar(store.alumnos.filter((alumno) => alumno.activo !== false))
+      // HU 64: el padrón devuelve solo los datos del alumno. La categoría vive en la inscripción y
+      // la expone el detalle, así que acá se quitan los campos de inscripción del ejemplo.
+      return copiar(
+        store.alumnos
+          .filter((alumno) => alumno.activo !== false)
+          .map(
+            ({ inscripciones, comision, categoria, porcentaje_beca, acceso, ...datos }) => datos,
+          ),
+      )
+    },
+
+    /**
+     * Detalle del alumno con **todas** sus inscripciones (HU 64).
+     *
+     * El ejemplo guarda la inscripción principal desnormalizada en el alumno —es lo que muestran las
+     * pantallas que ya existían— y una lista `inscripciones` para el caso de dos categorías. Si el
+     * alumno no tiene la lista, el detalle arma una sola inscripción con esos datos.
+     */
+    async obtenerAlumno(id) {
+      const alumno = store.alumnos.find((candidato) => candidato.id === Number(id))
+      if (!alumno) {
+        throw new Error('El alumno no existe.')
+      }
+      const { inscripciones, comision, categoria, porcentaje_beca, acceso, ...datos } = alumno
+      const detalle = inscripciones ?? [
+        {
+          id: alumno.id,
+          estado: 'ACTIVA',
+          comision,
+          categoria,
+          porcentaje_beca: porcentaje_beca ?? null,
+          empresa: null,
+          acceso,
+        },
+      ]
+      return { ...datos, inscripciones: detalle.length > 0 ? copiar(detalle) : [] }
     },
 
     async crearInscripcion({ alumno_id, comision_id }) {
