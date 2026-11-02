@@ -203,10 +203,6 @@ export function listarInscripcionesDeAlumno(alumnoId) {
   return getDataSource().listarInscripcionesDeAlumno(alumnoId)
 }
 
-export function buscarHabilitacion(consulta) {
-  return getDataSource().buscarHabilitacion(consulta)
-}
-
 export function registrarCobranza(datos) {
   return getDataSource().registrarCobranza(datos)
 }

@@ -93,8 +93,15 @@ function imputacionDelMock(store, item) {
       monto: Number(item.monto),
     }
   }
-  // En el ejemplo el identificador estable de la inscripción es el del alumno.
-  const alumno = store.alumnos.find((candidato) => candidato.id === Number(item.inscripcion_id))
+  // En el ejemplo la inscripción principal usa el id del alumno; desde la HU 64 un alumno puede
+  // tener varias inscripciones con id propio, así que se buscan las dos formas.
+  const alumno = store.alumnos.find(
+    (candidato) =>
+      candidato.id === Number(item.inscripcion_id) ||
+      (candidato.inscripciones ?? []).some(
+        (inscripcion) => inscripcion.id === Number(item.inscripcion_id),
+      ),
+  )
   return {
     destino: DESTINO_IMPUTACION.ALUMNO,
     id: Number(item.inscripcion_id),
@@ -801,12 +808,12 @@ export function createMockDataSource() {
       return { ...inscripcion }
     },
 
-    /** Búsqueda por DNI o nombre: es lo que promete el placeholder del buscador. */
+    /** Búsqueda por DNI, email o nombre: es lo que promete el placeholder del buscador. */
     async buscarAlumnos(texto) {
       return buscarPorTexto(
         store.alumnos.filter((alumno) => alumno.activo !== false),
         texto,
-        ['nombre', 'documento'],
+        ['nombre', 'documento', 'email'],
       )
     },
 
@@ -1053,69 +1060,45 @@ export function createMockDataSource() {
     },
 
     /**
-     * Inscripciones del alumno en el ejemplo. Cada alumno tiene una sola comisión en el
-     * maquetado; el identificador estable es el del alumno porque el mock no guarda
-     * inscripciones con id propio.
+     * Inscripciones activas del alumno, para elegir a cuál imputar (HU 21).
+     *
+     * Desde la HU 64 la categoría arancelaria y el estado son de la inscripción: el selector los
+     * muestra para distinguir dos cursadas del mismo alumno. El ejemplo guarda la inscripción
+     * principal desnormalizada y, cuando hay dos, la lista `inscripciones`.
      */
     async listarInscripcionesDeAlumno(alumnoId) {
       const alumno = store.alumnos.find((candidato) => candidato.id === Number(alumnoId))
       if (alumno === undefined) {
         throw new Error('El alumno no existe.')
       }
-      if (alumno.comision === null || alumno.comision === undefined) {
-        return []
-      }
-      return [
-        {
-          id: alumno.id,
-          estado: 'ACTIVA',
-          comision: {
-            codigo: alumno.comision.codigo,
-            nombre: alumno.comision.nombre,
-          },
-        },
-      ]
-    },
-
-    /**
-     * Consulta de habilitación: por DNI, email de alumno, CUIT o razón social. Es la búsqueda del
-     * bloque `Buscador de Alumnos y Cuentas Corporativas`.
-     *
-     * Documento, email y CUIT se comparan enteros y el nombre o la razón social por fragmento: la
-     * ayuda de la pantalla promete `Buscá por DNI de alumno, Email institucional, CUIT de empresa
-     * o Razón Social.`, y `Banco Federal` tiene que encontrar a `Banco Federal (Capacitaciones)`
-     * sin que quien busca tenga que escribir el paréntesis.
-     */
-    async buscarHabilitacion(consulta) {
-      const aguja = String(consulta ?? '').trim()
-      if (aguja === '') {
-        return null
-      }
-
-      const documento = normalizeDocumento(aguja)
-      const cuit = normalizeCuit(aguja)
-      const codigo = normalizeCode(aguja)
-
-      const alumno = store.alumnos.find(
-        (candidato) =>
-          normalizeDocumento(candidato.documento) === documento ||
-          candidato.email.toLowerCase() === aguja.toLowerCase() ||
-          normalizeCode(candidato.nombre).includes(codigo),
+      const inscripciones =
+        alumno.inscripciones ??
+        (alumno.comision === null || alumno.comision === undefined
+          ? []
+          : [
+              {
+                id: alumno.id,
+                estado: 'ACTIVA',
+                categoria: alumno.categoria,
+                comision: {
+                  codigo: alumno.comision.codigo,
+                  nombre: alumno.comision.nombre,
+                },
+              },
+            ])
+      return copiar(
+        inscripciones
+          .filter((inscripcion) => inscripcion.estado === 'ACTIVA')
+          .map((inscripcion) => ({
+            id: inscripcion.id,
+            estado: inscripcion.estado,
+            categoria: inscripcion.categoria,
+            comision: {
+              codigo: inscripcion.comision.codigo,
+              nombre: inscripcion.comision.nombre,
+            },
+          })),
       )
-      if (alumno) {
-        return { tipo: 'ALUMNO', registro: { ...alumno } }
-      }
-
-      const empresa = store.empresas.find(
-        (candidato) =>
-          normalizeCuit(candidato.cuit) === cuit ||
-          normalizeCode(candidato.razon_social).includes(codigo),
-      )
-      if (empresa) {
-        return { tipo: 'EMPRESA', registro: { ...empresa } }
-      }
-
-      return null
     },
 
     /**
@@ -1230,10 +1213,15 @@ export function createMockDataSource() {
         throw new Error('El motivo es obligatorio.')
       }
 
-      alumno.acceso = {
+      const acceso = {
         estado: 'BLOQUEADO',
         causa: motivo.trim(),
         forzado: { usuario, fecha_operacion: fechaOperacion, motivo: motivo.trim() },
+      }
+      // El forzado es sobre el alumno, así que alcanza a cada una de sus inscripciones (HU 64).
+      alumno.acceso = acceso
+      for (const inscripcion of alumno.inscripciones ?? []) {
+        inscripcion.acceso = { ...acceso }
       }
       return { ...alumno }
     },

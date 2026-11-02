@@ -48,7 +48,6 @@ const PATHS = Object.freeze({
   nominaEmpresa: '/empresas/:empresaId/nomina',
   sedes: '/sedes',
   cobranzas: '/cobranzas',
-  habilitacion: '/habilitaciones/consulta',
   override: '/habilitaciones/override',
   comisionesAsignadas: '/docentes/mis-comisiones',
   perfilDocente: '/docente/mi-perfil',
@@ -358,10 +357,6 @@ export function createApiDataSource() {
     /** Inscripciones activas del alumno, para el selector de imputación (HU 21). */
     async listarInscripcionesDeAlumno(alumnoId) {
       return request(PATHS.inscripcionesDeAlumno, { params: { alumnoId } })
-    },
-
-    async buscarHabilitacion(consulta) {
-      return request(PATHS.habilitacion, { query: { q: consulta } })
     },
 
     async registrarCobranza(datos) {

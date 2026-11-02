@@ -330,13 +330,15 @@ describe('la implementación de ejemplo', () => {
     expect(await fuente.listarCobranzas('nadie con ese nombre')).toHaveLength(0)
   })
 
-  it('devuelve la inscripción del alumno para elegir a dónde imputar', async () => {
+  it('devuelve las inscripciones activas del alumno con su categoría (HU 64)', async () => {
     const fuente = createMockDataSource()
 
     const inscripciones = await fuente.listarInscripcionesDeAlumno(1)
-    expect(inscripciones).toHaveLength(1)
+    expect(inscripciones).toHaveLength(2)
     expect(inscripciones[0].estado).toBe('ACTIVA')
     expect(inscripciones[0].comision.codigo).toBe('CUR-101')
+    expect(inscripciones[0].categoria).toBe('PARTICULAR')
+    expect(inscripciones[1].categoria).toBe('CORPORATIVO')
   })
 
   it('exige motivo para forzar un bloqueo y anota el usuario con la fecha', async () => {
@@ -370,20 +372,6 @@ describe('la implementación de ejemplo', () => {
     expect(await fuente.listarEmailsHabilitados('CUR-999')).toEqual([])
   })
 
-  it('encuentra la habilitación por DNI, email, CUIT o razón social', async () => {
-    const fuente = createMockDataSource()
-
-    expect((await fuente.buscarHabilitacion('41.332.114')).registro.nombre).toBe('Agustina Benítez')
-    expect((await fuente.buscarHabilitacion('valerossi@gmail.com')).registro.nombre).toBe(
-      'Valeria Rossi',
-    )
-    expect((await fuente.buscarHabilitacion('30-71665544-9')).tipo).toBe('EMPRESA')
-    expect((await fuente.buscarHabilitacion('Banco Federal')).registro.razon_social).toContain(
-      'Banco Federal',
-    )
-    expect(await fuente.buscarHabilitacion('   ')).toBeNull()
-    expect(await fuente.buscarHabilitacion('nadie')).toBeNull()
-  })
 })
 
 describe('la edición de curso', () => {

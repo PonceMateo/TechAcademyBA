@@ -91,6 +91,19 @@ export const ALUMNOS = markAsExample([
     categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
     porcentaje_beca: null,
     acceso: { estado: ESTADO_HABILITACION.HABILITADO, causa: null },
+    // HU 64: cursada terminada, sin inscripción activa. La consulta de accesos no tiene nada que
+    // habilitar y lo dice; el detalle del alumno la conserva con su estado.
+    inscripciones: [
+      {
+        id: 41,
+        estado: 'FINALIZADA',
+        comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+        categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
+        porcentaje_beca: null,
+        empresa: null,
+        acceso: null,
+      },
+    ],
   },
   {
     // La celda vacía de la planilla. El estado guardado decía "no pagó"; el motivo real es que

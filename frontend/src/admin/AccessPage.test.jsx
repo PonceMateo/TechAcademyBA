@@ -16,9 +16,6 @@ const CAMPOS_FICHA = [
   'DNI / Documento',
   'Nombre Completo',
   'Email Registrado',
-  'Curso Inscrito',
-  'Categoría Arancelaria',
-  'Último Pago Imputado',
 ]
 
 async function consultar(user, texto) {
@@ -50,7 +47,7 @@ describe('buscador', () => {
 })
 
 describe('consulta de un alumno', () => {
-  it('muestra la ficha resumen con sus seis campos', async () => {
+  it('muestra la ficha resumen con sus tres campos', async () => {
     const user = userEvent.setup()
 
     await consultar(user, '41.332.114')
@@ -72,28 +69,58 @@ describe('consulta de un alumno', () => {
     await screen.findByText('Agustina Benítez')
 
     expect(screen.getByText('CUR-101 Python Inicial')).toBeInTheDocument()
-    expect(screen.getByText('Becado parcial 50%')).toBeInTheDocument()
+    expect(screen.getByText(/Becado parcial 50%/)).toBeInTheDocument()
     expect(screen.getByText('BLOQUEADO')).toBeInTheDocument()
     expect(screen.getByText('comprobante ilegible')).toBeInTheDocument()
   })
 
-  it('muestra el acceso habilitado con su texto de apoyo', async () => {
+  it('muestra una sección por inscripción activa', async () => {
     const user = userEvent.setup()
 
     await consultar(user, '38.456.789')
     await screen.findByText('Juan Ignacio Pérez')
 
-    expect(screen.getByText('HABILITADO')).toBeInTheDocument()
-    expect(screen.getByText('El alumno cumple con la condición arancelaria.')).toBeInTheDocument()
+    // Juan tiene una inscripción particular y otra corporativa, las dos habilitadas (HU 64).
+    expect(screen.getByRole('heading', { name: 'CUR-101 Python Inicial' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'CUR-106 Machine Learning Aplicado' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Particular/)).toBeInTheDocument()
+    expect(screen.getByText(/Corporativo/)).toBeInTheDocument()
+    expect(screen.getAllByText('HABILITADO').length).toBe(2)
+    expect(
+      screen.getAllByText('El alumno cumple con la condición arancelaria.').length,
+    ).toBe(2)
   })
 
-  it('busca por email institucional', async () => {
+  it('busca por nombre en el padrón', async () => {
+    const user = userEvent.setup()
+
+    await consultar(user, 'Valeria Rossi')
+
+    expect(await screen.findByText('Valeria Rossi')).toBeInTheDocument()
+    expect(screen.getByText('debe saldo')).toBeInTheDocument()
+  })
+
+  it('busca por email en el padrón', async () => {
     const user = userEvent.setup()
 
     await consultar(user, 'valerossi@gmail.com')
 
     expect(await screen.findByText('Valeria Rossi')).toBeInTheDocument()
-    expect(screen.getByText('debe saldo')).toBeInTheDocument()
+  })
+
+  it('avisa cuando el alumno no tiene inscripciones activas', async () => {
+    const user = userEvent.setup()
+
+    // Nicolás Castro tiene una cursada terminada: no hay sección de acceso que mostrar.
+    await consultar(user, 'nicocastro_uy@gmail.com')
+
+    expect(await screen.findByText('Nicolás Castro')).toBeInTheDocument()
+    expect(
+      screen.getByText(/no tiene inscripciones activas/),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('CUR-106 Machine Learning Aplicado')).not.toBeInTheDocument()
   })
 
   it('busca una cuenta corporativa por CUIT', async () => {
@@ -102,7 +129,7 @@ describe('consulta de un alumno', () => {
     await consultar(user, '30-71665544-9')
 
     expect(await screen.findByText('Tech Solutions S.A.')).toBeInTheDocument()
-    expect(screen.getByText('Contrato corporativo')).toBeInTheDocument()
+    expect(screen.getByText('30-71665544-9')).toBeInTheDocument()
   })
 })
 
@@ -116,7 +143,7 @@ describe('acciones excepcionales', () => {
 
     expect(await screen.findByText('El motivo es obligatorio.')).toBeInTheDocument()
     // No cambió el estado: sigue habilitado y sin registro de forzado.
-    expect(screen.getByText('HABILITADO')).toBeInTheDocument()
+    expect(screen.getAllByText('HABILITADO').length).toBeGreaterThan(0)
     expect(screen.queryByText(/Bloqueo forzado por/)).not.toBeInTheDocument()
   })
 
@@ -128,11 +155,14 @@ describe('acciones excepcionales', () => {
     await user.type(screen.getByLabelText(/Motivo/), 'Revisión de comprobante pendiente')
     await user.click(screen.getByRole('button', { name: 'Forzar Bloqueo Manual' }))
 
-    await waitFor(() => expect(screen.getByText('BLOQUEADO')).toBeInTheDocument())
-    expect(screen.getByText('Revisión de comprobante pendiente')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getAllByText('BLOQUEADO').length).toBeGreaterThan(0))
     expect(
-      screen.getByText(/Bloqueo forzado por Secretaria BA el \d{2}\/\d{2}\/\d{4}/),
-    ).toBeInTheDocument()
+      screen.getAllByText('Revisión de comprobante pendiente').length,
+    ).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(/Bloqueo forzado por Secretaria BA el \d{2}\/\d{2}\/\d{4}/)
+        .length,
+    ).toBeGreaterThan(0)
   })
 
   it('copia solo los correos de los alumnos habilitados de la comisión', async () => {
@@ -157,7 +187,7 @@ describe('acciones excepcionales', () => {
     await screen.findByText('Juan Ignacio Pérez')
     await user.type(screen.getByLabelText(/Motivo/), 'Revisión de comprobante pendiente')
     await user.click(screen.getByRole('button', { name: 'Forzar Bloqueo Manual' }))
-    await waitFor(() => expect(screen.getByText('BLOQUEADO')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('BLOQUEADO').length).toBeGreaterThan(0))
 
     await user.selectOptions(await screen.findByLabelText('Comisión'), 'CUR-101')
     await user.click(screen.getByRole('button', { name: 'Copiar emails habilitados de CUR-101' }))
@@ -209,15 +239,11 @@ describe('emisión de certificados', () => {
   })
 })
 
-describe('consulta sin endpoint', () => {
-  it('avisa cuando la lectura del último pago falla y no deja una ficha a medias', async () => {
+describe('consulta que no resuelve', () => {
+  it('avisa cuando la búsqueda falla y no deja una ficha a medias', async () => {
     cleanup()
     stubDataSource({
-      buscarHabilitacion: async () => ({
-        tipo: 'ALUMNO',
-        registro: { nombre: 'Juan Ignacio Pérez' },
-      }),
-      listarCobranzas: async () => {
+      buscarAlumnos: async () => {
         throw new Error('No pudimos conectar con el servidor.')
       },
     })
@@ -229,54 +255,5 @@ describe('consulta sin endpoint', () => {
 
     expect(await screen.findByText('No pudimos conectar con el servidor.')).toBeInTheDocument()
     expect(screen.getByText(/Todavía no consultaste a nadie/)).toBeInTheDocument()
-  })
-})
-
-describe('último pago imputado', () => {
-  it('no cuenta como acreditado un pago observado o rechazado', async () => {
-    stubDataSource({
-      listarCobranzas: async () => [
-        {
-          id: 9,
-          fecha: '2026-06-01',
-          importe: 45000,
-          estado: 'OBSERVADO',
-          imputacion: { nombre: 'Agustina Benítez' },
-        },
-      ],
-    })
-    const user = userEvent.setup()
-
-    await consultar(user, '41.332.114')
-    await screen.findByText('Agustina Benítez')
-
-    expect(await screen.findByText('Sin pagos acreditados')).toBeInTheDocument()
-  })
-
-  it('muestra el pago acreditado más reciente y saltea los que no lo están', async () => {
-    stubDataSource({
-      listarCobranzas: async () => [
-        {
-          id: 9,
-          fecha: '2026-06-01',
-          importe: 45000,
-          estado: 'RECHAZADO',
-          imputacion: { nombre: 'Agustina Benítez' },
-        },
-        {
-          id: 8,
-          fecha: '2026-05-10',
-          importe: 31000,
-          estado: 'ACREDITADO',
-          imputacion: { nombre: 'Agustina Benítez' },
-        },
-      ],
-    })
-    const user = userEvent.setup()
-
-    await consultar(user, '41.332.114')
-    await screen.findByText('Agustina Benítez')
-
-    expect(await screen.findByText('10/05/2026 · $31.000')).toBeInTheDocument()
   })
 })
