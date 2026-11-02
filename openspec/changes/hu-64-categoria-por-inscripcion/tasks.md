@@ -16,9 +16,9 @@
 
 ## 3. Servicios y datos de ejemplo del frontend
 
-- [ ] 3.1 Agregar `obtenerAlumno(id)` en `src/services/dataService.js`, `apiDataSource.js` y `mockDataSource.js`, apuntando a `GET /alumnos/{id}`; verificar la ruta en `apiDataSource.test.js`
-- [ ] 3.2 Agregar a los mocks un alumno con una inscripción corporativa y otra particular, con su empresa, y ajustar `mocks.test.js`; verificar que el caso de dos categorías existe en los datos de ejemplo
-- [ ] 3.3 Actualizar los fixtures de tests que hoy esperan `comision`, `categoria`, `porcentaje_beca` o `acceso` en la respuesta del padrón, y verificar que `dataService.test.jsx` pasa
+- [x] 3.1 Agregar `obtenerAlumno(id)` en `src/services/dataService.js`, `apiDataSource.js` y `mockDataSource.js`, apuntando a `GET /alumnos/{id}`; verificar la ruta en `apiDataSource.test.js`
+- [x] 3.2 Agregar a los mocks un alumno con una inscripción corporativa y otra particular, con su empresa, y ajustar `mocks.test.js`; verificar que el caso de dos categorías existe en los datos de ejemplo
+- [x] 3.3 Actualizar los fixtures de tests que hoy esperan `comision`, `categoria`, `porcentaje_beca` o `acceso` en la respuesta del padrón, y verificar que `dataService.test.jsx` pasa
 
 ## 4. Padrón de alumnos sin datos de inscripción
 
@@ -34,18 +34,18 @@
 
 ## 6. Accesos con una sección por inscripción
 
-- [ ] 6.1 Cambiar `src/admin/AccessPage.jsx` para resolver la búsqueda contra el padrón por DNI, email o nombre y, sin resultado, contra las empresas por CUIT o razón social, pedir `GET /alumnos/{id}` y mostrar una sección por inscripción `ACTIVA` con curso, categoría, estado y causa; quitar `buscarHabilitacion`, `ultimoPagoAcreditado` y `PATHS.habilitacion` de `src/services/` con sus tests; verificar en `AccessPage.test.jsx` el alumno con dos inscripciones, el alumno sin inscripciones activas y la búsqueda de una empresa
-- [ ] 6.2 Dejar el forzado de bloqueo como está —motivo obligatorio, usuario y fecha, contra el alumno— sin extenderlo a una sección: el forzado por inscripción es la H/U 30, que agrega su endpoint; verificar que los tests del forzado y de la copia de correos siguen igual
-- [ ] 6.3 Correr `docker compose run --rm frontend npm run test -- src/admin/AccessPage.test.jsx` y `docker compose run --rm frontend npm run lint`
+- [x] 6.1 Cambiar `src/admin/AccessPage.jsx` para resolver la búsqueda contra el padrón por DNI, email o nombre y, sin resultado, contra las empresas por CUIT o razón social, pedir `GET /alumnos/{id}` y mostrar una sección por inscripción `ACTIVA` con curso, categoría, estado y causa; quitar `buscarHabilitacion`, `ultimoPagoAcreditado` y `PATHS.habilitacion` de `src/services/` con sus tests; verificar en `AccessPage.test.jsx` el alumno con dos inscripciones, el alumno sin inscripciones activas y la búsqueda de una empresa
+- [x] 6.2 Dejar el forzado de bloqueo como está —motivo obligatorio, usuario y fecha, contra el alumno— sin extenderlo a una sección: el forzado por inscripción es la H/U 30, que agrega su endpoint; verificar que los tests del forzado y de la copia de correos siguen igual
+- [x] 6.3 Correr `docker compose run --rm frontend npm run test -- src/admin/AccessPage.test.jsx` y `docker compose run --rm frontend npm run lint`
 
 ## 7. Inscripción identificada en Cobranzas
 
-- [ ] 7.1 Mostrar la categoría y el estado en el selector de inscripción de `src/admin/PaymentsPage.jsx`; verificar en `PaymentsPage.test.jsx` que un alumno con dos inscripciones ve las dos con su categoría y que el pago se imputa solo a la elegida
-- [ ] 7.2 Correr `docker compose run --rm frontend npm run test -- src/admin/PaymentsPage.test.jsx`
+- [x] 7.1 Mostrar la categoría y el estado en el selector de inscripción de `src/admin/PaymentsPage.jsx`; verificar en `PaymentsPage.test.jsx` que un alumno con dos inscripciones ve las dos con su categoría y que el pago se imputa solo a la elegida
+- [x] 7.2 Correr `docker compose run --rm frontend npm run test -- src/admin/PaymentsPage.test.jsx`
 
 ## 8. Verificación integrada
 
-- [ ] 8.1 Correr la suite completa del backend y del frontend más el build: `docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run lint`, `docker compose run --rm frontend npm run test` y `docker compose run --rm frontend npm run build`
+- [x] 8.1 Correr la suite completa del backend y del frontend más el build: `docker compose run --rm backend pytest`, `docker compose run --rm backend ruff check .`, `docker compose run --rm frontend npm run lint`, `docker compose run --rm frontend npm run test` y `docker compose run --rm frontend npm run build`
 - [ ] 8.2 Recorrer con los datos de ejemplo: inscribir al alumno de dos categorías en otra comisión, ver las dos secciones en Accesos, cambiar la categoría de una sola y confirmar que el padrón no muestra comisión, categoría ni acceso
 
 ## Workflow follow-up
