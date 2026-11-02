@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   componerCuil,
+  cuitValido,
   dniConForma,
   dniDigitos,
   emailConForma,
@@ -100,5 +101,18 @@ describe('formatearCuil', () => {
   it('deja el valor crudo cuando no tiene 11 dígitos', () => {
     expect(formatearCuil('2730111222')).toBe('2730111222')
     expect(formatearCuil(null)).toBe('')
+  })
+})
+
+describe('cuitValido', () => {
+  it('acepta un CUIT con dígito verificador correcto, con o sin guiones', () => {
+    expect(cuitValido('30123456781')).toBe(true)
+    expect(cuitValido('30-12345678-1')).toBe(true)
+  })
+
+  it('rechaza un dígito verificador incorrecto o una longitud distinta de 11', () => {
+    expect(cuitValido('30123456780')).toBe(false)
+    expect(cuitValido('3012345678')).toBe(false)
+    expect(cuitValido('')).toBe(false)
   })
 })

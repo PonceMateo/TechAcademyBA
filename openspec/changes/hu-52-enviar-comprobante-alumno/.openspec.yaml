@@ -1,0 +1,7 @@
+schema: spec-driven
+created: 2026-11-02
+goal: Implementar la HU 52, el envío del comprobante de pago del alumno con almacenamiento privado y revisión de Secretaría.
+affected_areas:
+  - backend
+  - frontend
+  - infraestructura

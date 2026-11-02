@@ -2229,3 +2229,66 @@ alcance de este change; queda a criterio del equipo agregarlo.
   inscripción evita duplicados.
 - **Dónde:** `backend/app/schemas/nomina.py`, `backend/app/services/nomina.py`,
   `backend/app/api/empresas.py`, `frontend/src/admin/StudentsPage.jsx` y sus fuentes de datos.
+
+---
+
+## Comprobante de pago enviado por el alumno (change `hu-52-enviar-comprobante-alumno`)
+
+### D67 — El comprobante del alumno es una entidad independiente, con storage privado y revisión de Secretaría
+
+- **Fecha:** 2026-11-02
+- **Autor:** Santiago Torrens
+- **Decisión — entidad:** el envío se guarda en `comprobante_alumno`, no en `cobranza`. Registra
+  alumno autenticado, inscripción a imputar, fecha del pago, importe, medio, titular opcional,
+  solicitud de Factura A, CUIT cuando corresponde, clave del archivo, estado y fecha/hora del
+  envío. No tiene FK a `cobranza` y no crea pagador ni imputación: enviar un comprobante **no
+  acredita el pago** ni altera saldos, habilitación o estado de la inscripción. `D12` y el enum
+  `EstadoCobranza` quedan intactos.
+- **Decisión — estados:** `EstadoComprobanteAlumno` tiene `PENDIENTE_CARGA` (técnico, mientras se
+  sube el archivo) y `PENDIENTE_REVISION` (estado inicial visible, una vez verificado el
+  contenido). No se agregan `ACEPTADO`/`RECHAZADO`: la aceptación definitiva pertenece al flujo
+  de revisión de cobranzas de las HU 21 y 22 y se implementará como una migración aditiva.
+- **Decisión — titular opcional:** `titular` nulo significa **no identificado** y no se completa
+  con el nombre del alumno. El comprobante puede haberlo pagado un familiar o una empresa, y
+  asumir lo contrario inventaría un dato. Es distinto de `TITULAR_SIN_IDENTIFICAR` de la cobranza
+  manual, donde la tabla necesita un texto para mostrar.
+- **Decisión — CUIT:** solo se acepta con Factura A, se valida con la misma regla de dígito
+  verificador del padrón (`EXPRESION_CUIT_VALIDO`, ahora pública en `app/models/inscripciones.py`)
+  y se guarda normalizado en `cuit_norm`. Sin Factura A un CUIT presente es un `422`.
+- **Decisión — almacenamiento en dos pasos:** `POST /alumno/comprobantes` valida los metadatos y
+  devuelve el destino; el navegador sube el archivo (al backend en desarrollo, a una URL firmada
+  en producción); `POST .../confirmar` lee el objeto, valida tamaño y contenido real (cabecera y
+  cierre de PDF/JPG/PNG, no la extensión ni el `Content-Type`) y recién ahí marca
+  `PENDIENTE_REVISION`. Motivo: el límite de 4,5 MB por request de las Vercel Functions no admite
+  los 5 MB permitidos. Si la verificación o el duplicado fallan, se borran el objeto y la fila
+  técnica; si el storage no responde, el comprobante queda en carga y la respuesta es `503`.
+- **Decisión — storage:** `app/core/storage.py` define `AlmacenamientoLocal` (volumen Docker
+  `comprobantes_data`, fuera de `/app` y sin servido estático) y `AlmacenamientoSupabase` (API de
+  Storage con service role: firma subida y descarga, borra). Las claves las genera el servidor
+  (`alumno/{alumno_id}/{uuid}`) y el nombre del usuario es solo etiqueta de descarga, así que no
+  hay traversal posible. En producción `STORAGE_BACKEND=local` y la falta de configuración se
+  rechazan con `503`; no hay fallback insegura.
+- **Decisión — permisos:** el alumno solo ve y descarga lo suyo, resuelto desde `usuario.alumno_id`
+  (D60). Secretaría (`ADMIN`) lista los pendientes y descarga cualquier adjunto; otro alumno
+  recibe `404` y sin sesión `401`. La descarga usa el endpoint autenticado o una URL firmada de
+  vida corta; no se publican URLs permanentes ni se registran binarios o URLs privadas en logs.
+- **Decisión — frontend:** «Mis Pagos» reemplaza el formulario de ejemplo por el envío real
+  (validación previa, nombre y tamaño del archivo, estado de carga, botón deshabilitado y aviso de
+  que queda pendiente) y agrega la lista de comprobantes enviados. Cobranzas muestra una bandeja
+  de pendientes reutilizando `Card`/`Table`, sin botones de acreditación.
+- **Por qué:** el comprobante llegaba por WhatsApp y no quedaba trazabilidad. Separar el envío del
+  hecho contable permite registrar la declaración sin tocar la habilitación, y reutilizar la
+  revisión de cobranzas cuando Secretaría decida acreditar.
+- **Límite conocido:** si el alumno sube el archivo y abandona antes de confirmar, queda una fila
+  `PENDIENTE_CARGA` y su objeto. Se limpian por antigüedad cuando exista una tarea de
+  mantenimiento; el registro no se muestra ni cuenta como pendiente.
+- **Dónde:** `backend/app/models/comprobantes.py`, `backend/app/models/enums.py`,
+  `backend/alembic/versions/0007_comprobante_alumno.py`, `backend/app/core/storage.py`,
+  `backend/app/core/config.py`, `backend/app/schemas/comprobantes.py`,
+  `backend/app/services/comprobantes.py`, `backend/app/api/comprobantes.py`,
+  `backend/app/api/router.py`, `backend/app/schemas/alumno.py`,
+  `backend/app/services/alumno.py`, `docker-compose.yml`, `.env.example`, `README.md`,
+  `frontend/src/alumno/StudentPaymentsPage.jsx`, `frontend/src/admin/ComprobantesAlumnoCard.jsx`,
+  `frontend/src/admin/PaymentsPage.jsx`, `frontend/src/domain/enums.js`,
+  `frontend/src/domain/validacion.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/mockDataSource.js`.
