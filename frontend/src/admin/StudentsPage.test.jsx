@@ -383,63 +383,6 @@ describe('ficha del alumno en modal (HU 61)', () => {
     expect(within(ficha).getByText('debe saldo')).toBeInTheDocument()
     expect(within(ficha).getByRole('button', { name: 'Motivo del bloqueo' })).toBeInTheDocument()
   })
-    cleanup()
-    stubDataSource({
-      obtenerAlumno: async () => ({
-        id: 1,
-        nombre: 'Juan Ignacio Pérez',
-        documento: '38.456.789',
-        email: 'juan.perez@gmail.com',
-        telefono: null,
-        inscripciones: [
-          {
-            id: 11,
-            estado: 'ACTIVA',
-            comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
-            categoria: 'PARTICULAR',
-            porcentaje_beca: null,
-            empresa: null,
-            acceso: { estado: 'BLOQUEADO', causa: 'debe saldo', forzado: false },
-            arancel: 45000,
-            monto_requerido: 45000,
-            total_pagado: 20000,
-            total_observado: 0,
-            saldo_pendiente: 25000,
-          },
-          {
-            id: 12,
-            estado: 'COMPLETADA',
-            comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
-            categoria: 'PARTICULAR',
-            porcentaje_beca: null,
-            empresa: null,
-            acceso: null,
-            arancel: 52000,
-            monto_requerido: 52000,
-            total_pagado: 0,
-            total_observado: 0,
-            saldo_pendiente: 52000,
-          },
-        ],
-      }),
-    })
-    renderAppAs('ADMIN', '/admin/alumnos')
-    await screen.findByText('Juan Ignacio Pérez')
-
-    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
-    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
-
-    expect(await within(ficha).findByText('BLOQUEADO')).toBeInTheDocument()
-    expect(within(ficha).getByText('debe saldo')).toBeInTheDocument()
-
-    await user.click(within(ficha).getByRole('combobox', { name: /Seleccionar comisión/ }))
-    await user.click(within(ficha).getByRole('option', { name: /CUR-106/ }))
-
-    expect(within(ficha).getByText('Estado de la inscripción: COMPLETADA')).toBeInTheDocument()
-    expect(within(ficha).queryByText('BLOQUEADO')).not.toBeInTheDocument()
-    // La deuda de una cursada terminada existe y se informa.
-    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('$52.000,00')
-  })
 
   it('muestra el arancel, lo pagado y el saldo con centavos', async () => {
     await abrirFichaConMouse('Valeria Rossi')

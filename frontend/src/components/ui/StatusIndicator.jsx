@@ -19,7 +19,7 @@ const TONOS_POR_ESTADO = {
   [ESTADO_HABILITACION.BLOQUEADO]: TONO.ROJO,
 }
 
-export function StatusIndicator({ estado, causa = null, habilitadoTexto = null, forzado = false }) {
+export function StatusIndicator({ estado, causa = null, habilitadoTexto = null }) {
   const bloqueado = estado === ESTADO_HABILITACION.BLOQUEADO
 
   if (bloqueado && (causa === null || causa === '')) {

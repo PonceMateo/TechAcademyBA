@@ -38,7 +38,7 @@ const ENFOCABLES = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ')
 
-export function Modal({ abierto, titulo, onClose, children, pie, cerrarAlClickAfuera = false }) {
+export function Modal({ abierto, titulo, onClose, children, pie, acciones = null, cerrarAlClickAfuera = false }) {
   const contenedorRef = useRef(null)
   const fondoRef = useRef(null)
   const identificadorRef = useRef(null)
@@ -160,16 +160,19 @@ export function Modal({ abierto, titulo, onClose, children, pie, cerrarAlClickAf
         tabIndex={-1}
         className="mt-10 max-h-[calc(100vh-5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl outline-none"
       >
-        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900">{titulo}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="foco-acento rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            {acciones}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="foco-acento rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="px-5 py-4">{children}</div>
