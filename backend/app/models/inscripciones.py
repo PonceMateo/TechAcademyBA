@@ -67,11 +67,6 @@ _CUIT_DIGITO_SEGURO = (
     " ELSE false END"
 )
 
-#: Nombre público de la expresión, para reutilizarla en otra tabla que guarde `cuit_norm`
-#: (HU 52). Devuelve `false` cuando el CUIT está incompleto, así que la tabla que la use tiene
-#: que admitir además el caso nulo.
-EXPRESION_CUIT_VALIDO = _CUIT_DIGITO_SEGURO
-
 
 class Empresa(TimestampMixin, Base):
     """Empresa con cuentas corporativas (historias #18 y #20).

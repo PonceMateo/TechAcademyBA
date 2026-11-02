@@ -16,7 +16,6 @@ from app.api import (
     catalogo,
     clases,
     cobranzas,
-    comprobantes,
     docente,
     empresas,
     health,
@@ -36,6 +35,4 @@ api_router.include_router(alumnos.router)
 api_router.include_router(empresas.router)
 api_router.include_router(inscripciones.router)
 api_router.include_router(cobranzas.router)
-api_router.include_router(comprobantes.router_alumno)
-api_router.include_router(comprobantes.router_admin)
 api_router.include_router(authorization_probe.router)

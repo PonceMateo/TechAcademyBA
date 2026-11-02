@@ -124,18 +124,6 @@ class EstadoCobranza(StrEnum):
     RECHAZADO = "RECHAZADO"
 
 
-class EstadoComprobanteAlumno(StrEnum):
-    """Estado del comprobante que envía el alumno (HU 52).
-
-    `PENDIENTE_CARGA` es técnico: la fila existe mientras el archivo se sube y no se lista en
-    ninguna pantalla. El estado inicial visible es `PENDIENTE_REVISION`; la aceptación o el
-    rechazo definitivo pertenecen al flujo de revisión de cobranzas y no a esta historia.
-    """
-
-    PENDIENTE_CARGA = "PENDIENTE_CARGA"
-    PENDIENTE_REVISION = "PENDIENTE_REVISION"
-
-
 class TipoFactura(StrEnum):
     """Tipo de factura (D29): se registra la A y la B."""
 
