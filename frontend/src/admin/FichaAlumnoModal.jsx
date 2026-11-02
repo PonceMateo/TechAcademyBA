@@ -175,6 +175,7 @@ function BloqueComision({ inscripcion, onCambiarCategoria }) {
               estado={inscripcion.acceso.estado}
               causa={inscripcion.acceso.causa}
               forzado={inscripcion.acceso.forzado === true}
+              mostrarCausa={inscripcion.acceso.estado !== 'BLOQUEADO'}
             />
             {inscripcion.acceso.estado === 'BLOQUEADO' && (
               <Tooltip

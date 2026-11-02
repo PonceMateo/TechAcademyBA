@@ -447,7 +447,7 @@ describe('ficha del alumno en modal (HU 61)', () => {
 
     await user.hover(indicador)
 
-    const ayuda = within(ficha).getByRole('tooltip')
+    const ayuda = await screen.findByRole('tooltip')
     expect(ayuda).toHaveTextContent('Incluye $26.000,00 en comprobantes observados')
     expect(indicador).toHaveAttribute('aria-describedby', ayuda.id)
   })

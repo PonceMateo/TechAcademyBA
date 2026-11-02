@@ -2292,7 +2292,14 @@ alcance de este change; queda a criterio del equipo agregarlo.
 
 ## Ficha del alumno — tooltip y observados (change `hu-61-ficha-alumno-modal`)
 
-### D71 — El tooltip de observados se renderiza fuera del scroll del modal
+### D72 — StatusIndicator perdió la causa visible al generalizar el cambio de FichaAlumnoModal
+
+- **Fecha:** 2026-11-02
+- **Autor:** Mateo Ponce
+- **Decisión:** `StatusIndicator` debe seguir mostrando `causa` debajo del badge cuando está `BLOQUEADO`; solo `FichaAlumnoModal` la oculta porque usa `Tooltip` (D71). El componente recupera el texto y recibe un prop opcional `mostrarCausa` (default `true`) para que la ficha lo desactive sin afectar otras pantallas.
+- **Por qué:** el cambio anterior quitó el `<span>` de causa en `StatusIndicator` para cumplir con el rediseño de la ficha, pero `AccessPage` y `CommissionDetailPage` dependen de que la causa aparezca directamente (tests `comprobante ilegible`, `debe saldo`). No es un cambio de contrato de datos ni de pantalla fuera de la ficha.
+- **Consecuencias:** `StatusIndicator` vuelve a mostrar la causa; `FichaAlumnoModal` pasa `mostrarCausa={false}` cuando está bloqueado para que solo quede el badge + tooltip.
+- **Dónde:** `frontend/src/components/ui/StatusIndicator.jsx`, `frontend/src/admin/FichaAlumnoModal.jsx`, `docs/decisions.md`.
 
 - **Fecha:** 2026-11-02
 - **Autor:** Mateo Ponce
