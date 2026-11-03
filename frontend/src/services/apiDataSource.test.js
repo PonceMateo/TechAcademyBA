@@ -355,6 +355,35 @@ describe('los POST nunca caen al ejemplo', () => {
 })
 
 describe('cobranzas manuales (HU 21)', () => {
+  it('pide el detalle del alumno por su id (HU 64) con los importes de cada inscripción', async () => {
+    const fetchMock = responder(200, {
+      id: 7,
+      inscripciones: [
+        {
+          id: 3,
+          estado: 'ACTIVA',
+          comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+          categoria: 'PARTICULAR',
+          arancel: 45000,
+          monto_requerido: 45000,
+          total_pagado: 20000,
+          total_observado: 0,
+          saldo_pendiente: 25000,
+        },
+      ],
+    })
+
+    const detalle = await createApiDataSource().obtenerAlumno(7)
+
+    expect(detalle.id).toBe(7)
+    expect(detalle.inscripciones[0]).toMatchObject({
+      monto_requerido: 45000,
+      total_pagado: 20000,
+      saldo_pendiente: 25000,
+    })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/alumnos\/7$/)
+  })
+
   const ALTA = {
     fecha: '2026-06-01',
     importe: 45000,
@@ -465,111 +494,6 @@ describe('cobranzas manuales (HU 21)', () => {
         justificacion: 'El banco confirmó la acreditación del cheque.',
       }),
     ).rejects.toThrow(/ya está acreditada/)
-  })
-})
-
-describe('comprobantes de alumnos (HU 52)', () => {
-  const PENDIENTE = {
-    id: 5,
-    estado: 'PENDIENTE_REVISION',
-    fecha_pago: '2026-06-01',
-    importe: '31000.00',
-    medio: 'TRANSFERENCIA',
-  }
-  const DATOS = {
-    inscripcion_id: 1,
-    fecha_pago: '2026-06-01',
-    importe: '31000.00',
-    medio: 'TRANSFERENCIA',
-    titular: null,
-    factura_a_solicitada: false,
-    cuit: null,
-  }
-
-  function archivo() {
-    return new File(['%PDF-1.4'], 'comprobante.pdf', { type: 'application/pdf' })
-  }
-
-  it('inicia, sube al backend y confirma en ese orden', async () => {
-    const fetchMock = vi.fn(async (url, options = {}) => {
-      if (url.endsWith('/alumno/comprobantes') && options.method === 'POST') {
-        return new Response(
-          JSON.stringify({
-            comprobante: PENDIENTE,
-            subida: { metodo: 'PUT', url: '/alumno/comprobantes/5/archivo', headers: {} },
-          }),
-          { status: 201, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-      if (url.endsWith('/alumno/comprobantes/5/archivo')) {
-        return new Response(null, { status: 204 })
-      }
-      if (url.endsWith('/alumno/comprobantes/5/confirmar')) {
-        return new Response(JSON.stringify(PENDIENTE), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-      throw new Error(`ruta inesperada: ${url}`)
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    const resultado = await createApiDataSource().enviarComprobante(DATOS, archivo())
-
-    expect(resultado.estado).toBe('PENDIENTE_REVISION')
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      '/api/alumno/comprobantes',
-      '/api/alumno/comprobantes/5/archivo',
-      '/api/alumno/comprobantes/5/confirmar',
-    ])
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      ...DATOS,
-      archivo_nombre: 'comprobante.pdf',
-    })
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'PUT' })
-  })
-
-  it('sube a la URL firmada sin anteponer /api', async () => {
-    const firmada = 'https://storage.invalid/object/upload/sign/comprobantes/alumno/1/x?token=abc'
-    const fetchMock = vi.fn(async (url) => {
-      if (url.endsWith('/alumno/comprobantes')) {
-        return new Response(
-          JSON.stringify({
-            comprobante: PENDIENTE,
-            subida: { metodo: 'PUT', url: firmada, headers: {} },
-          }),
-          { status: 201, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-      if (url === firmada) {
-        return new Response(null, { status: 200 })
-      }
-      return new Response(JSON.stringify(PENDIENTE), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
-    await createApiDataSource().enviarComprobante(DATOS, archivo())
-
-    expect(fetchMock.mock.calls[1][0]).toBe(firmada)
-  })
-
-  it('descarga el adjunto como blob con la ruta autenticada', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response('%PDF-1.4', {
-          status: 200,
-          headers: { 'Content-Type': 'application/pdf' },
-        }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-
-    const descargado = await createApiDataSource().descargarArchivoComprobante(5)
-
-    expect(descargado.type).toBe('application/pdf')
-    expect(ultimaRuta(fetchMock)).toBe('/api/comprobantes/5/archivo')
   })
 })
 

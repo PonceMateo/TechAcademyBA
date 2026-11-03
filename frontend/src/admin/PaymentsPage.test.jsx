@@ -1,7 +1,9 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
+import { configurarFuenteDeDatos } from '../services/dataSourceFactory'
+import { createMockDataSource } from '../services/mockDataSource'
 
 /**
  * Cobranzas e ingresos (9.6).
@@ -116,8 +118,8 @@ describe('formulario de registro', () => {
     await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Juan Ignacio Pérez')
     await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
     await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
-    // La inscripción se resuelve de forma asíncrona: con una sola se selecciona sola.
-    await screen.findByText(/Se imputará a CUR-101/)
+    // Juan tiene dos inscripciones activas (HU 64): se elige a cuál se imputa el pago.
+    await user.selectOptions(await screen.findByLabelText(/Inscripción a imputar/), '11')
     await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
 
     await waitFor(() => expect(filas()).toHaveLength(7))
@@ -313,7 +315,8 @@ describe('HU 21: el alta real contra la API', () => {
     await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Juan Ignacio Pérez')
     await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
     await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
-    await screen.findByText(/Se imputará a CUR-101/)
+    // Juan tiene dos inscripciones activas (HU 64): se elige a cuál se imputa el pago.
+    await user.selectOptions(await screen.findByLabelText(/Inscripción a imputar/), '11')
   }
 
   it('no envía una fecha futura y lo informa sin agregar la fila', async () => {
@@ -394,11 +397,13 @@ describe('HU 21: el alta real contra la API', () => {
         {
           id: 11,
           estado: 'ACTIVA',
+          categoria: 'PARTICULAR',
           comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
         },
         {
           id: 12,
           estado: 'ACTIVA',
+          categoria: 'BECADO_PARCIAL',
           comision: { codigo: 'CUR-102', nombre: 'Desarrollo Web Full Stack' },
         },
       ],
@@ -415,9 +420,31 @@ describe('HU 21: el alta real contra la API', () => {
 
     expect(opciones).toEqual([
       'Seleccionar…',
-      'CUR-101 — Python Inicial',
-      'CUR-102 — Desarrollo Web Full Stack',
+      'CUR-101 — Python Inicial · PARTICULAR · ACTIVA',
+      'CUR-102 — Desarrollo Web Full Stack · BECADO_PARCIAL · ACTIVA',
     ])
+  })
+
+  it('imputa el pago solo a la inscripción elegida', async () => {
+    // Juan Ignacio Pérez tiene una inscripción particular y otra corporativa en el ejemplo: el
+    // pago se imputa a la elegida y la otra queda intacta (HU 64).
+    const base = createMockDataSource()
+    const registrar = vi.fn((datos) => base.registrarCobranza(datos))
+    configurarFuenteDeDatos({ ...base, registrarCobranza: registrar })
+    const user = userEvent.setup()
+
+    await user.type(screen.getByLabelText(/Fecha Pago/), '2026-06-01')
+    await user.type(screen.getByLabelText(/Importe Cobrado/), '45000')
+    await user.selectOptions(screen.getByLabelText(/Medio de Pago/), 'EFECTIVO')
+    await user.type(screen.getByLabelText(/Titular del Comprobante/), 'Juan Ignacio Pérez')
+    await user.type(screen.getByLabelText(/Alumno a Imputar Pago/), 'Juan')
+    await user.click(await screen.findByRole('option', { name: /Juan Ignacio Pérez/ }))
+    await user.selectOptions(await screen.findByLabelText(/Inscripción a imputar/), '12')
+    await user.click(screen.getByRole('button', { name: 'Registrar Cobro' }))
+
+    await waitFor(() => expect(registrar).toHaveBeenCalledTimes(1))
+    expect(registrar.mock.calls[0][0]).toMatchObject({ alumno_id: 1, inscripcion_id: 12 })
+    await waitFor(() => expect(filas()).toHaveLength(7))
   })
 
   it('bloquea el pago imputado cuando el alumno no tiene inscripciones activas', async () => {
@@ -637,9 +664,29 @@ describe('HU 23: distribución entre varios alumnos', () => {
   const VALERIA = { busqueda: 'Valeria', nombre: 'Valeria Rossi' }
 
   /** El buscador de la fila filtra al escribir y la coincidencia se elige en la misma lista. */
-  async function elegirAlumno(user, indice, alumno) {
-    await user.type(screen.getByLabelText(new RegExp(`Alumno ${indice}`)), alumno.busqueda)
-    await user.click(await screen.findByRole('option', { name: new RegExp(alumno.nombre) }))
+  async function elegirAlumno(user, indice, alumno, scope = screen) {
+    await user.type(scope.getByLabelText(new RegExp(`Alumno ${indice}`)), alumno.busqueda)
+    await user.click(await scope.findByRole('option', { name: new RegExp(alumno.nombre) }))
+    await elegirInscripcionSiHaceFalta(user, scope, indice)
+  }
+
+  /**
+   * Con varias inscripciones activas la fila pide elegir a cuál imputar (HU 64); con una sola la
+   * pantalla muestra el texto y no hay nada que elegir.
+   */
+  async function elegirInscripcionSiHaceFalta(user, scope, indice) {
+    const { select } = await waitFor(() => {
+      const fila = scope.getByLabelText(new RegExp(`Alumno ${indice}`)).closest('li')
+      expect(fila).toHaveTextContent(/CUR-\d{3}/)
+      return { select: within(fila).queryByRole('combobox', { name: /Inscripción/ }) }
+    })
+
+    if (select !== null) {
+      const opciones = within(select)
+        .getAllByRole('option')
+        .filter((opcion) => opcion.value !== '')
+      await user.selectOptions(select, opciones[0].value)
+    }
   }
 
   async function escribirMonto(user, indice, monto) {
@@ -805,6 +852,7 @@ describe('HU 23: distribución entre varios alumnos', () => {
     await user.click(within(dialogo).getByRole('button', { name: 'Agregar alumno' }))
     await user.type(within(dialogo).getByLabelText(/Alumno 1/), 'Juan')
     await user.click(await within(dialogo).findByRole('option', { name: /Juan Ignacio Pérez/ }))
+    await elegirInscripcionSiHaceFalta(user, within(dialogo), 1)
     await user.type(within(dialogo).getByLabelText(/Importe imputado/), '70000')
     await user.click(within(dialogo).getByRole('button', { name: 'Imputar saldo' }))
 

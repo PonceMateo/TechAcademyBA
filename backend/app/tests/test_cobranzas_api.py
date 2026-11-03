@@ -288,6 +288,7 @@ def test_inscripciones_activas_del_alumno(
         {
             "id": inscripcion.id,
             "estado": EstadoInscripcion.ACTIVA.value,
+            "categoria": inscripcion.categoria,
             "comision": {
                 "codigo": inscripcion.comision.codigo,
                 "nombre": inscripcion.comision.curso.nombre,

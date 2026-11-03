@@ -98,7 +98,6 @@ def _a_inscripcion(session: Session, inscripcion: Inscripcion) -> InscripcionAlu
     comision = inscripcion.comision
 
     return InscripcionAlumnoOut(
-        inscripcion_id=inscripcion.id,
         codigo=comision.codigo,
         nombre_curso=comision.curso.nombre,
         docente_nombre=comision.docente_nombre,

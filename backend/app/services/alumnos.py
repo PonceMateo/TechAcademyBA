@@ -37,13 +37,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.security import MAX_PASSWORD_BYTES, hashear_password
 from app.models.catalogo import Comision
-from app.models.enums import Rol, TipoDocumento
+from app.models.enums import EstadoInscripcion, Rol, TipoDocumento
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Alumno, Usuario
 from app.schemas.alumnos import AlumnoCreate, AlumnoUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available, find_patron_registrado
-from app.services.habilitacion import derivar_estado
+from app.services.habilitacion import derivar_estado, derivar_montos
 from app.services.normalization import generar_password_inicial, normalize_document
 
 logger = logging.getLogger(__name__)
@@ -171,10 +171,11 @@ def crear_alumno(session: Session, datos: AlumnoCreate) -> AltaAlumno:
 
 
 def listar_alumnos(session: Session, consulta: str | None = None) -> list[Alumno]:
-    """Alumnos ordenados por id, con la comisión y categoría de su inscripción.
+    """Alumnos activos ordenados por id, sin datos de inscripción (HU 64).
 
-    La búsqueda por DNI, email o nombre admite coincidencias parciales (HU #16). La
-    habilitación queda en `None`: es la HU #27 (Should) y no se inventa un estado.
+    La búsqueda por DNI, email o nombre admite coincidencias parciales (HU #16). La categoría
+    arancelaria y la habilitación pertenecen a la inscripción, así que el padrón no las informa: el
+    detalle `GET /alumnos/{id}` es el contrato que las expone, una por inscripción.
     """
     alumnos = list(
         session.scalars(
@@ -201,43 +202,6 @@ def listar_alumnos(session: Session, consulta: str | None = None) -> list[Alumno
                 filtrados.append(alumno)
         alumnos = filtrados
 
-    inscripciones = list(
-        session.scalars(
-            select(Inscripcion)
-            .options(selectinload(Inscripcion.comision).selectinload(Comision.curso))
-            .order_by(Inscripcion.id)
-        )
-    )
-    por_alumno: dict[int, Inscripcion] = {}
-    for inscripcion in inscripciones:
-        por_alumno.setdefault(inscripcion.alumno_id, inscripcion)
-
-    for alumno in alumnos:
-        inscripcion = por_alumno.get(alumno.id)
-        if inscripcion is not None:
-            alumno.inscripcion_id = inscripcion.id  # type: ignore[attr-defined]
-            if inscripcion.comision is not None:
-                alumno.comision = SimpleNamespace(  # type: ignore[attr-defined]
-                    codigo=inscripcion.comision.codigo,
-                    nombre=inscripcion.comision.curso.nombre,
-                )
-            else:
-                alumno.comision = None  # type: ignore[attr-defined]
-            alumno.categoria = inscripcion.categoria  # type: ignore[attr-defined]
-            alumno.porcentaje_beca = inscripcion.porcentaje_beca  # type: ignore[attr-defined]
-            estado, causa, forzado = derivar_estado(session, inscripcion)
-            alumno.acceso = SimpleNamespace(  # type: ignore[attr-defined]
-                estado=estado,
-                causa=causa,
-                forzado=forzado,
-            )
-        else:
-            alumno.inscripcion_id = None  # type: ignore[attr-defined]
-            alumno.comision = None  # type: ignore[attr-defined]
-            alumno.categoria = None  # type: ignore[attr-defined]
-            alumno.porcentaje_beca = None  # type: ignore[attr-defined]
-            alumno.acceso = None  # type: ignore[attr-defined]
-
     return alumnos
 
 
@@ -247,6 +211,74 @@ def obtener_alumno(session: Session, alumno_id: int) -> Alumno:
     if alumno is None:
         raise AlumnoNoEncontrado
     return alumno
+
+
+def obtener_detalle(session: Session, alumno_id: int) -> Alumno:
+    """Alumno con **todas** sus inscripciones y su acceso derivado (HU 64).
+
+    Cada inscripción trae su comisión, su categoría, su porcentaje de beca, su empresa y el estado
+    de habilitación cuando está `ACTIVA`: una cursada terminada, dada de baja o en espera no tiene
+    habilitación que derivar y su `acceso` queda en `None`. La comisión, el curso y la empresa se
+    cargan con `selectinload` para no caer en una consulta por inscripción.
+
+    Es el único contrato que expone datos de inscripción del alumno: lo consumen el padrón, la
+    consulta de habilitación y, desde la HU 61, la ficha del alumno.
+    """
+    alumno = session.get(Alumno, alumno_id)
+    if alumno is None:
+        raise AlumnoNoEncontrado
+
+    inscripciones = list(
+        session.scalars(
+            select(Inscripcion)
+            .where(Inscripcion.alumno_id == alumno.id)
+            .options(
+                selectinload(Inscripcion.comision).selectinload(Comision.curso),
+                selectinload(Inscripcion.empresa),
+            )
+            .order_by(Inscripcion.id)
+        )
+    )
+
+    alumno.inscripciones = [  # type: ignore[attr-defined]
+        SimpleNamespace(
+            id=inscripcion.id,
+            estado=inscripcion.estado,
+            comision=SimpleNamespace(
+                codigo=inscripcion.comision.codigo,
+                nombre=inscripcion.comision.curso.nombre,
+            ),
+            categoria=inscripcion.categoria,
+            porcentaje_beca=inscripcion.porcentaje_beca,
+            empresa=(
+                SimpleNamespace(
+                    id=inscripcion.empresa.id,
+                    razon_social=inscripcion.empresa.razon_social,
+                )
+                if inscripcion.empresa is not None
+                else None
+            ),
+            arancel=montos.arancel,
+            monto_requerido=montos.requerido,
+            total_pagado=montos.acreditado,
+            total_observado=montos.observado,
+            saldo_pendiente=montos.saldo,
+            acceso=_acceso_de(session, inscripcion, montos),
+        )
+        for inscripcion in inscripciones
+        for montos in (derivar_montos(session, inscripcion),)
+    ]
+    return alumno
+
+
+def _acceso_de(
+    session: Session, inscripcion: Inscripcion, montos: SimpleNamespace
+) -> SimpleNamespace | None:
+    """Estado, causa y forzado de una inscripción activa; `None` si no está activa (HU 64)."""
+    if inscripcion.estado != EstadoInscripcion.ACTIVA.value:
+        return None
+    estado, causa, forzado = derivar_estado(session, inscripcion, montos)
+    return SimpleNamespace(estado=estado, causa=causa, forzado=forzado)
 
 
 def editar_alumno(session: Session, alumno: Alumno, datos: AlumnoUpdate) -> Alumno:
