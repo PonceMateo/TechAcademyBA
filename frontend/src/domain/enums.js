@@ -77,17 +77,24 @@ export const TIPO_FACTURA = Object.freeze({
 })
 
 /**
- * Estado del comprobante que envía el alumno (HU 52).
+ * Estado del comprobante que envía el alumno (HU 52 y HU 54).
  *
  * No comparte el enum de cobranza: un comprobante enviado todavía no es un cobro. `PENDIENTE_CARGA`
- * es técnico y no se muestra; la pantalla solo ve `PENDIENTE_REVISION`.
+ * es técnico y no se muestra. `ACEPTADO` ya generó la cobranza acreditada; `OBSERVADO` se puede
+ * reenviar y `RECHAZADO` es definitivo.
  */
 export const ESTADO_COMPROBANTE_ALUMNO = Object.freeze({
   PENDIENTE_REVISION: 'PENDIENTE_REVISION',
+  ACEPTADO: 'ACEPTADO',
+  OBSERVADO: 'OBSERVADO',
+  RECHAZADO: 'RECHAZADO',
 })
 
 export const ESTADO_COMPROBANTE_LABELS = Object.freeze({
   [ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION]: 'Pendiente de revisión',
+  [ESTADO_COMPROBANTE_ALUMNO.ACEPTADO]: 'Aceptado',
+  [ESTADO_COMPROBANTE_ALUMNO.OBSERVADO]: 'Observado',
+  [ESTADO_COMPROBANTE_ALUMNO.RECHAZADO]: 'Rechazado',
 })
 
 export const TIPO_DOCUMENTO = Object.freeze({

@@ -92,6 +92,10 @@ CHECKS_ESPERADOS = {
     "ck_comprobante_alumno_cuit_digito",
     "ck_comprobante_alumno_archivo_tamano_valido",
     "ck_comprobante_alumno_enviado_at_coherente",
+    # Resolución administrativa del comprobante (HU 54)
+    "ck_comprobante_alumno_revision_registro_completo",
+    "ck_comprobante_alumno_motivo_obligatorio",
+    "ck_comprobante_alumno_cobranza_solo_si_aceptado",
     # Clases y auditoría
     "ck_clase_clase_link_virtual_url",
     "ck_asistencia_asistencia_estado_valido",
@@ -128,6 +132,8 @@ INDICES_ESPERADOS = {
     "uq_comision_curso_numero",
     "uq_comision_horario_comision_id_dia",
     "uq_inscripcion_alumno_comision",
+    "uq_comprobante_alumno_cobranza_id",
+    "uq_comprobante_alumno_comprobante_origen_id",
     "uq_asistencia_clase_alumno",
 }
 
@@ -160,7 +166,7 @@ def test_la_migracion_inicial_deja_el_esquema_completo(db_session) -> None:
 
 def test_la_version_de_alembic_queda_registrada(db_session) -> None:
     versiones = db_session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    assert versiones == ["0007_comprobante_alumno"]
+    assert versiones == ["0008_revision_comprobantes"]
 
 
 def test_la_migracion_escrita_a_mano_cuadra_con_los_modelos(

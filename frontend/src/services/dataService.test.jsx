@@ -523,3 +523,41 @@ describe('el perfil del alumno contra el ejemplo', () => {
     ).rejects.toThrow('ya está registrado en el padrón de alumnos')
   })
 })
+
+describe('reenvío de comprobantes observados (HU 54)', () => {
+  /** Comprobante de ejemplo enviado y observado, listo para reenviar. */
+  async function observado(fuente) {
+    const enviado = await fuente.enviarComprobante(
+      {
+        inscripcion_id: 1,
+        fecha_pago: '2026-06-01',
+        importe: 31000,
+        medio: 'TRANSFERENCIA',
+        titular: null,
+        factura_a_solicitada: false,
+        cuit: null,
+      },
+      new File(['%PDF-1.4'], 'comprobante.pdf', { type: 'application/pdf' }),
+    )
+    await fuente.observarComprobante(enviado.id, 'Falta el sello.')
+    return enviado
+  }
+
+  it('un comprobante observado se reenvía una sola vez', async () => {
+    const fuente = createMockDataSource()
+    const original = await observado(fuente)
+
+    const reenvio = await fuente.reenviarComprobante(
+      original.id,
+      new File(['%PDF-1.4'], 'nuevo.pdf', { type: 'application/pdf' }),
+    )
+
+    expect(reenvio.comprobante_origen_id).toBe(original.id)
+    await expect(
+      fuente.reenviarComprobante(
+        original.id,
+        new File(['%PDF-1.4'], 'otra-vez.pdf', { type: 'application/pdf' }),
+      ),
+    ).rejects.toThrow('Ya reenviaste este comprobante observado.')
+  })
+})

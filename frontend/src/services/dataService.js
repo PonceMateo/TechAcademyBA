@@ -284,7 +284,7 @@ export function listarPagosAlumno() {
   return getDataSource().listarPagosAlumno()
 }
 
-/** Comprobantes enviados por el alumno autenticado (HU 52), con su estado. */
+/** Comprobantes enviados por el alumno autenticado (HU 52), con su estado y el motivo de la resolución. */
 export function listarComprobantesAlumno() {
   return getDataSource().listarComprobantesAlumno()
 }
@@ -297,9 +297,37 @@ export function enviarComprobante(datos, archivo) {
   return getDataSource().enviarComprobante(datos, archivo)
 }
 
-/** Comprobantes de alumnos pendientes de revisión, para Secretaría. */
-export function listarComprobantesPendientes() {
-  return getDataSource().listarComprobantesPendientes()
+/**
+ * Reenvía un comprobante observado (HU 54): copia los datos del original y sube el archivo nuevo.
+ * El original no se modifica y el reenvío queda pendiente de revisión.
+ */
+export function reenviarComprobante(id, archivo) {
+  return getDataSource().reenviarComprobante(id, archivo)
+}
+
+/** Panel de revisión de Secretaría: comprobantes de alumnos, pendientes primero (HU 54). */
+export function listarComprobantes(filtros = {}) {
+  return getDataSource().listarComprobantes(filtros)
+}
+
+/** Detalle de un comprobante para Secretaría (HU 54). */
+export function obtenerComprobante(id) {
+  return getDataSource().obtenerComprobante(id)
+}
+
+/** Acepta el comprobante: crea la cobranza acreditada y su imputación (HU 54). */
+export function aceptarComprobante(id) {
+  return getDataSource().aceptarComprobante(id)
+}
+
+/** Observa el comprobante con una causa obligatoria; el alumno puede reenviarlo (HU 54). */
+export function observarComprobante(id, motivo) {
+  return getDataSource().observarComprobante(id, motivo)
+}
+
+/** Rechaza el comprobante con una causa obligatoria; el rechazo es definitivo (HU 54). */
+export function rechazarComprobante(id, motivo) {
+  return getDataSource().rechazarComprobante(id, motivo)
 }
 
 /** Descarga autenticada del adjunto de un comprobante. Devuelve un `Blob`. */
