@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -36,11 +36,16 @@ def cliente_admin(api_client: TestClient, admin: Usuario) -> TestClient:
     return api_client
 
 
+def _periodo_actual() -> dict[str, date]:
+    """Período que contiene la fecha de hoy, para que el prorrateo tenga clases restantes."""
+    return {"fecha_inicio": date.today(), "fecha_fin": date.today() + timedelta(days=60)}
+
+
 def test_inscripcion_exitosa_descuenta_vacante(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     curso = crear_curso(db_session)
-    comision = crear_comision(db_session, curso=curso, cupo_maximo=2)
+    comision = crear_comision(db_session, curso=curso, cupo_maximo=2, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -61,7 +66,7 @@ def test_inscripcion_repetida_es_409(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     curso = crear_curso(db_session)
-    comision = crear_comision(db_session, curso=curso, cupo_maximo=5)
+    comision = crear_comision(db_session, curso=curso, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     primera = cliente_admin.post(
@@ -81,7 +86,7 @@ def test_comision_completa_es_409(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     curso = crear_curso(db_session)
-    comision = crear_comision(db_session, curso=curso, cupo_maximo=1)
+    comision = crear_comision(db_session, curso=curso, cupo_maximo=1, **_periodo_actual())
     alumno_uno = crear_alumno(db_session, email="uno@techacademy.invalid", documento="11111111")
     alumno_dos = crear_alumno(db_session, email="dos@techacademy.invalid", documento="22222222")
 
@@ -102,7 +107,7 @@ def test_alta_con_beca_parcial_guarda_el_porcentaje(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: el alta elige la categoría y guarda el porcentaje de la beca parcial."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -125,7 +130,7 @@ def test_alta_con_beca_parcial_sin_porcentaje_es_422(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: la beca parcial sin porcentaje se rechaza, igual que en el `PATCH`."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -145,7 +150,7 @@ def test_alta_con_porcentaje_fuera_de_rango_es_422(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: un porcentaje de 100 no es una beca parcial válida."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -165,7 +170,7 @@ def test_alta_corporativa_con_empresa(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: la inscripción corporativa nace con su empresa."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
     empresa = crear_empresa(db_session)
 
@@ -187,7 +192,7 @@ def test_alta_corporativa_sin_empresa_es_422(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: no se puede crear una corporativa sin empresa."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -207,7 +212,7 @@ def test_alta_corporativa_con_empresa_inexistente_es_404(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: la empresa elegida tiene que existir."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -227,7 +232,7 @@ def test_inscripciones_del_alumno_informan_la_categoria(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: el selector de Cobranzas distingue las inscripciones por su categoría."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
     crear_inscripcion(
         db_session,

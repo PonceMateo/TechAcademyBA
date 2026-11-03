@@ -166,7 +166,7 @@ def test_la_migracion_inicial_deja_el_esquema_completo(db_session) -> None:
 
 def test_la_version_de_alembic_queda_registrada(db_session) -> None:
     versiones = db_session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
-    assert versiones == ["0008_revision_comprobantes"]
+    assert versiones == ["0009_inscripcion_arancel_merge"]
 
 
 def test_la_migracion_escrita_a_mano_cuadra_con_los_modelos(
