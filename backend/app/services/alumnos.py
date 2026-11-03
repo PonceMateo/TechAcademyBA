@@ -43,7 +43,7 @@ from app.models.padron import Alumno, Usuario
 from app.schemas.alumnos import AlumnoCreate, AlumnoUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
 from app.services.emails import ensure_email_available, find_patron_registrado
-from app.services.habilitacion import derivar_estado, derivar_montos
+from app.services.habilitacion import derivar_estado, derivar_estado_automatico, derivar_montos
 from app.services.normalization import generar_password_inicial, normalize_document
 
 logger = logging.getLogger(__name__)
@@ -278,7 +278,15 @@ def _acceso_de(
     if inscripcion.estado != EstadoInscripcion.ACTIVA.value:
         return None
     estado, causa, forzado = derivar_estado(session, inscripcion, montos)
-    return SimpleNamespace(estado=estado, causa=causa, forzado=forzado)
+    estado_automatico, _ = derivar_estado_automatico(session, inscripcion, montos)
+    return SimpleNamespace(
+        estado=estado,
+        causa=causa,
+        forzado=forzado,
+        estado_automatico=estado_automatico,
+        # `derivar_estado` devuelve el motivo del override como causa cuando hay forzado.
+        motivo=causa if forzado else None,
+    )
 
 
 def editar_alumno(session: Session, alumno: Alumno, datos: AlumnoUpdate) -> Alumno:

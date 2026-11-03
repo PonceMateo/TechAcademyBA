@@ -69,13 +69,20 @@ class ComisionAsignadaOut(BaseModel):
 
 
 class AccesoAlumnoOut(BaseModel):
-    """El estado de habilitación derivado (HU #27)."""
+    """El estado de habilitación derivado (HU #27).
+
+    `estado` es el efectivo —el forzado cuando hay uno vigente— y `estado_automatico` el que
+    produce la regla sin forzado, para que la ficha pueda ofrecer el contrario. `motivo` solo
+    viaja cuando hay forzado.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     estado: str
     causa: str | None = None
     forzado: bool = False
+    estado_automatico: str
+    motivo: str | None = None
 
 
 class EmpresaInscripcionOut(BaseModel):

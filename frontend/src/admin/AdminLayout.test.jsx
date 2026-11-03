@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { accountForRole, renderAppAs, resetDataSource, stubBackend } from '../test/support'
@@ -9,7 +9,7 @@ import { PERIODO_LECTIVO, SECCIONES_ADMIN } from './navegacion'
  *
  * Se verifica el orden de los ítems del menú y las etiquetas literales del armazón. El orden es
  * requisito del spec, no una preferencia: por eso se compara la lista completa contra la que
- * espera, en vez de contar que hay seis.
+ * espera, en vez de contar que hay cinco.
  *
  * **El pie ya no lleva la persona y el nombre de la cuenta se mudó a la barra superior.** Desde el
  * change `ui-figma-dashboards` el armazón muestra el tagline y el período lectivo en el pie, sin
@@ -24,7 +24,6 @@ const ETIQUETAS_ESPERADAS = [
   'Docentes',
   'Alumnos e Inscripciones',
   'Cobranzas e Ingresos',
-  'Habilitación de Accesos',
 ]
 
 const TAGLINE = 'TechAcademy BA · Aprendemos, crecemos, conectamos.'
@@ -142,16 +141,15 @@ describe('navegación del menú', () => {
     expect(barraSuperior().getByText('Docentes')).toBeInTheDocument()
   })
 
-  it('deja la pantalla de habilitación de accesos sin rol ajeno', async () => {
-    const user = userEvent.setup()
-    await entrar('/admin')
+  it('no ofrece la sección de habilitación y la URL anterior da 404', async () => {
+    cleanup()
+    resetDataSource()
+    stubBackend()
+    renderAppAs('ADMIN', '/admin/habilitacion')
 
-    await user.click(screen.getByRole('link', { name: 'Alumnos e Inscripciones' }))
-    await waitFor(() => expect(screen.getByText('Padrón de Alumnos Regulares')).toBeInTheDocument())
-
-    await user.click(screen.getByRole('link', { name: 'Habilitación de Accesos' }))
-    await waitFor(() =>
-      expect(screen.getByText('Buscador de Alumnos y Cuentas Corporativas')).toBeInTheDocument(),
-    )
+    expect(await screen.findByText('404')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Habilitación de Accesos' }),
+    ).not.toBeInTheDocument()
   })
 })

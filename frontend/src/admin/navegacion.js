@@ -2,7 +2,6 @@ import {
   BookOpen,
   GraduationCap,
   LayoutDashboard,
-  ShieldCheck,
   Users,
   Wallet,
 } from 'lucide-react'
@@ -10,19 +9,22 @@ import {
 /**
  * Menú del shell de Administración.
  *
- * **El orden es parte del requisito**, no una preferencia: el spec de `admin-shell` fija los seis
- * ítems en este orden exacto. Por eso la lista es un dato y no seis `<Link>` escritos en el
+ * **El orden es parte del requisito**, no una preferencia: el spec de `admin-shell` fija los cinco
+ * ítems en este orden exacto. Por eso la lista es un dato y no cinco `<Link>` escritos en el
  * layout, que es la forma en la que un reordenamiento se cuela sin que nada lo note.
  *
  * La etiqueta visible es distinta de la ruta: Administración y Secretaría son el mismo rol (D3) y
  * la interfaz lo llama siempre `Secretaría`, pero la URL identifica quién entra (M10).
  *
- * `exacta` marca la sección raíz: sin ella, `/admin` sería el prefijo de las otras cinco rutas y
+ * `exacta` marca la sección raíz: sin ella, `/admin` sería el prefijo de las otras cuatro rutas y
  * el menú dejaría `Dashboard` y `Cursos y Comisiones` marcados a la vez.
  *
  * **Cada ítem lleva su ícono** (change `ui-figma-dashboards`, D40). Los del diseño son de lucide;
  * donde el menú del Figma no tiene el ítem —`Docentes` no aparece en su lista— se elige el ícono
  * del mismo set que corresponde al significado, y eso queda anotado como la única concesión.
+ *
+ * **Habilitación de Accesos ya no es una sección.** El forzado manual se administra desde la ficha
+ * del alumno, por inscripción (change `forzado-habilitacion-desde-ficha`, D78).
  */
 export const SECCIONES_ADMIN = Object.freeze([
   Object.freeze({
@@ -55,12 +57,6 @@ export const SECCIONES_ADMIN = Object.freeze([
     etiqueta: 'Cobranzas e Ingresos',
     ruta: '/admin/cobranzas',
     icono: Wallet,
-  }),
-  Object.freeze({
-    clave: 'habilitacion',
-    etiqueta: 'Habilitación de Accesos',
-    ruta: '/admin/habilitacion',
-    icono: ShieldCheck,
   }),
 ])
 

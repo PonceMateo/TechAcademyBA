@@ -55,6 +55,19 @@ describe('la fuente real usa las rutas del contrato', () => {
     expect(ultimaRuta(fetchMock)).toMatch(/\/sedes$/)
   })
 
+  it('fuerza y quita la habilitación sobre la inscripción, no sobre el alumno', async () => {
+    const fetchMock = responder(200, {})
+    const fuente = createApiDataSource()
+
+    await fuente.forzarHabilitacionInscripcion(7, { estado: 'BLOQUEADO', motivo: 'Revisión' })
+    expect(ultimaRuta(fetchMock)).toMatch(/\/inscripciones\/7\/habilitacion$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('POST')
+
+    await fuente.quitarForzadoHabilitacion(7)
+    expect(ultimaRuta(fetchMock)).toMatch(/\/inscripciones\/7\/habilitacion$/)
+    expect(fetchMock.mock.calls.at(-1)[1].method).toBe('DELETE')
+  })
+
   it('busca docentes con q y mapea las comisiones de la respuesta', async () => {
     const fetchMock = responder(200, [
       {

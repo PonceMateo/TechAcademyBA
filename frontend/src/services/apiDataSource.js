@@ -6,9 +6,8 @@ import { readStoredToken } from '../auth/tokenStorage'
  *
  * **Toda lectura que falla se propaga como `DataSourceError`; no hay datos de ejemplo en su
  * lugar.** Los endpoints que existen son los del catálogo, el padrón de docentes, el alta y la
- * consulta del padrón de alumnos, las empresas, las cobranzas y las inscripciones de un alumno.
- * La habilitación sigue siendo provisional (M33); el recurso de clases ya cuenta con sus
- * endpoints.
+ * consulta del padrón de alumnos, las empresas, las cobranzas, las inscripciones de un alumno y el
+ * forzado de habilitación por inscripción. El recurso de clases ya cuenta con sus endpoints.
  *
  * **Un error nunca se disfraza de dato válido:** ni un 404, ni un 500, ni un error de red. Un 404
  * es solo otro fallo —el endpoint o el registro pedido no existe— y sube tal cual, con su `status`,
@@ -48,7 +47,7 @@ const PATHS = Object.freeze({
   nominaEmpresa: '/empresas/:empresaId/nomina',
   sedes: '/sedes',
   cobranzas: '/cobranzas',
-  override: '/habilitaciones/override',
+  habilitacionInscripcion: '/inscripciones/:inscripcionId/habilitacion',
   comisionesAsignadas: '/docentes/mis-comisiones',
   perfilDocente: '/docente/mi-perfil',
   padronComision: '/comisiones/:codigo/alumnos',
@@ -457,10 +456,20 @@ export function createApiDataSource() {
       )
     },
 
-    async forzarBloqueoManual({ alumnoId, motivo, usuario, fechaOperacion }) {
-      return request(`${PATHS.override}/${alumnoId}`, {
+    /** Forzado manual del estado de una inscripción (H/U 30). */
+    async forzarHabilitacionInscripcion(inscripcionId, datos) {
+      return request(PATHS.habilitacionInscripcion, {
         method: 'POST',
-        body: { motivo, usuario, fecha_operacion: fechaOperacion },
+        params: { inscripcionId },
+        body: datos,
+      })
+    },
+
+    /** Quita el forzado y vuelve a la regla automática (H/U 30). */
+    async quitarForzadoHabilitacion(inscripcionId) {
+      return request(PATHS.habilitacionInscripcion, {
+        method: 'DELETE',
+        params: { inscripcionId },
       })
     },
 

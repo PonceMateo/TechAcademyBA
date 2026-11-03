@@ -26,7 +26,8 @@ import { obtenerAlumno } from '../services/dataService'
  * cargo de la empresa y una becada total, exenta.
  *
  * **Los datos personales van en modo lectura.** Editar, restablecer la contraseña y eliminar viven
- * en el menú `⋮`; la categoría se cambia desde la comisión elegida. La ficha solo abre esos modales.
+ * en el menú `⋮`; la categoría y el estado de habilitación se cambian desde la comisión elegida,
+ * cada uno con su lápiz. La ficha solo abre esos modales.
  *
  * **Un detalle que no llega no se inventa.** Mientras la consulta corre la ficha lo dice, y si
  * falla muestra el motivo: sin inscripciones, estados ni importes de relleno.
@@ -140,7 +141,7 @@ function IconoEditar() {
   )
 }
 
-function BloqueComision({ inscripcion, onCambiarCategoria }) {
+function BloqueComision({ inscripcion, onCambiarCategoria, onEditarHabilitacion }) {
   const definicion = TONOS_CATEGORIA[inscripcion.categoria] ?? {
     etiqueta: inscripcion.categoria,
     tono: TONO.GRIS,
@@ -183,13 +184,11 @@ function BloqueComision({ inscripcion, onCambiarCategoria }) {
                 label="Motivo del bloqueo"
                 content={
                   (() => {
-                    const causa = inscripcion.acceso.causa ?? 'desconocido'
-                    let texto = textoCausa(causa)
                     if (inscripcion.acceso.forzado === true) {
                       const razon = inscripcion.acceso.motivo ?? 'no especificado'
-                      texto += ` Forzado por Secretaría: ${razon}.`
+                      return `El acceso está bloqueado por una decisión manual de Secretaría. Motivo: ${razon}.`
                     }
-                    return texto
+                    return textoCausa(inscripcion.acceso.causa ?? 'desconocido')
                   })()
                 }
                 tonoBoton="rojo"
@@ -197,6 +196,15 @@ function BloqueComision({ inscripcion, onCambiarCategoria }) {
                 i
               </Tooltip>
             )}
+            <button
+              type="button"
+              aria-label="Editar habilitación"
+              title="Editar habilitación"
+              onClick={() => onEditarHabilitacion(inscripcion)}
+              className="foco-acento rounded p-1 text-slate-500 hover:bg-slate-100"
+            >
+              <IconoEditar />
+            </button>
           </>
         ) : (
           <span>{`Estado de la inscripción: ${inscripcion.estado}`}</span>
@@ -235,6 +243,7 @@ export function FichaAlumnoModal({
   onRestablecerPassword,
   onEliminar,
   onCambiarCategoria,
+  onEditarHabilitacion,
 }) {
   const [detalle, setDetalle] = useState(null)
   const [cargando, setCargando] = useState(true)
@@ -351,6 +360,7 @@ export function FichaAlumnoModal({
               <BloqueComision
                 inscripcion={inscripcionElegida}
                 onCambiarCategoria={onCambiarCategoria}
+                onEditarHabilitacion={onEditarHabilitacion}
               />
             )}
           </>

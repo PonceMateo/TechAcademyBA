@@ -367,26 +367,36 @@ describe('la implementación de ejemplo', () => {
     expect(inscripciones[1].categoria).toBe('CORPORATIVO')
   })
 
-  it('exige motivo para forzar un bloqueo y anota el usuario con la fecha', async () => {
+  it('exige motivo para forzar y aplica el forzado solo a esa inscripción', async () => {
     const fuente = createMockDataSource()
 
     await expect(
-      fuente.forzarBloqueoManual({ alumnoId: 1, motivo: '   ', usuario: 'Secretaria BA' }),
-    ).rejects.toThrow(/motivo es obligatorio/)
+      fuente.forzarHabilitacionInscripcion(11, { estado: 'BLOQUEADO', motivo: '   ' }),
+    ).rejects.toThrow(/motivo .*obligatorio/)
 
-    const alumno = await fuente.forzarBloqueoManual({
-      alumnoId: 1,
+    await fuente.forzarHabilitacionInscripcion(11, {
+      estado: 'BLOQUEADO',
       motivo: 'Revisión de comprobante',
-      usuario: 'Secretaria BA',
-      fechaOperacion: '2026-06-01',
     })
 
-    expect(alumno.acceso.estado).toBe('BLOQUEADO')
-    expect(alumno.acceso.causa).toBe('Revisión de comprobante')
-    expect(alumno.acceso.forzado).toEqual({
-      usuario: 'Secretaria BA',
-      fecha_operacion: '2026-06-01',
+    const alumno = await fuente.obtenerAlumno(1)
+    const forzada = alumno.inscripciones.find((inscripcion) => inscripcion.id === 11)
+    const intacta = alumno.inscripciones.find((inscripcion) => inscripcion.id === 12)
+
+    expect(forzada.acceso).toMatchObject({
+      estado: 'BLOQUEADO',
+      causa: 'Revisión de comprobante',
+      forzado: true,
       motivo: 'Revisión de comprobante',
+      estado_automatico: 'HABILITADO',
+    })
+    expect(intacta.acceso).toEqual({ estado: 'HABILITADO', causa: null })
+
+    await fuente.quitarForzadoHabilitacion(11)
+    const despues = await fuente.obtenerAlumno(1)
+    expect(despues.inscripciones.find((inscripcion) => inscripcion.id === 11).acceso).toEqual({
+      estado: 'HABILITADO',
+      causa: null,
     })
   })
 

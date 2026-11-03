@@ -58,7 +58,6 @@ la recorre sin que nadie la agregue a mano.
 | Administración | Docentes | `/admin/docentes` | `TeachersPage.test.jsx` (11 pruebas) |
 | Administración | Alumnos e Inscripciones | `/admin/alumnos` | `StudentsPage.test.jsx` (14 pruebas) |
 | Administración | Cobranzas e Ingresos | `/admin/cobranzas` | `PaymentsPage.test.jsx` (16 pruebas) |
-| Administración | Habilitación de Accesos | `/admin/habilitacion` | `AccessPage.test.jsx` (12 pruebas) |
 | Docente | Mis Comisiones | `/docente` | `TeacherCommissionsPage.test.jsx` (9 pruebas) |
 | Docente | Mis Alumnos | `/docente/alumnos` | `shellConsistency.test.jsx` |
 | Docente | Detalle de comisión | `/docente/alumnos/:codigo` | `CommissionDetailPage.test.jsx` (15 pruebas) |
@@ -100,7 +99,7 @@ solo refleja lo que el backend ya decidió.
 | Alumno | Pagar la cuota | `StudentLayout.test.jsx`: los dos deshabilitados, con `Próximamente` y sin enlace |
 | Alumno | Certificados | `StudentLayout.test.jsx` y `StudentProfilePage.test.jsx` |
 | Administración | Alta de docente sin formulario detrás | `TeachersPage.test.jsx`: la acción está, el formulario no, y `Clases dictadas` sale deshabilitado con `Próximamente` |
-| Administración | Controls sin implementar de cobranza y de habilitación | `PaymentsPage.test.jsx` y `AccessPage.test.jsx` |
+| Administración | Controls sin implementar de cobranza | `PaymentsPage.test.jsx` |
 
 Un ítem deshabilitado **no es un enlace sin destino**: el armazón lo dibuja como texto con la
 insignia `Próximamente` y sin atributo `href`, así que no hay forma de pulsarlo y no hay

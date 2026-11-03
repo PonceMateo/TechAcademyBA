@@ -84,7 +84,13 @@ def test_las_cursadas_llegan_con_su_estado_y_su_causa(
     assert inscripcion["docente_nombre"] == "Laura Benítez"
     assert inscripcion["horario"] == "Lun y Mié 18-20hs"
     assert inscripcion["categoria"] == CategoriaInscripcion.BECADO_TOTAL.value
-    assert inscripcion["acceso"] == {"estado": "HABILITADO", "causa": None, "forzado": False}
+    assert inscripcion["acceso"] == {
+        "estado": "HABILITADO",
+        "causa": None,
+        "forzado": False,
+        "estado_automatico": "HABILITADO",
+        "motivo": None,
+    }
 
 
 def test_un_alumno_sin_cursadas_recibe_una_lista_vacia(cliente_alumna: TestClient) -> None:

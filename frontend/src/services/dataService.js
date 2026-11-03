@@ -231,8 +231,20 @@ export function actualizarEstadoCobranza(id, datos) {
   return getDataSource().actualizarEstadoCobranza(id, datos)
 }
 
-export function forzarBloqueoManual(datos) {
-  return getDataSource().forzarBloqueoManual(datos)
+/**
+ * Forzado manual del estado de habilitación de **una inscripción** (H/U 30).
+ *
+ * El alcance es la inscripción y no el alumno: un alumno con dos cursadas puede tener una forzada
+ * y la otra con su estado automático. El motivo es obligatorio y el backend toma el administrador
+ * de la sesión, nunca del cuerpo.
+ */
+export function forzarHabilitacionInscripcion(inscripcionId, datos) {
+  return getDataSource().forzarHabilitacionInscripcion(inscripcionId, datos)
+}
+
+/** Quita el forzado vigente y devuelve la inscripción a la regla automática (H/U 30). */
+export function quitarForzadoHabilitacion(inscripcionId) {
+  return getDataSource().quitarForzadoHabilitacion(inscripcionId)
 }
 
 export function listarEmailsHabilitados(comisionCodigo) {
