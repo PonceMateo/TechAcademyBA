@@ -510,6 +510,83 @@ describe('la edición de comisión', () => {
   })
 })
 
+/**
+ * H/U 70: el ejemplo deriva el estado de la comisión igual que el backend.
+ *
+ * `fecha_fin` hoy o después deja `Vigente`; antes de hoy deja `Finalizada`; y la comisión heredada
+ * sin fechas queda `Vigente`, que es el trato conservador de las filas del cliente. El día se toma
+ * en `America/Argentina/Buenos_Aires`, así que las fechas del test se calculan en ese huso y no en
+ * el reloj de la máquina que corre la suite.
+ */
+describe('el estado derivado de la comisión en el ejemplo (H/U 70)', () => {
+  /** El día de hoy en el huso del dominio, con el mismo formato `YYYY-MM-DD` de las fechas. */
+  function hoyEnBuenosAires() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(
+      new Date(),
+    )
+  }
+
+  /** La fecha de `dias` respecto de hoy, sin que el huso del navegador corra el día. */
+  function diaRelativo(dias) {
+    const fecha = new Date(`${hoyEnBuenosAires()}T12:00:00Z`)
+    fecha.setUTCDate(fecha.getUTCDate() + dias)
+    return fecha.toISOString().slice(0, 10)
+  }
+
+  const PERIODO = {
+    docente_id: 1,
+    horarios: [{ dia: 'MAR', inicio: '19:00', fin: '21:00' }],
+    arancel: 45000,
+    cupo_maximo: 30,
+  }
+
+  /** Edita la comisión del ejemplo para que termine en `fechaFin` y devuelve su estado. */
+  async function estadoConFin(fechaFin) {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const actualizada = await editarComision(1, {
+      ...PERIODO,
+      fecha_inicio: diaRelativo(-30),
+      fecha_fin: fechaFin,
+    })
+    return actualizada.estado
+  }
+
+  it('deja Vigente la comisión que termina hoy', async () => {
+    expect(await estadoConFin(diaRelativo(0))).toBe('Vigente')
+  })
+
+  it('deja Vigente la comisión que termina mañana', async () => {
+    expect(await estadoConFin(diaRelativo(1))).toBe('Vigente')
+  })
+
+  it('deja Finalizada la comisión que terminó ayer', async () => {
+    expect(await estadoConFin(diaRelativo(-1))).toBe('Finalizada')
+  })
+
+  it('deja Vigente la comisión heredada que no tiene fechas', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const comisiones = await listarComisiones()
+
+    expect(comisiones.find((comision) => comision.codigo === 'CUR-103').estado).toBe('Vigente')
+  })
+
+  it('sigue listando la comisión finalizada: la fuente no filtra por estado', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+    await editarComision(1, {
+      ...PERIODO,
+      fecha_inicio: diaRelativo(-30),
+      fecha_fin: diaRelativo(-1),
+    })
+
+    const comisiones = await listarComisiones()
+
+    expect(comisiones).toHaveLength(5)
+    expect(comisiones.find((comision) => comision.codigo === 'CUR-101').estado).toBe('Finalizada')
+  })
+})
+
 describe('el autoservicio del alumno en la frontera de datos', () => {
   it('el servicio devuelve lo que entrega la fuente, sin transformar el contrato', async () => {
     const guardado = {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Campo, Modal } from '../components/ui'
+import { ESTADO_COMISION } from '../domain/enums'
 import {
   crearEmpresa,
   crearInscripcion,
@@ -49,6 +50,12 @@ export function InscripcionModal({
   const [erroresEmpresa, setErroresEmpresa] = useState({})
   const [falloEmpresa, setFalloEmpresa] = useState(null)
   const [guardandoEmpresa, setGuardandoEmpresa] = useState(false)
+
+  // H/U 70: una comisión finalizada no admite altas, así que el selector no la ofrece. La comisión
+  // abierta desde la gestión de una comisión no pasa por acá: viene fija y la valida la fuente.
+  const comisionesVigentes = comisiones.filter(
+    (candidata) => candidata.estado !== ESTADO_COMISION.FINALIZADA,
+  )
 
   // El formulario se monta al abrirse, así que cada apertura arranca limpia sin un efecto de reset.
   useEffect(() => {
@@ -161,7 +168,7 @@ export function InscripcionModal({
                 onChange={(evento) => setComisionSeleccionada(evento.target.value)}
               >
                 <option value="">Seleccionar…</option>
-                {comisiones.map((candidata) => (
+                {comisionesVigentes.map((candidata) => (
                   <option key={candidata.id} value={String(candidata.id)}>
                     {candidata.codigo} · {candidata.curso.nombre}
                   </option>

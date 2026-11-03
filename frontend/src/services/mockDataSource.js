@@ -15,6 +15,7 @@ import {
 import {
   CATEGORIA_INSCRIPCION,
   ESTADO_COBRANZA,
+  ESTADO_COMISION,
   ESTADO_COMPROBANTE_ALUMNO,
   TIPO_FACTURA,
   TITULAR_SIN_IDENTIFICAR,
@@ -266,9 +267,9 @@ function perfilDeDocente(store, docente) {
         codigo: candidata.codigo,
         nombre_curso: candidata.curso.nombre,
         horario: candidata.horario_legible,
-        // El modelo no tiene columna de estado de comisión (M2): la que existe es
-        // `cerrada_por_cupo`, y de ahí sale la etiqueta que ve el docente.
-        estado: candidata.cerrada_por_cupo ? 'Cerrada por cupo' : 'Activa',
+        // H/U 70: el estado es el derivado de `fecha_fin`, el mismo que ve Administración. Ya no
+        // existe la etiqueta `Cerrada por cupo`: el cupo lleno no dice nada del período.
+        estado: estadoDeComision(candidata),
       })),
   }
 }
@@ -411,6 +412,19 @@ function buscarPorTexto(registros, texto, campos) {
         .includes(aguja),
     ),
   )
+}
+
+/**
+ * Estado derivado de una comisión (H/U 70), con la misma regla que el backend: `fecha_fin` hoy o
+ * después deja `Vigente`, antes deja `Finalizada` y una comisión heredada sin fecha queda `Vigente`.
+ * El día se toma en `America/Argentina/Buenos_Aires`, no en el reloj de la máquina.
+ */
+function estadoDeComision(comision) {
+  if (!comision?.fecha_fin) return ESTADO_COMISION.VIGENTE
+  const hoy = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(new Date())
+  return comision.fecha_fin >= hoy ? ESTADO_COMISION.VIGENTE : ESTADO_COMISION.FINALIZADA
 }
 
 export function createMockDataSource() {
@@ -621,7 +635,12 @@ export function createMockDataSource() {
     modo: 'mock',
 
     async listarComisiones() {
-      return copiar(store.comisiones)
+      return copiar(
+        store.comisiones.map((comision) => ({
+          ...comision,
+          estado: estadoDeComision(comision),
+        })),
+      )
     },
 
     /**
@@ -826,7 +845,7 @@ export function createMockDataSource() {
         sede_nombre: sede?.nombre ?? null,
       }
       store.comisiones.push(comision)
-      return comision
+      return { ...comision, estado: estadoDeComision(comision) }
     },
 
     /**
@@ -874,7 +893,7 @@ export function createMockDataSource() {
         inscriptos,
         vacantes: Number(cupo_maximo) - inscriptos,
       })
-      return { ...comision }
+      return { ...comision, estado: estadoDeComision(comision) }
     },
 
     async listarAlumnos() {
@@ -1564,6 +1583,7 @@ export function createMockDataSource() {
             docente_nombre: candidata.docente_nombre,
             horario: candidata.horario_legible,
             proxima_clase: candidata.proxima_clase ?? null,
+            estado: estadoDeComision(candidata),
             habilitados: habilitados.length,
             bloqueados: alumnos.length - habilitados.length,
           }

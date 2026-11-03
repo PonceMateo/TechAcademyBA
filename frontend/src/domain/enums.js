@@ -27,6 +27,15 @@ export const CATEGORIA_INSCRIPCION = Object.freeze({
   CORPORATIVO: 'CORPORATIVO',
 })
 
+/**
+ * Estado derivado de una comisión (H/U 70). No es una columna: la fuente lo calcula comparando
+ * `fecha_fin` con el día corriente, y la pantalla solo lo muestra.
+ */
+export const ESTADO_COMISION = Object.freeze({
+  VIGENTE: 'Vigente',
+  FINALIZADA: 'Finalizada',
+})
+
 export const ESTADO_HABILITACION = Object.freeze({
   HABILITADO: 'HABILITADO',
   BLOQUEADO: 'BLOQUEADO',

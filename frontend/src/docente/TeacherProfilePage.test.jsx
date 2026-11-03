@@ -171,14 +171,14 @@ describe('comisiones asignadas', () => {
     expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(COLUMNAS)
   })
 
-  it('muestra CUR-101 con su horario y el estado Activa en verde', () => {
+  it('muestra CUR-101 con su horario y el estado Vigente en verde', () => {
     const fila = within(screen.getByRole('table')).getAllByRole('row')[1]
 
     expect(fila.cells[0]).toHaveTextContent('CUR-101')
     expect(fila.cells[1]).toHaveTextContent('Python Inicial')
     expect(fila.cells[2]).toHaveTextContent('Mar y Jue · 19 a 21 hs')
 
-    const estado = within(fila.cells[3]).getByText('Activa')
+    const estado = within(fila.cells[3]).getByText('Vigente')
     expect(estado.className).toContain('green')
   })
 })
