@@ -125,6 +125,7 @@ def listar_comisiones_asignadas(
                 nombre_curso=comision.curso.nombre,
                 docente_nombre=f"{docente.nombre} {docente.apellido}",
                 horario=comision.resumen_horarios,
+                estado=comision.estado,
                 proxima_clase=_proxima_clase(comision),
                 habilitados=habilitados,
                 bloqueados=len(inscripciones) - habilitados,
@@ -243,8 +244,8 @@ def _perfil(session: Session, docente: Docente) -> PerfilDocenteOut:
                 codigo=comision.codigo,
                 nombre_curso=comision.curso.nombre,
                 horario=comision.dias_horarios,
-                # El modelo no tiene estado de comisión (M2): la única columna es `activo`.
-                estado="Activa" if comision.activo else "Inactiva",
+                # H/U 70: mismo estado derivado que ve Administración, sin columna (D75).
+                estado=comision.estado,
             )
             for comision in comisiones
         ],

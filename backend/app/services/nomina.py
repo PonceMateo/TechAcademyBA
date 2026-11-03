@@ -10,6 +10,7 @@ from app.core.security import hashear_password
 from app.models.catalogo import Comision
 from app.models.enums import (
     CategoriaInscripcion,
+    EstadoComision,
     EstadoContrato,
     EstadoInscripcion,
     Rol,
@@ -35,6 +36,10 @@ class NominaInvalida(Exception):
     pass
 
 
+class ComisionFinalizada(Exception):
+    """La comisión ya terminó y no admite una nómina nueva (H/U 70)."""
+
+
 class CupoInsuficiente(Exception):
     pass
 
@@ -56,6 +61,10 @@ def cargar_nomina(session: Session, empresa_id: int, datos: NominaCreate):
     )
     if comision is None:
         raise ComisionNoEncontrada("La comisión no existe.")
+
+    # H/U 70: una comisión terminada no recibe nómina nueva, ni siquiera si tiene cupo.
+    if comision.estado == EstadoComision.FINALIZADA.value:
+        raise ComisionFinalizada("La comisión ya finalizó.")
 
     inscriptas = len(
         session.scalars(

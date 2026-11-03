@@ -18,7 +18,7 @@ import { formatFechaLarga } from '../utils/formato'
  * del día; el nombre de la sección vive en el ítem del menú y en el breadcrumb del armazón.
  */
 
-const COLUMNAS = ['CÓDIGO', 'CURSO', 'DOCENTE', 'HORARIO', 'PRÓXIMA CLASE', 'ACCESO']
+const COLUMNAS = ['CÓDIGO', 'CURSO', 'DOCENTE', 'HORARIO', 'ESTADO', 'PRÓXIMA CLASE', 'ACCESO']
 
 /** El tablero abre con el saludo de la cuenta de la sesión. */
 const SALUDO = `Buen día, ${accountForRole('DOCENTE').nombre}`
@@ -80,7 +80,8 @@ describe('comisiones asignadas', () => {
     expect(filas[0].cells[1]).toHaveTextContent('Python Inicial')
     expect(filas[0].cells[2]).toHaveTextContent('Profe Martín')
     expect(filas[0].cells[3]).toHaveTextContent('Mar y Jue · 19 a 21 hs')
-    expect(filas[0].cells[4]).toHaveTextContent('Hoy · 19:00')
+    expect(filas[0].cells[4]).toHaveTextContent('Vigente')
+    expect(filas[0].cells[5]).toHaveTextContent('Hoy · 19:00')
   })
 
   it('muestra el habilitado en verde y el bloqueado en rojo', () => {
@@ -174,6 +175,35 @@ describe('docente sin comisiones asignadas', () => {
       expect(indicador).not.toHaveTextContent('—')
     }
     expect(screen.getByText('PRÓXIMA CLASE', { selector: 'p' }).parentElement).toHaveTextContent('—')
+  })
+})
+
+/**
+ * H/U 70: la comisión que terminó no desaparece de la vista del docente.
+ *
+ * Sigue listada y lo que cambia es el estado, que ahora sale de `fecha_fin` y no de
+ * `cerrada_por_cupo`: la etiqueta `Cerrada por cupo` se fue con la regla anterior.
+ */
+describe('la comisión finalizada', () => {
+  beforeEach(async () => {
+    cleanup()
+    const [comision] = await obtenerComisionesAsignadas()
+
+    stubDataSource({
+      obtenerComisionesAsignadas: async () => [{ ...comision, estado: 'Finalizada' }],
+    })
+    renderAppAs('DOCENTE', '/docente')
+
+    await screen.findByRole('heading', { name: SALUDO })
+  })
+
+  it('sigue listada con el estado Finalizada y sin la etiqueta de cupo', async () => {
+    const fila = within(await screen.findByRole('table')).getAllByRole('row')[1]
+
+    expect(fila.cells[0]).toHaveTextContent('CUR-101')
+    expect(fila.cells[4]).toHaveTextContent('Finalizada')
+    expect(fila.cells[4].className).toContain('text-slate-700')
+    expect(screen.queryByText('Cerrada por cupo')).not.toBeInTheDocument()
   })
 })
 

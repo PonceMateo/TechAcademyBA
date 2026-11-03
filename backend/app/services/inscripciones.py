@@ -10,15 +10,14 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import Comision, clases_del_periodo
+from app.models.catalogo import ZONA_HORARIA_DOMINIO, Comision, clases_del_periodo
 from app.models.clases import AuditLog
-from app.models.enums import CategoriaInscripcion, EstadoInscripcion
+from app.models.enums import CategoriaInscripcion, EstadoComision, EstadoInscripcion
 from app.models.inscripciones import Empresa, Inscripcion
 from app.models.padron import Alumno, Usuario
 from app.schemas.inscripciones import (
@@ -49,20 +48,30 @@ class CupoLleno(Exception):
     """La comisión no tiene vacantes."""
 
 
+class ComisionFinalizada(Exception):
+    """La comisión ya terminó y no admite inscripciones (H/U 70)."""
+
+
 class ProrrateoNoDisponible(Exception):
     """No se puede calcular el importe de la inscripción."""
-
-
-ZONA_HORARIA_DOMINIO = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def calcular_importe_arancel(
     comision: Comision,
     categoria: str,
-    porcentaje_beca: Decimal | None = None,
     *,
     hoy: date | None = None,
 ) -> Decimal | None:
+    """Importe **base** de la inscripción, prorrateado por las clases restantes.
+
+    Es el arancel de la comisión multiplicado por las clases que quedan desde el alta y dividido
+    por las clases totales, redondeado a centavos. **No incluye el descuento de beca**: el
+    descuento se aplica al derivar el monto requerido, sobre este base guardado, para que un cambio
+    posterior de categoría no deje un importe viejo (H/U 70 y D77).
+
+    Corporativo no tiene importe propio (depende del contrato) y beca total queda exenta. Una
+    comisión sin período o sin clases restantes no inventa un importe.
+    """
     if categoria == CategoriaInscripcion.CORPORATIVO.value:
         return None
     if categoria == CategoriaInscripcion.BECADO_TOTAL.value:
@@ -83,8 +92,6 @@ def calcular_importe_arancel(
             "No se pudo calcular el importe: no quedan clases en el período."
         )
     importe = comision.arancel * Decimal(clases_restantes) / Decimal(clases_totales)
-    if categoria == CategoriaInscripcion.BECADO_PARCIAL.value:
-        importe *= (Decimal("100") - (porcentaje_beca or Decimal("0"))) / Decimal("100")
     return importe.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
@@ -116,6 +123,11 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
     if comision is None:
         raise ComisionNoEncontrada("La comisión no existe.")
 
+    # H/U 70: una comisión terminada no admite altas. Va antes del cupo y del duplicado para que
+    # el motivo informado sea el real cuando además está llena o el alumno ya está inscripto.
+    if comision.estado == EstadoComision.FINALIZADA.value:
+        raise ComisionFinalizada("La comisión ya finalizó.")
+
     existente = session.scalar(
         select(Inscripcion).where(
             Inscripcion.alumno_id == datos.alumno_id,
@@ -137,7 +149,7 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
     categoria, porcentaje_beca, empresa_id = _validar_categoria(
         session, datos.categoria, datos.porcentaje_beca, datos.empresa_id
     )
-    importe_arancel = calcular_importe_arancel(comision, categoria, porcentaje_beca)
+    importe_arancel = calcular_importe_arancel(comision, categoria)
 
     inscripcion = Inscripcion(
         alumno_id=datos.alumno_id,

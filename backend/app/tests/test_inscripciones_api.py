@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.enums import CategoriaInscripcion
@@ -80,6 +81,31 @@ def test_inscripcion_repetida_es_409(
         json={"alumno_id": alumno.id, "comision_id": comision.id},
     )
     assert segunda.status_code == 409
+
+
+def test_no_inscribe_en_una_comision_finalizada(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """H/U 70: el alta se rechaza con 422 y no deja ninguna fila."""
+    curso = crear_curso(db_session)
+    hoy = date.today()
+    comision = crear_comision(
+        db_session,
+        curso=curso,
+        cupo_maximo=5,
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+    alumno = crear_alumno(db_session)
+
+    respuesta = cliente_admin.post(
+        "/inscripciones",
+        json={"alumno_id": alumno.id, "comision_id": comision.id},
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert respuesta.json()["detail"] == "La comisión ya finalizó."
+    assert db_session.scalars(select(Inscripcion)).all() == []
 
 
 def test_comision_completa_es_409(
@@ -247,9 +273,10 @@ def test_inscripciones_del_alumno_informan_la_categoria(
     assert respuesta.json()[0]["categoria"] == "BECADO_TOTAL"
 
 
-def test_calcula_alta_tardia_y_aplica_beca_despues_del_prorrateo(
+def test_calcula_alta_tardia_sin_aplicar_la_beca_al_importe_base(
     db_session: Session,
 ) -> None:
+    """D77: el importe persistido es el base prorrateado; la beca se deriva después."""
     comision = crear_comision(
         db_session,
         arancel="52000.00",
@@ -261,11 +288,10 @@ def test_calcula_alta_tardia_y_aplica_beca_despues_del_prorrateo(
     importe = calcular_importe_arancel(
         comision,
         CategoriaInscripcion.BECADO_PARCIAL.value,
-        Decimal("25"),
         hoy=date(2026, 1, 19),
     )
 
-    assert importe == Decimal("19500.00")
+    assert importe == Decimal("26000.00")
 
 
 def test_calcula_arancel_completo_antes_del_inicio(db_session: Session) -> None:
@@ -294,6 +320,70 @@ def test_rechaza_prorrateo_sin_periodo(db_session: Session) -> None:
             CategoriaInscripcion.PARTICULAR.value,
             hoy=date(2026, 1, 19),
         )
+
+
+def _monto_requerido(cliente: TestClient, alumno_id: int) -> Decimal:
+    """El monto requerido que la ficha deriva para la única inscripción del alumno."""
+    respuesta = cliente.get(f"/alumnos/{alumno_id}")
+    assert respuesta.status_code == 200, respuesta.text
+    [fila] = respuesta.json()["inscripciones"]
+    return Decimal(fila["monto_requerido"])
+
+
+def test_el_cambio_de_categoria_aplica_la_beca_sobre_el_base_prorrateado(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """Issue #111: la beca se deriva del base guardado, no de un importe final congelado."""
+    hoy = date.today()
+    comision = crear_comision(
+        db_session,
+        arancel="52000.00",
+        cupo_maximo=5,
+        horarios_semana=[("LUN", "18:00", "20:00"), ("MIE", "18:00", "20:00")],
+        fecha_inicio=hoy - timedelta(days=14),
+        fecha_fin=hoy + timedelta(days=30),
+    )
+    particular = crear_alumno(db_session)
+    becado = crear_alumno(
+        db_session,
+        documento="40999888",
+        email="becado@techacademy.invalid",
+    )
+
+    alta_particular = cliente_admin.post(
+        "/inscripciones",
+        json={"alumno_id": particular.id, "comision_id": comision.id},
+    )
+    assert alta_particular.status_code == 201, alta_particular.text
+    alta_becado = cliente_admin.post(
+        "/inscripciones",
+        json={
+            "alumno_id": becado.id,
+            "comision_id": comision.id,
+            "categoria": CategoriaInscripcion.BECADO_PARCIAL.value,
+            "porcentaje_beca": 50,
+        },
+    )
+    assert alta_becado.status_code == 201, alta_becado.text
+
+    base = _monto_requerido(cliente_admin, particular.id)
+    esperado_con_beca = (base / 2).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    assert base < Decimal("52000.00"), "el alta tardía tiene que estar prorrateada"
+    assert _monto_requerido(cliente_admin, becado.id) == esperado_con_beca
+
+    a_beca = cliente_admin.patch(
+        f"/inscripciones/{alta_particular.json()['id']}",
+        json={"categoria": CategoriaInscripcion.BECADO_PARCIAL.value, "porcentaje_beca": 50},
+    )
+    assert a_beca.status_code == 200, a_beca.text
+    assert _monto_requerido(cliente_admin, particular.id) == esperado_con_beca
+
+    a_particular = cliente_admin.patch(
+        f"/inscripciones/{alta_particular.json()['id']}",
+        json={"categoria": CategoriaInscripcion.PARTICULAR.value},
+    )
+    assert a_particular.status_code == 200, a_particular.text
+    assert _monto_requerido(cliente_admin, particular.id) == base
 
 
 def test_alta_tardia_invalida_no_guarda_inscripcion(

@@ -7,9 +7,10 @@ tolerante a formato sobre columnas normalizadas).
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import (
     Boolean,
@@ -28,7 +29,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, no_vacio
-from app.models.enums import DiaSemana, Modalidad, enum_check
+from app.models.enums import DiaSemana, EstadoComision, Modalidad, enum_check
 
 if TYPE_CHECKING:
     # Solo para que el linter resuelva las anotaciones de `relationship`. Importarlo en
@@ -38,6 +39,29 @@ if TYPE_CHECKING:
 #: Ancho de los montos: pesos argentinos con dos decimales (spec `domain-schema`,
 #: "Convenciones transversales del esquema"). 14 dígitos enteros + 2 decimales.
 MONEY = Numeric(14, 2)
+
+#: Zona horaria del dominio. El "hoy" de una regla de negocio no es el del servidor (D75): la
+#: comparten el estado de la comisión y el prorrateo del alta.
+ZONA_HORARIA_DOMINIO = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def estado_comision(comision: Comision, *, hoy: date | None = None) -> str:
+    """Estado derivado de la comisión, `Vigente` o `Finalizada` (H/U 70).
+
+    Compara `fecha_fin` con el día corriente en `America/Argentina/Buenos_Aires`: hoy o después
+    deja `Vigente`, antes deja `Finalizada`. Una comisión heredada sin `fecha_fin` queda `Vigente`,
+    porque no hay fecha con la que afirmar que terminó y bloquearla impediría inscribir sobre datos
+    incompletos. La fecha se puede inyectar para las pruebas (D75).
+    """
+    if comision.fecha_fin is None:
+        return EstadoComision.VIGENTE.value
+    referencia = hoy or datetime.now(ZONA_HORARIA_DOMINIO).date()
+    return (
+        EstadoComision.VIGENTE.value
+        if comision.fecha_fin >= referencia
+        else EstadoComision.FINALIZADA.value
+    )
+
 
 #: Expresión de la columna generada `curso.codigo` (D32). Tiene que ser **exactamente**
 #: la misma cadena que escribe `alembic/versions/0002_altas_catalogo.py`, porque
@@ -237,6 +261,11 @@ class Comision(TimestampMixin, Base):
         if self.fecha_inicio is None or self.fecha_fin is None:
             return None
         return clases_del_periodo(self.fecha_inicio, self.fecha_fin, self.horarios)
+
+    @property
+    def estado(self) -> str:
+        """`Vigente` o `Finalizada`, derivado de `fecha_fin` (H/U 70 y D75)."""
+        return estado_comision(self)
 
     @property
     def sede_nombre(self) -> str | None:

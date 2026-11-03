@@ -58,6 +58,17 @@ class CategoriaInscripcion(StrEnum):
     CORPORATIVO = "CORPORATIVO"
 
 
+class EstadoComision(StrEnum):
+    """Estado derivado de una comisión según su fecha de fin (H/U 70).
+
+    **No se persiste**: se calcula por consulta a partir de `fecha_fin`, así que no hay columna
+    ni job que mantener (D75).
+    """
+
+    VIGENTE = "Vigente"
+    FINALIZADA = "Finalizada"
+
+
 class TipoDocumento(StrEnum):
     """Tipo de documento del padrón de alumnos.
 

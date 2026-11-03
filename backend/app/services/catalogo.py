@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -267,7 +267,13 @@ def crear_comision(session: Session, datos: ComisionCreate) -> Comision:
     if datos.sede_id is not None and session.get(Sede, datos.sede_id) is None:
         raise SedeNoEncontrada(datos.sede_id)
 
-    conflicto = _horario_en_conflicto(session, datos.docente_id, datos.horarios)
+    conflicto = _horario_en_conflicto(
+        session,
+        datos.docente_id,
+        datos.horarios,
+        fecha_inicio=datos.fecha_inicio,
+        fecha_fin=datos.fecha_fin,
+    )
     if conflicto is not None:
         raise HorarioDelDocenteEnConflicto(conflicto.comision, conflicto)
 
@@ -348,7 +354,12 @@ def editar_comision(session: Session, comision: Comision, datos: ComisionUpdate)
     # La propia comisión queda afuera del chequeo: reenviar sus horarios actuales no puede ser un
     # conflicto consigo misma.
     conflicto = _horario_en_conflicto(
-        session, datos.docente_id, datos.horarios, excluir_comision_id=comision.id
+        session,
+        datos.docente_id,
+        datos.horarios,
+        fecha_inicio=datos.fecha_inicio,
+        fecha_fin=datos.fecha_fin,
+        excluir_comision_id=comision.id,
     )
     if conflicto is not None:
         raise HorarioDelDocenteEnConflicto(conflicto.comision, conflicto)
@@ -463,6 +474,9 @@ def _horario_en_conflicto(
     session: Session,
     docente_id: int,
     horarios: list[HorarioComision],
+    *,
+    fecha_inicio: date,
+    fecha_fin: date,
     excluir_comision_id: int | None = None,
 ) -> ComisionHorario | None:
     """La primera fila del docente que se pisa con alguno de estos horarios, o `None`.
@@ -471,6 +485,12 @@ def _horario_en_conflicto(
     termina a las 18:30 y otro que empieza a las 18:30 no chocan. Solo participan comisiones
     vigentes: la baja lógica va por `activo`, y una comisión dada de baja no ocupa el horario del
     docente. Incluye comisiones de otros cursos, porque el docente es la misma persona.
+
+    Desde la H/U 70 el día y el horario no alcanzan: los **períodos** también tienen que cruzarse.
+    Dos comisiones del mismo docente en la misma franja con rangos de fechas disjuntos son válidas.
+    El cruce compara extremos estrictos, así que una comisión que termina el lunes y otra que
+    empieza ese mismo lunes no se consideran cruzadas. Una comisión heredada sin fechas sigue
+    participando por día y horario, porque no hay datos para descartar el cruce.
 
     **Techo asumido:** dos altas simultáneas del mismo docente pueden pasar las dos por acá, porque
     la comprobación es de aplicación y no un lock. A la escala del proyecto es aceptable; si
@@ -483,6 +503,14 @@ def _horario_en_conflicto(
             Comision.docente_id == docente_id,
             Comision.activo.is_(True),
             ComisionHorario.dia.in_([dato.dia.value for dato in horarios]),
+            or_(
+                Comision.fecha_inicio.is_(None),
+                Comision.fecha_fin.is_(None),
+                and_(
+                    Comision.fecha_inicio < fecha_fin,
+                    fecha_inicio < Comision.fecha_fin,
+                ),
+            ),
         )
         .options(selectinload(ComisionHorario.comision).selectinload(Comision.curso))
         .order_by(ComisionHorario.dia, ComisionHorario.id)

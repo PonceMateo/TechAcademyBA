@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { MODALIDAD } from '../domain/enums'
+import { ESTADO_COMISION, MODALIDAD } from '../domain/enums'
 import { normalizeCode, normalizeWords } from '../domain/normalize'
 import {
   obtenerResumenCatalogo,
@@ -86,18 +86,32 @@ const COLUMNAS = [
         ? `${formatFechaCorta(fila.fecha_inicio)} – ${formatFechaCorta(fila.fecha_fin)}`
         : PERIODO_SIN_DEFINIR,
   },
+  {
+    clave: 'estado',
+    titulo: 'ESTADO',
+    // H/U 70: el estado viene derivado de la fuente, igual que el docente o las vacantes. La
+    // comisión terminada no desaparece de la tabla: se muestra en gris para poder reactivarla.
+    render: (fila) => (
+      <Badge tono={fila.estado === ESTADO_COMISION.FINALIZADA ? TONO.GRIS : TONO.VERDE}>
+        {fila.estado}
+      </Badge>
+    ),
+  },
   { clave: 'cupo', titulo: 'CUPO MÁX.', render: (fila) => fila.cupo_maximo },
   {
     clave: 'vacantes',
     titulo: 'VACANTES',
-    render: (fila) =>
-      fila.vacantes === 0 ? (
+    // H/U 70: una comisión finalizada no ofrece vacantes, así que no lleva número ni chip `LLENO`.
+    render: (fila) => {
+      if (fila.estado === ESTADO_COMISION.FINALIZADA) return VACANTES_SIN_OFERTA
+      return fila.vacantes === 0 ? (
         <span className="inline-flex items-center gap-2">
           0<Badge tono={TONO.ROJO}>LLENO</Badge>
         </span>
       ) : (
         fila.vacantes
-      ),
+      )
+    },
   },
   { clave: 'arancel', titulo: 'ARANCEL', render: (fila) => formatMoneda(fila.arancel) },
 ]
@@ -180,6 +194,9 @@ function erroresDelPeriodo(campos) {
 
 /** Lo que la tabla dice de la comisión que no tiene período, en vez de dejar la celda vacía. */
 const PERIODO_SIN_DEFINIR = 'Sin definir'
+
+/** Lo que muestra `VACANTES` en una comisión finalizada, que no ofrece lugares (H/U 70). */
+const VACANTES_SIN_OFERTA = '—'
 
 /**
  * Coincidencia por prefijo de palabra para un campo.
@@ -1142,7 +1159,9 @@ export function CoursesPage() {
       {modalInscripcion && (
         <InscripcionModal
           abierto
-          comisiones={comisiones}
+          // H/U 70: dentro de un curso el selector se limita a sus comisiones, igual que el alta de
+          // comisión. Desde la vista de cursos ofrece el catálogo completo.
+          comisiones={cursoDeRuta === null ? comisiones : comisionesDelCurso}
           onClose={cerrarModalInscripcion}
           onInscripto={inscripcionCreada}
         />

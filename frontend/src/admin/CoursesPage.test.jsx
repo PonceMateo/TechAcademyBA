@@ -8,6 +8,7 @@ import {
   stubBackend,
   stubDataSource,
 } from '../test/support'
+import { API_MODE, createDataSource } from '../services/dataSourceFactory'
 
 /**
  * Cursos y comisiones (9.3), en las dos vistas de la sección.
@@ -36,6 +37,7 @@ const COLUMNAS = [
   'DOCENTE',
   'HORARIO',
   'PERÍODO',
+  'ESTADO',
   'CUPO MÁX.',
   'VACANTES',
   'ARANCEL',
@@ -107,6 +109,90 @@ describe('inscripción con categoría (HU 64)', () => {
       await within(dialogo).findByText('Seleccioná la empresa de la inscripción corporativa.'),
     ).toBeInTheDocument()
     expect(crearInscripcion).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * H/U 70: el selector de comisión de la inscripción.
+ *
+ * Tres reglas y una consecuencia. El selector se limita al curso cuando el modal se abre desde
+ * `/admin/cursos/:codigo`, igual que el alta de comisión, y ofrece el catálogo entero desde la vista
+ * de cursos; nunca ofrece una comisión `Finalizada`, porque el alta se rechaza. Cuando la fuente
+ * rechaza por comisión finalizada —la que terminó con el formulario ya abierto— el motivo se
+ * muestra sin cerrar el modal (D36).
+ */
+describe('el selector de comisión de la inscripción (H/U 70)', () => {
+  /** Abre el modal de inscripción en la ruta pedida, con la fuente que el test necesite. */
+  async function abrirInscripcionEn(ruta, overrides = {}) {
+    resetDataSource()
+    stubBackend()
+    stubDataSource(overrides)
+    renderAppAs('ADMIN', ruta)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: '+ Inscribir Alumno' }))
+    return { user, dialogo: await screen.findByRole('dialog', { name: 'Inscribir Alumno' }) }
+  }
+
+  /** Las comisiones que ofrece el selector, sin la opción vacía. */
+  function comisionesOfrecidas(dialogo) {
+    const selector = within(dialogo).getByLabelText(/^Comisión/)
+    return within(selector)
+      .getAllByRole('option')
+      .map((opcion) => opcion.textContent)
+      .filter((texto) => texto !== 'Seleccionar…')
+  }
+
+  async function elegirPrimeraOpcion(user, select) {
+    const opcion = within(select)
+      .getAllByRole('option')
+      .find((candidata) => candidata.value !== '')
+    await user.selectOptions(select, opcion)
+  }
+
+  it('se limita a las comisiones del curso abierto', async () => {
+    const { dialogo } = await abrirInscripcionEn(RUTA_CURSO)
+
+    expect(comisionesOfrecidas(dialogo)).toEqual(['CUR-101 · Python Inicial'])
+  })
+
+  it('ofrece el catálogo completo desde la vista de cursos', async () => {
+    const { dialogo } = await abrirInscripcionEn(RUTA_CATALOGO)
+
+    expect(comisionesOfrecidas(dialogo)).toEqual([
+      'CUR-101 · Python Inicial',
+      'CUR-104 · Diseño UX/UI Avanzado',
+      'CUR-108 · Java Backend Spring',
+      'CUR-110 · Power BI & Dashboards',
+      'CUR-103 · Marketing Digital & Ads',
+    ])
+  })
+
+  it('no ofrece una comisión finalizada', async () => {
+    const comisiones = await createDataSource({ modo: API_MODE.MOCK }).listarComisiones()
+
+    const { dialogo } = await abrirInscripcionEn(RUTA_CATALOGO, {
+      listarComisiones: async () =>
+        comisiones.map((comision) =>
+          comision.codigo === 'CUR-101' ? { ...comision, estado: 'Finalizada' } : comision,
+        ),
+    })
+
+    expect(comisionesOfrecidas(dialogo)).not.toContain('CUR-101 · Python Inicial')
+    expect(comisionesOfrecidas(dialogo)).toHaveLength(4)
+  })
+
+  it('muestra el motivo de la fuente y no se cierra si la comisión ya finalizó', async () => {
+    const crearInscripcion = vi.fn(async () => {
+      throw new Error('La comisión ya finalizó.')
+    })
+    const { user, dialogo } = await abrirInscripcionEn(RUTA_CATALOGO, { crearInscripcion })
+
+    await elegirPrimeraOpcion(user, within(dialogo).getByLabelText(/^Comisión/))
+    await elegirPrimeraOpcion(user, within(dialogo).getByLabelText(/^Alumno/))
+    await user.click(within(dialogo).getByRole('button', { name: 'Inscribir' }))
+
+    expect(await within(dialogo).findByRole('alert')).toHaveTextContent('La comisión ya finalizó.')
+    expect(screen.getByRole('dialog', { name: 'Inscribir Alumno' })).toBeInTheDocument()
   })
 })
 
@@ -342,6 +428,14 @@ describe('vista de comisiones del curso', () => {
     expect(filasDeComisiones()[0].cells[4].textContent).toBe('04/08/2026 – 26/11/2026')
   })
 
+  it('muestra el chip verde Vigente en la columna ESTADO', () => {
+    // H/U 70: la comisión del ejemplo termina en noviembre, así que sigue vigente.
+    const celda = filasDeComisiones()[0].cells[5]
+
+    expect(celda.textContent).toBe('Vigente')
+    expect(celda.firstChild.className).toContain('text-green-800')
+  })
+
   it('no muestra comisiones de otro curso', () => {
     expect(screen.queryByText('CUR-104')).not.toBeInTheDocument()
     expect(within(screen.getByRole('table')).queryByText('$52.000')).not.toBeInTheDocument()
@@ -403,15 +497,78 @@ describe('la comisión cerrada por cupo', () => {
   })
 })
 
+describe('la comisión finalizada', () => {
+  /**
+   * El ejemplo no tiene filas terminadas —sus cinco comisiones cierran a fin de año—, así que se
+   * reemplaza `listarComisiones` por la misma lista con `CUR-101` cerrada ayer. Es el estado que el
+   * spec exige ver y la frontera permite sustituir (D13), sin inventar una fila de negocio.
+   */
+  async function abrirConFinalizada() {
+    stubBackend()
+    const comisiones = await createDataSource({ modo: API_MODE.MOCK }).listarComisiones()
+    stubDataSource({
+      listarComisiones: async () =>
+        comisiones.map((comision) =>
+          comision.codigo === 'CUR-101'
+            ? {
+                ...comision,
+                estado: 'Finalizada',
+                // El período acompaña al estado: una comisión terminada ya cerró su cursada.
+                fecha_inicio: '2025-08-04',
+                fecha_fin: '2025-12-20',
+              }
+            : comision,
+        ),
+    })
+    renderAppAs('ADMIN', RUTA_CURSO)
+    await screen.findByRole('heading', { name: 'Comisiones Activas' })
+  }
+
+  beforeEach(abrirConFinalizada)
+
+  it('muestra el chip gris Finalizada sin sacar la fila de la tabla', () => {
+    const fila = filasDeComisiones()[0]
+
+    expect(fila.cells[0].textContent).toBe('CUR-101')
+    const chip = within(fila).getByText('Finalizada')
+    expect(chip.className).toContain('text-slate-700')
+  })
+
+  it('muestra — en VACANTES y no muestra el chip LLENO', () => {
+    const fila = filasDeComisiones()[0]
+
+    expect(fila.cells[7].textContent).toBe('—')
+    expect(within(fila).queryByText('LLENO')).not.toBeInTheDocument()
+  })
+
+  it('vuelve a Vigente y a informar vacantes cuando la edición extiende el período', async () => {
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Editar Comisión' })
+
+    const fin = within(dialogo).getByLabelText(/Fecha de Fin de la Cursada/)
+    await user.clear(fin)
+    await user.type(fin, '2027-03-31')
+    await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Editar Comisión' })).not.toBeInTheDocument(),
+    )
+    const fila = filasDeComisiones()[0]
+    expect(fila.cells[5].textContent).toBe('Vigente')
+    expect(fila.cells[7].textContent).toBe('7')
+  })
+})
+
 describe('las vacantes de una comisión con lugar', () => {
   beforeEach(() => abrirCurso())
 
   it('deja las vacantes a la vista y sin chip', () => {
     const fila = filasDeComisiones()[0]
 
-    // `VACANTES` es la séptima columna desde la historia #49: `PERÍODO` corrió un lugar las que
-    // siguen a `HORARIO`. El chip `LLENO` va dentro de la celda, al lado del 0.
-    expect(fila.cells[6].textContent).toBe('7')
+    // `VACANTES` es la octava columna desde la H/U 70: `ESTADO` corrió un lugar las que siguen a
+    // `PERÍODO`. El chip `LLENO` va dentro de la celda, al lado del 0.
+    expect(fila.cells[7].textContent).toBe('7')
     expect(within(fila).queryByText('LLENO')).not.toBeInTheDocument()
   })
 })
@@ -1206,8 +1363,8 @@ describe('edición de comisión', () => {
     )
     expect(screen.getByRole('status')).toHaveTextContent('Comisión CUR-101 actualizada.')
     const fila = filasDeComisiones()[0]
-    expect(fila.cells[5].textContent).toBe('25')
-    expect(fila.cells[6].textContent).toBe('2')
+    expect(fila.cells[6].textContent).toBe('25')
+    expect(fila.cells[7].textContent).toBe('2')
   })
 
   it('rechaza un cupo menor que los inscriptos sin llamar a la fuente', async () => {
@@ -1226,7 +1383,7 @@ describe('edición de comisión', () => {
     ).toBeInTheDocument()
     expect(editar).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog', { name: 'Editar Comisión' })).toBeInTheDocument()
-    expect(filasDeComisiones()[0].cells[5].textContent).toBe('30')
+    expect(filasDeComisiones()[0].cells[6].textContent).toBe('30')
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 

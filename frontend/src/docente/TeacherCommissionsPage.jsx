@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useSession } from '../auth/SessionContext'
 import { Badge, Card, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
+import { ESTADO_COMISION } from '../domain/enums'
 import { obtenerComisionesAsignadas } from '../services/dataService'
 import { formatFechaLarga } from '../utils/formato'
 
@@ -58,6 +59,16 @@ const COLUMNAS = [
   { clave: 'curso', titulo: 'CURSO', render: (fila) => fila.nombre_curso },
   { clave: 'docente', titulo: 'DOCENTE', render: (fila) => fila.docente_nombre },
   { clave: 'horario', titulo: 'HORARIO', render: (fila) => fila.horario },
+  {
+    clave: 'estado',
+    titulo: 'ESTADO',
+    // H/U 70: la comisión terminada sigue listada; el chip gris la distingue de la vigente.
+    render: (fila) => (
+      <Badge tono={fila.estado === ESTADO_COMISION.FINALIZADA ? TONO.GRIS : TONO.EMERALDA}>
+        {fila.estado}
+      </Badge>
+    ),
+  },
   { clave: 'proxima', titulo: 'PRÓXIMA CLASE', render: (fila) => fila.proxima_clase ?? '' },
   {
     clave: 'acceso',

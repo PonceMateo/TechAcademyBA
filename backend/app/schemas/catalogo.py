@@ -236,6 +236,7 @@ class ComisionOut(BaseModel):
     fecha_inicio: date | None
     fecha_fin: date | None
     cantidad_clases: int | None
+    estado: str
     cupo_maximo: int
     arancel: Decimal
     modalidad: Modalidad

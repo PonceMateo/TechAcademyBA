@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -137,3 +139,30 @@ def test_carga_nomina_rechaza_documentos_repetidos(
 
     assert respuesta.status_code == 422, respuesta.text
     assert "documentos repetidos" in respuesta.json()["detail"]
+
+
+def test_carga_nomina_en_comision_finalizada_es_422_y_no_crea_filas(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """H/U 70: una comisión terminada no admite nómina nueva."""
+    empresa = crear_empresa(db_session)
+    hoy = date.today()
+    comision = crear_comision(
+        db_session,
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+    cliente = cliente_admin(api_client, db_session)
+
+    respuesta = cliente.post(
+        f"/empresas/{empresa.id}/nomina",
+        json={
+            "comision_id": comision.id,
+            "empleados": [empleado("40123456", "Nuevo", "nuevo@techacademy.invalid")],
+        },
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert respuesta.json()["detail"] == "La comisión ya finalizó."
+    assert db_session.scalars(select(Inscripcion)).all() == []
+

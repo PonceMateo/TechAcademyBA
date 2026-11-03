@@ -246,6 +246,8 @@ def test_edicion_exitosa_devuelve_la_comision_actualizada(
     assert cuerpo["arancel"] == "48000.00"
     assert cuerpo["cupo_maximo"] == 12
     assert cuerpo["vacantes"] == 9
+    # H/U 70: la respuesta de la edición también trae el estado derivado del período guardado.
+    assert cuerpo["estado"] == "Finalizada", cuerpo
 
 
 def test_cupo_por_debajo_de_los_inscriptos_da_422_con_la_cantidad(

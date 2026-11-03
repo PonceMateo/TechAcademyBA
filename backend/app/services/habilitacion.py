@@ -25,10 +25,11 @@ def derivar_montos(session: Session, inscripcion: Inscripcion) -> SimpleNamespac
     muestra dos decimales: sin eso, un arancel con centavos y una beca de dos decimales dejan
     fracciones que se leen como `$0,00` mientras el acceso sigue bloqueado.
 
-    El saldo se deriva del arancel **actual** de la comisión —no hay precio guardado en la
-    inscripción—, nunca es negativo y es nulo en corporativo. Lo observado no descuenta: se informa
-    aparte. `causa`, `imputaciones` y `sin_acreditar` viajan acá porque el estado las necesita para
-    explicar el bloqueo sin volver a leer las imputaciones.
+    El saldo se deriva del importe **base** guardado en la inscripción —o del arancel actual cuando
+    la fila es heredada y no lo tiene—, nunca es negativo y es nulo en corporativo. El descuento de
+    beca se aplica siempre sobre ese base, así cambiar la categoría no deja un importe viejo. Lo
+    observado no descuenta: se informa aparte. `causa`, `imputaciones` y `sin_acreditar` viajan acá
+    porque el estado las necesita para explicar el bloqueo sin volver a leer las imputaciones.
     """
     categoria = inscripcion.categoria or CategoriaInscripcion.PARTICULAR.value
     comision = inscripcion.comision
@@ -39,18 +40,19 @@ def derivar_montos(session: Session, inscripcion: Inscripcion) -> SimpleNamespac
     elif categoria == CategoriaInscripcion.BECADO_TOTAL.value:
         requerido = Decimal(0)
     else:
+        # El importe guardado es el base prorrateado, sin descuento (D77). El descuento de la beca
+        # se aplica siempre acá, sobre ese base, así un cambio de categoría no deja un monto viejo.
         requerido = (
             Decimal(inscripcion.importe_arancel)
             if inscripcion.importe_arancel is not None
             else arancel
         )
         if (
-            inscripcion.importe_arancel is None
-            and categoria == CategoriaInscripcion.BECADO_PARCIAL.value
+            categoria == CategoriaInscripcion.BECADO_PARCIAL.value
             and inscripcion.porcentaje_beca is not None
         ):
             descuento = Decimal(inscripcion.porcentaje_beca)
-            requerido = arancel * (Decimal(100) - descuento) / Decimal(100)
+            requerido *= (Decimal(100) - descuento) / Decimal(100)
         requerido = requerido.quantize(CENTAVOS, rounding=ROUND_HALF_UP)
 
     imputaciones = list(

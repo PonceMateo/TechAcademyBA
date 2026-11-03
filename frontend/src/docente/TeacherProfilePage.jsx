@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '../auth/SessionContext'
 import { Avatar, Badge, Button, CampoTelefono, Card, Input, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
+import { ESTADO_COMISION } from '../domain/enums'
 import { emailConForma, formatearCuil } from '../domain/validacion'
 import { actualizarPerfilDocente, obtenerPerfilDocente } from '../services/dataService'
 import { formatDocumento, inicialesDe } from '../utils/formato'
@@ -34,8 +35,11 @@ const COLUMNAS = [
   {
     clave: 'estado',
     titulo: 'ESTADO',
+    // H/U 70: el estado viene derivado de `fecha_fin`, así que la vigente es la única en verde.
     render: (fila) => (
-      <Badge tono={fila.estado === 'Activa' ? TONO.VERDE : TONO.GRIS}>{fila.estado}</Badge>
+      <Badge tono={fila.estado === ESTADO_COMISION.FINALIZADA ? TONO.GRIS : TONO.VERDE}>
+        {fila.estado}
+      </Badge>
     ),
   },
 ]
