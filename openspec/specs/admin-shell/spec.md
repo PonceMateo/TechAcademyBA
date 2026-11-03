@@ -134,9 +134,14 @@ La **vista de comisiones del curso**, en la ruta `/admin/cursos/:codigo`, SHALL 
 comisiones del curso de la ruta con el chip del total del catálogo, el nombre y el código del curso a
 la vista, la acción `Volver a cursos` y la acción `+ Nueva Comisión`. La tabla SHALL conservar las
 columnas, con estos rótulos literales y en este orden: `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`,
-`HORARIO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES`, y SHALL contener solamente las comisiones del curso
-de la ruta. La vista de comisiones del curso SHALL NOT ofrecer la acción `+ Nuevo Curso`: dentro de
-un curso no tiene sentido dar de alta otro curso.
+`HORARIO`, `PERÍODO`, `ESTADO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES`, y SHALL contener
+solamente las comisiones del curso de la ruta. La vista de comisiones del curso SHALL NOT ofrecer la
+acción `+ Nuevo Curso`: dentro de un curso no tiene sentido dar de alta otro curso.
+
+La columna `ESTADO` SHALL mostrar un chip `Vigente` en verde cuando la comisión tenga `fecha_fin` hoy
+o posterior en `America/Argentina/Buenos_Aires`, y un chip `Finalizada` en gris cuando sea anterior a
+hoy. La tabla SHALL mostrar todas las comisiones del curso, vigentes y finalizadas, y el contador
+`COMISIONES` del Dashboard SHALL seguir contando todas, porque la fuente no filtra por estado.
 
 La tabla de la vista de comisiones del curso SHALL mostrar las comisiones que devuelve el catálogo,
 con los datos que la fuente informa de cada una. La pantalla SHALL NOT inventar cursos ni comisiones
@@ -154,10 +159,11 @@ cupo 40, 40 vacantes y `$38.000`. El modo mock SHALL NOT guardar horarios que el
 producir: los textos del ejemplo salen de los horarios estructurados, no de escribirlos a mano. En
 el modo por omisión las filas son las que hay en la base, no las del ejemplo.
 
-La columna `VACANTES` SHALL mostrar el conteo de vacantes que la fuente informa para cada comisión, y
-cuando valga 0 la fila SHALL llevar el chip `LLENO` en rojo junto al valor. En los datos de ejemplo
-la fila de `CUR-104` es la única con 0 vacantes, porque el cliente la registra con estado `Cerrada
-por cupo`.
+La columna `VACANTES` SHALL mostrar el conteo de vacantes que la fuente informa para cada comisión
+`Vigente`, y cuando valga 0 la fila SHALL llevar el chip `LLENO` en rojo junto al valor. WHEN la
+comisión esté `Finalizada`, la columna SHALL mostrar `—` y SHALL NOT mostrar el chip `LLENO`, porque
+una comisión terminada no ofrece vacantes. En los datos de ejemplo la fila de `CUR-104` es la única
+con 0 vacantes y chip `LLENO`.
 
 La columna `HORARIO` SHALL usar el renderer compacto del horario: una línea con ellipsis, el texto
 completo en el tooltip y, cuando el horario tenga más de un grupo de días, el badge `+N` que abre un
@@ -165,22 +171,22 @@ popover con la lista completa. El `N` del badge SHALL ser la cantidad de grupos 
 entran en la línea: con dos grupos en la celda el badge dice `+1`, y con un solo grupo no hay badge.
 
 El sistema SHALL abrir el modal `Crear Nueva Comisión` con los campos, en este orden literal:
-`Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de
-Comisión (AR$)` y `Modalidad`, más `Sede` cuando el campo corresponda renderizarse, con los botones
-`Cancelar` y `Guardar Comisión`. La fila `Días y Horarios` SHALL ocupar el ancho completo del modal y
-SHALL mostrar el horario cargado como chips de solo lectura —un chip por cada grupo de días con el
-mismo rango, con `flex-wrap` y sin truncar—, más el botón `Agregar horarios` cuando no hay ninguno o
-`Modificar horarios` cuando ya hay alguno. WHEN no haya horarios, la fila SHALL mostrar el texto
-`Sin horarios definidos`. El campo SHALL ser obligatorio: sin horarios, el formulario SHALL mostrar
-el error `Agregá al menos un horario` bajo el campo y SHALL NOT crear la comisión. El modal SHALL
-tener una altura máxima con scroll interno, de modo que el campo de horarios, el resto de los campos
-y el pie del modal se puedan ver sin salirse de la ventana. El modal SHALL NOT pedir un código de
-comisión: el código lo deriva el sistema del curso y del número, y la pantalla lo muestra al
-confirmar. `Docente Asignado` SHALL ser una selección de los docentes del padrón y SHALL NOT ser un
-campo de búsqueda de texto libre. `Modalidad` SHALL ofrecer `Virtual`, `Presencial` y `Híbrido`.
-`Sede` SHALL ser opcional en toda modalidad: SHALL renderizarse solo cuando la modalidad elegida sea
-`Presencial` o `Híbrido`, y SHALL NOT renderizarse cuando la modalidad sea `Virtual` ni mientras el
-selector siga en `Seleccionar…`, que es como abre el modal.
+`Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Fecha de Inicio`, `Fecha de Fin`, `Cupo
+Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, más `Sede` cuando el campo corresponda
+renderizarse, con los botones `Cancelar` y `Guardar Comisión`. La fila `Días y Horarios` SHALL ocupar
+el ancho completo del modal y SHALL mostrar el horario cargado como chips de solo lectura —un chip
+por cada grupo de días con el mismo rango, con `flex-wrap` y sin truncar—, más el botón `Agregar
+horarios` cuando no hay ninguno o `Modificar horarios` cuando ya hay alguno. WHEN no haya horarios,
+la fila SHALL mostrar el texto `Sin horarios definidos`. El campo SHALL ser obligatorio: sin
+horarios, el formulario SHALL mostrar el error `Agregá al menos un horario` bajo el campo y SHALL
+NOT crear la comisión. El modal SHALL tener una altura máxima con scroll interno, de modo que el
+campo de horarios, el resto de los campos y el pie del modal se puedan ver sin salirse de la
+ventana. El modal SHALL NOT pedir un código de comisión: el código lo deriva el sistema del curso y
+del número, y la pantalla lo muestra al confirmar. `Docente Asignado` SHALL ser una selección de los
+docentes del padrón y SHALL NOT ser un campo de búsqueda de texto libre. `Modalidad` SHALL ofrecer
+`Virtual`, `Presencial` y `Híbrido`. `Sede` SHALL ser opcional en toda modalidad: SHALL renderizarse
+solo cuando la modalidad elegida sea `Presencial` o `Híbrido`, y SHALL NOT renderizarse cuando la
+modalidad sea `Virtual` ni mientras el selector siga en `Seleccionar…`, que es como abre el modal.
 
 WHEN el modal de alta de comisión se abre desde la vista de comisiones del curso, el campo
 `Curso / Programa` SHALL venir elegido con el curso de la ruta y SHALL quedar bloqueado a ese curso,
@@ -218,12 +224,12 @@ con el motivo que informa la fuente y SHALL NOT confirmar la edición.
 
 La columna `ACCIONES` SHALL mostrar el botón `Editar` en cada fila. La pantalla SHALL abrir el modal
 `Editar Comisión` con los campos `Docente Asignado`, `Días y Horarios` —con el mismo tratamiento de
-chips de solo lectura y botón `Modificar horarios` que en el alta—, `Cupo Máximo` y `Valor de Arancel
-de Comisión (AR$)`, precargados con los valores actuales, y SHALL NOT mostrar los campos
-`Curso / Programa`, `Modalidad`, `Sede` ni ningún campo de código. El modal SHALL mostrar la cantidad
-de inscriptos activos de la comisión y SHALL usar los botones `Cancelar` y `Guardar Cambios`. Los
-horarios se cargan con el selector de horarios y se envían estructurados; la pantalla SHALL NOT pedir
-ni enviar el horario como texto libre.
+chips de solo lectura y botón `Modificar horarios` que en el alta—, `Fecha de Inicio`, `Fecha de
+Fin`, `Cupo Máximo` y `Valor de Arancel de Comisión (AR$)`, precargados con los valores actuales, y
+SHALL NOT mostrar los campos `Curso / Programa`, `Modalidad`, `Sede` ni ningún campo de código. El
+modal SHALL mostrar la cantidad de inscriptos activos de la comisión y SHALL usar los botones
+`Cancelar` y `Guardar Cambios`. Los horarios se cargan con el selector de horarios y se envían
+estructurados; la pantalla SHALL NOT pedir ni enviar el horario como texto libre.
 
 WHEN el cupo máximo informado sea menor que la cantidad de inscriptos activos, la pantalla SHALL
 rechazar el guardado e informar la cantidad actual, sin cerrar el modal ni confirmar la edición. Un
@@ -241,7 +247,7 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 #### Scenario: El usuario revisa el listado de comisiones
 
 - **WHEN** el usuario abre un curso del catálogo desde la vista de cursos
-- **THEN** ve el bloque `Comisiones Activas` de ese curso con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES` en ese orden, y las comisiones de ese curso con su arancel formateado
+- **THEN** ve el bloque `Comisiones Activas` de ese curso con las columnas `CÓDIGO`, `CURSO / PROGRAMA`, `DOCENTE`, `HORARIO`, `PERÍODO`, `ESTADO`, `CUPO MÁX.`, `VACANTES`, `ARANCEL` y `ACCIONES` en ese orden, y las comisiones de ese curso con su arancel formateado y su estado
 
 #### Scenario: El usuario abre la vista de cursos
 
@@ -273,6 +279,16 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 - **WHEN** el usuario pulsa `+ Nueva Comisión` en la vista de cursos
 - **THEN** el modal abre con `Curso / Programa` vacío y editable, ofreciendo cualquier curso del catálogo
 
+#### Scenario: El usuario ve el estado de cada comisión
+
+- **WHEN** el usuario recorre la columna `ESTADO` de un curso con comisiones terminadas y en curso
+- **THEN** las comisiones con `fecha_fin` anterior a hoy muestran el chip gris `Finalizada` y las demás el chip verde `Vigente`, y la tabla las muestra a todas
+
+#### Scenario: El usuario consulta las vacantes de una comisión finalizada
+
+- **WHEN** el usuario mira la fila de una comisión `Finalizada`
+- **THEN** `VACANTES` muestra `—` y no muestra el chip `LLENO`, porque la comisión no admite inscripciones
+
 #### Scenario: El usuario busca la comisión cerrada por cupo
 
 - **WHEN** el usuario abre el curso de `CUR-104` Diseño UX/UI Avanzado
@@ -286,7 +302,7 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 #### Scenario: El usuario abre el modal de alta
 
 - **WHEN** el usuario pulsa `+ Nueva Comisión`
-- **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, con los botones `Cancelar` y `Guardar Comisión`, no muestra ningún campo para el código de la comisión porque el sistema lo genera, y tampoco muestra `Sede`: el modal abre con `Modalidad` en `Seleccionar…` y el campo aparece recién cuando la modalidad elegida sea `Presencial` o `Híbrido`
+- **THEN** el modal `Crear Nueva Comisión` muestra los campos en el orden `Curso / Programa`, `Docente Asignado`, `Días y Horarios`, `Fecha de Inicio`, `Fecha de Fin`, `Cupo Máximo`, `Valor de Arancel de Comisión (AR$)` y `Modalidad`, con los botones `Cancelar` y `Guardar Comisión`, no muestra ningún campo para el código de la comisión porque el sistema lo genera, y tampoco muestra `Sede`: el modal abre con `Modalidad` en `Seleccionar…` y el campo aparece recién cuando la modalidad elegida sea `Presencial` o `Híbrido`
 
 #### Scenario: La fila de horarios empieza vacía
 
@@ -375,8 +391,13 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 
 #### Scenario: El usuario edita una comisión
 
-- **WHEN** el usuario pulsa `Editar` en una comisión, cambia el docente, los horarios, el cupo o el arancel y guarda
-- **THEN** el modal se cierra, la fila muestra los nuevos valores y vacantes, y la pantalla confirma que la comisión se actualizó
+- **WHEN** el usuario pulsa `Editar` en una comisión, cambia el docente, los horarios, el período, el cupo o el arancel y guarda
+- **THEN** el modal se cierra, la fila muestra los nuevos valores, el estado y las vacantes, y la pantalla confirma que la comisión se actualizó
+
+#### Scenario: El usuario reactiva una comisión finalizada
+
+- **WHEN** el usuario edita la fecha de fin de una comisión finalizada y la establece en una fecha futura
+- **THEN** el modal se cierra, la fila muestra el chip `Vigente` y las vacantes vuelven a informarse
 
 #### Scenario: El usuario reduce el cupo por debajo de los inscriptos
 
@@ -386,7 +407,7 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 #### Scenario: El modal de edición no cambia el curso ni la modalidad
 
 - **WHEN** el usuario abre `Editar Comisión`
-- **THEN** ve solo docente, el bloque de horarios, cupo y arancel, y no ve campos para el curso, la modalidad, la sede ni el código
+- **THEN** ve solo docente, el bloque de horarios, las dos fechas del período, cupo y arancel, y no ve campos para el curso, la modalidad, la sede ni el código
 
 #### Scenario: El usuario edita un curso
 
@@ -1107,7 +1128,12 @@ El modal de inscripción de la pantalla de Comisiones SHALL pedir alumno, comisi
 arancelaria. WHEN la categoría sea beca parcial, SHALL pedir un porcentaje entero entre 1 y 99.
 WHEN sea corporativo, SHALL pedir una empresa del padrón y SHALL ofrecer `+ Nueva Empresa` para
 darla de alta sin perder lo cargado. La pantalla SHALL validar antes de enviar y SHALL mostrar bajo
-el campo correspondiente el motivo que devuelva la fuente cuando el alta se rechace.
+el campo correspondiente el motivo que devuelva la fuente cuando el alta se rechace. El selector de
+comisión SHALL NOT ofrecer las comisiones `Finalizadas`, y WHEN la fuente rechace el alta porque la
+comisión ya finalizó, el modal SHALL mostrar ese motivo sin cerrarse. WHEN el modal se abra desde la
+vista de comisiones de un curso, en `/admin/cursos/:codigo`, el selector de comisión SHALL ofrecer
+solamente las comisiones de ese curso, igual que el alta de comisión dentro del curso; WHEN se abra
+desde la vista de cursos, SHALL ofrecer cualquier comisión del catálogo.
 
 #### Scenario: Inscripción particular
 
@@ -1142,6 +1168,26 @@ el campo correspondiente el motivo que devuelva la fuente cuando el alta se rech
 #### Scenario: La comisión está completa
 
 - **WHEN** la fuente rechaza el alta porque la comisión alcanzó su cupo
+- **THEN** el modal sigue abierto con lo cargado y muestra el motivo que devuelve la fuente
+
+#### Scenario: El selector no ofrece comisiones finalizadas
+
+- **WHEN** el administrador abre el selector de comisión del modal de inscripción
+- **THEN** solo aparecen las comisiones `Vigentes`
+
+#### Scenario: El selector se limita al curso abierto
+
+- **WHEN** el administrador inscribe un alumno desde `/admin/cursos/CUR-101`
+- **THEN** el selector de comisión ofrece solo las comisiones de `CUR-101` y no las de otros cursos
+
+#### Scenario: El selector del catálogo no se limita
+
+- **WHEN** el administrador inscribe un alumno desde la vista de cursos, en `/admin/cursos`
+- **THEN** el selector de comisión ofrece todas las comisiones vigentes del catálogo
+
+#### Scenario: La comisión finalizó mientras el modal estaba abierto
+
+- **WHEN** la fuente rechaza el alta porque la comisión ya finalizó
 - **THEN** el modal sigue abierto con lo cargado y muestra el motivo que devuelve la fuente
 
 ### Requirement: Identificación de la inscripción al imputar un pago
@@ -1281,3 +1327,79 @@ anuncia `Incluye $X en comprobantes observados`.
 
 - **WHEN** la inscripción no tiene comprobantes observados
 - **THEN** la fila del saldo no muestra el indicador
+
+### Requirement: Apertura de una comisión desde el listado
+
+La tabla de comisiones del curso SHALL abrir la comisión al hacer click sobre su fila o al activarla
+con `Enter` o espacio, navegando a `/admin/cursos/:codigo/comisiones/:comisionId`. El botón `Editar`
+SHALL seguir siendo una acción independiente que abre el modal de edición y SHALL NOT disparar la
+navegación. Las dos acciones SHALL ser accesibles por teclado.
+
+#### Scenario: Abrir la comisión desde la fila
+
+- **WHEN** el administrador hace click sobre una fila de la tabla de comisiones del curso
+- **THEN** la aplicación navega a la pantalla de gestión de inscriptos de esa comisión
+
+#### Scenario: Editar no navega
+
+- **WHEN** el administrador pulsa `Editar` en una fila de comisiones
+- **THEN** se abre el modal de edición de la comisión y la pantalla no cambia de ruta
+
+#### Scenario: Navegación por teclado
+
+- **WHEN** el administrador enfoca una fila y presiona `Enter` o espacio
+- **THEN** la aplicación abre la comisión de esa fila
+
+### Requirement: Pantalla de inscriptos de una comisión
+
+La pantalla SHALL mostrar el nombre del curso, el código de la comisión, una acción para volver al
+listado de comisiones del curso, el cupo máximo, la cantidad de inscriptos activos y las vacantes
+que informa la fuente. La tabla SHALL mostrar por inscripción el nombre del alumno, su DNI, la
+categoría arancelaria y el estado de habilitación derivado.
+
+#### Scenario: Volver al listado
+
+- **WHEN** el administrador pulsa `Volver a las comisiones`
+- **THEN** vuelve a `/admin/cursos/:codigo` con la tabla de comisiones del curso
+
+#### Scenario: Contadores de la comisión
+
+- **WHEN** la comisión tiene cupo 30 y 2 inscripciones activas, una de ellas dada de baja
+- **THEN** la pantalla muestra cupo 30, 2 inscriptos activos y 28 vacantes
+
+#### Scenario: Comisión sin inscriptos
+
+- **WHEN** la comisión no tiene ninguna inscripción
+- **THEN** la tabla dice que no hay inscriptos y los contadores informan cero inscriptos y el cupo completo de vacantes
+
+#### Scenario: Error de carga
+
+- **WHEN** la fuente rechaza la consulta de la comisión
+- **THEN** la pantalla muestra el motivo y la acción de volver, sin filas inventadas
+
+### Requirement: Acciones sobre una inscripción desde la comisión
+
+La pantalla SHALL ofrecer `Inscribir alumno`, `Cambiar categoría` y `Dar de baja`. La categoría
+SHALL guardarse sobre esa inscripción y SHALL NOT tocar las demás del alumno. La baja SHALL pedir
+confirmación, SHALL NOT ofrecerse sobre una inscripción ya dada de baja y SHALL actualizar el estado
+y las vacantes al confirmar.
+
+#### Scenario: Inscripción con la comisión bloqueada
+
+- **WHEN** el administrador inscribe un alumno desde la comisión
+- **THEN** la comisión aparece elegida y bloqueada, no se puede cambiar y el alta actualiza la tabla y las vacantes
+
+#### Scenario: Cambio de categoría
+
+- **WHEN** el administrador cambia la categoría de una inscripción desde la comisión
+- **THEN** solo esa inscripción queda con la categoría nueva y el listado se actualiza
+
+#### Scenario: Baja con confirmación
+
+- **WHEN** el administrador elige `Dar de baja` y confirma
+- **THEN** la inscripción pasa a `BAJA`, se muestra en el historial y las vacantes aumentan en uno
+
+#### Scenario: Baja rechazada por la fuente
+
+- **WHEN** la fuente responde que la inscripción ya no está activa
+- **THEN** la pantalla muestra el motivo, recarga el listado y no confirma la baja

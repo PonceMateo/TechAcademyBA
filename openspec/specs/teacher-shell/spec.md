@@ -73,10 +73,11 @@ esas comisiones y la próxima clase que estas informan, con un `0` real cuando e
 `—` cuando la fuente no puede responder (por ejemplo, cuando no hay ninguna próxima clase). Las
 tarjetas SHALL NOT mostrar valores literales fijos, sino los que resultan de las comisiones
 asignadas del docente. SHALL mostrar el bloque `Comisiones asignadas` con una fila por comisión
-asignada, con su código, su curso, su horario, su próxima clase y los conteos de habilitados y
-bloqueados de su padrón. El docente del maquetado tiene exactamente una comisión asignada en los
-datos del cliente, por lo que el maquetado SHALL NOT inventar comisiones adicionales para
-completar el bloque.
+asignada, con su código, su curso, su horario, su estado `Vigente` o `Finalizada`, su próxima clase y
+los conteos de habilitados y bloqueados de su padrón. Una comisión `Finalizada` SHALL seguir
+apareciendo en la vista del docente con su estado, sin eliminarse por haber terminado. El docente del
+maquetado tiene exactamente una comisión asignada en los datos del cliente, por lo que el maquetado
+SHALL NOT inventar comisiones adicionales para completar el bloque.
 
 El tablero SHALL conservar siempre su forma: las cuatro tarjetas, el bloque `Comisiones
 asignadas` y el bloque `Tu agenda` SHALL renderizarse aunque su dato no exista todavía, y el
@@ -119,6 +120,10 @@ inconsistencia del prototipo.
 #### Scenario: El docente cruza los indicadores con su única comisión
 - **WHEN** el docente compara `COMISIONES ACTIVAS` con el contenido del bloque `Comisiones asignadas`
 - **THEN** los conteos de las tarjetas coinciden con las comisiones asignadas y su padrón, porque los indicadores se derivan de las comisiones asignadas y no de valores fijos
+
+#### Scenario: El docente ve una comisión finalizada
+- **WHEN** el docente tiene asignada una comisión cuya `fecha_fin` es anterior a hoy en `America/Argentina/Buenos_Aires`
+- **THEN** la comisión sigue apareciendo en el bloque `Comisiones asignadas` con el estado `Finalizada`
 
 #### Scenario: El docente busca la columna de restricciones
 - **WHEN** el docente lee los encabezados de la tabla de comisiones

@@ -52,9 +52,10 @@ El sistema SHALL exponer la consulta de comisiones y su alta. La consulta
 `GET /comisiones` SHALL devolver las comisiones con su código derivado, su curso, su
 docente, sus horarios de cursada, su texto de días y horarios, su cupo máximo, su arancel
 y su modalidad, además de su período de cursada —fecha de inicio y fecha de fin— y la
-cantidad de clases derivada de él. El alta `POST /comisiones` SHALL aceptar el curso, el
-docente, los horarios de cursada, el arancel, el cupo máximo, la modalidad, la sede
-opcional y el período de cursada.
+cantidad de clases derivada de él. La consulta SHALL devolver **todas** las comisiones, incluidas
+las finalizadas, y cada una SHALL informar su estado `Vigente` o `Finalizada` derivado de
+`fecha_fin`. El alta `POST /comisiones` SHALL aceptar el curso, el docente, los horarios de cursada,
+el arancel, el cupo máximo, la modalidad, la sede opcional y el período de cursada.
 
 Los horarios SHALL venir como una lista no vacía de rangos, y cada rango SHALL traer el
 día de la semana (`LUN` a `DOM`), la hora de inicio y la hora de fin en formato `HH:MM`.
@@ -88,12 +89,17 @@ WHEN la lista traiga dos rangos que se pisen dentro de la misma comisión, el si
 rechazar el alta con `422` e indicar qué dato corregir.
 
 WHEN el docente ya tenga, en cualquier curso, otra comisión **vigente** —con `activo` en
-verdadero— el mismo día cuyo rango se pise con el que se está creando, el sistema SHALL
-rechazar el alta con `409` e informar la comisión en conflicto con su código, su día y su
-rango. Dos horarios que se tocan sin pisarse —uno termina a las 18:30 y el otro empieza a
-las 18:30— SHALL permitirse, porque la comparación de intervalos es estricta. El mismo
-horario dictado por docentes distintos SHALL permitirse. Comisiones no vigentes SHALL NOT
-participar del chequeo, y una comisión sin docente asignado SHALL NO ser chequeada.
+verdadero— el mismo día cuyo rango se pise con el que se está creando **y sus períodos se crucen**,
+el sistema SHALL rechazar el alta con `409` e informar la comisión en conflicto con su código, su
+día y su rango. Dos comisiones del mismo docente SHALL poder compartir día y horario cuando sus
+períodos no se cruzan, y SHALL NOT considerarse cruce cuando uno termina el mismo día en que el
+otro empieza: ese día compartido es el borde de los dos períodos y no un solapamiento. WHEN alguna
+de las dos comisiones no tenga período cargado, la comparación SHALL ser solo por día y horario,
+como hasta ahora, porque no hay fechas con las que descartar el cruce. Dos horarios que se tocan sin
+pisarse —uno termina a las 18:30 y el otro empieza a las 18:30— SHALL permitirse, porque la
+comparación de intervalos es estricta. El mismo horario dictado por docentes distintos SHALL
+permitirse. Comisiones no vigentes SHALL NOT participar del chequeo, y una comisión sin docente
+asignado SHALL NO ser chequeada.
 
 El `docente_id` SHALL ser obligatorio en el alta, aunque la columna de la comisión admita
 ausencia para poder asignar el docente más adelante. WHEN falte el docente, el sistema
@@ -111,11 +117,15 @@ el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Alta de comisión correcta
 - **WHEN** se envía una comisión con curso, docente, horarios de cursada, período de cursada, cupo máximo, arancel y modalidad
-- **THEN** el sistema responde con la comisión creada, su código derivado, sus horarios y la cantidad de clases calculada, y la comisión queda asociada al curso
+- **THEN** el sistema responde con la comisión creada, su código derivado, sus horarios, la cantidad de clases calculada y su estado, y la comisión queda asociada al curso
 
 #### Scenario: La respuesta trae los horarios estructurados
 - **WHEN** se consulta el listado o se recibe la respuesta del alta
 - **THEN** cada comisión trae sus horarios como filas de día, inicio y fin, además del texto `dias_horarios` derivado de ellos
+
+#### Scenario: La consulta informa el estado de cada comisión
+- **WHEN** se consulta el listado de comisiones
+- **THEN** cada fila informa `Vigente` o `Finalizada` según su `fecha_fin`, y aparecen tanto las vigentes como las finalizadas
 
 #### Scenario: El alta no admite texto libre de horarios
 - **WHEN** se envía una comisión con `dias_horarios` en lugar de la lista de horarios
@@ -162,8 +172,16 @@ el conflicto (historias #2, #5 y #8).
 - **THEN** la respuesta informa el período y la cantidad de clases como no definidos, sin completarlos con valores de ejemplo
 
 #### Scenario: Choque de horario con otra comisión del mismo docente
-- **WHEN** el docente tiene otra comisión vigente, en otro curso, el martes de 19:00 a 21:00, y se crea una comisión suya del martes de 20:00 a 22:00
+- **WHEN** el docente tiene otra comisión vigente, en otro curso, el martes de 19:00 a 21:00 con un período que se cruza, y se crea una comisión suya del martes de 20:00 a 22:00
 - **THEN** el sistema responde `409` e informa la comisión en conflicto con su código, su día y su rango
+
+#### Scenario: Mismo día y horario con períodos que no se cruzan
+- **WHEN** el docente tiene una comisión que finaliza el lunes y se da de alta otra que empieza ese mismo lunes a las 19 hs, sin que los períodos se crucen
+- **THEN** el sistema acepta el alta, porque el chequeo del docente compara día, horario y período
+
+#### Scenario: Períodos que se cruzan en la misma franja
+- **WHEN** el docente tiene una comisión del martes de 19:00 a 21:00 que termina el 30 de junio y se crea otra del martes de 19:00 a 21:00 que empieza el 1 de junio
+- **THEN** el sistema responde `409`, porque los períodos se superponen además del día y el horario
 
 #### Scenario: Los bordes exactos se permiten
 - **WHEN** una comisión del mismo docente termina a las 18:30 y la nueva empieza a las 18:30 el mismo día
@@ -176,6 +194,10 @@ el conflicto (historias #2, #5 y #8).
 #### Scenario: Las comisiones no vigentes no chocan
 - **WHEN** la comisión del mismo docente que se cruza está dada de baja (`activo` en falso)
 - **THEN** el sistema acepta el alta
+
+#### Scenario: Comisión heredada sin fechas en el chequeo
+- **WHEN** la comisión del mismo docente que comparte día y horario no tiene el período cargado
+- **THEN** el sistema responde `409`, porque sin fechas no puede descartar el cruce
 
 #### Scenario: Cupo inválido
 - **WHEN** se envía un cupo máximo cero, negativo o no numérico
@@ -203,7 +225,7 @@ el conflicto (historias #2, #5 y #8).
 
 #### Scenario: Listado de comisiones
 - **WHEN** se consulta el listado de comisiones
-- **THEN** cada fila trae el código derivado, el nombre del curso, el docente, los horarios y su texto derivado, el período de cursada con su cantidad de clases, el cupo máximo y el arancel
+- **THEN** cada fila trae el código derivado, el nombre del curso, el docente, los horarios y su texto derivado, el período de cursada con su cantidad de clases, el estado derivado, el cupo máximo y el arancel
 
 ### Requirement: Consulta y alta de docentes
 

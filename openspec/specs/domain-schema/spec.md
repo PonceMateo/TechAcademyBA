@@ -72,7 +72,12 @@ comisión SHALL NOT llevar `sede_id`. Las vacantes SHALL derivarse de `cupo_maxi
 la cantidad de inscripciones activas y SHALL NOT almacenarse como un valor editable
 (historias #2, #5, #6, #7 y #8).
 
-Las dos reglas que dependen de las inscripciones —no Inscribir en una comisión sin vacantes y no
+El **estado de la comisión** SHALL derivarse de `fecha_fin` y SHALL NOT almacenarse como columna
+ni requerir un job programado. La comparación SHALL hacerse contra el día corriente en la zona
+horaria `America/Argentina/Buenos_Aires`: la comisión SHALL estar `Vigente` cuando `fecha_fin` sea
+hoy o posterior y `Finalizada` cuando `fecha_fin` sea anterior a hoy (H/U 70).
+
+Las dos reglas que dependen de las inscripciones —no inscribir en una comisión sin vacantes y no
 reducir el cupo por debajo de los inscriptos— **quedan diferidas al change de inscripciones**.
 Este change no incluye el alta de inscripciones, así que todavía no hay servicio ni endpoint que
 las pueda rechazar. Se mantienen escritas porque el modelo las tiene que sostener cuando existan,
@@ -121,6 +126,22 @@ y la forma de derivar las vacantes por consulta —que es su base— ya está re
 #### Scenario: Reducción de cupo por debajo de los inscriptos
 - **WHEN** una comisión tiene 15 inscripciones activas y se intenta reducir su cupo máximo a un valor menor que 15
 - **THEN** **Diferido a las inscripciones.** No existe endpoint que modifique `cupo_maximo`, así que el cambio no se puede intentar y la regla no está verificada. Cuando exista, la regla se sostiene con la misma derivación de vacantes por consulta, sin columna nueva
+
+#### Scenario: Estado derivado de la fecha de fin
+- **WHEN** se consulta una comisión cuya `fecha_fin` es hoy o una fecha posterior en `America/Argentina/Buenos_Aires`
+- **THEN** el sistema informa el estado `Vigente`
+
+#### Scenario: Comisión finalizada
+- **WHEN** se consulta una comisión cuya `fecha_fin` es anterior a hoy en `America/Argentina/Buenos_Aires`
+- **THEN** el sistema informa el estado `Finalizada`, sin haber escrito ninguna columna de estado ni ejecutado un job
+
+#### Scenario: El cambio de día mueve el estado sin intervención
+- **WHEN** llega el día siguiente al `fecha_fin` de una comisión `Vigente`
+- **THEN** la misma consulta la informa como `Finalizada`, porque el estado se calcula por consulta
+
+#### Scenario: Comisión heredada sin fecha de fin
+- **WHEN** se consulta una comisión que no tiene `fecha_fin` cargada
+- **THEN** el sistema la informa como `Vigente`, porque no hay fecha con la que afirmar que terminó y bloquearla impediría inscribir sobre datos incompletos
 
 ### Requirement: Padrón de docentes y alumnos
 
@@ -184,7 +205,7 @@ requiere no forman parte de este change: su definición se discute con el client
 
 ### Requirement: Inscripciones con categoría arancelaria
 
-El sistema SHALL almacenar una inscripción que vincule un alumno con una comisión, y la combinación alumno y comisión SHALL ser única. Cada inscripción SHALL tener una categoría arancelaria y un estado entre Activa, En espera, Baja y Completada. La categoría SHALL tomar un valor entre Particular, Becado parcial, Becado total y Corporativo. WHEN la categoría sea Becado parcial, `porcentaje_beca` SHALL ser obligatorio y SHALL estar entre 1 y 99; en cualquier otra categoría SHALL ser nulo. WHEN la categoría sea Corporativo, la empresa asociada SHALL ser obligatoria. La categoría Becado total SHALL implicar exención de pago (historia #14, historia #15).
+El sistema SHALL almacenar una inscripción que vincule un alumno con una comisión, y la combinación alumno y comisión SHALL ser única. Cada inscripción SHALL tener una categoría arancelaria, un estado entre Activa, En espera, Baja y Completada y un importe arancelario base. La categoría SHALL tomar un valor entre Particular, Becado parcial, Becado total y Corporativo. WHEN la categoría sea Becado parcial, `porcentaje_beca` SHALL ser obligatorio y SHALL estar entre 1 y 99; en cualquier otra categoría SHALL ser nulo. WHEN la categoría sea Corporativo, la empresa asociada SHALL ser obligatoria y el importe SHALL provenir del contrato corporativo. Para una inscripción Particular o Becado parcial en una comisión con período válido, el importe base SHALL calcularse con las clases restantes y SHALL NOT incluir el descuento de beca: el descuento SHALL aplicarse cada vez que se deriva el monto requerido, sobre el importe base guardado. La categoría Becado total SHALL implicar exención de pago (historias #14, #15 y #50).
 
 #### Scenario: Inscripción única
 - **WHEN** se inscribe un alumno en una comisión en la que ya está inscripto
@@ -192,7 +213,7 @@ El sistema SHALL almacenar una inscripción que vincule un alumno con una comisi
 
 #### Scenario: Beca parcial con porcentaje válido
 - **WHEN** se selecciona Becado parcial y se informa un porcentaje de descuento entre 1 y 99
-- **THEN** el sistema guarda la categoría y el porcentaje, y el arancel a abonar se deriva con ese descuento
+- **THEN** el sistema guarda la categoría y el porcentaje, y el monto requerido se deriva aplicando el descuento al importe base
 
 #### Scenario: Porcentaje de beca fuera de rango
 - **WHEN** la categoría es Becado parcial y el porcentaje está fuera del rango o no es numérico
@@ -205,6 +226,30 @@ El sistema SHALL almacenar una inscripción que vincule un alumno con una comisi
 #### Scenario: Beca total exenta
 - **WHEN** una inscripción tiene categoría Becado total
 - **THEN** el sistema la registra como exenta de pago sin requerir imputación de cobros
+
+#### Scenario: Alta antes del inicio
+- **WHEN** se crea una inscripción Particular o Becado parcial en la fecha de inicio o antes
+- **THEN** el importe base corresponde al arancel completo de la comisión
+
+#### Scenario: Alta tardía prorrateada
+- **WHEN** se crea una inscripción Particular en una comisión iniciada, con período válido y clases restantes
+- **THEN** el importe base persistido es el arancel multiplicado por clases restantes y dividido por clases totales, redondeado a centavos
+
+#### Scenario: Beca parcial tardía
+- **WHEN** se crea una inscripción Becado parcial en una comisión iniciada
+- **THEN** el importe base persistido es el arancel prorrateado por clases restantes, **sin** descuento, y el monto requerido se deriva con el porcentaje de beca aplicado sobre ese base
+
+#### Scenario: Cambio de categoría después del alta
+- **WHEN** una inscripción con importe base prorrateado cambia a Becado parcial con un porcentaje entre 1 y 99, o cambia de Becado parcial a Particular
+- **THEN** el monto requerido se vuelve a derivar aplicando o quitando el descuento sobre el mismo importe base, sin volver a prorratear y sin perder el importe histórico de la cursada
+
+#### Scenario: El importe base no sigue al arancel de la comisión
+- **WHEN** se edita el arancel de una comisión que ya tiene inscripciones
+- **THEN** el importe base y el monto requerido de cada inscripción existente conservan el valor calculado en su alta
+
+#### Scenario: Comisión sin período prorrateable
+- **WHEN** se intenta una inscripción que requiere prorrateo y la comisión no tiene período válido o no tiene clases computables
+- **THEN** el sistema rechaza la operación con un mensaje que informa que no se pudo calcular el importe
 
 ### Requirement: Cuentas corporativas y nómina de empleados
 

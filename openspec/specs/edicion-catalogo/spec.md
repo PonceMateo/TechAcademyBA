@@ -75,12 +75,20 @@ días de cursada de la comisión. WHEN falte alguna de las dos fechas, WHEN la f
 anterior a la de inicio o WHEN el período no contenga ninguna clase, el sistema SHALL responder
 `422` y la comisión SHALL conservar el período que tenía.
 
-WHEN los horarios guardados se pisan con los de otra comisión **vigente** del mismo docente, en
-cualquier curso, el sistema SHALL rechazar la edición con `409` e informar la comisión en conflicto
-con su código, su día y su rango. La propia comisión editada SHALL quedar excluida del chequeo, de
-modo que reenviar sus horarios actuales o tocar el rango de un solo día SHALL NOT producir un
-conflicto falso. Los bordes exactos —un rango termina a las 18:30 y otro empieza a las 18:30—
-SHALL permitirse, y un horario dictado por otro docente SHALL NO chocar.
+WHEN los horarios guardados se pisen con los de otra comisión **vigente** del mismo docente, en
+cualquier curso, **y sus períodos se crucen**, el sistema SHALL rechazar la edición con `409` e
+informar la comisión en conflicto con su código, su día y su rango. Dos comisiones del mismo docente
+SHALL poder compartir día y horario cuando sus períodos no se cruzan, y SHALL NOT considerarse cruce
+cuando uno termina el mismo día en que el otro empieza. WHEN alguna de las dos comisiones no tenga
+período cargado, la comparación SHALL ser solo por día y horario. La propia comisión editada SHALL
+quedar excluida del chequeo, de modo que reenviar sus horarios actuales o tocar el rango de un solo
+día SHALL NOT producir un conflicto falso. Los bordes exactos —un rango termina a las 18:30 y otro
+empieza a las 18:30— SHALL permitirse, y un horario dictado por otro docente SHALL NO chocar.
+
+WHEN la edición lleve `fecha_fin` de una comisión `Finalizada` a hoy o a una fecha futura, la
+comisión SHALL volver a quedar `Vigente` y el chequeo de solapamiento del docente SHALL ejecutarse
+con el período nuevo; WHEN ese chequeo encuentre un cruce, el sistema SHALL rechazar la edición con
+`409` y conservar el período anterior.
 
 El docente SHALL ser obligatorio, igual que en el alta. WHEN la comisión o el docente no existan, el
 sistema SHALL responder `404`. WHEN los horarios vengan vacíos, el arancel no sea positivo o el
@@ -97,12 +105,13 @@ el que se envía en la misma edición, sin recalcularse a partir del período.
 
 La respuesta SHALL devolver la comisión actualizada con su código derivado, sus horarios
 estructurados, el texto de días y horarios derivado de ellos, el período con la cantidad de clases
-derivada de él y sus vacantes recalculadas a partir del nuevo cupo y de las inscripciones activas.
+derivada de él, su estado derivado de `fecha_fin` y sus vacantes recalculadas a partir del nuevo cupo
+y de las inscripciones activas.
 
 #### Scenario: Edición exitosa
 
 - **WHEN** se modifican el docente, los horarios, el arancel o el cupo de una comisión con valores válidos y se guarda
-- **THEN** los cambios quedan persistidos, la respuesta trae la comisión con sus horarios y sus vacantes recalculadas, y las inscripciones y pagos siguen asociados a la misma comisión
+- **THEN** los cambios quedan persistidos, la respuesta trae la comisión con sus horarios, su estado y sus vacantes recalculadas, y las inscripciones y pagos siguen asociados a la misma comisión
 
 #### Scenario: Edición del período con valores válidos
 
@@ -131,8 +140,23 @@ derivada de él y sus vacantes recalculadas a partir del nuevo cupo y de las ins
 
 #### Scenario: Choque de horario con otra comisión del mismo docente
 
-- **WHEN** el docente tiene otra comisión vigente, en otro curso, el martes de 19:00 a 21:00, y la edición lleva esa misma comisión al martes de 20:00 a 22:00
+- **WHEN** el docente tiene otra comisión vigente, en otro curso, el martes de 19:00 a 21:00 con un período que se cruza, y la edición lleva esa misma comisión al martes de 20:00 a 22:00
 - **THEN** el sistema responde `409` e informa la comisión en conflicto con su código, su día y su rango
+
+#### Scenario: Períodos que no se cruzan en la edición
+
+- **WHEN** el docente tiene una comisión que finaliza el lunes y se edita otra para que empiece ese mismo lunes a las 19 hs, sin que los períodos se crucen
+- **THEN** el sistema acepta la edición, porque el chequeo compara día, horario y período
+
+#### Scenario: Reactivación de una comisión finalizada
+
+- **WHEN** se edita la `fecha_fin` de una comisión finalizada y se establece hoy o una fecha futura
+- **THEN** la comisión vuelve a quedar `Vigente` en la respuesta y el chequeo de solapamiento del docente se ejecuta con el período nuevo
+
+#### Scenario: Reactivación con solapamiento
+
+- **WHEN** se edita la `fecha_fin` de una comisión finalizada a una fecha futura y, con el período nuevo, sus horarios chocan con otra comisión vigente del mismo docente
+- **THEN** el sistema responde `409` e informa la comisión en conflicto, y la comisión conserva el período anterior
 
 #### Scenario: Los bordes exactos se permiten
 
