@@ -363,8 +363,8 @@ desde la vista de cursos, SHALL ofrecer cualquier comisión del catálogo.
 
 #### Scenario: El selector se limita al curso abierto
 
-- **WHEN** el administrador inscribe un alumno desde `/admin/cursos/CUR001`
-- **THEN** el selector de comisión ofrece solo las comisiones de `CUR001` y no las de otros cursos
+- **WHEN** el administrador inscribe un alumno desde `/admin/cursos/CUR-101`
+- **THEN** el selector de comisión ofrece solo las comisiones de `CUR-101` y no las de otros cursos
 
 #### Scenario: El selector del catálogo no se limita
 

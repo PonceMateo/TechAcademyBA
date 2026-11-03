@@ -30,18 +30,18 @@
 
 ## 6. Administración: estado y selector
 
-- [ ] 6.1 Agregar la columna `ESTADO` después de `PERÍODO` en la tabla de comisiones, con chip verde `Vigente` y chip gris `Finalizada`, y mostrar `—` en `VACANTES` de las finalizadas sin chip `LLENO`. Verificar con tests de `CoursesPage` que cubran las dos filas y el chip.
-- [ ] 6.2 Hacer que `InscripcionModal` ofrezca solo las comisiones vigentes y, cuando se abra desde `/admin/cursos/:codigo`, solo las de ese curso (`CoursesPage` le pasa `comisionesDelCurso` en lugar del catálogo); mostrar el motivo cuando la fuente responde `422` por comisión finalizada. Verificar con tests de `CoursesPage` y de `InscripcionModal` que cubran el selector acotado por curso y el del catálogo completo.
-- [ ] 6.3 Agregar el estado de cada comisión al mock de catálogo (derivado de `fecha_fin`), quitar la etiqueta `Cerrada por cupo` de la vista del docente y mantener el contador `COMISIONES` del Dashboard contando todas. Verificar con los tests de `mockDataSource`, `CoursesPage` y el tablero.
+- [x] 6.1 Agregar la columna `ESTADO` después de `PERÍODO` en la tabla de comisiones, con chip verde `Vigente` y chip gris `Finalizada`, y mostrar `—` en `VACANTES` de las finalizadas sin chip `LLENO`. Verificar con tests de `CoursesPage` que cubran las dos filas y el chip.
+- [x] 6.2 Hacer que `InscripcionModal` ofrezca solo las comisiones vigentes y, cuando se abra desde `/admin/cursos/:codigo`, solo las de ese curso (`CoursesPage` le pasa `comisionesDelCurso` en lugar del catálogo); mostrar el motivo cuando la fuente responde `422` por comisión finalizada. Verificar con tests de `CoursesPage` y de `InscripcionModal` que cubran el selector acotado por curso y el del catálogo completo.
+- [x] 6.3 Agregar el estado de cada comisión al mock de catálogo (derivado de `fecha_fin`), quitar la etiqueta `Cerrada por cupo` de la vista del docente y mantener el contador `COMISIONES` del Dashboard contando todas. Verificar con los tests de `mockDataSource`, `CoursesPage` y el tablero.
 
 ## 7. Vista del docente
 
-- [ ] 7.1 Mostrar el estado `Vigente`/`Finalizada` en cada fila de `Comisiones asignadas`, manteniendo la comisión finalizada en la lista. Verificar con un test de la vista del docente con una comisión finalizada.
+- [x] 7.1 Mostrar el estado `Vigente`/`Finalizada` en cada fila de `Comisiones asignadas`, manteniendo la comisión finalizada en la lista. Verificar con un test de la vista del docente con una comisión finalizada.
 
 ## 8. Verificación de integración
 
-- [ ] 8.1 Correr las suites completas en contenedores (`pytest` backend contra PostgreSQL real y `npm test` frontend) y corregir lo que falle. Verificar que no queden tests con el importe anterior ni con `Activa`/`Inactiva`.
-- [ ] 8.2 Recorrer los escenarios de la H/U 70 de punta a punta: consulta de estado, alta y nómina rechazadas, reactivación, vacantes y tabla de Administración, pago permitido y vista del docente. Verificar que cada uno coincida con los deltas de specs.
+- [x] 8.1 Correr las suites completas en contenedores (`pytest` backend contra PostgreSQL real y `npm test` frontend) y corregir lo que falle. Verificar que no queden tests con el importe anterior ni con `Activa`/`Inactiva`.
+- [x] 8.2 Recorrer los escenarios de la H/U 70 de punta a punta: consulta de estado, alta y nómina rechazadas, reactivación, vacantes y tabla de Administración, pago permitido y vista del docente. Verificar que cada uno coincida con los deltas de specs.
 
 ## Workflow follow-up
 
