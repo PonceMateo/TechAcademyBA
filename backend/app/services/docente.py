@@ -124,6 +124,7 @@ def listar_comisiones_asignadas(
                 nombre_curso=comision.curso.nombre,
                 docente_nombre=f"{docente.nombre} {docente.apellido}",
                 horario=comision.resumen_horarios,
+                estado=comision.estado,
                 proxima_clase=_proxima_clase(comision),
                 habilitados=habilitados,
                 bloqueados=len(inscripciones) - habilitados,

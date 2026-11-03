@@ -33,6 +33,8 @@ class ComisionAsignadaDocenteOut(BaseModel):
     nombre_curso: str
     docente_nombre: str
     horario: str
+    # H/U 70: mismo estado derivado que ve Administración, sin columna (D75).
+    estado: str
     proxima_clase: str | None = None
     habilitados: int = 0
     bloqueados: int = 0

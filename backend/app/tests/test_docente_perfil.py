@@ -20,6 +20,7 @@ from app.tests.factories import (
     PASSWORD_DE_PRUEBA,
     crear_alumno,
     crear_comision,
+    crear_curso,
     crear_docente,
     crear_usuario_admin,
     crear_usuario_alumno,
@@ -103,6 +104,42 @@ def test_el_perfil_mantiene_la_comision_finalizada_con_su_estado(
     [asignada] = respuesta.json()["comisiones"]
     assert asignada["codigo"] == comision.codigo
     assert asignada["estado"] == "Finalizada"
+
+
+def test_el_tablero_trae_el_estado_de_cada_comision_asignada(
+    cliente_docente: TestClient, db_session: Session, docente: Docente
+) -> None:
+    """H/U 70: la tabla `Comisiones asignadas` muestra el mismo estado que Administración.
+
+    El tablero usa `/docentes/mis-comisiones`, no el perfil: si esa respuesta no trae `estado`, la
+    columna se dibuja vacía aunque el perfil lo informe.
+    """
+    hoy = date.today()
+    # Un solo curso y sin sede: el padrón del test no puede repetir nombre de curso ni de sede.
+    curso = crear_curso(db_session)
+    crear_comision(
+        db_session,
+        curso=curso,
+        docente=docente,
+        con_sede=False,
+        fecha_inicio=hoy - timedelta(days=90),
+        fecha_fin=hoy + timedelta(days=30),
+    )
+    finalizada = crear_comision(
+        db_session,
+        curso=curso,
+        docente=docente,
+        con_sede=False,
+        fecha_inicio=hoy - timedelta(days=90),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+
+    respuesta = cliente_docente.get("/docentes/mis-comisiones")
+
+    assert respuesta.status_code == 200, respuesta.text
+    estados = {fila["codigo"]: fila["estado"] for fila in respuesta.json()}
+    assert estados[finalizada.codigo] == "Finalizada"
+    assert set(estados.values()) == {"Vigente", "Finalizada"}
 
 
 # --- Edición de email y teléfono ----------------------------------------------------------------
