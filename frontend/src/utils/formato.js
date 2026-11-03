@@ -30,6 +30,25 @@ export function formatMoneda(monto) {
 }
 
 /**
+ * Miles y pesos con centavos.
+ *
+ * La ficha del alumno muestra saldos que pueden ser de un centavo (HU 61): redondear a pesos haría
+ * que un saldo de `0,01` se lea como `$0` mientras el acceso sigue bloqueado.
+ */
+const MILES_CON_CENTAVOS = new Intl.NumberFormat('es-AR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+export function formatMonedaConCentavos(monto) {
+  if (monto === null || monto === undefined || monto === '') {
+    return ''
+  }
+
+  return `$${MILES_CON_CENTAVOS.format(monto)}`
+}
+
+/**
  * `2026-05-10` → `10/05/2026`. Sin `Date`: las fechas del dominio son fechas, no instantes (el
  * instante actual lo formatea `formatFechaLarga`).
  */

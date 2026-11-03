@@ -16,11 +16,59 @@ import {
   listarAlumnos,
   listarComisiones,
   listarCursos,
+  obtenerAlumno,
   obtenerPerfilAlumno,
   reactivarAlumno,
   restablecerPasswordAlumno,
   restablecerPasswordDocente,
 } from './dataService'
+
+describe('detalle del alumno (HU 64 y 61)', () => {
+  it('devuelve una entrada por inscripción con su categoría', async () => {
+    const detalle = await obtenerAlumno(1)
+
+    expect(detalle.inscripciones).toHaveLength(2)
+    expect(detalle.inscripciones.map((inscripcion) => inscripcion.categoria)).toEqual([
+      'PARTICULAR',
+      'CORPORATIVO',
+    ])
+    expect(detalle.inscripciones[1].empresa.razon_social).toBe('Tech Solutions S.A.')
+  })
+
+  it('informa los importes de cada inscripción', async () => {
+    const detalle = await obtenerAlumno(1)
+    const [particular, corporativa] = detalle.inscripciones
+
+    // Juan pagó el arancel completo de la particular y la corporativa va a cargo de la empresa.
+    expect(particular.monto_requerido).toBe(45000)
+    expect(particular.total_pagado).toBe(45000)
+    expect(particular.saldo_pendiente).toBe(0)
+    expect(corporativa.monto_requerido).toBeNull()
+    expect(corporativa.saldo_pendiente).toBeNull()
+  })
+
+  it('descuenta la beca parcial, exime la beca total e informa lo observado', async () => {
+    const [camila] = (await obtenerAlumno(2)).inscripciones
+    const [matias] = (await obtenerAlumno(3)).inscripciones
+    const [valeria] = (await obtenerAlumno(6)).inscripciones
+
+    expect(camila.monto_requerido).toBe(26000)
+    expect(camila.saldo_pendiente).toBe(0)
+    expect(matias.monto_requerido).toBe(0)
+    expect(matias.saldo_pendiente).toBe(0)
+    expect(valeria.total_pagado).toBe(0)
+    expect(valeria.total_observado).toBe(26000)
+    expect(valeria.saldo_pendiente).toBe(52000)
+  })
+
+  it('deja el padrón sin datos de inscripción', async () => {
+    const [alumno] = await listarAlumnos()
+
+    expect(alumno).not.toHaveProperty('comision')
+    expect(alumno).not.toHaveProperty('categoria')
+    expect(alumno).not.toHaveProperty('acceso')
+  })
+})
 
 /**
  * La frontera de datos (8.2).
@@ -308,13 +356,15 @@ describe('la implementación de ejemplo', () => {
     expect(await fuente.listarCobranzas('nadie con ese nombre')).toHaveLength(0)
   })
 
-  it('devuelve la inscripción del alumno para elegir a dónde imputar', async () => {
+  it('devuelve las inscripciones activas del alumno con su categoría (HU 64)', async () => {
     const fuente = createMockDataSource()
 
     const inscripciones = await fuente.listarInscripcionesDeAlumno(1)
-    expect(inscripciones).toHaveLength(1)
+    expect(inscripciones).toHaveLength(2)
     expect(inscripciones[0].estado).toBe('ACTIVA')
     expect(inscripciones[0].comision.codigo).toBe('CUR-101')
+    expect(inscripciones[0].categoria).toBe('PARTICULAR')
+    expect(inscripciones[1].categoria).toBe('CORPORATIVO')
   })
 
   it('exige motivo para forzar un bloqueo y anota el usuario con la fecha', async () => {
@@ -348,20 +398,6 @@ describe('la implementación de ejemplo', () => {
     expect(await fuente.listarEmailsHabilitados('CUR-999')).toEqual([])
   })
 
-  it('encuentra la habilitación por DNI, email, CUIT o razón social', async () => {
-    const fuente = createMockDataSource()
-
-    expect((await fuente.buscarHabilitacion('41.332.114')).registro.nombre).toBe('Agustina Benítez')
-    expect((await fuente.buscarHabilitacion('valerossi@gmail.com')).registro.nombre).toBe(
-      'Valeria Rossi',
-    )
-    expect((await fuente.buscarHabilitacion('30-71665544-9')).tipo).toBe('EMPRESA')
-    expect((await fuente.buscarHabilitacion('Banco Federal')).registro.razon_social).toContain(
-      'Banco Federal',
-    )
-    expect(await fuente.buscarHabilitacion('   ')).toBeNull()
-    expect(await fuente.buscarHabilitacion('nadie')).toBeNull()
-  })
 })
 
 describe('la edición de curso', () => {
@@ -521,5 +557,43 @@ describe('el perfil del alumno contra el ejemplo', () => {
     await expect(
       actualizarPerfilAlumno({ email: 'juan.perez@gmail.com', telefono: null }),
     ).rejects.toThrow('ya está registrado en el padrón de alumnos')
+  })
+})
+
+describe('reenvío de comprobantes observados (HU 54)', () => {
+  /** Comprobante de ejemplo enviado y observado, listo para reenviar. */
+  async function observado(fuente) {
+    const enviado = await fuente.enviarComprobante(
+      {
+        inscripcion_id: 1,
+        fecha_pago: '2026-06-01',
+        importe: 31000,
+        medio: 'TRANSFERENCIA',
+        titular: null,
+        factura_a_solicitada: false,
+        cuit: null,
+      },
+      new File(['%PDF-1.4'], 'comprobante.pdf', { type: 'application/pdf' }),
+    )
+    await fuente.observarComprobante(enviado.id, 'Falta el sello.')
+    return enviado
+  }
+
+  it('un comprobante observado se reenvía una sola vez', async () => {
+    const fuente = createMockDataSource()
+    const original = await observado(fuente)
+
+    const reenvio = await fuente.reenviarComprobante(
+      original.id,
+      new File(['%PDF-1.4'], 'nuevo.pdf', { type: 'application/pdf' }),
+    )
+
+    expect(reenvio.comprobante_origen_id).toBe(original.id)
+    await expect(
+      fuente.reenviarComprobante(
+        original.id,
+        new File(['%PDF-1.4'], 'otra-vez.pdf', { type: 'application/pdf' }),
+      ),
+    ).rejects.toThrow('Ya reenviaste este comprobante observado.')
   })
 })

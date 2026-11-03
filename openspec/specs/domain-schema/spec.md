@@ -208,7 +208,7 @@ El sistema SHALL almacenar una inscripción que vincule un alumno con una comisi
 
 ### Requirement: Cuentas corporativas y nómina de empleados
 
-El sistema SHALL almacenar una empresa con razón social, CUIT e indicador de necesidad de Factura A. El CUIT SHALL ser único y SHALL validarse tanto por formato como por dígito verificador. El sistema SHALL almacenar un contrato corporativo con tipo entre Charla y Curso formal, monto y estado. WHEN el tipo sea Charla, el sistema SHALL NOT generar alumnos ni solicitar la carga de nómina, porque una charla cerrada no genera alumnos (historia #19). WHEN el tipo sea Curso formal, la empresa SHALL poder cargar su nómina de empleados y el sistema SHALL crear una inscripción por empleado en la comisión contratada, clasificando a cada empleado como Becado parcial o Becado total, y SHALL vincular al alumno existente cuando el documento ya esté en el padrón, sin duplicar su registro. WHEN la nómina supere las vacantes disponibles, el sistema SHALL rechazar la carga e informar las vacantes (historias #18, #19, #20).
+El sistema SHALL almacenar una empresa con razón social, CUIT e indicador de necesidad de Factura A. El CUIT SHALL ser único y SHALL validarse tanto por formato como por dígito verificador. El sistema SHALL almacenar un contrato corporativo con tipo entre Charla y Curso formal, monto y estado. WHEN el tipo sea Charla, el sistema SHALL NOT generar alumnos ni solicitar la carga de nómina, porque una charla cerrada no genera alumnos (historia #19). WHEN el tipo sea Curso formal, la empresa SHALL poder cargar su nómina de empleados y el sistema SHALL crear una inscripción por empleado en la comisión contratada, clasificando cada inscripción como `CORPORATIVO`, vinculándola a la empresa y sin porcentaje de beca, y SHALL vincular al alumno existente cuando el documento ya esté en el padrón, sin duplicar su registro. WHEN la nómina supere las vacantes disponibles, el sistema SHALL rechazar la carga e informar las vacantes (historias #18, #19, #20).
 
 #### Scenario: Alta de empresa
 - **WHEN** se completa razón social, un CUIT válido y se indica si requiere Factura A
@@ -224,7 +224,7 @@ El sistema SHALL almacenar una empresa con razón social, CUIT e indicador de ne
 
 #### Scenario: Carga de nómina en curso formal
 - **WHEN** se carga la nómina de empleados de una empresa con curso formal y una comisión con vacantes suficientes
-- **THEN** el sistema crea una inscripción por empleado vinculada a la empresa y a la comisión
+- **THEN** el sistema crea una inscripción por empleado con categoría `CORPORATIVO`, empresa asociada y sin porcentaje de beca
 
 #### Scenario: Empleado ya registrado en el padrón
 - **WHEN** un empleado de la nómina ya existe en el padrón de alumnos

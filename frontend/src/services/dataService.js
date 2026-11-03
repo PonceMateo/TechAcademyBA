@@ -107,6 +107,15 @@ export function listarAlumnos() {
   return getDataSource().listarAlumnos()
 }
 
+/**
+ * Detalle del alumno con **todas** sus inscripciones (HU 64): comisión, categoría, porcentaje de
+ * beca, empresa y acceso derivado. Es el contrato que expone la categoría arancelaria; el padrón
+ * trae solo los datos personales.
+ */
+export function obtenerAlumno(id) {
+  return getDataSource().obtenerAlumno(id)
+}
+
 export function actualizarCategoriaInscripcion(inscripcionId, datos) {
   return getDataSource().actualizarCategoriaInscripcion(inscripcionId, datos)
 }
@@ -194,10 +203,6 @@ export function listarInscripcionesDeAlumno(alumnoId) {
   return getDataSource().listarInscripcionesDeAlumno(alumnoId)
 }
 
-export function buscarHabilitacion(consulta) {
-  return getDataSource().buscarHabilitacion(consulta)
-}
-
 export function registrarCobranza(datos) {
   return getDataSource().registrarCobranza(datos)
 }
@@ -282,6 +287,57 @@ export function obtenerDetalleInscripcion(comisionCodigo) {
 /** Comprobantes imputados al alumno (11.4). No incluye pagos de empresas ni cheques sin imputar. */
 export function listarPagosAlumno() {
   return getDataSource().listarPagosAlumno()
+}
+
+/** Comprobantes enviados por el alumno autenticado (HU 52), con su estado y el motivo de la resolución. */
+export function listarComprobantesAlumno() {
+  return getDataSource().listarComprobantesAlumno()
+}
+
+/**
+ * Envía un comprobante de pago: valida los metadatos, sube el archivo y confirma la verificación.
+ * Devuelve el comprobante en `PENDIENTE_REVISION`; **no acredita el pago**.
+ */
+export function enviarComprobante(datos, archivo) {
+  return getDataSource().enviarComprobante(datos, archivo)
+}
+
+/**
+ * Reenvía un comprobante observado (HU 54): copia los datos del original y sube el archivo nuevo.
+ * El original no se modifica y el reenvío queda pendiente de revisión.
+ */
+export function reenviarComprobante(id, archivo) {
+  return getDataSource().reenviarComprobante(id, archivo)
+}
+
+/** Panel de revisión de Secretaría: comprobantes de alumnos, pendientes primero (HU 54). */
+export function listarComprobantes(filtros = {}) {
+  return getDataSource().listarComprobantes(filtros)
+}
+
+/** Detalle de un comprobante para Secretaría (HU 54). */
+export function obtenerComprobante(id) {
+  return getDataSource().obtenerComprobante(id)
+}
+
+/** Acepta el comprobante: crea la cobranza acreditada y su imputación (HU 54). */
+export function aceptarComprobante(id) {
+  return getDataSource().aceptarComprobante(id)
+}
+
+/** Observa el comprobante con una causa obligatoria; el alumno puede reenviarlo (HU 54). */
+export function observarComprobante(id, motivo) {
+  return getDataSource().observarComprobante(id, motivo)
+}
+
+/** Rechaza el comprobante con una causa obligatoria; el rechazo es definitivo (HU 54). */
+export function rechazarComprobante(id, motivo) {
+  return getDataSource().rechazarComprobante(id, motivo)
+}
+
+/** Descarga autenticada del adjunto de un comprobante. Devuelve un `Blob`. */
+export function descargarArchivoComprobante(id) {
+  return getDataSource().descargarArchivoComprobante(id)
 }
 
 /**

@@ -74,6 +74,24 @@ export function componerCuil(prefijo, dni, verificador) {
 }
 
 /**
+ * Dígito verificador de CUIT, con la misma regla que el backend (historias #18 y #52).
+ *
+ * Vive acá y no en cada pantalla para que el formulario de cobranzas y el de comprobantes del
+ * alumno rechacen exactamente lo mismo que rechaza la API.
+ */
+export function cuitValido(valor) {
+  const digitos = String(valor).replace(/\D/g, '')
+  if (digitos.length !== 11) {
+    return false
+  }
+  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+  const suma = pesos.reduce((total, peso, indice) => total + Number(digitos[indice]) * peso, 0)
+  const resto = suma % 11
+  const verificador = resto === 0 ? '0' : resto === 1 ? '9' : String(11 - resto)
+  return digitos[10] === verificador
+}
+
+/**
  * Separa un CUIL guardado en el prefijo y el verificador que muestran los controles.
  *
  * Los 8 dígitos del medio no se devuelven: el formulario los arma siempre con el DNI actual, que
