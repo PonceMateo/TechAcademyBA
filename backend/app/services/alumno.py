@@ -140,6 +140,9 @@ def obtener_detalle(
     inscripcion = _inscripcion_por_codigo(session, alumno, codigo)
     comision = inscripcion.comision
 
+    acceso = _acceso(session, inscripcion)
+    link = _link_clase(session, comision) if acceso.estado == "HABILITADO" else None
+
     return DetalleCursadaOut(
         comision=ComisionCursadaOut(
             codigo=comision.codigo,
@@ -150,12 +153,23 @@ def obtener_detalle(
         ),
         categoria=inscripcion.categoria,
         porcentaje_beca=inscripcion.porcentaje_beca,
-        acceso=_acceso(session, inscripcion),
+        acceso=acceso,
+        link_clase=link,
         # Las dos fechas del período van juntas o ninguna (D64): la comisión heredada informa que
         # todavía no está definida en lugar de completarla con una fecha de ejemplo.
         cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=comision.fecha_fin),
         proximos_encuentros=_proximos_encuentros(session, comision, hoy or date.today()),
     )
+
+
+def _link_clase(session: Session, comision: Comision) -> str | None:
+    """El último link cargado para la comisión, o `None` si el docente todavía no publicó."""
+    clase = session.scalar(
+        select(Clase)
+        .where(Clase.comision_id == comision.id, Clase.link_virtual.is_not(None))
+        .order_by(Clase.fecha.desc())
+    )
+    return clase.link_virtual if clase is not None else None
 
 
 def _inscripcion_por_codigo(session: Session, alumno: Alumno, codigo: str) -> Inscripcion:
