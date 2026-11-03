@@ -2234,7 +2234,7 @@ alcance de este change; queda a criterio del equipo agregarlo.
 
 ## Categoría arancelaria por inscripción (change `hu-64-categoria-por-inscripcion`)
 
-### D67 — El padrón no expone datos de inscripción y el detalle del alumno es el único contrato
+### D68 — El padrón no expone datos de inscripción y el detalle del alumno es el único contrato
 
 - **Fecha:** 2026-11-02
 - **Autor:** Mateo Ponce
@@ -2265,7 +2265,7 @@ alcance de este change; queda a criterio del equipo agregarlo.
 
 ## Ficha del alumno en modal e importes por inscripción (change `hu-61-ficha-alumno-modal`)
 
-### D68 — Una sola regla de dinero para el estado y para el saldo, contra el arancel actual
+### D69 — Una sola regla de dinero para el estado y para el saldo, contra el arancel actual
 
 - **Fecha:** 2026-11-02
 - **Autor:** Mateo Ponce
@@ -2292,7 +2292,7 @@ alcance de este change; queda a criterio del equipo agregarlo.
 
 ## Ficha del alumno — tooltip y observados (change `hu-61-ficha-alumno-modal`)
 
-### D72 — StatusIndicator perdió la causa visible al generalizar el cambio de FichaAlumnoModal
+### D73 — StatusIndicator perdió la causa visible al generalizar el cambio de FichaAlumnoModal
 
 - **Fecha:** 2026-11-02
 - **Autor:** Mateo Ponce
@@ -2318,7 +2318,7 @@ alcance de este change; queda a criterio del equipo agregarlo.
   abierto y otro modal encima, `Escape` cierra el tooltip sin tocar el modal de atrás.
 - **Dónde:** `frontend/src/components/ui/Tooltip.jsx`, `frontend/src/admin/FichaAlumnoModal.jsx`.
 
-### D69 — La suite del frontend tiene un tope de 15 s por test
+### D70 — La suite del frontend tiene un tope de 15 s por test
 
 - **Fecha:** 2026-11-02
 - **Autor:** Mateo Ponce
@@ -2333,7 +2333,7 @@ alcance de este change; queda a criterio del equipo agregarlo.
   un test tarda más de 15 s, conviene mirar por qué antes de subir el número otra vez.
 - **Dónde:** `frontend/vite.config.js`.
 
-### D70 — El saldo de la ficha se muestra, no se calcula; el click afuera es opt-in
+### D71 — El saldo de la ficha se muestra, no se calcula; el click afuera es opt-in
 
 - **Fecha:** 2026-11-02
 - **Autor:** Mateo Ponce
