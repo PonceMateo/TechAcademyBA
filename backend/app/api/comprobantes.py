@@ -16,7 +16,7 @@ from __future__ import annotations
 import urllib.parse
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -27,16 +27,19 @@ from app.core.storage import (
     AlmacenamientoLocal,
     AlmacenamientoNoConfigurado,
     AlmacenamientoSupabase,
+    DestinoDeCarga,
     construir_almacenamiento,
 )
 from app.models.comprobantes import TAMANO_MAXIMO_BYTES
-from app.models.enums import Rol
+from app.models.enums import EstadoComprobanteAlumno, Rol
 from app.models.padron import Usuario
 from app.schemas.comprobantes import (
     ComprobanteAlumnoOut,
     ComprobanteCreate,
     ComprobanteIniciadoOut,
     ComprobantePendienteOut,
+    ComprobanteReenvioCreate,
+    ComprobanteRevision,
     SubidaDeArchivoOut,
 )
 from app.services import comprobantes
@@ -105,24 +108,62 @@ def iniciar_comprobante(
     except comprobantes.AlmacenamientoFallido as error:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
 
-    subida = (
-        SubidaDeArchivoOut(
+    return ComprobanteIniciadoOut(
+        comprobante=comprobantes.serializar(comprobante),
+        subida=_subida(comprobante, destino),
+    )
+
+
+@router_alumno.post(
+    "/{comprobante_id}/reenviar",
+    response_model=ComprobanteIniciadoOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Reenviar un comprobante observado",
+)
+def reenviar_comprobante(
+    comprobante_id: int,
+    cuerpo: ComprobanteReenvioCreate,
+    session: SessionDep,
+    usuario: AlumnoDep,
+    almacen: AlmacenamientoDep,
+) -> ComprobanteIniciadoOut:
+    """Copia un comprobante observado en un envío nuevo (HU 54).
+
+    Los datos del pago se copian del original: solo se elige el archivo. 404 si el comprobante no
+    es propio; 409 si no está observado o ya tiene un reenvío; 503 si el storage no responde.
+    El original conserva su motivo y su historial.
+    """
+    try:
+        comprobante, destino = comprobantes.iniciar_reenvio(
+            session, usuario, comprobante_id, cuerpo, almacen
+        )
+    except comprobantes.ComprobanteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except comprobantes.ComprobanteNoReenviable as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except comprobantes.AlmacenamientoFallido as error:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+
+    return ComprobanteIniciadoOut(
+        comprobante=comprobantes.serializar(comprobante),
+        subida=_subida(comprobante, destino),
+    )
+
+
+def _subida(comprobante, destino: DestinoDeCarga | None) -> SubidaDeArchivoOut:
+    """El destino de la subida, relativo en desarrollo y firmado en producción."""
+    if destino is None:
+        return SubidaDeArchivoOut(
             metodo="PUT",
             url=f"/alumno/comprobantes/{comprobante.id}/archivo",
             headers={},
             expira_segundos=get_settings().storage_url_expira_segundos,
         )
-        if destino is None
-        else SubidaDeArchivoOut(
-            metodo=destino.metodo,
-            url=destino.url,
-            headers=destino.headers,
-            expira_segundos=destino.expira_segundos,
-        )
-    )
-    return ComprobanteIniciadoOut(
-        comprobante=comprobantes.serializar(comprobante),
-        subida=subida,
+    return SubidaDeArchivoOut(
+        metodo=destino.metodo,
+        url=destino.url,
+        headers=destino.headers,
+        expira_segundos=destino.expira_segundos,
     )
 
 
@@ -213,11 +254,113 @@ def descargar_mi_archivo(
 @router_admin.get(
     "",
     response_model=list[ComprobantePendienteOut],
-    summary="Consultar los comprobantes pendientes de revisión",
+    summary="Consultar los comprobantes enviados por alumnos",
 )
-def listar_pendientes(session: SessionDep, _admin: AdminDep) -> list[ComprobantePendienteOut]:
-    """Bandeja de Secretaría. No crea cobranzas ni imputaciones: solo lista y permite abrir."""
-    return comprobantes.listar_pendientes(session)
+def listar_comprobantes(
+    session: SessionDep,
+    _admin: AdminDep,
+    estado: Annotated[EstadoComprobanteAlumno | None, Query()] = None,
+) -> list[ComprobantePendienteOut]:
+    """Panel de revisión de Secretaría (HU 54).
+
+    Los pendientes van primero y del más viejo al más nuevo por fecha de recepción; los resueltos
+    quedan después y se alcanzan con el filtro `estado`. No crea cobranzas ni imputaciones.
+    """
+    return comprobantes.listar_para_revision(
+        session, estado.value if estado is not None else None
+    )
+
+
+@router_admin.get(
+    "/{comprobante_id}",
+    response_model=ComprobantePendienteOut,
+    summary="Consultar el detalle de un comprobante",
+)
+def obtener_comprobante(
+    comprobante_id: int, session: SessionDep, _admin: AdminDep
+) -> ComprobantePendienteOut:
+    """Datos del comprobante, su estado, el motivo de la resolución y el vínculo con la cobranza."""
+    try:
+        return comprobantes.obtener_para_revision(session, comprobante_id)
+    except comprobantes.ComprobanteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+
+@router_admin.post(
+    "/{comprobante_id}/aceptar",
+    response_model=ComprobantePendienteOut,
+    summary="Aceptar un comprobante y acreditar el pago",
+)
+def aceptar_comprobante(
+    comprobante_id: int, session: SessionDep, admin: AdminDep
+) -> ComprobantePendienteOut:
+    """Crea la cobranza acreditada, la imputación y la auditoría en una sola transacción.
+
+    409 si otro administrador ya lo resolvió, 422 si la inscripción dejó de estar activa o la base
+    rechaza el alta. El comprobante no puede generar más de una cobranza.
+    """
+    try:
+        comprobantes.aceptar(session, admin, comprobante_id)
+    except comprobantes.ComprobanteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except comprobantes.ComprobanteYaResuelto as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except comprobantes.ComprobanteInvalido as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    return comprobantes.obtener_para_revision(session, comprobante_id)
+
+
+@router_admin.post(
+    "/{comprobante_id}/observar",
+    response_model=ComprobantePendienteOut,
+    summary="Observar un comprobante",
+)
+def observar_comprobante(
+    comprobante_id: int,
+    cuerpo: ComprobanteRevision,
+    session: SessionDep,
+    admin: AdminDep,
+) -> ComprobantePendienteOut:
+    """Deja el comprobante observado con su causa, sin crear cobranza ni cambiar la habilitación.
+
+    422 si el motivo está vacío; 409 si ya fue resuelto. El alumno puede reenviarlo.
+    """
+    return _resolver(session, admin, comprobante_id, comprobantes.observar, cuerpo.motivo)
+
+
+@router_admin.post(
+    "/{comprobante_id}/rechazar",
+    response_model=ComprobantePendienteOut,
+    summary="Rechazar un comprobante",
+)
+def rechazar_comprobante(
+    comprobante_id: int,
+    cuerpo: ComprobanteRevision,
+    session: SessionDep,
+    admin: AdminDep,
+) -> ComprobantePendienteOut:
+    """Deja el comprobante rechazado con su causa, sin crear cobranza ni cambiar la habilitación.
+
+    El rechazo es definitivo para ese comprobante. 422 si el motivo está vacío; 409 si ya fue
+    resuelto por otro administrador.
+    """
+    return _resolver(session, admin, comprobante_id, comprobantes.rechazar, cuerpo.motivo)
+
+
+def _resolver(session, admin: Usuario, comprobante_id: int, accion, motivo: str):
+    """Traduce a HTTP las dos resoluciones sin cobranza: observar y rechazar."""
+    try:
+        accion(session, admin, comprobante_id, motivo)
+    except comprobantes.ComprobanteNoEncontrado as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except comprobantes.ComprobanteYaResuelto as error:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except (
+        comprobantes.MotivoObligatorio,
+        comprobantes.ComprobanteInvalido,
+    ) as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    return comprobantes.obtener_para_revision(session, comprobante_id)
 
 
 @router_admin.get(
@@ -230,7 +373,7 @@ def descargar_archivo(
     admin: AdminDep,
     almacen: AlmacenamientoDep,
 ):
-    """Adjunto de un comprobante pendiente, para Secretaría."""
+    """Adjunto de un comprobante, pendiente o resuelto, para Secretaría."""
     return _descargar(session, admin, comprobante_id, almacen)
 
 

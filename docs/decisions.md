@@ -2417,3 +2417,50 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/admin/PaymentsPage.jsx`, `frontend/src/domain/enums.js`,
   `frontend/src/domain/validacion.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/dataService.js`, `frontend/src/services/mockDataSource.js`.
+
+### D68 — La resolución del comprobante reutiliza la cobranza, con lock y trazabilidad en la misma fila
+
+- **Fecha:** 2026-11-02
+- **Autor:** Santiago Torrens
+- **Decisión — aceptación reutiliza la cobranza:** `POST /comprobantes/{id}/aceptar` crea la
+  cobranza `ACREDITADO` con la misma lógica de la HU 21 y 23. Para que el alta, la imputación, el
+  cambio de estado del comprobante y la auditoría caigan en una sola transacción, se extrajo
+  `cobranzas.construir_cobranza` (sin confirmar) y `crear_cobranza` pasó a envolverla. No se
+  duplica ningún servicio ni se altera ningún pago existente. La habilitación no se escribe: se
+  deriva de la cobranza acreditada con la regla de la HU #27 (D9).
+- **Decisión — estados y campos:** `EstadoComprobanteAlumno` suma `ACEPTADO`, `OBSERVADO` y
+  `RECHAZADO`. `comprobante_alumno` guarda `cobranza_id` (FK única), `revisado_por`,
+  `revisado_at`, `motivo` y `comprobante_origen_id` (FK única) en la migración aditiva
+  `0008_revision_comprobantes`. Los estados de la HU 52 se conservan.
+- **Decisión — una sola cobranza:** la aceptación bloquea la fila con `SELECT ... FOR UPDATE` y
+  vuelve a comprobar el estado, igual que la HU 23. La segunda resolución recibe `409` y no
+  sobrescribe al primer administrador. La restricción única de `cobranza_id` refuerza la garantía
+  en PostgreSQL y un CHECK exige cobranza si y solo si el estado es `ACEPTADO`.
+- **Decisión — causa obligatoria:** observar o rechazar exige un motivo con contenido. Se valida
+  en el contrato (`422`) y con un CHECK que usa `~ '[^[:space:]]'`, así una causa de solo espacios
+  o tabuladores también es inválida (misma regla que D28 para la cobranza).
+- **Decisión — reenvío:** un comprobante observado se reenvía creando una fila nueva
+  `PENDIENTE_REVISION` con los datos copiados del original y `comprobante_origen_id`. El original
+  conserva su motivo y su archivo. La unicidad de `comprobante_origen_id` impide dos reenvíos del
+  mismo comprobante y las validaciones y el storage son los de la HU 52. El panel del alumno deja
+  de ofrecer el reenvío cuando ya existe uno para ese comprobante.
+- **Decisión — orden y filtros:** la bandeja administrativa ordena por `enviado_at` (recepción),
+  pendientes primero y del más viejo al más nuevo; los resueltos quedan después y se alcanzan por
+  `?estado=`. No se usa la fecha declarada del pago para ordenar.
+- **Decisión — permisos:** listado, detalle y resolución exigen `ADMIN` (`401` sin sesión, `403`
+  con otro rol). El adjunto se resuelve con la sesión o una URL firmada temporal, también para
+  comprobantes resueltos; el alumno sigue viendo solo lo suyo.
+- **Por qué:** el comprobante no podía acreditarse sin cargar una cobranza a mano y sin vínculo
+  con el archivo recibido. Resolverlo en la misma fila deja trazabilidad comprobante → cobranza →
+  imputación, y el reenvío conserva el historial en lugar de pisarlo.
+- **Límite conocido:** el reenvío copia los datos del pago y no permite corregirlos; si el cliente
+  necesita editar importe o fecha al reenviar, se agrega un contrato explícito.
+- **Dónde:** `backend/app/models/comprobantes.py`, `backend/app/models/enums.py`,
+  `backend/alembic/versions/0008_revision_comprobantes.py`,
+  `backend/app/schemas/comprobantes.py`, `backend/app/services/comprobantes.py`,
+  `backend/app/services/cobranzas.py`, `backend/app/api/comprobantes.py`,
+  `backend/app/tests/test_comprobantes_revision_api.py`, `backend/app/tests/test_migration.py`,
+  `frontend/src/admin/ComprobantesAlumnoCard.jsx`,
+  `frontend/src/alumno/StudentPaymentsPage.jsx`, `frontend/src/domain/enums.js`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`.

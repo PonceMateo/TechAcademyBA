@@ -193,8 +193,14 @@ def _resolver_destino(
     return None, empresa.id, imputacion.monto
 
 
-def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
-    """Crea pagador, cobranza e imputaciones en una sola transacción."""
+def construir_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
+    """Crea pagador, cobranza e imputaciones en la sesión del llamador, **sin confirmar**.
+
+    La usa la aceptación de un comprobante (HU 54), que necesita que el alta, la imputación, el
+    cambio de estado del comprobante y su auditoría caigan en la misma transacción. Los errores de
+    integridad suben para que el llamador decida: `crear_cobranza` los traduce a `CobranzaInvalida`
+    y revierte.
+    """
     if datos.imputaciones is None:
         inscripcion = resolver_inscripcion(
             session,
@@ -222,17 +228,24 @@ def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
     )
 
     session.add(cobranza)
-    try:
-        session.flush()
-        for inscripcion_id, empresa_id, monto in destinos:
-            session.add(
-                Imputacion(
-                    cobranza_id=cobranza.id,
-                    inscripcion_id=inscripcion_id,
-                    empresa_id=empresa_id,
-                    monto=monto,
-                )
+    session.flush()
+    for inscripcion_id, empresa_id, monto in destinos:
+        session.add(
+            Imputacion(
+                cobranza_id=cobranza.id,
+                inscripcion_id=inscripcion_id,
+                empresa_id=empresa_id,
+                monto=monto,
             )
+        )
+    session.flush()
+    return cobranza
+
+
+def crear_cobranza(session: Session, datos: CobranzaCreate) -> Cobranza:
+    """Crea pagador, cobranza e imputaciones en una sola transacción."""
+    try:
+        cobranza = construir_cobranza(session, datos)
         session.commit()
     except (IntegrityError, DataError) as error:
         session.rollback()

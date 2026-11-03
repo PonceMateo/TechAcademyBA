@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Campo, Card, Input, Table } from '../components/ui'
+import { Badge, Button, Campo, Card, Input, Modal, Table } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import {
   ESTADO_COBRANZA,
+  ESTADO_COMPROBANTE_ALUMNO,
   ESTADO_COMPROBANTE_LABELS,
   MEDIO_PAGO,
   MEDIO_PAGO_LABELS,
@@ -13,6 +14,7 @@ import {
   listarComprobantesAlumno,
   listarInscripcionesAlumno,
   listarPagosAlumno,
+  reenviarComprobante,
 } from '../services/dataService'
 import { formatFechaCorta, formatMoneda } from '../utils/formato'
 
@@ -70,6 +72,14 @@ const COLUMNAS = [
   },
 ]
 
+/** Los estados de un comprobante enviado, con el color con el que los ve el alumno (HU 54). */
+const ESTADOS_COMPROBANTE = {
+  [ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION]: { tono: TONO.AMBAR },
+  [ESTADO_COMPROBANTE_ALUMNO.ACEPTADO]: { tono: TONO.VERDE },
+  [ESTADO_COMPROBANTE_ALUMNO.OBSERVADO]: { tono: TONO.CELESTE },
+  [ESTADO_COMPROBANTE_ALUMNO.RECHAZADO]: { tono: TONO.ROJO },
+}
+
 const COLUMNAS_ENVIADOS = [
   {
     clave: 'fecha_pago',
@@ -86,7 +96,14 @@ const COLUMNAS_ENVIADOS = [
     clave: 'estado',
     titulo: 'ESTADO',
     render: (fila) => (
-      <Badge tono={TONO.AMBAR}>{ESTADO_COMPROBANTE_LABELS[fila.estado] ?? fila.estado}</Badge>
+      <span className="inline-flex flex-col items-start gap-1">
+        <Badge tono={ESTADOS_COMPROBANTE[fila.estado]?.tono ?? TONO.GRIS}>
+          {ESTADO_COMPROBANTE_LABELS[fila.estado] ?? fila.estado}
+        </Badge>
+        {fila.motivo !== null && fila.motivo !== undefined && (
+          <span className="text-xs text-slate-600">{fila.motivo}</span>
+        )}
+      </span>
     ),
   },
 ]
@@ -110,6 +127,9 @@ const SIN_INSCRIPCION = 'No tenés una inscripción activa para imputar el compr
 
 const AVISO_ENVIO =
   'Tu comprobante quedó Pendiente de revisión. Todavía no acredita el pago ni cambia tu acceso.'
+
+const AVISO_REENVIO =
+  'Reenviamos tu comprobante y quedó Pendiente de revisión otra vez. El anterior conserva su motivo.'
 
 /** Los 5 MB que acepta el backend, sin depender de cómo los escriba el navegador. */
 const TAMANO_MAXIMO_BYTES = 5 * 1024 * 1024
@@ -143,6 +163,23 @@ function tamanioLegible(bytes) {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
+function erroresDelArchivo(archivo) {
+  if (archivo === null) {
+    return ['Adjuntá el comprobante.']
+  }
+  const errores = []
+  if (!EXTENSIONES_PERMITIDAS.includes(extensionDe(archivo))) {
+    errores.push('El comprobante tiene que ser un PDF, JPG o PNG.')
+  }
+  if (archivo.size > TAMANO_MAXIMO_BYTES) {
+    errores.push('El comprobante no puede superar los 5 MB.')
+  }
+  if (archivo.size === 0) {
+    errores.push('El archivo está vacío.')
+  }
+  return errores
+}
+
 function erroresDelFormulario(formulario) {
   const errores = []
 
@@ -165,19 +202,7 @@ function erroresDelFormulario(formulario) {
       errores.push('Ingresá un CUIT válido cuando solicitás Factura A.')
     }
   }
-  if (formulario.archivo === null) {
-    errores.push('Adjuntá el comprobante.')
-  } else {
-    if (!EXTENSIONES_PERMITIDAS.includes(extensionDe(formulario.archivo))) {
-      errores.push('El comprobante tiene que ser un PDF, JPG o PNG.')
-    }
-    if (formulario.archivo.size > TAMANO_MAXIMO_BYTES) {
-      errores.push('El comprobante no puede superar los 5 MB.')
-    }
-    if (formulario.archivo.size === 0) {
-      errores.push('El archivo está vacío.')
-    }
-  }
+  errores.push(...erroresDelArchivo(formulario.archivo))
 
   return errores
 }
@@ -191,6 +216,11 @@ export function StudentPaymentsPage() {
   const [errores, setErrores] = useState([])
   const [aviso, setAviso] = useState(null)
   const [enviando, setEnviando] = useState(false)
+  //: Reenvío de un comprobante observado (HU 54): el original y el archivo nuevo.
+  const [comprobanteAReenviar, setComprobanteAReenviar] = useState(null)
+  const [archivoReenvio, setArchivoReenvio] = useState(null)
+  const [errorReenvio, setErrorReenvio] = useState(null)
+  const [reenviando, setReenviando] = useState(false)
 
   useEffect(() => {
     listarPagosAlumno()
@@ -251,6 +281,78 @@ export function StudentPaymentsPage() {
     }
   }
 
+  /** El reenvío copia los datos del original: el alumno solo elige el archivo nuevo. */
+  async function reenviar() {
+    if (reenviando || comprobanteAReenviar === null) {
+      return
+    }
+
+    const faltantes = erroresDelArchivo(archivoReenvio)
+    if (faltantes.length > 0) {
+      setErrorReenvio(faltantes.join(' '))
+      return
+    }
+
+    setErrorReenvio(null)
+    setAviso(null)
+    setReenviando(true)
+    try {
+      const nuevo = await reenviarComprobante(comprobanteAReenviar.id, archivoReenvio)
+      setComprobantes((anteriores) => [nuevo, ...anteriores])
+      setComprobanteAReenviar(null)
+      setArchivoReenvio(null)
+      setAviso(AVISO_REENVIO)
+    } catch (error) {
+      setErrorReenvio(error?.message ?? 'No pudimos reenviar el comprobante.')
+    } finally {
+      setReenviando(false)
+    }
+  }
+
+  function abrirReenvio(fila) {
+    // Defensa de la pantalla: un observado ya reenviado no se vuelve a reenviar.
+    if (comprobantes.some((otro) => otro.comprobante_origen_id === fila.id)) {
+      return
+    }
+    setComprobanteAReenviar(fila)
+    setArchivoReenvio(null)
+    setErrorReenvio(null)
+    setAviso(null)
+  }
+
+  function cerrarReenvio() {
+    if (reenviando) {
+      return
+    }
+    setComprobanteAReenviar(null)
+    setArchivoReenvio(null)
+    setErrorReenvio(null)
+  }
+
+  const columnasEnviados = [
+    ...COLUMNAS_ENVIADOS,
+    {
+      clave: 'acciones',
+      titulo: '',
+      render: (fila) => {
+        if (fila.estado !== ESTADO_COMPROBANTE_ALUMNO.OBSERVADO) {
+          return null
+        }
+        // Un comprobante observado se reenvía una sola vez: el original conserva su historial.
+        const yaReenviado = comprobantes.some(
+          (otro) => otro.comprobante_origen_id === fila.id,
+        )
+        return yaReenviado ? (
+          <span className="text-xs text-slate-500">Ya reenviado</span>
+        ) : (
+          <Button variante="secundario" tamano="chico" onClick={() => abrirReenvio(fila)}>
+            Reenviar
+          </Button>
+        )
+      },
+    },
+  ]
+
   const sinInscripciones = inscripciones.length === 0
 
   return (
@@ -268,10 +370,10 @@ export function StudentPaymentsPage() {
 
       <Card
         titulo="Comprobantes enviados"
-        descripcion="Pendiente de revisión: todavía no acredita el pago ni cambia tu acceso."
+    
       >
         <Table
-          columnas={COLUMNAS_ENVIADOS}
+          columnas={columnasEnviados}
           filas={comprobantes}
           claveDeFila={(fila) => fila.id}
           vacio={<p className="text-sm text-slate-600">{SIN_COMPROBANTES}</p>}
@@ -433,6 +535,62 @@ export function StudentPaymentsPage() {
           </>
         )}
       </Card>
+
+      <Modal
+        abierto={comprobanteAReenviar !== null}
+        titulo="Reenviar comprobante observado"
+        onClose={cerrarReenvio}
+        pie={
+          <>
+            <Button variante="secundario" onClick={cerrarReenvio} disabled={reenviando}>
+              Cancelar
+            </Button>
+            <Button onClick={reenviar} disabled={reenviando}>
+              {reenviando ? 'Reenviando…' : 'Reenviar comprobante'}
+            </Button>
+          </>
+        }
+      >
+        {comprobanteAReenviar !== null && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-700">
+              Secretaría observó el comprobante del{' '}
+              <strong>{formatFechaCorta(comprobanteAReenviar.fecha_pago)}</strong> por{' '}
+              <strong>{formatMoneda(comprobanteAReenviar.importe)}</strong>.
+            </p>
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <span className="font-medium">Motivo:</span> {comprobanteAReenviar.motivo}
+            </p>
+            <p className="text-sm text-slate-700">
+              Adjuntá un comprobante nuevo. Los datos del pago se conservan y el envío anterior
+              queda en tu historial con su motivo.
+            </p>
+
+            <Campo etiqueta="Comprobante nuevo (PDF, JPG o PNG, hasta 5 MB)" id="archivo-reenvio" obligatorio>
+              <input
+                id="archivo-reenvio"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                aria-label="Adjuntar comprobante nuevo"
+                onChange={(evento) => setArchivoReenvio(evento.target.files?.[0] ?? null)}
+                disabled={reenviando}
+                className="w-full text-sm text-slate-700"
+              />
+              {archivoReenvio !== null && (
+                <p className="text-xs text-slate-500">
+                  {archivoReenvio.name} · {tamanioLegible(archivoReenvio.size)}
+                </p>
+              )}
+            </Campo>
+
+            {errorReenvio !== null && (
+              <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorReenvio}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

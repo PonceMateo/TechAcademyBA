@@ -328,3 +328,133 @@ describe('alumno sin inscripciones activas', () => {
     expect(screen.queryByRole('button', { name: 'Enviar comprobante' })).not.toBeInTheDocument()
   })
 })
+
+describe('resoluciones de Secretaría (HU 54)', () => {
+  it('muestra aceptado, observado con su causa y rechazado', async () => {
+    cleanup()
+    stubDataSource({
+      listarComprobantesAlumno: async () => [
+        { ...PENDIENTE, id: 21, estado: 'ACEPTADO' },
+        {
+          ...PENDIENTE,
+          id: 22,
+          estado: 'OBSERVADO',
+          motivo: 'El importe no coincide.',
+        },
+        {
+          ...PENDIENTE,
+          id: 23,
+          estado: 'RECHAZADO',
+          motivo: 'Comprobante apócrifo.',
+        },
+      ],
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    const tabla = (await screen.findByText('Aceptado')).closest('table')
+    expect(within(tabla).getByText('Observado')).toBeInTheDocument()
+    expect(within(tabla).getByText('El importe no coincide.')).toBeInTheDocument()
+    expect(within(tabla).getByText('Rechazado')).toBeInTheDocument()
+    expect(within(tabla).getByText('Comprobante apócrifo.')).toBeInTheDocument()
+  })
+
+  it('solo ofrece reenviar un comprobante observado', async () => {
+    cleanup()
+    stubDataSource({
+      listarComprobantesAlumno: async () => [
+        { ...PENDIENTE, id: 21, estado: 'ACEPTADO' },
+        { ...PENDIENTE, id: 22, estado: 'OBSERVADO', motivo: 'Falta el sello.' },
+        { ...PENDIENTE, id: 23, estado: 'RECHAZADO', motivo: 'Apócrifo.' },
+      ],
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    await screen.findByText('Falta el sello.')
+    expect(screen.getAllByRole('button', { name: 'Reenviar' })).toHaveLength(1)
+  })
+
+  it('reenvía un observado con un archivo nuevo y deja el original en el historial', async () => {
+    const user = userEvent.setup()
+    const observado = { ...PENDIENTE, id: 22, estado: 'OBSERVADO', motivo: 'Falta el sello.' }
+    const reenviar = vi.fn(async () => ({ ...PENDIENTE, id: 24, comprobante_origen_id: 22 }))
+    cleanup()
+    stubDataSource({
+      listarComprobantesAlumno: async () => [observado],
+      reenviarComprobante: reenviar,
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    await user.click(await screen.findByRole('button', { name: 'Reenviar' }))
+    expect(within(screen.getByRole('dialog')).getByText('Falta el sello.')).toBeInTheDocument()
+
+    await user.upload(
+      screen.getByLabelText(/Adjuntar comprobante nuevo/),
+      new File(['%PDF-1.4'], 'comprobante-nuevo.pdf'),
+      { applyAccept: false },
+    )
+    await user.click(screen.getByRole('button', { name: 'Reenviar comprobante' }))
+
+    await waitFor(() => expect(reenviar).toHaveBeenCalledTimes(1))
+    expect(reenviar.mock.calls[0][0]).toBe(22)
+    expect(reenviar.mock.calls[0][1].name).toBe('comprobante-nuevo.pdf')
+    expect(
+      await screen.findByText(
+        'Reenviamos tu comprobante y quedó Pendiente de revisión otra vez. El anterior conserva su motivo.',
+      ),
+    ).toBeInTheDocument()
+    // El original sigue en el historial, el reenvío se suma como pendiente y no se ofrece otra vez.
+    expect(screen.getByText('Falta el sello.')).toBeInTheDocument()
+    expect(screen.getAllByText('Pendiente de revisión')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Reenviar' })).not.toBeInTheDocument()
+    expect(screen.getByText('Ya reenviado')).toBeInTheDocument()
+  })
+
+  it('no ofrece reenviar un observado que ya tiene un reenvío', async () => {
+    cleanup()
+    stubDataSource({
+      listarComprobantesAlumno: async () => [
+        { ...PENDIENTE, id: 22, estado: 'OBSERVADO', motivo: 'Falta el sello.' },
+        { ...PENDIENTE, id: 24, comprobante_origen_id: 22 },
+      ],
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    await screen.findByText('Falta el sello.')
+    expect(screen.queryByRole('button', { name: 'Reenviar' })).not.toBeInTheDocument()
+    expect(screen.getByText('Ya reenviado')).toBeInTheDocument()
+  })
+
+  it('exige un archivo válido para reenviar', async () => {
+    const user = userEvent.setup()
+    const reenviar = vi.fn()
+    cleanup()
+    stubDataSource({
+      listarComprobantesAlumno: async () => [
+        { ...PENDIENTE, id: 22, estado: 'OBSERVADO', motivo: 'Falta el sello.' },
+      ],
+      reenviarComprobante: reenviar,
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    await user.click(await screen.findByRole('button', { name: 'Reenviar' }))
+    await user.click(screen.getByRole('button', { name: 'Reenviar comprobante' }))
+
+    expect(reenviar).not.toHaveBeenCalled()
+    expect(await screen.findByText('Adjuntá el comprobante.')).toBeInTheDocument()
+  })
+
+  it('no deja al alumno cambiar el estado de un comprobante', async () => {
+    cleanup()
+    stubDataSource({
+      listarComprobantesAlumno: async () => [
+        { ...PENDIENTE, id: 22, estado: 'OBSERVADO', motivo: 'Falta el sello.' },
+      ],
+    })
+    renderAppAs('ALUMNO', '/alumno/pagos')
+
+    await screen.findByText('Falta el sello.')
+    expect(screen.queryByRole('button', { name: /Aceptar/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Rechazar/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Observar/ })).not.toBeInTheDocument()
+  })
+})

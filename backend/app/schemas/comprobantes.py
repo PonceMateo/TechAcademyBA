@@ -94,15 +94,49 @@ class ComprobanteAlumnoOut(BaseModel):
     archivo_mime: str | None
     archivo_bytes: int | None
     enviado_at: datetime | None
+    #: HU 54: motivo de la observación o del rechazo, visible para el alumno.
+    motivo: str | None = None
+    revisado_at: datetime | None = None
+    #: Presente cuando la fila es el reenvío de un comprobante observado.
+    comprobante_origen_id: int | None = None
     inscripcion: InscripcionComprobanteOut
 
 
 class ComprobantePendienteOut(ComprobanteAlumnoOut):
-    """Fila de la bandeja de Secretaría, con el alumno resuelto."""
+    """Fila del panel de revisión de Secretaría, con el alumno resuelto."""
 
     alumno: str
     alumno_email: str
     alumno_documento: str | None
+    #: Cobranza acreditada que generó la aceptación; `None` mientras no se aceptó (HU 54).
+    cobranza_id: int | None = None
+    revisado_por: int | None = None
+    revisado_por_nombre: str | None = None
+
+
+class ComprobanteRevision(BaseModel):
+    """Cuerpo de `POST /comprobantes/{id}/observar` y `/rechazar` (HU 54).
+
+    La causa es obligatoria y no puede ser solo espacios: observar o rechazar sin decir por qué
+    deja al alumno sin nada que corregir. La base sostiene la misma regla con un CHECK.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    motivo: str = Field(min_length=1, max_length=500)
+
+
+class ComprobanteReenvioCreate(BaseModel):
+    """Cuerpo de `POST /alumno/comprobantes/{id}/reenviar` (HU 54).
+
+    Solo viaja el nombre del archivo: los datos del pago son los del comprobante observado y se
+    copian en el servidor, así el reenvío no puede cambiar el importe ni la inscripción a mitad de
+    camino.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    archivo_nombre: str | None = Field(default=None, max_length=200)
 
 
 class SubidaDeArchivoOut(BaseModel):

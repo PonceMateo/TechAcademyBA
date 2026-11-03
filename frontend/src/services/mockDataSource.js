@@ -453,6 +453,46 @@ export function createMockDataSource() {
   }
 
   /**
+   * Resolución administrativa de un comprobante (HU 54).
+   *
+   * shortcut: el maquetado cambia el estado y no crea la cobranza acreditada; el alta real y la
+   * habilitación las resuelve el backend, que es lo que cubren los tests de la API.
+   */
+  function resolverComprobante(id, estado, motivo = null) {
+    const comprobante = store.comprobantes.find((candidato) => candidato.id === id)
+
+    if (comprobante === undefined) {
+      throw new Error('No encontré ese comprobante.')
+    }
+    if (comprobante.estado !== ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION) {
+      const error = new Error('Ese comprobante ya fue resuelto por otro administrador.')
+      error.status = 409
+      throw error
+    }
+    if (estado !== ESTADO_COMPROBANTE_ALUMNO.ACEPTADO && String(motivo ?? '').trim() === '') {
+      throw new Error('Indicá el motivo de la resolución del comprobante.')
+    }
+
+    comprobante.estado = estado
+    comprobante.motivo = estado === ESTADO_COMPROBANTE_ALUMNO.ACEPTADO ? null : String(motivo).trim()
+    comprobante.revisado_at = new Date().toISOString()
+    comprobante.revisado_por_nombre = 'Secretaría'
+    if (estado === ESTADO_COMPROBANTE_ALUMNO.ACEPTADO) {
+      comprobante.cobranza_id = siguienteId(store.cobranzas)
+    }
+
+    const alumno = store.alumnos.find((candidato) => candidato.id === comprobante.alumno_id)
+    const fila = { ...comprobante }
+    delete fila.alumno_id
+    return {
+      ...fila,
+      alumno: alumno?.nombre ?? '',
+      alumno_email: alumno?.email ?? '',
+      alumno_documento: alumno?.documento ?? null,
+    }
+  }
+
+  /**
    * La inscripción del alumno del ejemplo, o un error.
    *
    * El perfil y el guardado del contacto no tienen un "no hay nada que mostrar": si el ejemplo no
@@ -1625,8 +1665,9 @@ export function createMockDataSource() {
     },
 
     /**
-     * Comprobantes enviados por el alumno (HU 52). Solo los del alumno del ejemplo y solo los que
-     * llegaron a `PENDIENTE_REVISION`: una carga a medias no se muestra en la API real.
+     * Comprobantes enviados por el alumno (HU 52 y HU 54). Solo los del alumno del ejemplo y solo
+     * los que llegaron a `PENDIENTE_REVISION` o ya se resolvieron: una carga a medias no se muestra
+     * en la API real.
      */
     async listarComprobantesAlumno() {
       const propia = inscripcionDelAlumno()
@@ -1636,7 +1677,11 @@ export function createMockDataSource() {
       }
 
       return store.comprobantes
-        .filter((comprobante) => comprobante.alumno_id === propia.alumno.id)
+        .filter(
+          (comprobante) =>
+            comprobante.alumno_id === propia.alumno.id &&
+            comprobante.estado !== ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_CARGA,
+        )
         .map((comprobante) => ({ ...comprobante }))
     },
 
@@ -1655,6 +1700,7 @@ export function createMockDataSource() {
       const comprobante = {
         id: siguienteId(store.comprobantes),
         alumno_id: alumno.id,
+        inscripcion_id: datos.inscripcion_id,
         estado: ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
         fecha_pago: datos.fecha_pago,
         importe: Number(datos.importe),
@@ -1666,6 +1712,12 @@ export function createMockDataSource() {
         archivo_mime: archivo?.type || null,
         archivo_bytes: archivo?.size ?? null,
         enviado_at: new Date().toISOString(),
+        motivo: null,
+        revisado_at: null,
+        revisado_por: null,
+        revisado_por_nombre: null,
+        cobranza_id: null,
+        comprobante_origen_id: null,
         inscripcion: {
           id: datos.inscripcion_id,
           codigo: inscripcion.comision.codigo,
@@ -1677,14 +1729,72 @@ export function createMockDataSource() {
       return { ...comprobante }
     },
 
-    /** Bandeja de Secretaría con el alumno resuelto, como el contrato de `GET /comprobantes`. */
-    async listarComprobantesPendientes() {
+    /**
+     * Reenvío de un observado (HU 54). La API copia los datos del original en el servidor; acá se
+     * hace lo mismo y el original conserva su motivo y su historial.
+     */
+    async reenviarComprobante(id, archivo) {
+      const propia = inscripcionDelAlumno()
+      const origen = store.comprobantes.find(
+        (comprobante) =>
+          comprobante.id === id && comprobante.alumno_id === propia?.alumno.id,
+      )
+
+      if (origen === undefined || origen.estado !== ESTADO_COMPROBANTE_ALUMNO.OBSERVADO) {
+        throw new Error('Solo podés reenviar un comprobante observado.')
+      }
+      if (store.comprobantes.some((comprobante) => comprobante.comprobante_origen_id === id)) {
+        const error = new Error('Ya reenviaste este comprobante observado.')
+        error.status = 409
+        throw error
+      }
+
+      const { alumno_id, ...datosDelPago } = origen
+      const comprobante = {
+        ...datosDelPago,
+        id: siguienteId(store.comprobantes),
+        alumno_id,
+        estado: ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
+        archivo_nombre: archivo?.name ?? 'comprobante',
+        archivo_mime: archivo?.type || null,
+        archivo_bytes: archivo?.size ?? null,
+        enviado_at: new Date().toISOString(),
+        motivo: null,
+        revisado_at: null,
+        revisado_por: null,
+        revisado_por_nombre: null,
+        cobranza_id: null,
+        comprobante_origen_id: origen.id,
+      }
+
+      store.comprobantes.unshift(comprobante)
+      return { ...comprobante }
+    },
+
+    /**
+     * Panel de revisión (HU 54) con el alumno resuelto, como el contrato de `GET /comprobantes`.
+     * Pendientes primero y del más viejo al más nuevo por fecha de recepción.
+     */
+    async listarComprobantes({ estado } = {}) {
+      const pendiente = ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION
+
       return store.comprobantes
-        .filter(
-          (comprobante) => comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
-        )
-        .map(({ alumno_id, ...comprobante }) => {
-          const alumno = store.alumnos.find((candidato) => candidato.id === alumno_id)
+        .filter((comprobante) => estado === undefined || comprobante.estado === estado)
+        .sort((uno, otro) => {
+          const unoEsPendiente = uno.estado === pendiente ? 0 : 1
+          const otroEsPendiente = otro.estado === pendiente ? 0 : 1
+          if (unoEsPendiente !== otroEsPendiente) {
+            return unoEsPendiente - otroEsPendiente
+          }
+          const recepcion = String(uno.enviado_at).localeCompare(String(otro.enviado_at))
+          return unoEsPendiente === 0 ? recepcion : -recepcion
+        })
+        .map((comprobanteOrigen) => {
+          const comprobante = { ...comprobanteOrigen }
+          delete comprobante.alumno_id
+          const alumno = store.alumnos.find(
+            (candidato) => candidato.id === comprobanteOrigen.alumno_id,
+          )
           return {
             ...comprobante,
             alumno: alumno?.nombre ?? '',
@@ -1692,6 +1802,42 @@ export function createMockDataSource() {
             alumno_documento: alumno?.documento ?? null,
           }
         })
+    },
+
+    /** Detalle de un comprobante (HU 54). */
+    async obtenerComprobante(id) {
+      const alumno = (comprobante) =>
+        store.alumnos.find((candidato) => candidato.id === comprobante.alumno_id)
+      const fila = store.comprobantes.find((comprobante) => comprobante.id === id)
+      if (fila === undefined) {
+        throw new Error('No encontré ese comprobante.')
+      }
+      const comprobante = { ...fila }
+      delete comprobante.alumno_id
+      return {
+        ...comprobante,
+        alumno: alumno(fila)?.nombre ?? '',
+        alumno_email: alumno(fila)?.email ?? '',
+        alumno_documento: alumno(fila)?.documento ?? null,
+      }
+    },
+
+    /**
+     * Resolución administrativa (HU 54).
+     *
+     * shortcut: el maquetado cambia el estado y no crea la cobranza; el alta real y la
+     * habilitación las resuelve el backend, que es lo que prueban los tests de la API.
+     */
+    async aceptarComprobante(id) {
+      return resolverComprobante(id, ESTADO_COMPROBANTE_ALUMNO.ACEPTADO)
+    },
+
+    async observarComprobante(id, motivo) {
+      return resolverComprobante(id, ESTADO_COMPROBANTE_ALUMNO.OBSERVADO, motivo)
+    },
+
+    async rechazarComprobante(id, motivo) {
+      return resolverComprobante(id, ESTADO_COMPROBANTE_ALUMNO.RECHAZADO, motivo)
     },
 
     /** Adjunto del ejemplo: un PDF mínimo, solo para que la pantalla abra algo. */

@@ -533,9 +533,48 @@ export function createApiDataSource() {
       })
     },
 
-    /** Bandeja de Secretaría: comprobantes de alumnos pendientes de revisión. */
-    async listarComprobantesPendientes() {
-      return request(PATHS.comprobantesPendientes)
+    /**
+     * Reenvío de un comprobante observado (HU 54): inicia el envío nuevo, sube el archivo y
+     * confirma. Los datos del pago los copia el backend del original.
+     */
+    async reenviarComprobante(id, archivo) {
+      const iniciado = await request(`${PATHS.comprobantesAlumno}/${id}/reenviar`, {
+        method: 'POST',
+        body: { archivo_nombre: archivo.name },
+      })
+      await subirArchivo(iniciado.subida, archivo)
+      return request(`${PATHS.comprobantesAlumno}/${iniciado.comprobante.id}/confirmar`, {
+        method: 'POST',
+      })
+    },
+
+    /** Panel de Secretaría: comprobantes de alumnos, pendientes primero (HU 54). */
+    async listarComprobantes({ estado } = {}) {
+      return request(PATHS.comprobantesPendientes, { query: { estado } })
+    },
+
+    /** Detalle de un comprobante para Secretaría (HU 54). */
+    async obtenerComprobante(id) {
+      return request(`${PATHS.comprobantesPendientes}/${id}`)
+    },
+
+    /** Resolución administrativa: acepta, observa o rechaza según la acción (HU 54). */
+    async aceptarComprobante(id) {
+      return request(`${PATHS.comprobantesPendientes}/${id}/aceptar`, { method: 'POST' })
+    },
+
+    async observarComprobante(id, motivo) {
+      return request(`${PATHS.comprobantesPendientes}/${id}/observar`, {
+        method: 'POST',
+        body: { motivo },
+      })
+    },
+
+    async rechazarComprobante(id, motivo) {
+      return request(`${PATHS.comprobantesPendientes}/${id}/rechazar`, {
+        method: 'POST',
+        body: { motivo },
+      })
     },
 
     /** Adjunto de un comprobante, descargado con la sesión de quien lo pide. */
