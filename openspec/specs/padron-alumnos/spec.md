@@ -242,130 +242,24 @@ quedar ninguna.
 
 ### Requirement: Consulta básica del padrón de alumnos
 
-El sistema SHALL exponer `GET /alumnos` para Administración. La consulta SHALL devolver los alumnos
-activos con `id`, `nombre`, `documento`, `tipo_documento`, `email`, `telefono` y `activo`, ordenados
-por `id`, y SHALL admitir la búsqueda opcional `?q=` por DNI, email o nombre. La respuesta SHALL NOT
-incluir `comision`, `categoria`, `porcentaje_beca` ni `acceso`: los datos de inscripción se consultan
-en el detalle del alumno.
+El sistema SHALL exponer `GET /alumnos` para Administración. La consulta SHALL devolver los
+alumnos con `id`, `nombre`, `documento`, `tipo_documento`, `email`, `telefono` y `activo`, y
+SHALL incluir `comision`, `categoria`, `porcentaje_beca` y `acceso` en `null` mientras el
+alumno no tenga una inscripción. La respuesta SHALL NOT inventar comisión, categoría ni
+habilitación. La búsqueda por DNI o email queda para la historia #16.
 
 #### Scenario: El alta aparece en el padrón
-
 - **WHEN** se consulta el padrón después de un alta exitosa
 - **THEN** el alumno creado aparece en la respuesta con sus datos personales
 
-#### Scenario: El padrón no trae datos de inscripción
-
-- **WHEN** se consulta un alumno que tiene una o varias inscripciones
-- **THEN** la fila trae solo sus datos personales y no incluye comisión, categoría, porcentaje de beca ni acceso
-
 #### Scenario: Alumno sin inscripción
-
 - **WHEN** se consulta un alumno que todavía no tiene inscripción
-- **THEN** la respuesta trae sus datos personales igual que la de cualquier otro alumno, sin campos de inscripción que completar
+- **THEN** `comision`, `categoria`, `porcentaje_beca` y `acceso` vienen en `null`, y la pantalla los muestra como «Sin comisión» y «—»
 
 #### Scenario: El padrón vacío
-
 - **WHEN** se consulta el padrón y no hay alumnos
 - **THEN** la respuesta es una lista vacía y la pantalla muestra su estado vacío, sin filas inventadas
 
 #### Scenario: Solo Administración consulta el padrón
-
 - **WHEN** un usuario con rol Docente o Alumno intenta consultar `GET /alumnos`
 - **THEN** el sistema responde `403`; sin token responde `401`
-
-### Requirement: Detalle del alumno con sus inscripciones
-
-El sistema SHALL exponer `GET /alumnos/{id}` solo para Administración. La respuesta SHALL incluir
-los datos del alumno y un arreglo `inscripciones` con **todas** sus inscripciones: cada una con su
-comisión, categoría, porcentaje de beca, empresa y acceso derivado con las reglas de la
-habilitación. `acceso` SHALL ser nulo fuera de las inscripciones `ACTIVA`. SHALL responder `404` si
-el alumno no existe.
-
-#### Scenario: Alumno con dos categorías
-
-- **WHEN** un alumno tiene una inscripción corporativa y otra particular
-- **THEN** el detalle trae las dos inscripciones, cada una con su comisión, su categoría y su acceso, sin colapsarlas en una sola
-
-#### Scenario: Alumno sin inscripciones
-
-- **WHEN** se consulta el detalle de un alumno que no tiene ninguna inscripción
-- **THEN** el sistema responde `200` con `inscripciones` vacío y la pantalla muestra un mensaje informativo en lugar de las pestañas
-
-#### Scenario: Inscripción corporativa
-
-- **WHEN** el detalle incluye una inscripción con categoría `CORPORATIVO`
-- **THEN** esa inscripción trae el `id` y la `razon_social` de su empresa
-
-#### Scenario: Habilitación por inscripción
-
-- **WHEN** el detalle incluye una inscripción habilitada y otra bloqueada
-- **THEN** cada una trae su propio estado y, la bloqueada, su causa; no hay un estado único del alumno
-
-#### Scenario: Inscripción que no está activa
-
-- **WHEN** el detalle incluye una inscripción en estado `COMPLETADA`
-- **THEN** esa inscripción informa `COMPLETADA` en `estado` y `acceso` nulo, sin causa de bloqueo
-
-#### Scenario: Alumno inexistente
-
-- **WHEN** se consulta el detalle de un `id` que no corresponde a ningún alumno
-- **THEN** el sistema responde `404`
-
-#### Scenario: Solo Administración consulta el detalle
-
-- **WHEN** un Docente o un Alumno intenta consultar `GET /alumnos/{id}`
-- **THEN** el sistema responde `403`; sin token responde `401`
-
-### Requirement: Importes por inscripción en el detalle del alumno
-
-El detalle `GET /alumnos/{id}` SHALL incluir por inscripción `arancel`, `monto_requerido`,
-`total_pagado`, `total_observado` y `saldo_pendiente`. `monto_requerido` SHALL ser el arancel de la
-comisión ajustado por la beca parcial, cero en beca total y nulo en corporativo. `total_pagado`
-SHALL sumar solo las imputaciones acreditadas y `total_observado` las observadas.
-`saldo_pendiente` SHALL ser la diferencia entre requerido y pagado, nunca negativa y nula en
-corporativo.
-
-#### Scenario: Particular con pago parcial
-
-- **WHEN** una inscripción particular tiene un arancel de 50000 y un pago acreditado de 20000
-- **THEN** el detalle informa `monto_requerido` 50000, `total_pagado` 20000 y `saldo_pendiente` 30000
-
-#### Scenario: Beca parcial con descuento
-
-- **WHEN** una inscripción de beca parcial del 50% tiene un arancel de 50000 y un pago acreditado de 10000
-- **THEN** `monto_requerido` es 25000 y `saldo_pendiente` es 15000
-
-#### Scenario: Beca total exenta
-
-- **WHEN** la inscripción es de beca total
-- **THEN** `monto_requerido` y `saldo_pendiente` son cero, sin importar el arancel de la comisión
-
-#### Scenario: Corporativo a cargo de la empresa
-
-- **WHEN** la inscripción es corporativa
-- **THEN** `monto_requerido` y `saldo_pendiente` son nulos, y `total_pagado` informa lo imputado a esa inscripción
-
-#### Scenario: Cobro observado
-
-- **WHEN** una inscripción tiene un cobro observado y ningún cobro acreditado
-- **THEN** `total_observado` lo suma, `total_pagado` sigue en cero y `saldo_pendiente` no baja
-
-#### Scenario: Pago que supera el requerido
-
-- **WHEN** lo acreditado supera el monto requerido de la inscripción
-- **THEN** `saldo_pendiente` es cero y no se informa un saldo negativo
-
-#### Scenario: El saldo coincide con el estado
-
-- **WHEN** una inscripción con arancel 12345.67 y beca parcial de 33.33% tiene un pago acreditado de 8230.85
-- **THEN** `monto_requerido` es 8230.86 —redondeado a centavos con `ROUND_HALF_UP`—, la inscripción figura bloqueada y `saldo_pendiente` es 0.01; con un pago de 8230.86 figura habilitada y el saldo es cero
-
-#### Scenario: Cambio del arancel de la comisión
-
-- **WHEN** se edita el arancel de la comisión y se vuelve a consultar el detalle
-- **THEN** `monto_requerido` y `saldo_pendiente` reflejan el arancel nuevo, porque no hay precio guardado en la inscripción
-
-#### Scenario: Dos inscripciones no mezclan importes
-
-- **WHEN** el alumno tiene dos inscripciones con pagos distintos
-- **THEN** cada inscripción informa su propio requerido, su pagado y su saldo, sin sumar los de la otra

@@ -1,12 +1,6 @@
-"""Reglas de negocio de inscripciones (HU #14 y HU 64).
-
-El alta y el `PATCH` de categoría comparten la validación de categoría, porcentaje de beca y
-empresa: la regla no puede depender de la puerta por la que entra la inscripción (HU 64).
-"""
+"""Reglas de negocio de inscripciones (HU #14)."""
 
 from __future__ import annotations
-
-from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -79,16 +73,10 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
     if inscriptas >= comision.cupo_maximo:
         raise CupoLleno("La comisión está completa.")
 
-    categoria, porcentaje_beca, empresa_id = _validar_categoria(
-        session, datos.categoria, datos.porcentaje_beca, datos.empresa_id
-    )
-
     inscripcion = Inscripcion(
         alumno_id=datos.alumno_id,
         comision_id=datos.comision_id,
-        categoria=categoria,
-        porcentaje_beca=porcentaje_beca,
-        empresa_id=empresa_id,
+        categoria=datos.categoria,
         estado=EstadoInscripcion.ACTIVA.value,
     )
     session.add(inscripcion)
@@ -122,39 +110,6 @@ class EmpresaNoEncontrada(Exception):
     """La empresa no existe."""
 
 
-def _validar_categoria(
-    session: Session,
-    categoria: str,
-    porcentaje_beca: int | None,
-    empresa_id: int | None,
-) -> tuple[str, Decimal | None, int | None]:
-    """Valida y normaliza categoría, porcentaje de beca y empresa (HU 64).
-
-    Beca parcial exige un porcentaje entre 1 y 99, corporativo exige una empresa existente y las
-    demás categorías no llevan ninguno de los dos. El alta y el `PATCH` usan esta misma función y
-    guardan lo que devuelve, así la base nunca ve una combinación que el servicio no aprobó.
-    """
-    if categoria not in {member.value for member in CategoriaInscripcion}:
-        raise CategoriaInvalida("La categoría no es válida.")
-
-    if categoria == CategoriaInscripcion.BECADO_PARCIAL.value:
-        if porcentaje_beca is None or porcentaje_beca < 1 or porcentaje_beca > 99:
-            raise PorcentajeInvalido("El porcentaje debe estar entre 1 y 99.")
-        porcentaje = Decimal(porcentaje_beca)
-    else:
-        porcentaje = None
-
-    if categoria == CategoriaInscripcion.CORPORATIVO.value:
-        if empresa_id is None:
-            raise EmpresaRequerida("Seleccioná la empresa.")
-        if session.get(Empresa, empresa_id) is None:
-            raise EmpresaNoEncontrada("La empresa no existe.")
-    else:
-        empresa_id = None
-
-    return categoria, porcentaje, empresa_id
-
-
 def actualizar_categoria(
     session: Session, inscripcion_id: int, datos: InscripcionCategoriaUpdate
 ) -> Inscripcion:
@@ -162,9 +117,27 @@ def actualizar_categoria(
     if inscripcion is None:
         raise InscripcionNoEncontrada("La inscripción no existe.")
 
-    categoria, porcentaje, empresa_id = _validar_categoria(
-        session, datos.categoria, datos.porcentaje_beca, datos.empresa_id
-    )
+    categoria = datos.categoria
+    if categoria not in {member.value for member in CategoriaInscripcion}:
+        raise CategoriaInvalida("La categoría no es válida.")
+
+    porcentaje = datos.porcentaje_beca
+    empresa_id = datos.empresa_id
+
+    if categoria == CategoriaInscripcion.BECADO_PARCIAL.value:
+        if porcentaje is None or porcentaje < 1 or porcentaje > 99:
+            raise PorcentajeInvalido("El porcentaje debe estar entre 1 y 99.")
+    else:
+        porcentaje = None
+
+    if categoria == CategoriaInscripcion.CORPORATIVO.value:
+        if empresa_id is None:
+            raise EmpresaRequerida("Seleccioná la empresa.")
+        empresa = session.get(Empresa, empresa_id)
+        if empresa is None:
+            raise EmpresaNoEncontrada("La empresa no existe.")
+    else:
+        empresa_id = None
 
     inscripcion.categoria = categoria
     inscripcion.porcentaje_beca = porcentaje

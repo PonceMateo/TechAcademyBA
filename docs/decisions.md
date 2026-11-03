@@ -2232,128 +2232,63 @@ alcance de este change; queda a criterio del equipo agregarlo.
 
 ---
 
-## Categoría arancelaria por inscripción (change `hu-64-categoria-por-inscripcion`)
+## Comprobante de pago enviado por el alumno (change `hu-52-enviar-comprobante-alumno`)
 
-### D67 — El padrón no expone datos de inscripción y el detalle del alumno es el único contrato
-
-- **Fecha:** 2026-11-02
-- **Autor:** Mateo Ponce
-- **Decisión:** `GET /alumnos` devuelve solo los datos del alumno: deja de informar
-  `inscripcion_id`, `comision`, `categoria`, `porcentaje_beca` y `acceso`, y el listado ya no deriva
-  habilitación. El detalle `GET /alumnos/{id}` es el único contrato que expone las inscripciones con
-  comisión, categoría, porcentaje, empresa y acceso derivado, y se declara **después** de
-  `/alumnos/reactivable` para que el path param no se coma esa ruta. `POST /inscripciones` acepta
-  `porcentaje_beca` y `empresa_id` con las mismas reglas que el `PATCH`, a través de una validación
-  compartida en `app/services/inscripciones.py`.
-- **Por qué:** la categoría se define por inscripción desde la HU 15, pero el padrón armaba un
-  resumen por alumno tomando su primera inscripción y lo mostraba como si fuera única. Con una
-  inscripción corporativa y otra particular, la tabla afirmaba una categoría que no pertenecía a la
-  fila y el estado de habilitación de una cursada tapaba el de la otra. Un solo detalle deja que la
-  ficha de la HU 61 lo extienda en lugar de duplicar contratos.
-- **Consecuencias:** el forzado de habilitación por inscripción queda **fuera de alcance** de este
-  change: `POST /habilitaciones/override` no existe y la acción sigue operando contra el alumno. Su
-  endpoint y su regla por sección son la H/U 30, en `Ready`. El arancel no se persiste en la
-  inscripción; el saldo se deriva con el arancel actual (HU 61).
-- **Dónde:** `backend/app/api/alumnos.py`, `backend/app/services/alumnos.py`,
-  `backend/app/schemas/alumnos.py`, `backend/app/api/inscripciones.py`,
-  `backend/app/services/inscripciones.py`, `backend/app/schemas/inscripciones.py`,
-  `frontend/src/admin/StudentsPage.jsx`, `frontend/src/admin/AccessPage.jsx`,
-  `frontend/src/admin/CoursesPage.jsx`, `frontend/src/admin/PaymentsPage.jsx`,
-  `frontend/src/services/`.
-
----
-
-## Ficha del alumno en modal e importes por inscripción (change `hu-61-ficha-alumno-modal`)
-
-### D68 — Una sola regla de dinero para el estado y para el saldo, contra el arancel actual
+### D67 — El comprobante del alumno es una entidad independiente, con storage privado y revisión de Secretaría
 
 - **Fecha:** 2026-11-02
-- **Autor:** Mateo Ponce
-- **Decisión:** se extrae `derivar_montos(session, inscripcion)` en
-  `backend/app/services/habilitacion.py` —arancel, requerido, acreditado y observado— y
-  `derivar_estado` decide contra ese mismo requerido. El requerido se cuantiza a centavos con
-  `ROUND_HALF_UP` antes de compararlo con lo acreditado y de calcular el saldo. El detalle
-  `GET /alumnos/{id}` suma por inscripción `arancel`, `monto_requerido`, `total_pagado`,
-  `total_observado` y `saldo_pendiente`. El saldo nunca es negativo y es nulo en corporativo; en
-  beca total, requerido y saldo son cero.
-- **Por qué:** la pantalla muestra `$0,00` con dos decimales. Si el estado comparaba fracciones y el
-  saldo se calculaba aparte, un arancel con centavos y una beca de dos decimales podían dejar un
-  saldo de fracciones que se leía como cero mientras el acceso seguía bloqueado. Escribir el
-  criterio de beca y de cobros observados dos veces garantizaba que divergieran.
-- **Consecuencias:** el saldo se deriva con el arancel **actual** de la comisión: no hay precio
-  guardado en la inscripción, así que editar el arancel de la comisión cambia el saldo de todas sus
-  inscripciones. Lo observado no descuenta y se informa aparte. La habilitación solo se deriva para
-  inscripciones `ACTIVA`; una `COMPLETADA` muestra su estado de inscripción y conserva sus importes.
-- **Dónde:** `backend/app/services/habilitacion.py`, `backend/app/services/alumnos.py`,
-  `backend/app/schemas/alumnos.py`, `frontend/src/admin/StudentsPage.jsx`,
-  `frontend/src/components/ui/Table.jsx`, `frontend/src/services/`.
-
----
-
-## Ficha del alumno — tooltip y observados (change `hu-61-ficha-alumno-modal`)
-
-### D72 — StatusIndicator perdió la causa visible al generalizar el cambio de FichaAlumnoModal
-
-- **Fecha:** 2026-11-02
-- **Autor:** Mateo Ponce
-- **Decisión:** `StatusIndicator` debe seguir mostrando `causa` debajo del badge cuando está `BLOQUEADO`; solo `FichaAlumnoModal` la oculta porque usa `Tooltip` (D71). El componente recupera el texto y recibe un prop opcional `mostrarCausa` (default `true`) para que la ficha lo desactive sin afectar otras pantallas.
-- **Por qué:** el cambio anterior quitó el `<span>` de causa en `StatusIndicator` para cumplir con el rediseño de la ficha, pero `AccessPage` y `CommissionDetailPage` dependen de que la causa aparezca directamente (tests `comprobante ilegible`, `debe saldo`). No es un cambio de contrato de datos ni de pantalla fuera de la ficha.
-- **Consecuencias:** `StatusIndicator` vuelve a mostrar la causa; `FichaAlumnoModal` pasa `mostrarCausa={false}` cuando está bloqueado para que solo quede el badge + tooltip.
-- **Dónde:** `frontend/src/components/ui/StatusIndicator.jsx`, `frontend/src/admin/FichaAlumnoModal.jsx`, `docs/decisions.md`.
-
-- **Fecha:** 2026-11-02
-- **Autor:** Mateo Ponce
-- **Decisión:** el indicador de comprobantes observados usa un componente `Tooltip` compartido con
-  portal (`createPortal`) sobre `document.body`, `position: fixed`, `pointer-events: none` en el
-  cuerpo y `pointer-events: auto` en el botón, con cierre por `blur`, `Escape` y `mouseleave`, y
-  un `aria-describedby` al botón. No hay componente de tooltip existente en `components/ui`; se
-  crea `components/ui/Tooltip.jsx` y se reutiliza en el indicador de observados y en el de bloqueado.
-- **Por qué:** el tooltip anterior estaba `absolute` dentro del `dl` del modal; al aparecer al
-  borde inferior del contenido activaba el scrollbar (`overflow-y-auto`), el botón se desplazaba,
-  se perdía `hover`, el tooltip desaparecía, el scrollbar se ocultaba, el botón volvía y el ciclo
-  se repetía. Un portal fija la posición al viewport y no participa del layout del modal.
-- **Consecuencias:** el tooltip puede tapar contenido de la ventana o quedar cortado por el borde
-  del viewport; se limita con `max-w-xs`, `flip` por JS simple y se muestra siempre a la derecha
-  del botón. El `Escape` cierra primero el desplegable (D70) y luego el tooltip; con el tooltip
-  abierto y otro modal encima, `Escape` cierra el tooltip sin tocar el modal de atrás.
-- **Dónde:** `frontend/src/components/ui/Tooltip.jsx`, `frontend/src/admin/FichaAlumnoModal.jsx`.
-
-### D69 — La suite del frontend tiene un tope de 15 s por test
-
-- **Fecha:** 2026-11-02
-- **Autor:** Mateo Ponce
-- **Decisión:** `frontend/vite.config.js` fija `testTimeout: 15000`. El tope por omisión de Vitest
-  es de 5 s.
-- **Por qué:** los tests de pantalla usan `userEvent` y tardan entre uno y dos segundos cada uno.
-  Con la suite completa corriendo en paralelo —37 archivos— varios se pasaban de 5 s y fallaban
-  por tiempo sin que hubiera nada roto: pasaban al correrlos solos y fallaban de forma
-  intermitente en la suite. Un tope más alto no esconde una falla, porque el test sigue fallando si
-  la lógica se cuelga.
-- **Consecuencias:** la suite tarda lo mismo; deja de reportar fallas que no existen. Si algún día
-  un test tarda más de 15 s, conviene mirar por qué antes de subir el número otra vez.
-- **Dónde:** `frontend/vite.config.js`.
-
-### D70 — El saldo de la ficha se muestra, no se calcula; el click afuera es opt-in
-
-- **Fecha:** 2026-11-02
-- **Autor:** Mateo Ponce
-- **Decisión:** la ficha del alumno muestra `monto_requerido`, `total_pagado`,
-  `total_observado` y `saldo_pendiente` **tal como los devuelve `derivar_montos`**; el frontend no
-  recalcula ninguno. «Arancel a abonar» es `monto_requerido` —`$0` en beca total, `—` en
-  corporativo—; «Saldo pendiente» es `saldo_pendiente` —«Exento» en beca total, «A cargo de la
-  empresa» en corporativo— y el indicador de comprobantes observados aparece solo cuando
-  `total_observado > 0`. El `Modal` compartido gana la prop `cerrarAlClickAfuera`, con `false` por
-  omisión, y la ficha la activa: el click cierra solo si `mousedown` y `mouseup` ocurrieron sobre
-  el fondo y solo responde el modal de arriba de la pila.
-- **Por qué:** el saldo y el estado de habilitación salen del mismo requerido cuantizado (D68). Si
-  la ficha volviera a sumar cobranzas por su cuenta, la pantalla podría mostrar `$0` al lado de un
-  acceso bloqueado. El click afuera, en cambio, no puede ser el comportamiento de todos los
-  modales: el prototipo ya perdió altas por un click accidental en el fondo y los formularios
-  conservan ese comportamiento a propósito.
-- **Consecuencias:** una cobranza observada no baja el saldo y se informa aparte; el total pagado de
-  una inscripción corporativa suma solo lo imputado a esa inscripción, nunca lo imputado a la
-  empresa. Con el desplegable de comisiones abierto, `Escape` y el click afuera cierran primero el
-  desplegable.
-- **Dónde:** `frontend/src/admin/FichaAlumnoModal.jsx`, `frontend/src/admin/StudentsPage.jsx`,
-  `frontend/src/components/ui/Modal.jsx`, `frontend/src/components/ui/Table.jsx`,
-  `frontend/src/components/ui/Select.jsx`.
+- **Autor:** Santiago Torrens
+- **Decisión — entidad:** el envío se guarda en `comprobante_alumno`, no en `cobranza`. Registra
+  alumno autenticado, inscripción a imputar, fecha del pago, importe, medio, titular opcional,
+  solicitud de Factura A, CUIT cuando corresponde, clave del archivo, estado y fecha/hora del
+  envío. No tiene FK a `cobranza` y no crea pagador ni imputación: enviar un comprobante **no
+  acredita el pago** ni altera saldos, habilitación o estado de la inscripción. `D12` y el enum
+  `EstadoCobranza` quedan intactos.
+- **Decisión — estados:** `EstadoComprobanteAlumno` tiene `PENDIENTE_CARGA` (técnico, mientras se
+  sube el archivo) y `PENDIENTE_REVISION` (estado inicial visible, una vez verificado el
+  contenido). No se agregan `ACEPTADO`/`RECHAZADO`: la aceptación definitiva pertenece al flujo
+  de revisión de cobranzas de las HU 21 y 22 y se implementará como una migración aditiva.
+- **Decisión — titular opcional:** `titular` nulo significa **no identificado** y no se completa
+  con el nombre del alumno. El comprobante puede haberlo pagado un familiar o una empresa, y
+  asumir lo contrario inventaría un dato. Es distinto de `TITULAR_SIN_IDENTIFICAR` de la cobranza
+  manual, donde la tabla necesita un texto para mostrar.
+- **Decisión — CUIT:** solo se acepta con Factura A, se valida con la misma regla de dígito
+  verificador del padrón (`EXPRESION_CUIT_VALIDO`, ahora pública en `app/models/inscripciones.py`)
+  y se guarda normalizado en `cuit_norm`. Sin Factura A un CUIT presente es un `422`.
+- **Decisión — almacenamiento en dos pasos:** `POST /alumno/comprobantes` valida los metadatos y
+  devuelve el destino; el navegador sube el archivo (al backend en desarrollo, a una URL firmada
+  en producción); `POST .../confirmar` lee el objeto, valida tamaño y contenido real (cabecera y
+  cierre de PDF/JPG/PNG, no la extensión ni el `Content-Type`) y recién ahí marca
+  `PENDIENTE_REVISION`. Motivo: el límite de 4,5 MB por request de las Vercel Functions no admite
+  los 5 MB permitidos. Si la verificación o el duplicado fallan, se borran el objeto y la fila
+  técnica; si el storage no responde, el comprobante queda en carga y la respuesta es `503`.
+- **Decisión — storage:** `app/core/storage.py` define `AlmacenamientoLocal` (volumen Docker
+  `comprobantes_data`, fuera de `/app` y sin servido estático) y `AlmacenamientoSupabase` (API de
+  Storage con service role: firma subida y descarga, borra). Las claves las genera el servidor
+  (`alumno/{alumno_id}/{uuid}`) y el nombre del usuario es solo etiqueta de descarga, así que no
+  hay traversal posible. En producción `STORAGE_BACKEND=local` y la falta de configuración se
+  rechazan con `503`; no hay fallback insegura.
+- **Decisión — permisos:** el alumno solo ve y descarga lo suyo, resuelto desde `usuario.alumno_id`
+  (D60). Secretaría (`ADMIN`) lista los pendientes y descarga cualquier adjunto; otro alumno
+  recibe `404` y sin sesión `401`. La descarga usa el endpoint autenticado o una URL firmada de
+  vida corta; no se publican URLs permanentes ni se registran binarios o URLs privadas en logs.
+- **Decisión — frontend:** «Mis Pagos» reemplaza el formulario de ejemplo por el envío real
+  (validación previa, nombre y tamaño del archivo, estado de carga, botón deshabilitado y aviso de
+  que queda pendiente) y agrega la lista de comprobantes enviados. Cobranzas muestra una bandeja
+  de pendientes reutilizando `Card`/`Table`, sin botones de acreditación.
+- **Por qué:** el comprobante llegaba por WhatsApp y no quedaba trazabilidad. Separar el envío del
+  hecho contable permite registrar la declaración sin tocar la habilitación, y reutilizar la
+  revisión de cobranzas cuando Secretaría decida acreditar.
+- **Límite conocido:** si el alumno sube el archivo y abandona antes de confirmar, queda una fila
+  `PENDIENTE_CARGA` y su objeto. Se limpian por antigüedad cuando exista una tarea de
+  mantenimiento; el registro no se muestra ni cuenta como pendiente.
+- **Dónde:** `backend/app/models/comprobantes.py`, `backend/app/models/enums.py`,
+  `backend/alembic/versions/0007_comprobante_alumno.py`, `backend/app/core/storage.py`,
+  `backend/app/core/config.py`, `backend/app/schemas/comprobantes.py`,
+  `backend/app/services/comprobantes.py`, `backend/app/api/comprobantes.py`,
+  `backend/app/api/router.py`, `backend/app/schemas/alumno.py`,
+  `backend/app/services/alumno.py`, `docker-compose.yml`, `.env.example`, `README.md`,
+  `frontend/src/alumno/StudentPaymentsPage.jsx`, `frontend/src/admin/ComprobantesAlumnoCard.jsx`,
+  `frontend/src/admin/PaymentsPage.jsx`, `frontend/src/domain/enums.js`,
+  `frontend/src/domain/validacion.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/mockDataSource.js`.

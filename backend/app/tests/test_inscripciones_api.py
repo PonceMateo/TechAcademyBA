@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models.enums import CategoriaInscripcion
 from app.models.padron import Usuario
 from app.tests.factories import (
     crear_alumno,
     crear_comision,
     crear_curso,
-    crear_empresa,
-    crear_inscripcion,
     crear_usuario_admin,
     encabezado_de_autorizacion,
     token_de_prueba,
@@ -93,147 +88,3 @@ def test_comision_completa_es_409(
         json={"alumno_id": alumno_dos.id, "comision_id": comision.id},
     )
     assert segunda.status_code == 409
-
-
-def test_alta_con_beca_parcial_guarda_el_porcentaje(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: el alta elige la categoría y guarda el porcentaje de la beca parcial."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-
-    respuesta = cliente_admin.post(
-        "/inscripciones",
-        json={
-            "alumno_id": alumno.id,
-            "comision_id": comision.id,
-            "categoria": "BECADO_PARCIAL",
-            "porcentaje_beca": 50,
-        },
-    )
-
-    assert respuesta.status_code == 201, respuesta.text
-    cuerpo = respuesta.json()
-    assert cuerpo["categoria"] == "BECADO_PARCIAL"
-    assert Decimal(str(cuerpo["porcentaje_beca"])) == Decimal("50")
-
-
-def test_alta_con_beca_parcial_sin_porcentaje_es_422(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: la beca parcial sin porcentaje se rechaza, igual que en el `PATCH`."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-
-    respuesta = cliente_admin.post(
-        "/inscripciones",
-        json={
-            "alumno_id": alumno.id,
-            "comision_id": comision.id,
-            "categoria": "BECADO_PARCIAL",
-        },
-    )
-
-    assert respuesta.status_code == 422
-    assert respuesta.json()["detail"] == "El porcentaje debe estar entre 1 y 99."
-
-
-def test_alta_con_porcentaje_fuera_de_rango_es_422(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: un porcentaje de 100 no es una beca parcial válida."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-
-    respuesta = cliente_admin.post(
-        "/inscripciones",
-        json={
-            "alumno_id": alumno.id,
-            "comision_id": comision.id,
-            "categoria": "BECADO_PARCIAL",
-            "porcentaje_beca": 100,
-        },
-    )
-
-    assert respuesta.status_code == 422
-
-
-def test_alta_corporativa_con_empresa(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: la inscripción corporativa nace con su empresa."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-    empresa = crear_empresa(db_session)
-
-    respuesta = cliente_admin.post(
-        "/inscripciones",
-        json={
-            "alumno_id": alumno.id,
-            "comision_id": comision.id,
-            "categoria": "CORPORATIVO",
-            "empresa_id": empresa.id,
-        },
-    )
-
-    assert respuesta.status_code == 201, respuesta.text
-    assert respuesta.json()["empresa_id"] == empresa.id
-
-
-def test_alta_corporativa_sin_empresa_es_422(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: no se puede crear una corporativa sin empresa."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-
-    respuesta = cliente_admin.post(
-        "/inscripciones",
-        json={
-            "alumno_id": alumno.id,
-            "comision_id": comision.id,
-            "categoria": "CORPORATIVO",
-        },
-    )
-
-    assert respuesta.status_code == 422
-    assert respuesta.json()["detail"] == "Seleccioná la empresa."
-
-
-def test_alta_corporativa_con_empresa_inexistente_es_404(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: la empresa elegida tiene que existir."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-
-    respuesta = cliente_admin.post(
-        "/inscripciones",
-        json={
-            "alumno_id": alumno.id,
-            "comision_id": comision.id,
-            "categoria": "CORPORATIVO",
-            "empresa_id": 999999,
-        },
-    )
-
-    assert respuesta.status_code == 404
-
-
-def test_inscripciones_del_alumno_informan_la_categoria(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: el selector de Cobranzas distingue las inscripciones por su categoría."""
-    comision = crear_comision(db_session, cupo_maximo=5)
-    alumno = crear_alumno(db_session)
-    crear_inscripcion(
-        db_session,
-        alumno=alumno,
-        comision=comision,
-        categoria=CategoriaInscripcion.BECADO_TOTAL.value,
-    )
-
-    respuesta = cliente_admin.get(f"/alumnos/{alumno.id}/inscripciones")
-
-    assert respuesta.status_code == 200, respuesta.text
-    assert respuesta.json()[0]["categoria"] == "BECADO_TOTAL"

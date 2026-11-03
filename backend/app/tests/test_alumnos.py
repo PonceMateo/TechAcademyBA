@@ -281,10 +281,7 @@ def test_si_falla_la_cuenta_no_queda_el_alumno(
 # --------------------------------------------------------------- listado
 
 
-def test_el_listado_trae_solo_los_datos_del_alumno(
-    cliente_admin: TestClient, db_session: Session
-) -> None:
-    """HU 64: el padrón no expone datos de inscripción aunque el alumno tenga una."""
+def test_el_listado_trae_los_huecos_en_null(cliente_admin: TestClient, db_session: Session) -> None:
     crear_alumno(db_session, documento="30111222", email="sin.inscripcion@techacademy.invalid")
 
     respuesta = cliente_admin.get("/alumnos")
@@ -292,11 +289,10 @@ def test_el_listado_trae_solo_los_datos_del_alumno(
     assert respuesta.status_code == 200, respuesta.text
     [fila] = respuesta.json()
     assert fila["documento"] == "30111222"
-    assert "comision" not in fila
-    assert "categoria" not in fila
-    assert "porcentaje_beca" not in fila
-    assert "acceso" not in fila
-    assert "inscripcion_id" not in fila
+    assert fila["comision"] is None
+    assert fila["categoria"] is None
+    assert fila["porcentaje_beca"] is None
+    assert fila["acceso"] is None
 
 
 def test_el_padron_vacio_devuelve_una_lista_vacia(cliente_admin: TestClient) -> None:

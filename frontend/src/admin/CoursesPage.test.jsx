@@ -53,63 +53,6 @@ async function abrir(ruta) {
   renderAppAs('ADMIN', ruta)
 }
 
-describe('inscripción con categoría (HU 64)', () => {
-  async function abrirInscripcion(overrides = {}) {
-    resetDataSource()
-    stubBackend()
-    stubDataSource(overrides)
-    renderAppAs('ADMIN', RUTA_CATALOGO)
-    const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: '+ Inscribir Alumno' }))
-    return { user, dialogo: await screen.findByRole('dialog', { name: 'Inscribir Alumno' }) }
-  }
-
-  async function elegirPrimeraOpcion(user, select) {
-    const opcion = within(select)
-      .getAllByRole('option')
-      .find((candidata) => candidata.value !== '')
-    await user.selectOptions(select, opcion)
-  }
-
-  it('abre el modal con la categoría Particular por defecto y sin campos de beca ni empresa', async () => {
-    const { dialogo } = await abrirInscripcion()
-
-    expect(within(dialogo).getByLabelText(/^Categoría/)).toHaveValue('PARTICULAR')
-    expect(within(dialogo).queryByLabelText(/^Descuento/)).not.toBeInTheDocument()
-    expect(within(dialogo).queryByLabelText(/^Empresa/)).not.toBeInTheDocument()
-  })
-
-  it('no inscribe una beca parcial sin porcentaje', async () => {
-    const crearInscripcion = vi.fn()
-    const { user, dialogo } = await abrirInscripcion({ crearInscripcion })
-
-    await elegirPrimeraOpcion(user, within(dialogo).getByLabelText(/^Comisión/))
-    await elegirPrimeraOpcion(user, within(dialogo).getByLabelText(/^Alumno/))
-    await user.selectOptions(within(dialogo).getByLabelText(/^Categoría/), 'BECADO_PARCIAL')
-    await user.click(within(dialogo).getByRole('button', { name: 'Inscribir' }))
-
-    expect(
-      await within(dialogo).findByText('El porcentaje de la beca debe ser un entero entre 1 y 99.'),
-    ).toBeInTheDocument()
-    expect(crearInscripcion).not.toHaveBeenCalled()
-  })
-
-  it('no inscribe una corporativa sin empresa', async () => {
-    const crearInscripcion = vi.fn()
-    const { user, dialogo } = await abrirInscripcion({ crearInscripcion })
-
-    await elegirPrimeraOpcion(user, within(dialogo).getByLabelText(/^Comisión/))
-    await elegirPrimeraOpcion(user, within(dialogo).getByLabelText(/^Alumno/))
-    await user.selectOptions(within(dialogo).getByLabelText(/^Categoría/), 'CORPORATIVO')
-    await user.click(within(dialogo).getByRole('button', { name: 'Inscribir' }))
-
-    expect(
-      await within(dialogo).findByText('Seleccioná la empresa de la inscripción corporativa.'),
-    ).toBeInTheDocument()
-    expect(crearInscripcion).not.toHaveBeenCalled()
-  })
-})
-
 async function abrirCatalogo() {
   await abrir(RUTA_CATALOGO)
   await screen.findByRole('heading', { name: 'Cursos' })

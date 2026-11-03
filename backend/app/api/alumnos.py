@@ -28,7 +28,6 @@ from app.models.padron import Usuario
 from app.schemas.alumnos import (
     AlumnoCreadoOut,
     AlumnoCreate,
-    AlumnoDetalleOut,
     AlumnoOut,
     AlumnoUpdate,
     RestablecerPasswordRequest,
@@ -78,7 +77,6 @@ def listar_inscripciones_del_alumno(
         InscripcionDisponibleOut(
             id=inscripcion.id,
             estado=inscripcion.estado,
-            categoria=inscripcion.categoria,
             comision=ComisionDisponibleOut(
                 codigo=inscripcion.comision.codigo,
                 nombre=inscripcion.comision.curso.nombre,
@@ -148,33 +146,6 @@ def consultar_alumno_reactivable(
     """
     alumno = alumnos.buscar_alumno_reactivable(session, documento, email)
     return AlumnoOut.model_validate(alumno) if alumno is not None else None
-
-
-@router.get(
-    "/{alumno_id}",
-    response_model=AlumnoDetalleOut,
-    summary="Consultar el detalle de un alumno con sus inscripciones",
-)
-def obtener_detalle_alumno(
-    alumno_id: int,
-    session: Annotated[Session, Depends(get_db)],
-    _admin: Annotated[Usuario, Depends(_solo_admin)],
-) -> AlumnoDetalleOut:
-    """El alumno con **todas** sus inscripciones (HU 64).
-
-    Cada inscripción trae su comisión, categoría, porcentaje de beca, empresa y el acceso derivado
-    cuando está `ACTIVA`. Es el contrato del padrón, de la consulta de habilitación y de la ficha
-    de la HU 61. **Se declara después de `/reactivable`**: si fuera antes, el path param se comería
-    esa ruta y la reactivación de la HU 17 respondería 422.
-
-    404 si el alumno no existe, 403 para un rol que no sea Administración y 401 sin token.
-    """
-    try:
-        detalle = alumnos.obtener_detalle(session, alumno_id)
-    except alumnos.AlumnoNoEncontrado as error:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
-
-    return AlumnoDetalleOut.model_validate(detalle)
 
 
 @router.put(

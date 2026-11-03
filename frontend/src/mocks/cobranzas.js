@@ -32,7 +32,7 @@ export const COBRANZAS = markAsExample([
     importe: 45000,
     estado: ESTADO_COBRANZA.ACREDITADO,
     causa: null,
-    imputacion: { destino: 'ALUMNO', id: 1, inscripcion_id: 11, nombre: 'Juan Ignacio Pérez' },
+    imputacion: { destino: 'ALUMNO', id: 1, nombre: 'Juan Ignacio Pérez' },
   },
   {
     // El pago dividido: es becada parcial 50% y abona la mitad del arancel, y aun así queda
@@ -45,7 +45,7 @@ export const COBRANZAS = markAsExample([
     importe: 31000,
     estado: ESTADO_COBRANZA.ACREDITADO,
     causa: null,
-    imputacion: { destino: 'ALUMNO', id: 2, inscripcion_id: 2, nombre: 'Camila Rodríguez' },
+    imputacion: { destino: 'ALUMNO', id: 2, nombre: 'Camila Rodríguez' },
   },
   {
     // La empresa que paga: el comprobante va a nombre de la empresa y la imputación cae sobre el
@@ -85,7 +85,7 @@ export const COBRANZAS = markAsExample([
     importe: null,
     estado: ESTADO_COBRANZA.OBSERVADO,
     causa: 'comprobante ilegible',
-    imputacion: { destino: 'ALUMNO', id: 5, inscripcion_id: 5, nombre: 'Agustina Benítez' },
+    imputacion: { destino: 'ALUMNO', id: 5, nombre: 'Agustina Benítez' },
   },
   {
     // La seña: debe la mitad del arancel.
@@ -97,7 +97,7 @@ export const COBRANZAS = markAsExample([
     importe: 26000,
     estado: ESTADO_COBRANZA.OBSERVADO,
     causa: 'debe saldo',
-    imputacion: { destino: 'ALUMNO', id: 6, inscripcion_id: 6, nombre: 'Valeria Rossi' },
+    imputacion: { destino: 'ALUMNO', id: 6, nombre: 'Valeria Rossi' },
   },
 ])
 

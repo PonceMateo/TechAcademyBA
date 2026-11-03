@@ -160,16 +160,16 @@ def test_la_causa_del_bloqueo_es_la_misma_que_ve_administracion(db_session) -> N
     )
 
     (del_alumno,) = listar_inscripciones(db_session, usuario)
-    # HU 64: el estado por inscripción se lee en el detalle del alumno, no en el padrón.
-    detalle = servicio_alumnos.obtener_detalle(db_session, alumno.id)
-    (inscripcion_administrativa,) = detalle.inscripciones
+    fila_administrativa = next(
+        fila for fila in servicio_alumnos.listar_alumnos(db_session) if fila.id == alumno.id
+    )
 
     assert del_alumno.acceso.estado == EstadoHabilitacion.BLOQUEADO.value
     assert del_alumno.acceso.causa == "Comprobante ilegible"
     assert del_alumno.acceso.forzado is True
-    assert inscripcion_administrativa.acceso.estado == del_alumno.acceso.estado
-    assert inscripcion_administrativa.acceso.causa == del_alumno.acceso.causa
-    assert inscripcion_administrativa.acceso.forzado == del_alumno.acceso.forzado
+    assert fila_administrativa.acceso.estado == del_alumno.acceso.estado
+    assert fila_administrativa.acceso.causa == del_alumno.acceso.causa
+    assert fila_administrativa.acceso.forzado == del_alumno.acceso.forzado
 
 
 def test_un_alumno_sin_inscripciones_recibe_una_lista_vacia(db_session) -> None:

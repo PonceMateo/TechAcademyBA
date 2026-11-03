@@ -1,20 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ESTADO_HABILITACION } from '../../domain/enums'
 import { formatFechaCorta, formatMoneda } from '../../utils/formato'
-import {
-  Badge,
-  Button,
-  Card,
-  Campo,
-  Input,
-  Modal,
-  Select,
-  StatusIndicator,
-  Table,
-} from './index'
+import { Badge, Button, Card, Campo, Input, Modal, StatusIndicator, Table } from './index'
 
 /**
  * Componentes compartidos (8.3).
@@ -127,41 +117,6 @@ describe('Table', () => {
 
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(screen.getByText('No se encontraron resultados')).toBeInTheDocument()
-  })
-
-  it('abre la fila con click, Enter y espacio cuando la pantalla la vuelve accionable', async () => {
-    const user = userEvent.setup()
-    const alAbrir = vi.fn()
-    render(
-      <Table
-        columnas={COLUMNAS}
-        filas={[{ id: 1, codigo: 'CUR-101', arancel: 45000 }]}
-        onFila={alAbrir}
-        etiquetaDeFila={(fila) => `Abrir ${fila.codigo}`}
-      />,
-    )
-
-    const fila = screen.getByRole('row', { name: 'Abrir CUR-101' })
-    expect(fila).toHaveAttribute('tabindex', '0')
-
-    await user.click(fila)
-    await user.keyboard('{Enter}')
-    await user.keyboard(' ')
-
-    expect(alAbrir).toHaveBeenCalledTimes(3)
-    expect(alAbrir).toHaveBeenCalledWith({ id: 1, codigo: 'CUR-101', arancel: 45000 })
-  })
-
-  it('deja las filas sin foco ni click cuando la pantalla no las vuelve accionables', () => {
-    render(<Table columnas={COLUMNAS} filas={[{ id: 1, codigo: 'CUR-101', arancel: 45000 }]} />)
-
-    expect(screen.getByRole('row', { name: 'CUR-101 $45.000' })).not.toHaveAttribute('tabindex')
-  })
-
-  it('aplica el hover gris a la fila de datos', () => {
-    render(<Table columnas={COLUMNAS} filas={[{ id: 1, codigo: 'CUR-101', arancel: 45000 }]} />)
-    const fila = screen.getByRole('row', { name: 'CUR-101 $45.000' })
-    expect(fila.className).toContain('hover:bg-slate-200')
   })
 })
 
@@ -328,124 +283,6 @@ describe('Modal', () => {
 
     await user.keyboard('{Escape}')
     expect(abridor).toHaveFocus()
-  })
-
-  it('por omisión no se cierra con un click en el fondo', () => {
-    const onClose = vi.fn()
-    render(
-      <Modal abierto titulo="Crear Nueva Comisión" onClose={onClose}>
-        <p>Formulario</p>
-      </Modal>,
-    )
-
-    const fondo = screen.getByRole('dialog', { name: 'Crear Nueva Comisión' }).parentElement
-    fireEvent.mouseDown(fondo)
-    fireEvent.mouseUp(fondo)
-
-    expect(onClose).not.toHaveBeenCalled()
-  })
-
-  it('cierra con un click en el fondo cuando la pantalla lo habilita', () => {
-    const onClose = vi.fn()
-    render(
-      <Modal abierto titulo="Ficha del alumno" onClose={onClose} cerrarAlClickAfuera>
-        <p>Datos del alumno</p>
-      </Modal>,
-    )
-
-    const fondo = screen.getByRole('dialog', { name: 'Ficha del alumno' }).parentElement
-    fireEvent.mouseDown(fondo)
-    fireEvent.mouseUp(fondo)
-
-    expect(onClose).toHaveBeenCalledTimes(1)
-  })
-
-  it('no cierra si el arrastre empezó adentro del modal y terminó en el fondo', () => {
-    const onClose = vi.fn()
-    render(
-      <Modal abierto titulo="Ficha del alumno" onClose={onClose} cerrarAlClickAfuera>
-        <p>Datos del alumno</p>
-      </Modal>,
-    )
-
-    const dialogo = screen.getByRole('dialog', { name: 'Ficha del alumno' })
-    fireEvent.mouseDown(dialogo)
-    fireEvent.mouseUp(dialogo.parentElement)
-
-    expect(onClose).not.toHaveBeenCalled()
-  })
-})
-
-describe('Select', () => {
-  const OPCIONES = [
-    { valor: '11', etiqueta: 'CUR-101 Python Inicial' },
-    { valor: '12', etiqueta: 'CUR-106 Machine Learning Aplicado' },
-  ]
-
-  function Selector({ onChange = () => {} }) {
-    const [valor, setValor] = useState('11')
-    return (
-      <Select
-        id="comision"
-        etiqueta="Seleccionar comisión"
-        opciones={OPCIONES}
-        valor={valor}
-        onChange={(nuevo) => {
-          setValor(nuevo)
-          onChange(nuevo)
-        }}
-      />
-    )
-  }
-
-  it('anuncia si está abierto y deja elegir una opción', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(<Selector onChange={onChange} />)
-
-    const boton = screen.getByRole('combobox', { name: /Seleccionar comisión/ })
-    expect(boton).toHaveTextContent('CUR-101 Python Inicial')
-    expect(boton).toHaveAttribute('aria-expanded', 'false')
-
-    await user.click(boton)
-
-    expect(boton).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('listbox')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('option', { name: 'CUR-106 Machine Learning Aplicado' }))
-
-    expect(onChange).toHaveBeenCalledWith('12')
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-    expect(boton).toHaveTextContent('CUR-106 Machine Learning Aplicado')
-  })
-
-  it('se mueve con las flechas y elige con Enter', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(<Selector onChange={onChange} />)
-
-    screen.getByRole('combobox', { name: /Seleccionar comisión/ }).focus()
-    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
-
-    expect(onChange).toHaveBeenCalledWith('12')
-  })
-
-  it('cierra con Escape sin cerrar la ventana que lo contiene', async () => {
-    const user = userEvent.setup()
-    const onCloseModal = vi.fn()
-    render(
-      <Modal abierto titulo="Ficha del alumno" onClose={onCloseModal}>
-        <Selector />
-      </Modal>,
-    )
-
-    await user.click(screen.getByRole('combobox', { name: /Seleccionar comisión/ }))
-    expect(screen.getByRole('listbox')).toBeInTheDocument()
-
-    await user.keyboard('{Escape}')
-
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-    expect(onCloseModal).not.toHaveBeenCalled()
   })
 })
 

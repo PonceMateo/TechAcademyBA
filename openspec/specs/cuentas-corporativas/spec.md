@@ -63,19 +63,3 @@ social y CUIT.
 #### Scenario: CUIT duplicado
 - **WHEN** se envía un CUIT ya registrado, escrito con guiones o sin ellos
 - **THEN** el sistema responde 409 e identifica la empresa existente por razón social y CUIT
-
-### Requirement: Carga de nómina corporativa
-
-WHEN una empresa contrata un curso formal y carga empleados, el sistema SHALL crear una inscripción por empleado con categoría arancelaria `CORPORATIVO`, asociada a la empresa y a la comisión contratada. La carga SHALL NOT solicitar ni aceptar una categoría de beca ni un porcentaje de beca.
-
-#### Scenario: Empleados clasificados como corporativos
-- **WHEN** una administración carga una nómina para una empresa y una comisión de curso formal
-- **THEN** cada inscripción creada tiene categoría `CORPORATIVO`, referencia a la empresa y porcentaje de beca nulo
-
-#### Scenario: La interfaz no ofrece becas
-- **WHEN** se abre el formulario de carga de nómina
-- **THEN** el formulario solicita los datos del empleado, pero no muestra selector de beca ni porcentaje de descuento
-
-#### Scenario: Rechazo de datos de beca
-- **WHEN** una solicitud de carga de nómina intenta informar una categoría o porcentaje de beca
-- **THEN** el sistema rechaza la solicitud por no corresponder al flujo corporativo

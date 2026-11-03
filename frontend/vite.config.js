@@ -36,10 +36,6 @@ export default defineConfig(({ mode }) => {
       // transformación de Tailwind en cada archivo.
       css: false,
       restoreMocks: true,
-      // Los tests de pantalla usan `userEvent` y tardan entre uno y dos segundos cada uno. Con la
-      // suite completa corriendo en paralelo se pasaban de los 5 s por defecto y fallaban por tiempo
-      // sin que hubiera nada roto: el tope es de la suite, no de la lógica.
-      testTimeout: 15000,
     },
   }
 })
