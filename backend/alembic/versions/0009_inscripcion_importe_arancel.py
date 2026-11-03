@@ -7,6 +7,7 @@ Revises: 0007_inscripcion_importe_arancel, 0008_revision_comprobantes
 from __future__ import annotations
 
 from collections.abc import Sequence
+
 from alembic import op
 
 revision: str = "0009_inscripcion_arancel_merge"
