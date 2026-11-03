@@ -429,6 +429,8 @@ export function createMockDataSource() {
     asistencias: copiar(ASISTENCIAS),
     links: copiar(LINKS_DE_CLASE),
     inscripciones: copiar(INSCRIPCIONES),
+    // Bajas lógicas del ejemplo (HU 60): la fila se conserva y solo cambia su estado.
+    bajas: new Set(),
   }
 
   /** El padrón de una comisión: los alumnos que tiene, con el acceso que ya viene derivado (D9). */
@@ -436,6 +438,58 @@ export function createMockDataSource() {
     const codigo = normalizeCode(comisionCodigo)
 
     return store.alumnos.filter((alumno) => normalizeCode(alumno.comision.codigo) === codigo)
+  }
+
+  /**
+   * Inscripciones del ejemplo que pertenecen a una comisión, con el alumno ya cruzado (HU 60).
+   *
+   * El maquetado guarda la inscripción principal desnormalizada en el alumno y, desde la HU 64, una
+   * lista `inscripciones`. Se leen las dos formas sin duplicar la comisión: si la lista ya tiene una
+   * fila de esa comisión, la desnormalizada no se agrega.
+   */
+  function inscripcionesDeLaComision(comision) {
+    const codigo = normalizeCode(comision.codigo)
+    const filas = []
+
+    for (const alumno of store.alumnos) {
+      const propias = alumno.inscripciones ?? []
+      const deLaComision = propias.filter(
+        (inscripcion) => normalizeCode(inscripcion.comision?.codigo) === codigo,
+      )
+      if (deLaComision.length > 0) {
+        filas.push(...deLaComision.map((inscripcion) => filaDeComision(alumno, inscripcion)))
+        continue
+      }
+      if (alumno.comision && normalizeCode(alumno.comision.codigo) === codigo) {
+        filas.push(
+          filaDeComision(alumno, {
+            id: 1000 + alumno.id,
+            estado: 'ACTIVA',
+            categoria: alumno.categoria,
+            porcentaje_beca: alumno.porcentaje_beca ?? null,
+            empresa: null,
+            acceso: alumno.acceso,
+          }),
+        )
+      }
+    }
+
+    return filas
+  }
+
+  /** Una fila del listado de la comisión, con el estado que la baja lógica le haya dado (HU 60). */
+  function filaDeComision(alumno, inscripcion) {
+    const estado = store.bajas.has(inscripcion.id) ? 'BAJA' : (inscripcion.estado ?? 'ACTIVA')
+    return {
+      id: inscripcion.id,
+      alumno: { id: alumno.id, nombre: alumno.nombre, documento: alumno.documento ?? null },
+      categoria: inscripcion.categoria ?? alumno.categoria,
+      porcentaje_beca: inscripcion.porcentaje_beca ?? null,
+      empresa_id: inscripcion.empresa?.id ?? null,
+      empresa_nombre: inscripcion.empresa?.razon_social ?? null,
+      estado,
+      acceso: estado === 'ACTIVA' ? (inscripcion.acceso ?? alumno.acceso ?? null) : null,
+    }
   }
 
   /**
@@ -884,7 +938,13 @@ export function createMockDataSource() {
       }
     },
 
-    async crearInscripcion({ alumno_id, comision_id }) {
+    async crearInscripcion({
+      alumno_id,
+      comision_id,
+      categoria = 'PARTICULAR',
+      porcentaje_beca = null,
+      empresa_id = null,
+    }) {
       const comision = store.comisiones.find((c) => c.id === comision_id)
       if (!comision) {
         throw new Error('La comisión no existe.')
@@ -902,13 +962,87 @@ export function createMockDataSource() {
       comision.vacantes = comision.cupo_maximo - comision.inscriptos
       store.inscripciones = store.inscripciones || []
       store.inscripciones.push({ alumno_id, comision_id, estado: 'ACTIVA' })
+      // La fila nueva entra en la lista del alumno para que el listado de la comisión la muestre
+      // sin recargar el padrón (HU 60).
+      const alumno = store.alumnos.find((candidato) => candidato.id === alumno_id)
+      if (alumno) {
+        const empresa = store.empresas.find((candidata) => candidata.id === empresa_id)
+        alumno.inscripciones = [
+          ...(alumno.inscripciones ?? []),
+          {
+            id: siguienteId(store.alumnos.flatMap((fila) => fila.inscripciones ?? [])),
+            estado: 'ACTIVA',
+            comision: { codigo: comision.codigo, nombre: comision.curso.nombre },
+            arancel: comision.arancel,
+            categoria,
+            porcentaje_beca,
+            empresa: empresa ? { id: empresa.id, razon_social: empresa.razon_social } : null,
+            acceso: alumno.acceso ?? null,
+          },
+        ]
+      }
       return {
         id: store.inscripciones.length,
         alumno_id,
         comision_id,
-        categoria: 'PARTICULAR',
+        categoria,
         importe_arancel: comision.arancel,
         estado: 'ACTIVA',
+      }
+    },
+
+    /**
+     * Inscriptos de una comisión (HU 60).
+     *
+     * Los contadores salen de la comisión del ejemplo —que ya trae los inscriptos del cliente— y las
+     * filas son los alumnos que el maquetado registra en ella. Una baja descuenta el inscripto de la
+     * comisión, así el contador y la vacante se mueven juntos, como en la API.
+     */
+    async listarInscripcionesDeComision(comisionId) {
+      const comision = store.comisiones.find((c) => c.id === Number(comisionId))
+      if (!comision) {
+        throw new Error('La comisión no existe.')
+      }
+      const filas = inscripcionesDeLaComision(comision)
+      const activas = filas.filter((fila) => fila.estado === 'ACTIVA')
+      const inscriptos = comision.inscriptos ?? activas.length
+      return {
+        comision: {
+          id: comision.id,
+          codigo: comision.codigo,
+          nombre_curso: comision.curso.nombre,
+          cupo_maximo: comision.cupo_maximo,
+          inscriptos_activos: inscriptos,
+          vacantes: Math.max(comision.cupo_maximo - inscriptos, 0),
+        },
+        inscripciones: [...activas, ...filas.filter((fila) => fila.estado !== 'ACTIVA')],
+      }
+    },
+
+    /** Baja lógica de ejemplo (HU 60): conserva la fila y libera el lugar de la comisión. */
+    async darDeBajaInscripcion(inscripcionId, comisionId) {
+      const comision = store.comisiones.find((c) => c.id === Number(comisionId))
+      if (!comision) {
+        throw new Error('La comisión no existe.')
+      }
+      const fila = inscripcionesDeLaComision(comision).find(
+        (candidata) => candidata.id === Number(inscripcionId),
+      )
+      if (!fila) {
+        throw new Error('La inscripción no existe en esa comisión.')
+      }
+      if (fila.estado !== 'ACTIVA') {
+        throw new Error('La inscripción ya no está activa: no se puede dar de baja otra vez.')
+      }
+      store.bajas.add(fila.id)
+      comision.inscriptos = Math.max((comision.inscriptos ?? 0) - 1, 0)
+      comision.vacantes = comision.cupo_maximo - comision.inscriptos
+      return {
+        id: fila.id,
+        alumno_id: fila.alumno.id,
+        comision_id: comision.id,
+        categoria: fila.categoria,
+        estado: 'BAJA',
       }
     },
 
@@ -923,6 +1057,14 @@ export function createMockDataSource() {
             inscripcion = encontrada
             break
           }
+        }
+      }
+      if (!inscripcion) {
+        // La inscripción principal del maquetado va desnormalizada en el alumno (HU 60): su fila
+        // del listado se identifica con `1000 + id`, la misma cuenta que arma `filaDeComision`.
+        const alumno = store.alumnos.find((candidato) => 1000 + candidato.id === inscripcionId)
+        if (alumno) {
+          inscripcion = { id: inscripcionId, alumno_id: alumno.id, categoria: alumno.categoria }
         }
       }
       if (!inscripcion) {

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AccessPage } from './admin/AccessPage'
 import { AdminLayout } from './admin/AdminLayout'
+import { CommissionEnrollmentsPage } from './admin/CommissionEnrollmentsPage'
 import { CoursesPage } from './admin/CoursesPage'
 import { DashboardPage } from './admin/DashboardPage'
 import { PaymentsPage } from './admin/PaymentsPage'
@@ -85,6 +86,11 @@ export function AppRoutes() {
         {/* El catálogo de cursos abre sus comisiones: la misma pantalla lee el código de la ruta y
             dibuja la tabla de ese curso. */}
         <Route path="cursos/:codigo" element={<CoursesPage />} />
+        {/* La fila de una comisión abre su gestión de inscriptos (HU 60). */}
+        <Route
+          path="cursos/:codigo/comisiones/:comisionId"
+          element={<CommissionEnrollmentsPage />}
+        />
         <Route path="docentes" element={<TeachersPage />} />
         <Route path="alumnos" element={<StudentsPage />} />
         <Route path="cobranzas" element={<PaymentsPage />} />

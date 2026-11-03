@@ -12,9 +12,9 @@ import {
 import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
 import { FichaAlumnoModal } from './FichaAlumnoModal'
+import { CategoriaInscripcionModal } from './CategoriaInscripcionModal'
 import { dniConForma, emailConForma } from '../domain/validacion'
 import {
-  actualizarCategoriaInscripcion,
   buscarAlumnoReactivable,
   buscarAlumnos,
   cargarNominaEmpresa,
@@ -162,13 +162,7 @@ export function StudentsPage() {
   const [falloNomina, setFalloNomina] = useState(null)
   const [guardandoNomina, setGuardandoNomina] = useState(false)
 
-  const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false)
   const [inscripcionCategoria, setInscripcionCategoria] = useState(null)
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('PARTICULAR')
-  const [porcentajeCategoria, setPorcentajeCategoria] = useState('')
-  const [empresaCategoria, setEmpresaCategoria] = useState('')
-  const [falloCategoria, setFalloCategoria] = useState(null)
-  const [guardandoCategoria, setGuardandoCategoria] = useState(false)
   // Cambiar la categoría desde la ficha recarga solo el detalle de la ficha (HU 61).
   const [fichaVersion, setFichaVersion] = useState(0)
 
@@ -483,49 +477,18 @@ export function StudentsPage() {
    */
   function abrirFormularioCategoria(inscripcion) {
     setInscripcionCategoria(inscripcion)
-    setCategoriaSeleccionada(inscripcion.categoria)
-    setPorcentajeCategoria(inscripcion.porcentaje_beca ?? '')
-    setEmpresaCategoria(inscripcion.empresa?.id != null ? String(inscripcion.empresa.id) : '')
-    setFalloCategoria(null)
-    setModalCategoriaAbierto(true)
   }
 
   function cerrarModalCategoria() {
-    setModalCategoriaAbierto(false)
     setInscripcionCategoria(null)
-    setFalloCategoria(null)
   }
 
-  async function guardarCategoria() {
-    if (inscripcionCategoria === null) {
-      setFalloCategoria('Elegí la inscripción a la que le asignás la categoría.')
-      return
-    }
-    setGuardandoCategoria(true)
-    setFalloCategoria(null)
+  /** El formulario compartido guardó: la ficha se recarga y la pantalla lo anuncia. */
+  function categoriaGuardada() {
     const comision = `${inscripcionCategoria.comision.codigo} ${inscripcionCategoria.comision.nombre}`
-    try {
-      const porcentaje =
-        categoriaSeleccionada === 'BECADO_PARCIAL' && porcentajeCategoria !== ''
-          ? Number(porcentajeCategoria)
-          : null
-      const empresaId =
-        categoriaSeleccionada === 'CORPORATIVO' && empresaCategoria !== ''
-          ? Number(empresaCategoria)
-          : null
-      await actualizarCategoriaInscripcion(inscripcionCategoria.id, {
-        categoria: categoriaSeleccionada,
-        porcentaje_beca: porcentaje,
-        empresa_id: empresaId,
-      })
-      cerrarModalCategoria()
-      setFichaVersion((version) => version + 1)
-      setMensaje(`Categoría actualizada en ${comision}.`)
-    } catch (error) {
-      setFalloCategoria(error?.message ?? 'No se pudo actualizar la categoría.')
-    } finally {
-      setGuardandoCategoria(false)
-    }
+    cerrarModalCategoria()
+    setFichaVersion((version) => version + 1)
+    setMensaje(`Categoría actualizada en ${comision}.`)
   }
 
   function validarEmpresa() {
@@ -1042,79 +1005,14 @@ export function StudentsPage() {
         </div>
       </Modal>
 
-      <Modal
-        abierto={modalCategoriaAbierto}
-        titulo="Asignar categoría"
-        onClose={cerrarModalCategoria}
-        pie={
-          <>
-            <Button variante="secundario" onClick={cerrarModalCategoria}>
-              Cancelar
-            </Button>
-            <Button onClick={guardarCategoria} disabled={guardandoCategoria}>
-              {guardandoCategoria ? 'Guardando…' : 'Guardar'}
-            </Button>
-          </>
-        }
-      >
-        <div className="grid gap-4">
-          {inscripcionCategoria !== null && (
-            <p className="text-sm text-slate-700">
-              {`${inscripcionCategoria.comision.codigo} ${inscripcionCategoria.comision.nombre}`}
-            </p>
-          )}
-          <label className="text-sm text-slate-700">
-            Categoría
-            <select
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-              value={categoriaSeleccionada}
-              onChange={(evento) => setCategoriaSeleccionada(evento.target.value)}
-            >
-              <option value="PARTICULAR">Particular</option>
-              <option value="BECADO_PARCIAL">Becado parcial</option>
-              <option value="BECADO_TOTAL">Becado total</option>
-              <option value="CORPORATIVO">Corporativo</option>
-            </select>
-          </label>
-
-          {categoriaSeleccionada === 'BECADO_PARCIAL' && (
-            <Input
-              id="porcentaje-categoria"
-              etiqueta="Porcentaje de descuento"
-              type="number"
-              valor={porcentajeCategoria}
-              onChange={(evento) => setPorcentajeCategoria(evento.target.value)}
-            />
-          )}
-
-          {categoriaSeleccionada === 'CORPORATIVO' && (
-            <label className="text-sm text-slate-700">
-              Empresa
-              <select
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
-                value={empresaCategoria}
-                onChange={(evento) => setEmpresaCategoria(evento.target.value)}
-              >
-                <option value="">Seleccionar…</option>
-                {empresas.map((empresa) => (
-                  <option key={empresa.id} value={String(empresa.id)}>
-                    {empresa.razon_social}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {falloCategoria !== null && (
-            <p
-              role="alert"
-              className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-            >
-              {falloCategoria}
-            </p>
-          )}
-        </div>
-      </Modal>
+      {inscripcionCategoria !== null && (
+        <CategoriaInscripcionModal
+          inscripcion={inscripcionCategoria}
+          empresas={empresas}
+          onClose={cerrarModalCategoria}
+          onGuardado={categoriaGuardada}
+        />
+      )}
 
       <Modal
         abierto={alumnoEditando !== null}

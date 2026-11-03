@@ -8,21 +8,18 @@ import {
   obtenerResumenCatalogo,
   crearComision,
   crearCurso,
-  crearEmpresa,
-  crearInscripcion,
   editarComision,
   editarCurso,
-  listarAlumnos,
   listarComisiones,
   listarCursos,
   listarDocentes,
-  listarEmpresas,
   listarSedes,
 } from '../services/dataService'
 import { formatFechaCorta, formatMoneda } from '../utils/formato'
 import { CampoHorarios } from '../components/horarios/CampoHorarios'
 import { HorarioCompacto } from '../components/horarios/HorarioCompacto'
 import { SelectorHorarios } from '../components/horarios/SelectorHorarios'
+import { InscripcionModal } from './InscripcionModal'
 
 /**
  * Cursos y comisiones (9.3), en dos vistas encadenadas.
@@ -295,24 +292,6 @@ export function CoursesPage() {
   const [falloEdicionComision, setFalloEdicionComision] = useState(null)
   const [guardandoEdicionComision, setGuardandoEdicionComision] = useState(false)
   const [modalInscripcion, setModalInscripcion] = useState(false)
-  const [alumnos, setAlumnos] = useState([])
-  const [alumnoSeleccionado, setAlumnoSeleccionado] = useState('')
-  const [comisionSeleccionada, setComisionSeleccionada] = useState('')
-  const [falloInscripcion, setFalloInscripcion] = useState(null)
-  const [guardandoInscripcion, setGuardandoInscripcion] = useState(false)
-  const [categoriaInscripcion, setCategoriaInscripcion] = useState('PARTICULAR')
-  const [porcentajeInscripcion, setPorcentajeInscripcion] = useState('')
-  const [empresaInscripcion, setEmpresaInscripcion] = useState('')
-  const [empresas, setEmpresas] = useState([])
-  const [modalEmpresaInscripcion, setModalEmpresaInscripcion] = useState(false)
-  const [camposEmpresaInscripcion, setCamposEmpresaInscripcion] = useState({
-    razon_social: '',
-    cuit: '',
-    requiere_factura_a: false,
-  })
-  const [erroresEmpresaInscripcion, setErroresEmpresaInscripcion] = useState({})
-  const [falloEmpresaInscripcion, setFalloEmpresaInscripcion] = useState(null)
-  const [guardandoEmpresaInscripcion, setGuardandoEmpresaInscripcion] = useState(false)
   const [campos, setCampos] = useState(CAMPOS_COMISION_VACIOS)
   const [camposCurso, setCamposCurso] = useState(CAMPOS_CURSO_VACIOS)
   const [errores, setErrores] = useState({})
@@ -332,9 +311,7 @@ export function CoursesPage() {
       setCatalogoListo(true)
     })
     listarDocentes().then(setDocentes)
-    listarAlumnos().then(setAlumnos)
     listarSedes().then(setSedes)
-    listarEmpresas().then(setEmpresas).catch(() => setEmpresas([]))
     obtenerResumenCatalogo().then(setResumen)
   }, [])
 
@@ -619,117 +596,24 @@ export function CoursesPage() {
     }
   }
 
-  function abrirModalInscripcion(comisionId = '') {
-    setComisionSeleccionada(comisionId === '' ? '' : String(comisionId))
-    setAlumnoSeleccionado('')
-    setCategoriaInscripcion('PARTICULAR')
-    setPorcentajeInscripcion('')
-    setEmpresaInscripcion('')
-    setFalloInscripcion(null)
+  function abrirModalInscripcion() {
     setModalInscripcion(true)
   }
 
   function cerrarModalInscripcion() {
     setModalInscripcion(false)
-    setComisionSeleccionada('')
-    setAlumnoSeleccionado('')
-    setCategoriaInscripcion('PARTICULAR')
-    setPorcentajeInscripcion('')
-    setEmpresaInscripcion('')
-    setFalloInscripcion(null)
   }
 
-  async function guardarInscripcion() {
-    if (alumnoSeleccionado === '' || comisionSeleccionada === '') {
-      setFalloInscripcion('Elegí el alumno y la comisión.')
-      return
-    }
-    // La validación local repite la regla del backend para que el formulario no mande una
-    // inscripción que va a volver con un 422 sin decir qué campo corregir (HU 64).
-    if (categoriaInscripcion === 'BECADO_PARCIAL') {
-      const porcentaje = Number(porcentajeInscripcion)
-      if (
-        porcentajeInscripcion === '' ||
-        !Number.isInteger(porcentaje) ||
-        porcentaje < 1 ||
-        porcentaje > 99
-      ) {
-        setFalloInscripcion('El porcentaje de la beca debe ser un entero entre 1 y 99.')
-        return
-      }
-    }
-    if (categoriaInscripcion === 'CORPORATIVO' && empresaInscripcion === '') {
-      setFalloInscripcion('Seleccioná la empresa de la inscripción corporativa.')
-      return
-    }
-    setGuardandoInscripcion(true)
-    setFalloInscripcion(null)
-    try {
-      await crearInscripcion({
-        alumno_id: Number(alumnoSeleccionado),
-        comision_id: Number(comisionSeleccionada),
-        categoria: categoriaInscripcion,
-        porcentaje_beca:
-          categoriaInscripcion === 'BECADO_PARCIAL' ? Number(porcentajeInscripcion) : null,
-        empresa_id:
-          categoriaInscripcion === 'CORPORATIVO' ? Number(empresaInscripcion) : null,
-      })
-      // Actualización optimista: la vacante baja en uno sin recargar.
-      setComisiones((anteriores) =>
-        anteriores.map((comision) =>
-          comision.id === Number(comisionSeleccionada)
-            ? { ...comision, vacantes: Math.max((comision.vacantes ?? 0) - 1, 0) }
-            : comision,
-        ),
-      )
-      cerrarModalInscripcion()
-    } catch (error) {
-      setFalloInscripcion(error?.message ?? 'No se pudo inscribir al alumno.')
-    } finally {
-      setGuardandoInscripcion(false)
-    }
-  }
-
-  function abrirEmpresaInscripcion() {
-    setCamposEmpresaInscripcion({ razon_social: '', cuit: '', requiere_factura_a: false })
-    setErroresEmpresaInscripcion({})
-    setFalloEmpresaInscripcion(null)
-    setModalEmpresaInscripcion(true)
-  }
-
-  /**
-   * Alta de la empresa sin cerrar el formulario de inscripción (HU 64): al volver, la empresa nueva
-   * queda seleccionada y el alumno, la comisión y la categoría siguen como estaban.
-   */
-  async function guardarEmpresaInscripcion() {
-    const encontrados = {}
-    if (camposEmpresaInscripcion.razon_social.trim() === '') {
-      encontrados.razon_social = 'La razón social es obligatoria.'
-    }
-    if (camposEmpresaInscripcion.cuit.trim() === '') {
-      encontrados.cuit = 'El CUIT es obligatorio.'
-    }
-    setErroresEmpresaInscripcion(encontrados)
-    if (Object.keys(encontrados).length > 0) {
-      return
-    }
-
-    setGuardandoEmpresaInscripcion(true)
-    setFalloEmpresaInscripcion(null)
-    try {
-      const creada = await crearEmpresa({
-        razon_social: camposEmpresaInscripcion.razon_social,
-        cuit: camposEmpresaInscripcion.cuit,
-        requiere_factura_a: camposEmpresaInscripcion.requiere_factura_a,
-      })
-      setEmpresas((anteriores) => [...anteriores, creada])
-      setEmpresaInscripcion(String(creada.id))
-      setModalEmpresaInscripcion(false)
-    } catch (error) {
-      setFalloEmpresaInscripcion(error?.message ?? 'No se pudo guardar la empresa.')
-    } finally {
-      setGuardandoEmpresaInscripcion(false)
-    }
+  /** El formulario compartido inscribió: la vacante baja en uno sin recargar el catálogo. */
+  function inscripcionCreada(inscripcion) {
+    setComisiones((anteriores) =>
+      anteriores.map((comision) =>
+        comision.id === inscripcion.comision_id
+          ? { ...comision, vacantes: Math.max((comision.vacantes ?? 0) - 1, 0) }
+          : comision,
+      ),
+    )
+    cerrarModalInscripcion()
   }
 
   function validar() {
@@ -843,6 +727,11 @@ export function CoursesPage() {
     navegar(`/admin/cursos/${curso.codigo}`)
   }
 
+  /** Abrir la comisión desde su fila es la puerta a la gestión de sus inscriptos (HU 60). */
+  function abrirComision(comision) {
+    navegar(`/admin/cursos/${cursoDeRuta.codigo}/comisiones/${comision.id}`)
+  }
+
   /**
    * La tabla de comisiones con la columna de acciones al final, como en el padrón de alumnos.
    *
@@ -901,6 +790,7 @@ export function CoursesPage() {
           onVolver={() => navegar('/admin/cursos')}
           onNuevaComision={abrirModalComision}
           onInscribir={() => abrirModalInscripcion()}
+          onAbrirComision={abrirComision}
         />
       )
     }
@@ -1249,170 +1139,14 @@ export function CoursesPage() {
         onCancelar={() => setSelectorHorarios(null)}
       />
 
-      <Modal
-        abierto={modalInscripcion}
-        titulo="Inscribir Alumno"
-        onClose={cerrarModalInscripcion}
-        pie={
-          <>
-            <Button variante="secundario" onClick={cerrarModalInscripcion}>
-              Cancelar
-            </Button>
-            <Button onClick={guardarInscripcion} disabled={guardandoInscripcion}>
-              {guardandoInscripcion ? 'Guardando…' : 'Inscribir'}
-            </Button>
-          </>
-        }
-      >
-        <div className="grid gap-4">
-          <Campo id="comision-inscripcion" etiqueta="Comisión" obligatorio>
-            <select
-              id="comision-inscripcion"
-              value={comisionSeleccionada}
-              onChange={(evento) => setComisionSeleccionada(evento.target.value)}
-            >
-              <option value="">Seleccionar…</option>
-              {comisiones.map((comision) => (
-                <option key={comision.id} value={String(comision.id)}>
-                  {comision.codigo} · {comision.curso.nombre}
-                </option>
-              ))}
-            </select>
-          </Campo>
-
-          <Campo id="alumno-inscripcion" etiqueta="Alumno" obligatorio>
-            <select
-              id="alumno-inscripcion"
-              value={alumnoSeleccionado}
-              onChange={(evento) => setAlumnoSeleccionado(evento.target.value)}
-            >
-              <option value="">Seleccionar…</option>
-              {alumnos.map((alumno) => (
-                <option key={alumno.id} value={String(alumno.id)}>
-                  {alumno.nombre}
-                </option>
-              ))}
-            </select>
-          </Campo>
-
-          <Campo id="categoria-inscripcion" etiqueta="Categoría" obligatorio>
-            <select
-              id="categoria-inscripcion"
-              value={categoriaInscripcion}
-              onChange={(evento) => setCategoriaInscripcion(evento.target.value)}
-            >
-              <option value="PARTICULAR">Particular</option>
-              <option value="BECADO_PARCIAL">Becado parcial</option>
-              <option value="BECADO_TOTAL">Becado total</option>
-              <option value="CORPORATIVO">Corporativo</option>
-            </select>
-          </Campo>
-
-          {categoriaInscripcion === 'BECADO_PARCIAL' && (
-            <Campo id="porcentaje-inscripcion" etiqueta="Descuento (%)" obligatorio>
-              <input
-                id="porcentaje-inscripcion"
-                type="number"
-                min="1"
-                max="99"
-                value={porcentajeInscripcion}
-                onChange={(evento) => setPorcentajeInscripcion(evento.target.value)}
-              />
-            </Campo>
-          )}
-
-          {categoriaInscripcion === 'CORPORATIVO' && (
-            <Campo id="empresa-inscripcion" etiqueta="Empresa" obligatorio>
-              <div className="grid gap-2">
-                <select
-                  id="empresa-inscripcion"
-                  value={empresaInscripcion}
-                  onChange={(evento) => setEmpresaInscripcion(evento.target.value)}
-                >
-                  <option value="">Seleccionar…</option>
-                  {empresas.map((empresa) => (
-                    <option key={empresa.id} value={String(empresa.id)}>
-                      {empresa.razon_social}
-                    </option>
-                  ))}
-                </select>
-                <Button variante="secundario" tamano="chico" onClick={abrirEmpresaInscripcion}>
-                  + Nueva Empresa
-                </Button>
-              </div>
-            </Campo>
-          )}
-
-          {falloInscripcion !== null && <MensajeFallo>{falloInscripcion}</MensajeFallo>}
-        </div>
-      </Modal>
-
-      <Modal
-        abierto={modalEmpresaInscripcion}
-        titulo="Nueva Empresa"
-        onClose={() => setModalEmpresaInscripcion(false)}
-        pie={
-          <>
-            <Button variante="secundario" onClick={() => setModalEmpresaInscripcion(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={guardarEmpresaInscripcion} disabled={guardandoEmpresaInscripcion}>
-              {guardandoEmpresaInscripcion ? 'Guardando…' : 'Guardar Empresa'}
-            </Button>
-          </>
-        }
-      >
-        <div className="grid gap-4">
-          <Campo
-            id="empresa-inscripcion-razon"
-            etiqueta="Razón Social"
-            obligatorio
-            error={erroresEmpresaInscripcion.razon_social ?? null}
-          >
-            <input
-              id="empresa-inscripcion-razon"
-              value={camposEmpresaInscripcion.razon_social}
-              onChange={(evento) =>
-                setCamposEmpresaInscripcion((anteriores) => ({
-                  ...anteriores,
-                  razon_social: evento.target.value,
-                }))
-              }
-            />
-          </Campo>
-          <Campo
-            id="empresa-inscripcion-cuit"
-            etiqueta="CUIT"
-            obligatorio
-            error={erroresEmpresaInscripcion.cuit ?? null}
-          >
-            <input
-              id="empresa-inscripcion-cuit"
-              value={camposEmpresaInscripcion.cuit}
-              onChange={(evento) =>
-                setCamposEmpresaInscripcion((anteriores) => ({
-                  ...anteriores,
-                  cuit: evento.target.value,
-                }))
-              }
-            />
-          </Campo>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={camposEmpresaInscripcion.requiere_factura_a}
-              onChange={(evento) =>
-                setCamposEmpresaInscripcion((anteriores) => ({
-                  ...anteriores,
-                  requiere_factura_a: evento.target.checked,
-                }))
-              }
-            />
-            Requiere Factura A
-          </label>
-          {falloEmpresaInscripcion !== null && <MensajeFallo>{falloEmpresaInscripcion}</MensajeFallo>}
-        </div>
-      </Modal>
+      {modalInscripcion && (
+        <InscripcionModal
+          abierto
+          comisiones={comisiones}
+          onClose={cerrarModalInscripcion}
+          onInscripto={inscripcionCreada}
+        />
+      )}
     </div>
   )
 }
@@ -1602,6 +1336,7 @@ function VistaComisiones({
   onVolver,
   onNuevaComision,
   onInscribir,
+  onAbrirComision,
 }) {
   return (
     <Card
@@ -1633,6 +1368,8 @@ function VistaComisiones({
       <Table
         columnas={columnas}
         filas={comisiones}
+        onFila={onAbrirComision}
+        etiquetaDeFila={(fila) => `Abrir comisión ${fila.codigo}`}
         vacio={
           comisiones.length === 0 && busqueda.trim() !== '' ? (
             <p className="text-sm text-slate-500">No se encontraron comisiones.</p>

@@ -391,6 +391,19 @@ export function createApiDataSource() {
       return request(PATHS.inscripciones, { method: 'POST', body: datos })
     },
 
+    /** Inscriptos de una comisión (HU 60): activos, historial, cupo y vacantes. */
+    async listarInscripcionesDeComision(comisionId) {
+      return request(PATHS.inscripciones, { query: { comision_id: comisionId } })
+    },
+
+    /** Baja lógica (HU 60): la comisión viaja para que el backend valide la relación. */
+    async darDeBajaInscripcion(inscripcionId, comisionId) {
+      return request(`${PATHS.inscripciones}/${inscripcionId}/baja`, {
+        method: 'POST',
+        body: { comision_id: comisionId },
+      })
+    },
+
     async actualizarCategoriaInscripcion(inscripcionId, datos) {
       return request(`${PATHS.inscripciones}/${inscripcionId}`, {
         method: 'PATCH',
