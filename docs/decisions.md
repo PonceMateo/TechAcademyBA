@@ -2464,3 +2464,43 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/alumno/StudentPaymentsPage.jsx`, `frontend/src/domain/enums.js`,
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/mockDataSource.js`.
+
+### D74 — La comisión abre su gestión de inscriptos y la baja es lógica, con lock y auditoría
+
+- **Contexto:** las HU 14, 15 y 64 dejaron el alta de inscripción y la categoría arancelaria, pero
+  no había forma de ver los inscriptos de una comisión desde su fila ni de dar de baja una
+  inscripción. El estado `BAJA` ya existía en `EstadoInscripcion` y el cupo ya se derivaba de las
+  inscripciones `ACTIVA` (D10).
+- **Decisión — listado:** `GET /inscripciones?comision_id=` (solo `ADMIN`) devuelve la comisión, su
+  cupo, los inscriptos activos, las vacantes y **todas** las inscripciones, con el alumno, su DNI,
+  la categoría y el estado de habilitación derivado con `habilitacion.derivar_estado` (D9). Las
+  bajas viajan con su estado y sin `acceso`: una baja no tiene bloqueo que derivar. No se agrega una
+  entidad ni una consulta por fila.
+- **Decisión — alta desde la comisión:** se reutiliza `POST /inscripciones` con el `comision_id`
+  explícito; el campo bloqueado es una restricción de interfaz y la autoridad sigue siendo el
+  backend. El alta toma la fila de la comisión con `SELECT ... FOR UPDATE` para que la cuenta de
+  cupo y el `INSERT` no se cuelen entre dos peticiones simultáneas; el índice único
+  `uq_inscripcion_alumno_comision` sigue cubriendo el duplicado.
+- **Decisión — baja lógica:** `POST /inscripciones/{id}/baja` con `{comision_id}`. Bloquea la
+  inscripción con `SELECT ... FOR UPDATE`, exige que pertenezca a esa comisión (`404`) y que esté
+  `ACTIVA` (`409`), cambia el estado a `BAJA`, escribe `audit_log` (`accion =
+  "inscripcion.baja"`) y confirma en una sola transacción. La fila, el alumno y sus cobranzas,
+  imputaciones y comprobantes se conservan; la vacante se libera sola porque el cupo se deriva (D10).
+  No se implementa rehabilitación ni reinscripción: queda fuera del alcance de la HU 60.
+- **Decisión — una sola pantalla de gestión:** la fila de la comisión navega a
+  `/admin/cursos/:codigo/comisiones/:comisionId` y `Editar` sigue siendo un control independiente
+  (la tabla ya ignora los clicks sobre botones). El modal de inscripción y el de categoría se
+  extrajeron a `InscripcionModal` y `CategoriaInscripcionModal` para que las pantallas existentes y
+  la nueva compartan las mismas reglas.
+- **Por qué:** la secretaría no podía ver quién cursa una comisión sin recorrer el padrón general y
+  no existía una baja que conservara el historial. Reutilizar el alta, el `PATCH` y la derivación de
+  habilitación evita una segunda versión de cada regla.
+- **Sin migración Alembic:** el esquema ya soporta el listado y la baja; no se agregan columnas.
+- **Dónde:** `backend/app/schemas/inscripciones.py`, `backend/app/services/inscripciones.py`,
+  `backend/app/api/inscripciones.py`, `backend/app/tests/test_gestion_inscriptos_comision.py`,
+  `frontend/src/App.jsx`, `frontend/src/admin/CoursesPage.jsx`,
+  `frontend/src/admin/CommissionEnrollmentsPage.jsx`, `frontend/src/admin/InscripcionModal.jsx`,
+  `frontend/src/admin/CategoriaInscripcionModal.jsx`, `frontend/src/admin/StudentsPage.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
+  `frontend/src/services/mockDataSource.js`,
+  `frontend/src/admin/CommissionEnrollmentsPage.test.jsx`.

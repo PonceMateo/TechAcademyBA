@@ -49,6 +49,75 @@ class InscripcionCategoriaUpdate(BaseModel):
     empresa_id: int | None = Field(default=None, gt=0)
 
 
+class InscripcionBaja(BaseModel):
+    """Cuerpo de `POST /inscripciones/{id}/baja` (HU 60).
+
+    La comisión viaja en el cuerpo para que el backend compruebe la relación: una baja pedida desde
+    la pantalla de otra comisión no puede cambiar una fila que no le corresponde.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    comision_id: int = Field(gt=0)
+
+
+class AlumnoDeInscripcionOut(BaseModel):
+    """El alumno tal como lo lista la gestión de la comisión: nombre y documento (HU 60)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nombre: str
+    documento: str | None = None
+
+
+class AccesoDeInscripcionOut(BaseModel):
+    """Estado de habilitación derivado de la inscripción (D9)."""
+
+    estado: str
+    causa: str | None = None
+    forzado: bool = False
+
+
+class InscripcionDeComisionOut(BaseModel):
+    """Una inscripción del listado de una comisión (HU 60).
+
+    `acceso` es nulo cuando la inscripción no está `ACTIVA`: una baja no tiene bloqueo que derivar y
+    la pantalla muestra su estado de inscripción en su lugar.
+    """
+
+    id: int
+    alumno: AlumnoDeInscripcionOut
+    categoria: str
+    porcentaje_beca: Decimal | None = None
+    empresa_id: int | None = None
+    empresa_nombre: str | None = None
+    estado: str
+    acceso: AccesoDeInscripcionOut | None = None
+
+
+class ComisionDeInscripcionesOut(BaseModel):
+    """Encabezado y contadores de la comisión abierta (HU 60).
+
+    `inscriptos_activos` y `vacantes` se derivan de las inscripciones `ACTIVA`, el mismo criterio
+    del cupo (D10), así una baja libera el lugar en la misma respuesta.
+    """
+
+    id: int
+    codigo: str
+    nombre_curso: str
+    cupo_maximo: int
+    inscriptos_activos: int
+    vacantes: int
+
+
+class InscripcionesDeComisionOut(BaseModel):
+    """Respuesta de `GET /inscripciones?comision_id=` (HU 60)."""
+
+    comision: ComisionDeInscripcionesOut
+    inscripciones: list[InscripcionDeComisionOut]
+
+
 class ComisionDisponibleOut(BaseModel):
     """Comisión que la pantalla muestra al elegir a qué inscripción imputar (HU 21)."""
 

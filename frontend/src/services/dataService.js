@@ -124,6 +124,20 @@ export function crearInscripcion(datos) {
   return getDataSource().crearInscripcion(datos)
 }
 
+/**
+ * Inscriptos de una comisión (HU 60): cupo, inscriptos activos, vacantes y todas las inscripciones,
+ * con las dadas de baja al final como historial. Las vacantes salen de la fuente porque se derivan
+ * de las inscripciones activas (D10) y una baja libera el lugar.
+ */
+export function listarInscripcionesDeComision(comisionId) {
+  return getDataSource().listarInscripcionesDeComision(comisionId)
+}
+
+/** Baja lógica de una inscripción (HU 60): conserva la fila, el alumno y sus pagos. */
+export function darDeBajaInscripcion(inscripcionId, comisionId) {
+  return getDataSource().darDeBajaInscripcion(inscripcionId, comisionId)
+}
+
 export function buscarAlumnos(texto) {
   return getDataSource().buscarAlumnos(texto)
 }
