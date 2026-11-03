@@ -16,6 +16,7 @@ un validador de Pydantic que dejara pasar algo que la base rechaza tiene que fal
 from __future__ import annotations
 
 import itertools
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -75,6 +76,8 @@ def _existente(
     curso=None,
     horarios_semana: list[tuple[str, str, str]],
     activo: bool = True,
+    fecha_inicio: date | None = None,
+    fecha_fin: date | None = None,
 ) -> Comision:
     """Comisión ya guardada, sin sede y con el horario pedido.
 
@@ -87,6 +90,8 @@ def _existente(
         docente=docente,
         con_sede=False,
         horarios_semana=horarios_semana,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
     )
     if not activo:
         comision.activo = False
@@ -241,6 +246,84 @@ def test_los_bordes_exactos_se_permiten(cliente_admin: TestClient, db_session: S
     assert respuesta.status_code == 201, respuesta.text
 
 
+def test_el_mismo_horario_con_periodos_disjuntos_se_permite(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """H/U 70: mismo docente, mismo día y franja, pero rangos de fechas que no se cruzan."""
+    docente = crear_docente(db_session)
+    _existente(
+        db_session,
+        docente,
+        horarios_semana=[("MAR", "19:00", "21:00")],
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 2, 27),
+    )
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json=_cuerpo(
+            crear_curso(db_session, nombre="Python Inicial").id,
+            docente.id,
+            horarios=[{"dia": "MAR", "inicio": "19:00", "fin": "21:00"}],
+        ),
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+
+
+def test_el_borde_de_dos_periodos_se_permite(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """La historia #70: una termina el lunes y la otra empieza ese mismo lunes."""
+    docente = crear_docente(db_session)
+    _existente(
+        db_session,
+        docente,
+        horarios_semana=[("MAR", "19:00", "21:00")],
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 7, 3),
+    )
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json=_cuerpo(
+            crear_curso(db_session, nombre="Python Inicial").id,
+            docente.id,
+            horarios=[{"dia": "MAR", "inicio": "19:00", "fin": "21:00"}],
+            fecha_inicio="2026-07-03",
+            fecha_fin="2026-08-31",
+        ),
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+
+
+def test_dos_periodos_que_se_cruzan_chocan(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """Con día, horario y período cruzados, el rechazo sigue siendo 409."""
+    docente = crear_docente(db_session)
+    existente = _existente(
+        db_session,
+        docente,
+        horarios_semana=[("MAR", "19:00", "21:00")],
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 7, 3),
+    )
+
+    respuesta = cliente_admin.post(
+        "/comisiones",
+        json=_cuerpo(
+            crear_curso(db_session, nombre="Python Inicial").id,
+            docente.id,
+            horarios=[{"dia": "MAR", "inicio": "19:00", "fin": "21:00"}],
+        ),
+    )
+
+    assert respuesta.status_code == 409, respuesta.text
+    assert existente.codigo in respuesta.text
+
+
 def test_el_mismo_horario_de_otro_docente_se_permite(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
@@ -324,3 +407,69 @@ def test_la_edicion_rechaza_el_choque_con_otra_comision(
 
     assert respuesta.status_code == 409, respuesta.text
     assert fija.codigo in respuesta.text
+
+
+def test_reactivar_una_comision_finalizada_la_deja_vigente(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """H/U 70: editar `fecha_fin` a futuro saca a la comisión de `Finalizada`."""
+    docente = crear_docente(db_session)
+    hoy = date.today()
+    comision = _existente(
+        db_session,
+        docente,
+        horarios_semana=[("LUN", "18:00", "20:00")],
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+    nueva_fin = hoy + timedelta(days=60)
+
+    respuesta = cliente_admin.put(
+        f"/comisiones/{comision.id}",
+        json=_editar(
+            docente,
+            horarios=horarios("LUN", inicio="18:00", fin="20:00"),
+            fecha_inicio=hoy.isoformat(),
+            fecha_fin=nueva_fin.isoformat(),
+        ),
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["estado"] == "Vigente"
+    assert respuesta.json()["fecha_fin"] == nueva_fin.isoformat()
+
+
+def test_reactivar_con_solapamiento_da_409_y_conserva_el_periodo(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """H/U 70: al reactivar se vuelve a chequear el solapamiento del docente."""
+    docente = crear_docente(db_session)
+    hoy = date.today()
+    _existente(
+        db_session,
+        docente,
+        horarios_semana=[("LUN", "18:00", "20:00")],
+        fecha_inicio=hoy + timedelta(days=1),
+        fecha_fin=hoy + timedelta(days=60),
+    )
+    finalizada = _existente(
+        db_session,
+        docente,
+        horarios_semana=[("MIE", "18:00", "20:00")],
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+
+    respuesta = cliente_admin.put(
+        f"/comisiones/{finalizada.id}",
+        json=_editar(
+            docente,
+            horarios=horarios("LUN", inicio="18:00", fin="20:00"),
+            fecha_inicio=(hoy + timedelta(days=2)).isoformat(),
+            fecha_fin=(hoy + timedelta(days=30)).isoformat(),
+        ),
+    )
+
+    assert respuesta.status_code == 409, respuesta.text
+    db_session.refresh(finalizada)
+    assert finalizada.fecha_fin == hoy - timedelta(days=1)

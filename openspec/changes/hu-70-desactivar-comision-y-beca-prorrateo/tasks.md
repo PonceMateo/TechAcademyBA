@@ -12,8 +12,8 @@
 
 ## 3. Solapamiento del docente por período
 
-- [ ] 3.1 Hacer que el chequeo de solapamiento reciba las fechas del alta o de la edición y descarte comisiones con períodos que no se cruzan, con comparación estricta de los extremos y trato conservador para comisiones sin fechas. Verificar con tests de alta: períodos disjuntos aceptados, períodos cruzados con `409` y borde `fin_a == inicio_b` aceptado.
-- [ ] 3.2 Pasar el período nuevo en la edición y cubrir la reactivación: `fecha_fin` futura sin cruce devuelve `Vigente`; con cruce devuelve `409` y conserva el período anterior. Verificar con `pytest backend/app/tests/test_edicion_comision.py`.
+- [x] 3.1 Hacer que el chequeo de solapamiento reciba las fechas del alta o de la edición y descarte comisiones con períodos que no se cruzan, con comparación estricta de los extremos y trato conservador para comisiones sin fechas. Verificar con tests de alta: períodos disjuntos aceptados, períodos cruzados con `409` y borde `fin_a == inicio_b` aceptado.
+- [x] 3.2 Pasar el período nuevo en la edición y cubrir la reactivación: `fecha_fin` futura sin cruce devuelve `Vigente`; con cruce devuelve `409` y conserva el período anterior. Verificar con `pytest backend/app/tests/test_edicion_comision.py`.
 
 ## 4. Rechazos en comisiones finalizadas
 
