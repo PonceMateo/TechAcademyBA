@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -9,7 +10,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.enums import CategoriaInscripcion
+from app.models.inscripciones import Inscripcion
 from app.models.padron import Usuario
+from app.services.inscripciones import ProrrateoNoDisponible, calcular_importe_arancel
 from app.tests.factories import (
     crear_alumno,
     crear_comision,
@@ -33,11 +36,16 @@ def cliente_admin(api_client: TestClient, admin: Usuario) -> TestClient:
     return api_client
 
 
+def _periodo_actual() -> dict[str, date]:
+    """Período que contiene la fecha de hoy, para que el prorrateo tenga clases restantes."""
+    return {"fecha_inicio": date.today(), "fecha_fin": date.today() + timedelta(days=60)}
+
+
 def test_inscripcion_exitosa_descuenta_vacante(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     curso = crear_curso(db_session)
-    comision = crear_comision(db_session, curso=curso, cupo_maximo=2)
+    comision = crear_comision(db_session, curso=curso, cupo_maximo=2, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -58,7 +66,7 @@ def test_inscripcion_repetida_es_409(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     curso = crear_curso(db_session)
-    comision = crear_comision(db_session, curso=curso, cupo_maximo=5)
+    comision = crear_comision(db_session, curso=curso, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     primera = cliente_admin.post(
@@ -78,7 +86,7 @@ def test_comision_completa_es_409(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     curso = crear_curso(db_session)
-    comision = crear_comision(db_session, curso=curso, cupo_maximo=1)
+    comision = crear_comision(db_session, curso=curso, cupo_maximo=1, **_periodo_actual())
     alumno_uno = crear_alumno(db_session, email="uno@techacademy.invalid", documento="11111111")
     alumno_dos = crear_alumno(db_session, email="dos@techacademy.invalid", documento="22222222")
 
@@ -99,7 +107,7 @@ def test_alta_con_beca_parcial_guarda_el_porcentaje(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: el alta elige la categoría y guarda el porcentaje de la beca parcial."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -122,7 +130,7 @@ def test_alta_con_beca_parcial_sin_porcentaje_es_422(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: la beca parcial sin porcentaje se rechaza, igual que en el `PATCH`."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -142,7 +150,7 @@ def test_alta_con_porcentaje_fuera_de_rango_es_422(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: un porcentaje de 100 no es una beca parcial válida."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -162,7 +170,7 @@ def test_alta_corporativa_con_empresa(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: la inscripción corporativa nace con su empresa."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
     empresa = crear_empresa(db_session)
 
@@ -184,7 +192,7 @@ def test_alta_corporativa_sin_empresa_es_422(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: no se puede crear una corporativa sin empresa."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -204,7 +212,7 @@ def test_alta_corporativa_con_empresa_inexistente_es_404(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: la empresa elegida tiene que existir."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
 
     respuesta = cliente_admin.post(
@@ -224,7 +232,7 @@ def test_inscripciones_del_alumno_informan_la_categoria(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """HU 64: el selector de Cobranzas distingue las inscripciones por su categoría."""
-    comision = crear_comision(db_session, cupo_maximo=5)
+    comision = crear_comision(db_session, cupo_maximo=5, **_periodo_actual())
     alumno = crear_alumno(db_session)
     crear_inscripcion(
         db_session,
@@ -237,3 +245,72 @@ def test_inscripciones_del_alumno_informan_la_categoria(
 
     assert respuesta.status_code == 200, respuesta.text
     assert respuesta.json()[0]["categoria"] == "BECADO_TOTAL"
+
+
+def test_calcula_alta_tardia_y_aplica_beca_despues_del_prorrateo(
+    db_session: Session,
+) -> None:
+    comision = crear_comision(
+        db_session,
+        arancel="52000.00",
+        horarios_semana=[("LUN", "18:00", "20:00"), ("MIE", "18:00", "20:00")],
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 1, 30),
+    )
+
+    importe = calcular_importe_arancel(
+        comision,
+        CategoriaInscripcion.BECADO_PARCIAL.value,
+        Decimal("25"),
+        hoy=date(2026, 1, 19),
+    )
+
+    assert importe == Decimal("19500.00")
+
+
+def test_calcula_arancel_completo_antes_del_inicio(db_session: Session) -> None:
+    comision = crear_comision(
+        db_session,
+        arancel="52000.00",
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 1, 30),
+    )
+
+    importe = calcular_importe_arancel(
+        comision,
+        CategoriaInscripcion.PARTICULAR.value,
+        hoy=date(2026, 1, 5),
+    )
+
+    assert importe == Decimal("52000.00")
+
+
+def test_rechaza_prorrateo_sin_periodo(db_session: Session) -> None:
+    comision = crear_comision(db_session, fecha_inicio=None, fecha_fin=None)
+
+    with pytest.raises(ProrrateoNoDisponible):
+        calcular_importe_arancel(
+            comision,
+            CategoriaInscripcion.PARTICULAR.value,
+            hoy=date(2026, 1, 19),
+        )
+
+
+def test_alta_tardia_invalida_no_guarda_inscripcion(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    comision = crear_comision(db_session, fecha_inicio=None, fecha_fin=None)
+    alumno = crear_alumno(db_session)
+
+    respuesta = cliente_admin.post(
+        "/inscripciones",
+        json={"alumno_id": alumno.id, "comision_id": comision.id},
+    )
+
+    assert respuesta.status_code == 422
+    assert (
+        db_session.query(Inscripcion)
+        .filter_by(alumno_id=alumno.id, comision_id=comision.id)
+        .count()
+        == 0
+    )

@@ -106,6 +106,7 @@ def _a_inscripcion(session: Session, inscripcion: Inscripcion) -> InscripcionAlu
         horarios=_horarios(comision),
         categoria=inscripcion.categoria,
         porcentaje_beca=inscripcion.porcentaje_beca,
+        importe_arancel=inscripcion.importe_arancel,
         acceso=_acceso(session, inscripcion),
     )
 

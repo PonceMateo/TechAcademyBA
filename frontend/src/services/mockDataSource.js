@@ -166,7 +166,9 @@ function montosDeInscripcion(store, inscripcion) {
 
   let requerido = null
   if (categoria !== CATEGORIA_INSCRIPCION.CORPORATIVO) {
-    if (categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL) {
+    if (inscripcion.importe_arancel != null) {
+      requerido = Number(inscripcion.importe_arancel)
+    } else if (categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL) {
       requerido = 0
     } else if (
       categoria === CATEGORIA_INSCRIPCION.BECADO_PARCIAL &&
@@ -842,7 +844,8 @@ export function createMockDataSource() {
      * El ejemplo guarda la inscripción principal desnormalizada en el alumno —es lo que muestran las
      * pantallas que ya existían— y una lista `inscripciones` para el caso de dos categorías. Si el
      * alumno no tiene la lista, el detalle arma una sola inscripción con esos datos. Los importes se
-     * derivan del arancel y de las cobranzas del ejemplo, con la misma regla que el backend.
+     * parten del importe histórico cuando está disponible y mantienen compatibilidad con datos
+     * heredados que todavía solo tienen el arancel y las cobranzas del ejemplo.
      */
     async obtenerAlumno(id) {
       const alumno = store.alumnos.find((candidato) => candidato.id === Number(id))
@@ -904,6 +907,7 @@ export function createMockDataSource() {
         alumno_id,
         comision_id,
         categoria: 'PARTICULAR',
+        importe_arancel: comision.arancel,
         estado: 'ACTIVA',
       }
     },

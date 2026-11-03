@@ -35,6 +35,7 @@ class InscripcionOut(BaseModel):
     categoria: str
     porcentaje_beca: Decimal | None = None
     empresa_id: int | None = None
+    importe_arancel: Decimal | None = None
     estado: str
 
 

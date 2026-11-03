@@ -333,6 +333,7 @@ def crear_inscripcion(
     categoria: str = CategoriaInscripcion.PARTICULAR.value,
     porcentaje_beca: Decimal | str | None = None,
     empresa_id: int | None = None,
+    importe_arancel: Decimal | str | None = None,
     estado: str = EstadoInscripcion.ACTIVA.value,
 ) -> Inscripcion:
     return _persistir(
@@ -343,6 +344,9 @@ def crear_inscripcion(
             categoria=categoria,
             porcentaje_beca=Decimal(porcentaje_beca) if porcentaje_beca is not None else None,
             empresa_id=empresa_id,
+            importe_arancel=(
+                Decimal(importe_arancel) if importe_arancel is not None else None
+            ),
             estado=estado,
         ),
     )

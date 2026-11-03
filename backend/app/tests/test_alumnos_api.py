@@ -311,12 +311,17 @@ def test_el_requerido_se_redondea_a_centavos_y_coincide_con_el_estado(
     assert completo["acceso"]["estado"] == "HABILITADO"
 
 
-def test_el_saldo_sigue_al_arancel_actual_de_la_comision(
+def test_el_saldo_conserva_el_importe_historico_de_la_inscripcion(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     alumno = crear_alumno(db_session)
     comision = crear_comision(db_session, arancel="50000.00", cupo_maximo=5)
-    crear_inscripcion(db_session, alumno=alumno, comision=comision)
+    crear_inscripcion(
+        db_session,
+        alumno=alumno,
+        comision=comision,
+        importe_arancel="50000.00",
+    )
 
     [antes] = _inscripciones_de(cliente_admin, alumno.id)
     assert Decimal(antes["saldo_pendiente"]) == Decimal("50000.00")
@@ -325,8 +330,8 @@ def test_el_saldo_sigue_al_arancel_actual_de_la_comision(
     db_session.commit()
 
     [despues] = _inscripciones_de(cliente_admin, alumno.id)
-    assert Decimal(despues["monto_requerido"]) == Decimal("60000.00")
-    assert Decimal(despues["saldo_pendiente"]) == Decimal("60000.00")
+    assert Decimal(despues["monto_requerido"]) == Decimal("50000.00")
+    assert Decimal(despues["saldo_pendiente"]) == Decimal("50000.00")
 
 
 def test_dos_inscripciones_del_mismo_alumno_no_mezclan_importes(

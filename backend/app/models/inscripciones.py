@@ -204,6 +204,7 @@ class Inscripcion(TimestampMixin, Base):
     empresa_id: Mapped[int | None] = mapped_column(
         ForeignKey("empresa.id", ondelete="RESTRICT"), nullable=True
     )
+    importe_arancel: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     estado: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=EstadoInscripcion.ACTIVA.value
     )

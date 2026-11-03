@@ -244,6 +244,7 @@ def test_la_inscripcion_no_expone_estado_de_habilitacion(db_session: Session) ->
         "categoria",
         "porcentaje_beca",
         "empresa_id",
+        "importe_arancel",
         "estado",
         "created_at",
         "updated_at",

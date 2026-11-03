@@ -52,6 +52,8 @@ def crear_inscripcion(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     except inscripciones.EmpresaNoEncontrada as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except inscripciones.ProrrateoNoDisponible as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     return InscripcionOut.model_validate(inscripcion)
 
 

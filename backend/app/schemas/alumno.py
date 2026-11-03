@@ -65,6 +65,7 @@ class InscripcionAlumnoOut(BaseModel):
     horarios: list[HorarioCursadaOut]
     categoria: str
     porcentaje_beca: Decimal | None = None
+    importe_arancel: Decimal | None = None
     acceso: AccesoAlumnoOut
 
 
