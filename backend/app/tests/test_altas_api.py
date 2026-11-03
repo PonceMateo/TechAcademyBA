@@ -19,6 +19,8 @@ Lo que estos tests afirma por debajo de la respuesta:
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -153,6 +155,8 @@ def test_alta_de_comision_devuelve_el_codigo_derivado(
     assert cuerpo["docente_nombre"] == f"{docente.nombre} {docente.apellido}", cuerpo
     assert cuerpo["sede_nombre"] == sede.nombre, cuerpo
     assert cuerpo["vacantes"] == 20, "recién creada no tiene inscriptos, así que están todas"
+    # H/U 70: el estado se deriva ya en la respuesta del alta. El período del cuerpo terminó.
+    assert cuerpo["estado"] == "Finalizada", cuerpo
 
 
 def test_las_comisiones_de_un_curso_se_numeran_consecutivas(
@@ -383,6 +387,35 @@ def test_listado_de_comisiones_devuelve_las_vacantes_derivadas(
     fila = respuesta.json()[0]
     assert fila["vacantes"] == 8, fila
     assert "vacantes" not in comision.__table__.columns, "D10: las vacantes no son columna"
+
+
+def test_el_listado_informa_el_estado_derivado_de_cada_comision(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """H/U 70: la consulta trae todas, con `Vigente` o `Finalizada` según la fecha de fin."""
+    from app.tests.factories import crear_comision
+
+    hoy = date.today()
+    vigente = crear_comision(
+        db_session,
+        curso=crear_curso(db_session, nombre="Curso vigente"),
+        con_sede=False,
+        fecha_inicio=hoy - timedelta(days=30),
+        fecha_fin=hoy + timedelta(days=30),
+    )
+    finalizada = crear_comision(
+        db_session,
+        curso=crear_curso(db_session, nombre="Curso terminado"),
+        con_sede=False,
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+
+    respuesta = cliente_admin.get("/comisiones")
+
+    assert respuesta.status_code == 200, respuesta.text
+    estados = {fila["codigo"]: fila["estado"] for fila in respuesta.json()}
+    assert estados == {vigente.codigo: "Vigente", finalizada.codigo: "Finalizada"}
 
 
 # -------------------------------------------------------------------- docentes

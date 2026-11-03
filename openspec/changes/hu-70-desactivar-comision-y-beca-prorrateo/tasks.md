@@ -7,8 +7,8 @@
 
 ## 2. Estado de comisión en la API
 
-- [ ] 2.1 Exponer `estado` en `ComisionOut` y cubrir alta, consulta y edición con tests de API que comparen `Vigente`/`Finalizada` contra la fecha de fin. Verificar con `pytest backend/app/tests/test_altas_api.py backend/app/tests/test_edicion_comision.py`.
-- [ ] 2.2 Reemplazar `Activa`/`Inactiva` por `Vigente`/`Finalizada` en el perfil del docente. Verificar con un test de perfil que una comisión finalizada sigue listada y con estado `Finalizada`.
+- [x] 2.1 Exponer `estado` en `ComisionOut` y cubrir alta, consulta y edición con tests de API que comparen `Vigente`/`Finalizada` contra la fecha de fin. Verificar con `pytest backend/app/tests/test_altas_api.py backend/app/tests/test_edicion_comision.py`.
+- [x] 2.2 Reemplazar `Activa`/`Inactiva` por `Vigente`/`Finalizada` en el perfil del docente. Verificar con un test de perfil que una comisión finalizada sigue listada y con estado `Finalizada`.
 
 ## 3. Solapamiento del docente por período
 

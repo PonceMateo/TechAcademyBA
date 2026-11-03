@@ -8,6 +8,8 @@ tienen acceso, y una cuenta con cambio de contraseña pendiente tampoco (D45). E
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -78,9 +80,29 @@ def test_el_perfil_trae_la_identidad_las_comisiones_y_el_contacto(
             "codigo": comision.codigo,
             "nombre_curso": comision.curso.nombre,
             "horario": comision.dias_horarios,
-            "estado": "Activa",
+            "estado": "Vigente",
         }
     ]
+
+
+def test_el_perfil_mantiene_la_comision_finalizada_con_su_estado(
+    cliente_docente: TestClient, db_session: Session, docente: Docente
+) -> None:
+    """H/U 70: una comisión terminada sigue en la vista del docente, marcada `Finalizada`."""
+    hoy = date.today()
+    comision = crear_comision(
+        db_session,
+        docente=docente,
+        fecha_inicio=hoy - timedelta(days=90),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+
+    respuesta = cliente_docente.get("/docente/mi-perfil")
+
+    assert respuesta.status_code == 200, respuesta.text
+    [asignada] = respuesta.json()["comisiones"]
+    assert asignada["codigo"] == comision.codigo
+    assert asignada["estado"] == "Finalizada"
 
 
 # --- Edición de email y teléfono ----------------------------------------------------------------
