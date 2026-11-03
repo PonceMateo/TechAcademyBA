@@ -58,6 +58,8 @@ const PATHS = Object.freeze({
   detalleInscripcionAlumno: '/alumno/inscripciones/:codigo',
   pagosAlumno: '/alumno/pagos',
   perfilAlumno: '/alumno/mi-perfil',
+  comprobantesAlumno: '/alumno/comprobantes',
+  comprobantesPendientes: '/comprobantes',
 })
 
 async function request(path, { method = 'GET', body, query, params } = {}) {
@@ -109,8 +111,9 @@ async function request(path, { method = 'GET', body, query, params } = {}) {
   return response.json()
 }
 
-/** El `detail` de un error del backend, si lo tiene. Un 4xx sin cuerpo no rompe nada. */
-async function leerDetalle(response) {
+/** El `detail` de un error del backend, si lo tiene. Un 4xx sin cuerpo no rompe nada. */ async function leerDetalle(
+  response,
+) {
   try {
     const cuerpo = await response.json()
     if (typeof cuerpo?.detail === 'string') return cuerpo.detail
@@ -129,6 +132,70 @@ async function leerDetalle(response) {
     return errores.length > 0 ? `Revisá los datos: ${errores.join(' ')}` : null
   } catch {
     return null
+  }
+}
+
+/**
+ * Descarga autenticada de un archivo. El backend responde con los bytes o redirige a una URL
+ * firmada temporal; en los dos casos la frontera devuelve un `Blob`.
+ */
+async function requestBinario(path) {
+  const headers = {}
+  const token = readStoredToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  let response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { headers })
+  } catch {
+    throw new DataSourceError('No pudimos conectar con el servidor.')
+  }
+
+  if (!response.ok) {
+    throw new DataSourceError(
+      (await leerDetalle(response)) ?? `La API respondió ${response.status} a GET ${path}.`,
+      response.status,
+    )
+  }
+
+  return response.blob()
+}
+
+/**
+ * Sube el archivo al destino que devolvió el backend.
+ *
+ * La URL puede ser relativa (la sube el backend en desarrollo) o absoluta (URL firmada del
+ * storage en producción). El `Authorization` solo se agrega a la ruta propia: mandarlo a otro
+ * origen filtraría el token.
+ */
+async function subirArchivo(subida, archivo) {
+  const propia = !/^https?:\/\//i.test(subida.url)
+  const headers = { ...subida.headers, 'Content-Type': archivo.type || 'application/octet-stream' }
+  if (propia) {
+    const token = readStoredToken()
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+  }
+
+  let response
+  try {
+    response = await fetch(propia ? `${API_BASE_URL}${subida.url}` : subida.url, {
+      method: subida.metodo,
+      headers,
+      body: archivo,
+    })
+  } catch {
+    throw new DataSourceError('No pudimos subir el archivo del comprobante.')
+  }
+
+  if (!response.ok) {
+    throw new DataSourceError(
+      (await leerDetalle(response)) ?? 'No pudimos subir el archivo del comprobante.',
+      response.status,
+    )
   }
 }
 
@@ -441,6 +508,39 @@ export function createApiDataSource() {
 
     async listarPagosAlumno() {
       return request(PATHS.pagosAlumno)
+    },
+
+    /**
+     * Comprobantes enviados por el alumno (HU 52), con su estado. Solo los verificados; una carga
+     * interrumpida no aparece.
+     */
+    async listarComprobantesAlumno() {
+      return request(PATHS.comprobantesAlumno)
+    },
+
+    /**
+     * Envío completo del comprobante: inicia, sube el archivo al destino que indique el backend y
+     * confirma la verificación. La pantalla hace una sola llamada y no conoce el storage.
+     */
+    async enviarComprobante(datos, archivo) {
+      const iniciado = await request(PATHS.comprobantesAlumno, {
+        method: 'POST',
+        body: { ...datos, archivo_nombre: archivo.name },
+      })
+      await subirArchivo(iniciado.subida, archivo)
+      return request(`${PATHS.comprobantesAlumno}/${iniciado.comprobante.id}/confirmar`, {
+        method: 'POST',
+      })
+    },
+
+    /** Bandeja de Secretaría: comprobantes de alumnos pendientes de revisión. */
+    async listarComprobantesPendientes() {
+      return request(PATHS.comprobantesPendientes)
+    },
+
+    /** Adjunto de un comprobante, descargado con la sesión de quien lo pide. */
+    async descargarArchivoComprobante(id) {
+      return requestBinario(`${PATHS.comprobantesPendientes}/${id}/archivo`)
     },
 
     async obtenerPerfilAlumno() {

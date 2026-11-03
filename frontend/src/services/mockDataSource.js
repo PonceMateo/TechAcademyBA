@@ -15,6 +15,7 @@ import {
 import {
   CATEGORIA_INSCRIPCION,
   ESTADO_COBRANZA,
+  ESTADO_COMPROBANTE_ALUMNO,
   TIPO_FACTURA,
   TITULAR_SIN_IDENTIFICAR,
   TRANSICIONES_ESTADO_COBRANZA,
@@ -415,14 +416,17 @@ export function createMockDataSource() {
   const store = {
     comisiones: structuredClone(COMISIONES),
     cursos: cursosDelCatalogo(COMISIONES),
-    docentes: structuredClone(DOCENTES),
-    alumnos: structuredClone(ALUMNOS),
-    empresas: structuredClone(EMPRESAS),
-    sedes: structuredClone(SEDES),
-    cobranzas: structuredClone(COBRANZAS),
-    asistencias: structuredClone(ASISTENCIAS),
-    links: structuredClone(LINKS_DE_CLASE),
-    inscripciones: structuredClone(INSCRIPCIONES),
+    docentes: copiar(DOCENTES),
+    alumnos: copiar(ALUMNOS),
+    empresas: copiar(EMPRESAS),
+    sedes: copiar(SEDES),
+    cobranzas: copiar(COBRANZAS),
+    // Los comprobantes enviados por el alumno no existen en el maquetado (HU 52): se crean al
+    // enviarlos, igual que en la API.
+    comprobantes: [],
+    asistencias: copiar(ASISTENCIAS),
+    links: copiar(LINKS_DE_CLASE),
+    inscripciones: copiar(INSCRIPCIONES),
   }
 
   /** El padrón de una comisión: los alumnos que tiene, con el acceso que ya viene derivado (D9). */
@@ -1137,7 +1141,7 @@ export function createMockDataSource() {
       }
       comision.inscriptos = (comision.inscriptos ?? 0) + empleados.length
       comision.vacantes = comision.cupo_maximo - comision.inscriptos
-      empresa.nomina_empleados = `${(empresa.nomina_empleados ? `${empresa.nomina_empleados}; ` : '')}${empleados.length} personas`
+      empresa.nomina_empleados = `${empresa.nomina_empleados ? `${empresa.nomina_empleados}; ` : ''}${empleados.length} personas`
       return {
         contrato_id: siguienteId(store.contratos ?? []),
         empresa_id: empresa.id,
@@ -1444,8 +1448,9 @@ export function createMockDataSource() {
       const docente = store.docentes.find((candidata) => candidata.id === DOCENTE_DEL_MAQUETADO)
       const correo = String(email ?? '').trim()
       const ocupado =
-        store.docentes.some((candidata) => candidata.id !== docente.id && candidata.email === correo) ||
-        store.alumnos.some((candidata) => candidata.email === correo)
+        store.docentes.some(
+          (candidata) => candidata.id !== docente.id && candidata.email === correo,
+        ) || store.alumnos.some((candidata) => candidata.email === correo)
 
       if (ocupado) {
         throw new Error(`El email ${correo} ya está registrado en el padrón de docentes.`)
@@ -1523,6 +1528,9 @@ export function createMockDataSource() {
 
       return [
         {
+          // La inscripción del ejemplo no guarda id porque el maquetado no lo necesitaba; el
+          // envío de comprobantes (HU 52) sí, y en la API es el id real de la fila.
+          inscripcion_id: 1,
           codigo: inscripcion.comision.codigo,
           nombre_curso: inscripcion.comision.nombre,
           docente_nombre: inscripcion.comision.docente_nombre,
@@ -1614,6 +1622,81 @@ export function createMockDataSource() {
               normalizeCode(cobranza.pagador.nombre) !== normalizeCode(alumno.nombre),
           }
         })
+    },
+
+    /**
+     * Comprobantes enviados por el alumno (HU 52). Solo los del alumno del ejemplo y solo los que
+     * llegaron a `PENDIENTE_REVISION`: una carga a medias no se muestra en la API real.
+     */
+    async listarComprobantesAlumno() {
+      const propia = inscripcionDelAlumno()
+
+      if (propia === undefined) {
+        return []
+      }
+
+      return store.comprobantes
+        .filter((comprobante) => comprobante.alumno_id === propia.alumno.id)
+        .map((comprobante) => ({ ...comprobante }))
+    },
+
+    /**
+     * Envío del comprobante (HU 52) con el mismo resultado que la API: la fila en
+     * `PENDIENTE_REVISION`. No crea una cobranza ni cambia el acceso del alumno.
+     */
+    async enviarComprobante(datos, archivo) {
+      const propia = inscripcionDelAlumno()
+
+      if (propia === undefined) {
+        throw new Error('No tenés una inscripción activa para imputar el comprobante.')
+      }
+
+      const { inscripcion, alumno } = propia
+      const comprobante = {
+        id: siguienteId(store.comprobantes),
+        alumno_id: alumno.id,
+        estado: ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
+        fecha_pago: datos.fecha_pago,
+        importe: Number(datos.importe),
+        medio: datos.medio,
+        titular: datos.titular || null,
+        factura_a_solicitada: Boolean(datos.factura_a_solicitada),
+        cuit: datos.cuit || null,
+        archivo_nombre: archivo?.name ?? 'comprobante',
+        archivo_mime: archivo?.type || null,
+        archivo_bytes: archivo?.size ?? null,
+        enviado_at: new Date().toISOString(),
+        inscripcion: {
+          id: datos.inscripcion_id,
+          codigo: inscripcion.comision.codigo,
+          nombre_curso: inscripcion.comision.nombre,
+        },
+      }
+
+      store.comprobantes.unshift(comprobante)
+      return { ...comprobante }
+    },
+
+    /** Bandeja de Secretaría con el alumno resuelto, como el contrato de `GET /comprobantes`. */
+    async listarComprobantesPendientes() {
+      return store.comprobantes
+        .filter(
+          (comprobante) => comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
+        )
+        .map(({ alumno_id, ...comprobante }) => {
+          const alumno = store.alumnos.find((candidato) => candidato.id === alumno_id)
+          return {
+            ...comprobante,
+            alumno: alumno?.nombre ?? '',
+            alumno_email: alumno?.email ?? '',
+            alumno_documento: alumno?.documento ?? null,
+          }
+        })
+    },
+
+    /** Adjunto del ejemplo: un PDF mínimo, solo para que la pantalla abra algo. */
+    async descargarArchivoComprobante() {
+      return new Blob(['%PDF-1.4\n%%EOF\n'], { type: 'application/pdf' })
     },
 
     /**

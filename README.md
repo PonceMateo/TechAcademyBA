@@ -277,6 +277,23 @@ dentro de cada curso, así que el número asignado puede no ser el que tenía la
 El `downgrade()` de `0001_initial` tira las tablas enteras (`DROP TABLE`), así que no sirve
 para deshacer esta migración: el paso atrás es el de arriba.
 
+### Almacenamiento de comprobantes (HU 52)
+
+Los comprobantes que envían los alumnos **no viven en el repositorio ni en una carpeta pública**.
+En desarrollo se guardan en el volumen `comprobantes_data`, montado en
+`/var/lib/techacademy/comprobantes`: sobrevive a los reinicios y solo lo lee el backend. La
+descarga pasa por un endpoint autenticado; no hay una URL estática que abrir.
+
+En producción el backend corre como Vercel Function, que tiene un límite de 4,5 MB por request y
+no tiene disco persistente. Por eso la subida va **del navegador a Supabase Storage con una URL
+firmada** y el backend solo firma, verifica y borra. Configuración, una sola vez:
+
+- Bucket **privado** (sin acceso público) para los comprobantes.
+- Variables en el entorno de Vercel: `STORAGE_BACKEND=supabase`, `STORAGE_BUCKET`,
+  `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (esta última como secreto, nunca en el repo).
+- Si falta alguna, el envío responde `503` y **no** hay fallback al disco local: en producción
+  `STORAGE_BACKEND=local` también se rechaza.
+
 ## API
 
 Hoy la interfaz solo habla con el backend para el login (`POST /auth/login` y `GET /auth/me`);
@@ -325,6 +342,11 @@ defecto, así que el entorno levanta sin tocar nada. Para cambiar alguna: `cp .e
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Vigencia del token, en minutos | `480` (ocho horas) |
 | `CORS_ORIGINS` | Orígenes del navegador permitidos, separados por coma | `http://localhost:5173` |
 | `EMAIL_BACKEND` | Implementación de envío de correo | `log` |
+| `STORAGE_BACKEND` | Almacenamiento privado de comprobantes: `local` o `supabase` | `local` |
+| `STORAGE_LOCAL_DIR` | Carpeta privada de comprobantes en desarrollo | volumen `comprobantes_data` |
+| `STORAGE_BUCKET` | Bucket privado de Supabase Storage | vacío |
+| `SUPABASE_URL` | URL del proyecto de Supabase, solo para storage | vacío |
+| `SUPABASE_SERVICE_ROLE_KEY` | Credencial de storage de producción (secreto) | vacío |
 | `VITE_API_BASE_URL` | Ruta que el navegador usa para llamar al backend | `/api` |
 | `VITE_API_PROXY_TARGET` | A quién reenvía el proxy `/api` de Vite | `http://backend:8000` |
 

@@ -9,10 +9,12 @@ from app.models.base import Base, TimestampMixin
 from app.models.catalogo import MONEY, Comision, Curso, Sede
 from app.models.clases import Asistencia, AuditLog, Clase, OverrideHabilitacion
 from app.models.cobranza import Cobranza, Factura, Imputacion, Pagador
+from app.models.comprobantes import ComprobanteAlumno
 from app.models.enums import (
     CategoriaInscripcion,
     EstadoAsistencia,
     EstadoCobranza,
+    EstadoComprobanteAlumno,
     EstadoContrato,
     EstadoHabilitacion,
     EstadoInscripcion,
@@ -42,12 +44,14 @@ __all__ = [
     "Clase",
     "Cobranza",
     "Comision",
+    "ComprobanteAlumno",
     "ContratoCorporativo",
     "Curso",
     "Docente",
     "Empresa",
     "EstadoAsistencia",
     "EstadoCobranza",
+    "EstadoComprobanteAlumno",
     "EstadoContrato",
     "EstadoHabilitacion",
     "EstadoInscripcion",
