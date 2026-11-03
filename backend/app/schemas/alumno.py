@@ -125,6 +125,7 @@ class DetalleCursadaOut(BaseModel):
     categoria: str
     porcentaje_beca: Decimal | None = None
     acceso: AccesoAlumnoOut
+    link_clase: str | None = None
     cronograma: CronogramaOut
     proximos_encuentros: list[EncuentroOut]
 

@@ -131,7 +131,8 @@ function DetalleCursada({ codigo }) {
     )
   }
 
-  const { comision, acceso, cronograma, proximos_encuentros: encuentros } = detalle
+  const { comision, acceso, link_clase: linkClase, cronograma, proximos_encuentros: encuentros } =
+    detalle
   const bloqueado = acceso.estado === ESTADO_HABILITACION.BLOQUEADO
   // Sin encuentros hay dos causas distintas y el mensaje no puede ser el mismo: la comisión
   // todavía no tiene días de cursada cargados, o la cursada ya terminó y el período lo dice
@@ -186,7 +187,18 @@ function DetalleCursada({ codigo }) {
           <div className="flex flex-col items-start gap-2">
             <Badge tono={TONO.VERDE}>HABILITADO</Badge>
             <p className="text-sm text-slate-700">{TEXTO_ACCESO_HABILITADO}</p>
-            <p className="text-sm text-amber-800">{TEXTO_SIN_LINK}</p>
+            {linkClase ? (
+              <a
+                href={linkClase}
+                target="_blank"
+                rel="noreferrer"
+                className="boton-primario foco-acento inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition"
+              >
+                Ingresar a la clase
+              </a>
+            ) : (
+              <p className="text-sm text-amber-800">{TEXTO_SIN_LINK}</p>
+            )}
           </div>
         )}
       </Card>
