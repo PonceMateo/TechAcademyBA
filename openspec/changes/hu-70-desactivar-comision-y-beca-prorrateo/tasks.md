@@ -23,10 +23,10 @@
 
 ## 5. Corrección del descuento de beca (#111)
 
-- [ ] 5.1 Quitar el descuento de `calcular_importe_arancel` y aplicarlo siempre en la derivación de montos sobre el importe base guardado; ajustar el redondeo a centavos. Verificar con tests de: alta tardía particular, alta tardía becada y monto requerido igual a base con descuento.
-- [ ] 5.2 Cubrir el `PATCH` de categoría: cambio a beca parcial sobre inscripción prorrateada aplica el descuento, y cambio a particular lo quita, sin re-prorratear ni modificar el importe base. Verificar con `pytest backend/app/tests/test_inscripciones_api.py backend/app/tests/test_alumnos_api.py`.
-- [ ] 5.3 Agregar la migración `0010` (down_revision `0009_inscripcion_arancel_merge`) que des-aplica el descuento de las filas `BECADO_PARCIAL` con `importe_arancel` no nulo, y su `downgrade` equivalente. Verificar con `docker compose exec backend alembic upgrade head` y después con una fila becada de prueba: el monto requerido conserva el mismo valor que antes de la migración.
-- [ ] 5.4 Actualizar el mock de datos y `montosDeInscripcion` para que apliquen el descuento sobre el importe base y no lo tomen como importe final, incluidos los datos de ejemplo con beca. Verificar con los tests de `frontend/src/services/dataService.test.jsx` y de la ficha del alumno.
+- [x] 5.1 Quitar el descuento de `calcular_importe_arancel` y aplicarlo siempre en la derivación de montos sobre el importe base guardado; ajustar el redondeo a centavos. Verificar con tests de: alta tardía particular, alta tardía becada y monto requerido igual a base con descuento.
+- [x] 5.2 Cubrir el `PATCH` de categoría: cambio a beca parcial sobre inscripción prorrateada aplica el descuento, y cambio a particular lo quita, sin re-prorratear ni modificar el importe base. Verificar con `pytest backend/app/tests/test_inscripciones_api.py backend/app/tests/test_alumnos_api.py`.
+- [x] 5.3 Agregar la migración `0010` (down_revision `0009_inscripcion_arancel_merge`) que des-aplica el descuento de las filas `BECADO_PARCIAL` con `importe_arancel` no nulo, y su `downgrade` equivalente. Verificar con `docker compose exec backend alembic upgrade head` y después con una fila becada de prueba: el monto requerido conserva el mismo valor que antes de la migración.
+- [x] 5.4 Actualizar el mock de datos y `montosDeInscripcion` para que apliquen el descuento sobre el importe base y no lo tomen como importe final, incluidos los datos de ejemplo con beca. Verificar con los tests de `frontend/src/services/dataService.test.jsx` y de la ficha del alumno.
 
 ## 6. Administración: estado y selector
 

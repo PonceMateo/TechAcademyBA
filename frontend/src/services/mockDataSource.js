@@ -154,8 +154,10 @@ function redondearCentavos(valor) {
 
 /**
  * Importes derivados de una inscripción (HU 61), con la misma regla que el backend: el requerido
- * sale del arancel ajustado por la beca parcial, se cuantiza a centavos, es cero en beca total y
- * nulo en corporativo; lo observado no descuenta y el saldo nunca es negativo.
+ * sale del importe base guardado —o del arancel, en datos heredados— con la beca parcial aplicada
+ * encima, se cuantiza a centavos, es cero en beca total y nulo en corporativo. El descuento no se
+ * guarda en la inscripción: se deriva siempre, así cambiar la categoría no deja un monto viejo
+ * (D77). Lo observado no descuenta y el saldo nunca es negativo.
  */
 function montosDeInscripcion(store, inscripcion) {
   const comision = store.comisiones.find(
@@ -166,19 +168,20 @@ function montosDeInscripcion(store, inscripcion) {
 
   let requerido = null
   if (categoria !== CATEGORIA_INSCRIPCION.CORPORATIVO) {
-    if (inscripcion.importe_arancel != null) {
-      requerido = Number(inscripcion.importe_arancel)
-    } else if (categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL) {
+    if (categoria === CATEGORIA_INSCRIPCION.BECADO_TOTAL) {
       requerido = 0
-    } else if (
-      categoria === CATEGORIA_INSCRIPCION.BECADO_PARCIAL &&
-      inscripcion.porcentaje_beca != null
-    ) {
-      requerido = redondearCentavos(
-        (arancel * (100 - inscripcion.porcentaje_beca)) / 100,
-      )
     } else {
-      requerido = arancel
+      let base =
+        inscripcion.importe_arancel != null
+          ? Number(inscripcion.importe_arancel)
+          : arancel
+      if (
+        categoria === CATEGORIA_INSCRIPCION.BECADO_PARCIAL &&
+        inscripcion.porcentaje_beca != null
+      ) {
+        base *= (100 - inscripcion.porcentaje_beca) / 100
+      }
+      requerido = redondearCentavos(base)
     }
   }
 

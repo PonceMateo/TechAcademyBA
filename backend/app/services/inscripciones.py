@@ -59,10 +59,19 @@ class ProrrateoNoDisponible(Exception):
 def calcular_importe_arancel(
     comision: Comision,
     categoria: str,
-    porcentaje_beca: Decimal | None = None,
     *,
     hoy: date | None = None,
 ) -> Decimal | None:
+    """Importe **base** de la inscripción, prorrateado por las clases restantes.
+
+    Es el arancel de la comisión multiplicado por las clases que quedan desde el alta y dividido
+    por las clases totales, redondeado a centavos. **No incluye el descuento de beca**: el
+    descuento se aplica al derivar el monto requerido, sobre este base guardado, para que un cambio
+    posterior de categoría no deje un importe viejo (H/U 70 y D77).
+
+    Corporativo no tiene importe propio (depende del contrato) y beca total queda exenta. Una
+    comisión sin período o sin clases restantes no inventa un importe.
+    """
     if categoria == CategoriaInscripcion.CORPORATIVO.value:
         return None
     if categoria == CategoriaInscripcion.BECADO_TOTAL.value:
@@ -83,8 +92,6 @@ def calcular_importe_arancel(
             "No se pudo calcular el importe: no quedan clases en el período."
         )
     importe = comision.arancel * Decimal(clases_restantes) / Decimal(clases_totales)
-    if categoria == CategoriaInscripcion.BECADO_PARCIAL.value:
-        importe *= (Decimal("100") - (porcentaje_beca or Decimal("0"))) / Decimal("100")
     return importe.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
@@ -142,7 +149,7 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
     categoria, porcentaje_beca, empresa_id = _validar_categoria(
         session, datos.categoria, datos.porcentaje_beca, datos.empresa_id
     )
-    importe_arancel = calcular_importe_arancel(comision, categoria, porcentaje_beca)
+    importe_arancel = calcular_importe_arancel(comision, categoria)
 
     inscripcion = Inscripcion(
         alumno_id=datos.alumno_id,
