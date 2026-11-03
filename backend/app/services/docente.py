@@ -21,8 +21,9 @@ from app.models.catalogo import Comision
 from app.models.enums import DiaSemana, EstadoHabilitacion, EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Docente, Usuario
-from app.schemas.alumnos import AlumnoOut
+from app.schemas.alumnos import AccesoAlumnoOut
 from app.schemas.docente import (
+    AlumnoPadronDocenteOut,
     ComisionAsignadaDocenteOut,
     ComisionDocenteOut,
     PadronComisionDocenteOut,
@@ -164,7 +165,7 @@ def obtener_padron_comision(
     for inscripcion in inscripciones:
         estado, causa, forzado = habilitacion.derivar_estado(session, inscripcion)
         alumnos.append(
-            AlumnoOut(
+            AlumnoPadronDocenteOut(
                 id=inscripcion.alumno.id,
                 nombre=inscripcion.alumno.nombre,
                 documento=inscripcion.alumno.documento,
@@ -176,7 +177,7 @@ def obtener_padron_comision(
                 comision={"codigo": comision.codigo, "nombre": comision.curso.nombre},
                 categoria=inscripcion.categoria,
                 porcentaje_beca=inscripcion.porcentaje_beca,
-                acceso={"estado": estado, "causa": causa, "forzado": forzado},
+                acceso=AccesoAlumnoOut(estado=estado, causa=causa, forzado=forzado),
             )
         )
     return PadronComisionDocenteOut(
