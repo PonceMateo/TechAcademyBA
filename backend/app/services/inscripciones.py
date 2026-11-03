@@ -6,13 +6,15 @@ empresa: la regla no puede depender de la puerta por la que entra la inscripció
 
 from __future__ import annotations
 
-from decimal import Decimal
+from datetime import date, datetime
+from decimal import ROUND_HALF_UP, Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import Comision
+from app.models.catalogo import Comision, clases_del_periodo
 from app.models.enums import CategoriaInscripcion, EstadoInscripcion
 from app.models.inscripciones import Empresa, Inscripcion
 from app.models.padron import Alumno
@@ -33,6 +35,45 @@ class InscripcionDuplicada(Exception):
 
 class CupoLleno(Exception):
     """La comisión no tiene vacantes."""
+
+
+class ProrrateoNoDisponible(Exception):
+    """No se puede calcular el importe de la inscripción."""
+
+
+ZONA_HORARIA_DOMINIO = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def calcular_importe_arancel(
+    comision: Comision,
+    categoria: str,
+    porcentaje_beca: Decimal | None = None,
+    *,
+    hoy: date | None = None,
+) -> Decimal | None:
+    if categoria == CategoriaInscripcion.CORPORATIVO.value:
+        return None
+    if categoria == CategoriaInscripcion.BECADO_TOTAL.value:
+        return Decimal("0.00")
+    if comision.fecha_inicio is None or comision.fecha_fin is None:
+        raise ProrrateoNoDisponible(
+            "No se pudo calcular el importe: la comisión no tiene un período completo."
+        )
+    fecha_alta = hoy or datetime.now(ZONA_HORARIA_DOMINIO).date()
+    clases_totales = comision.cantidad_clases
+    clases_restantes = (
+        clases_totales
+        if fecha_alta <= comision.fecha_inicio
+        else clases_del_periodo(fecha_alta, comision.fecha_fin, comision.horarios)
+    )
+    if not clases_totales or not clases_restantes:
+        raise ProrrateoNoDisponible(
+            "No se pudo calcular el importe: no quedan clases en el período."
+        )
+    importe = comision.arancel * Decimal(clases_restantes) / Decimal(clases_totales)
+    if categoria == CategoriaInscripcion.BECADO_PARCIAL.value:
+        importe *= (Decimal("100") - (porcentaje_beca or Decimal("0"))) / Decimal("100")
+    return importe.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def listar_inscripciones_activas(session: Session, alumno_id: int) -> list[Inscripcion]:
@@ -82,6 +123,7 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
     categoria, porcentaje_beca, empresa_id = _validar_categoria(
         session, datos.categoria, datos.porcentaje_beca, datos.empresa_id
     )
+    importe_arancel = calcular_importe_arancel(comision, categoria, porcentaje_beca)
 
     inscripcion = Inscripcion(
         alumno_id=datos.alumno_id,
@@ -89,6 +131,7 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
         categoria=categoria,
         porcentaje_beca=porcentaje_beca,
         empresa_id=empresa_id,
+        importe_arancel=importe_arancel,
         estado=EstadoInscripcion.ACTIVA.value,
     )
     session.add(inscripcion)

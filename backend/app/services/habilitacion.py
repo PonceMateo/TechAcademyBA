@@ -39,9 +39,14 @@ def derivar_montos(session: Session, inscripcion: Inscripcion) -> SimpleNamespac
     elif categoria == CategoriaInscripcion.BECADO_TOTAL.value:
         requerido = Decimal(0)
     else:
-        requerido = arancel
+        requerido = (
+            Decimal(inscripcion.importe_arancel)
+            if inscripcion.importe_arancel is not None
+            else arancel
+        )
         if (
-            categoria == CategoriaInscripcion.BECADO_PARCIAL.value
+            inscripcion.importe_arancel is None
+            and categoria == CategoriaInscripcion.BECADO_PARCIAL.value
             and inscripcion.porcentaje_beca is not None
         ):
             descuento = Decimal(inscripcion.porcentaje_beca)

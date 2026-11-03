@@ -40,6 +40,7 @@ export const ALUMNOS = markAsExample([
         estado: 'ACTIVA',
         comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
         arancel: 45000,
+        importe_arancel: 40000,
         categoria: CATEGORIA_INSCRIPCION.PARTICULAR,
         porcentaje_beca: null,
         empresa: null,

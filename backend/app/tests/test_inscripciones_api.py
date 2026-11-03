@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -9,7 +10,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.enums import CategoriaInscripcion
+from app.models.inscripciones import Inscripcion
 from app.models.padron import Usuario
+from app.services.inscripciones import ProrrateoNoDisponible, calcular_importe_arancel
 from app.tests.factories import (
     crear_alumno,
     crear_comision,
@@ -237,3 +240,72 @@ def test_inscripciones_del_alumno_informan_la_categoria(
 
     assert respuesta.status_code == 200, respuesta.text
     assert respuesta.json()[0]["categoria"] == "BECADO_TOTAL"
+
+
+def test_calcula_alta_tardia_y_aplica_beca_despues_del_prorrateo(
+    db_session: Session,
+) -> None:
+    comision = crear_comision(
+        db_session,
+        arancel="52000.00",
+        horarios_semana=[("LUN", "18:00", "20:00"), ("MIE", "18:00", "20:00")],
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 1, 30),
+    )
+
+    importe = calcular_importe_arancel(
+        comision,
+        CategoriaInscripcion.BECADO_PARCIAL.value,
+        Decimal("25"),
+        hoy=date(2026, 1, 19),
+    )
+
+    assert importe == Decimal("19500.00")
+
+
+def test_calcula_arancel_completo_antes_del_inicio(db_session: Session) -> None:
+    comision = crear_comision(
+        db_session,
+        arancel="52000.00",
+        fecha_inicio=date(2026, 1, 5),
+        fecha_fin=date(2026, 1, 30),
+    )
+
+    importe = calcular_importe_arancel(
+        comision,
+        CategoriaInscripcion.PARTICULAR.value,
+        hoy=date(2026, 1, 5),
+    )
+
+    assert importe == Decimal("52000.00")
+
+
+def test_rechaza_prorrateo_sin_periodo(db_session: Session) -> None:
+    comision = crear_comision(db_session, fecha_inicio=None, fecha_fin=None)
+
+    with pytest.raises(ProrrateoNoDisponible):
+        calcular_importe_arancel(
+            comision,
+            CategoriaInscripcion.PARTICULAR.value,
+            hoy=date(2026, 1, 19),
+        )
+
+
+def test_alta_tardia_invalida_no_guarda_inscripcion(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    comision = crear_comision(db_session, fecha_inicio=None, fecha_fin=None)
+    alumno = crear_alumno(db_session)
+
+    respuesta = cliente_admin.post(
+        "/inscripciones",
+        json={"alumno_id": alumno.id, "comision_id": comision.id},
+    )
+
+    assert respuesta.status_code == 422
+    assert (
+        db_session.query(Inscripcion)
+        .filter_by(alumno_id=alumno.id, comision_id=comision.id)
+        .count()
+        == 0
+    )

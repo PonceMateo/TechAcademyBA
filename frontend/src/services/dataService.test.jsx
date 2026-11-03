@@ -39,8 +39,8 @@ describe('detalle del alumno (HU 64 y 61)', () => {
     const detalle = await obtenerAlumno(1)
     const [particular, corporativa] = detalle.inscripciones
 
-    // Juan pagó el arancel completo de la particular y la corporativa va a cargo de la empresa.
-    expect(particular.monto_requerido).toBe(45000)
+    // Juan conserva el importe histórico de su inscripción y la corporativa va a cargo de la empresa.
+    expect(particular.monto_requerido).toBe(40000)
     expect(particular.total_pagado).toBe(45000)
     expect(particular.saldo_pendiente).toBe(0)
     expect(corporativa.monto_requerido).toBeNull()

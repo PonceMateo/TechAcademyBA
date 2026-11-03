@@ -20,8 +20,8 @@ import { obtenerAlumno } from '../services/dataService'
  * inscripción, porque una cursada terminada no tiene bloqueo que derivar.
  *
  * **El dinero se muestra, no se calcula.** «Arancel a abonar» es `monto_requerido` y «Saldo
- * pendiente» es `saldo_pendiente`, los dos derivados por el backend con el arancel actual y
- * cuantizados a centavos (D68 y D70). Lo observado no descuenta: se informa aparte con un
+ * pendiente» es `saldo_pendiente`, derivados por el backend desde el importe histórico de la
+ * inscripción y cuantizados a centavos (D68 y D70). Lo observado no descuenta: se informa aparte con un
  * indicador que solo aparece cuando hay algo observado. Una inscripción corporativa se muestra a
  * cargo de la empresa y una becada total, exenta.
  *
