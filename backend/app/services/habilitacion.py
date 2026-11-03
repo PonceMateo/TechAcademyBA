@@ -1,17 +1,24 @@
-"""Derivación del estado de habilitación y de los importes de una inscripción (HU #27 y 61)."""
+"""Derivación del estado de habilitación y forzado manual de una inscripción (HU #27, 30 y 61)."""
 
 from __future__ import annotations
 
+import json
 from decimal import ROUND_HALF_UP, Decimal
 from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.clases import OverrideHabilitacion
+from app.models.clases import AuditLog, OverrideHabilitacion
 from app.models.cobranza import Cobranza, Imputacion
-from app.models.enums import CategoriaInscripcion, EstadoCobranza, EstadoHabilitacion
+from app.models.enums import (
+    CategoriaInscripcion,
+    EstadoCobranza,
+    EstadoHabilitacion,
+    EstadoInscripcion,
+)
 from app.models.inscripciones import Empresa, Inscripcion
+from app.models.padron import Usuario
 
 #: Los importes se muestran con dos decimales: el requerido se cuantiza antes de compararlo.
 CENTAVOS = Decimal("0.01")
@@ -99,20 +106,28 @@ def derivar_estado(
 
     `montos` permite reutilizar la derivación cuando quien llama ya la hizo (el detalle del alumno);
     si no viene, se calcula acá. El estado y el saldo salen siempre del mismo requerido.
+
+    **El forzado vigente manda, pero no borra el automático.** `derivar_estado_automatico` se
+    calcula igual, porque la ficha necesita el estado que produciría la regla sin forzado para
+    ofrecer el contrario y para mostrarlo en el modal.
     """
-    override = session.scalar(
-        select(OverrideHabilitacion).where(
-            OverrideHabilitacion.inscripcion_id == inscripcion.id,
-            OverrideHabilitacion.activo.is_(True),
-        ).order_by(OverrideHabilitacion.fecha.desc())
-    )
+    override = override_vigente(session, inscripcion.id)
+    estado_automatico, causa = derivar_estado_automatico(session, inscripcion, montos)
     if override is not None:
         return (override.estado_forzado, override.motivo, True)
+    return (estado_automatico, causa, False)
 
+
+def derivar_estado_automatico(
+    session: Session,
+    inscripcion: Inscripcion,
+    montos: SimpleNamespace | None = None,
+) -> tuple[str, str | None]:
+    """Estado y causa que produce la regla arancelaria, ignorando cualquier forzado."""
     categoria = inscripcion.categoria or CategoriaInscripcion.PARTICULAR.value
 
     if categoria == CategoriaInscripcion.BECADO_TOTAL.value:
-        return (EstadoHabilitacion.HABILITADO.value, None, False)
+        return (EstadoHabilitacion.HABILITADO.value, None)
 
     if montos is None:
         montos = derivar_montos(session, inscripcion)
@@ -120,16 +135,164 @@ def derivar_estado(
     if categoria == CategoriaInscripcion.CORPORATIVO.value:
         empresa = session.get(Empresa, inscripcion.empresa_id) if inscripcion.empresa_id else None
         if empresa is None:
-            return (EstadoHabilitacion.BLOQUEADO.value, "falta la empresa", False)
+            return (EstadoHabilitacion.BLOQUEADO.value, "falta la empresa")
         if montos.sin_acreditar:
-            return (EstadoHabilitacion.BLOQUEADO.value, "empresa impaga", False)
-        return (EstadoHabilitacion.HABILITADO.value, None, False)
+            return (EstadoHabilitacion.BLOQUEADO.value, "empresa impaga")
+        return (EstadoHabilitacion.HABILITADO.value, None)
 
     # Particular o becado parcial.
     if montos.acreditado >= montos.requerido and montos.requerido > 0:
-        return (EstadoHabilitacion.HABILITADO.value, None, False)
+        return (EstadoHabilitacion.HABILITADO.value, None)
     if montos.causa is not None:
-        return (EstadoHabilitacion.BLOQUEADO.value, montos.causa, False)
+        return (EstadoHabilitacion.BLOQUEADO.value, montos.causa)
     if montos.imputaciones == 0:
-        return (EstadoHabilitacion.BLOQUEADO.value, "pago pendiente", False)
-    return (EstadoHabilitacion.BLOQUEADO.value, "saldo pendiente", False)
+        return (EstadoHabilitacion.BLOQUEADO.value, "pago pendiente")
+    return (EstadoHabilitacion.BLOQUEADO.value, "saldo pendiente")
+
+
+def override_vigente(session: Session, inscripcion_id: int) -> OverrideHabilitacion | None:
+    """El forzado activo de una inscripción, si existe. Es la única lectura del override."""
+    return session.scalar(
+        select(OverrideHabilitacion)
+        .where(
+            OverrideHabilitacion.inscripcion_id == inscripcion_id,
+            OverrideHabilitacion.activo.is_(True),
+        )
+        .order_by(OverrideHabilitacion.fecha.desc())
+    )
+
+
+class InscripcionNoEncontrada(Exception):
+    """El `id` no corresponde a ninguna inscripción."""
+
+    def __init__(self) -> None:
+        super().__init__("La inscripción no existe.")
+
+
+class InscripcionNoActiva(Exception):
+    """Solo una inscripción `ACTIVA` tiene habilitación que forzar."""
+
+    def __init__(self) -> None:
+        super().__init__("Solo una inscripción activa puede tener un estado forzado.")
+
+
+class ForzadoYaVigente(Exception):
+    """La inscripción ya tiene un forzado activo: primero hay que quitarlo."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "La inscripción ya tiene un estado forzado vigente. Quitalo antes de forzar otro."
+        )
+
+
+class SinForzadoVigente(Exception):
+    """La operación de quita no aplica sobre una inscripción sin forzado."""
+
+    def __init__(self) -> None:
+        super().__init__("La inscripción no tiene un estado forzado vigente.")
+
+
+class EstadoForzadoInvalido(Exception):
+    """El estado pedido no es `HABILITADO` ni `BLOQUEADO`."""
+
+    def __init__(self) -> None:
+        super().__init__("El estado forzado tiene que ser HABILITADO o BLOQUEADO.")
+
+
+class ForzadoIgualAlAutomatico(Exception):
+    """Solo se fuerza el estado contrario al que produce la regla automática."""
+
+    def __init__(self) -> None:
+        super().__init__("El estado forzado tiene que ser el contrario al estado automático.")
+
+
+class MotivoVacio(Exception):
+    """El motivo del forzado no puede quedar vacío."""
+
+    def __init__(self) -> None:
+        super().__init__("El motivo del forzado es obligatorio.")
+
+
+def _inscripcion_bloqueada(session: Session, inscripcion_id: int) -> Inscripcion:
+    """Lee la inscripción con `FOR UPDATE`: dos operaciones simultáneas se serializan."""
+    inscripcion = session.scalar(
+        select(Inscripcion).where(Inscripcion.id == inscripcion_id).with_for_update()
+    )
+    if inscripcion is None:
+        raise InscripcionNoEncontrada
+    if inscripcion.estado != EstadoInscripcion.ACTIVA.value:
+        raise InscripcionNoActiva
+    return inscripcion
+
+
+def forzar_estado(
+    session: Session,
+    inscripcion_id: int,
+    estado_forzado: str,
+    motivo: str,
+    usuario: Usuario,
+) -> OverrideHabilitacion:
+    """Crea el forzado vigente de una inscripción (HU #30 y #27).
+
+    El estado pedido tiene que ser el **contrario** al automático: forzar lo que la regla ya dice
+    no es una excepción y no se registra. El actor sale de la sesión autenticada, nunca del cuerpo.
+    """
+    if estado_forzado not in (
+        EstadoHabilitacion.HABILITADO.value,
+        EstadoHabilitacion.BLOQUEADO.value,
+    ):
+        raise EstadoForzadoInvalido
+    motivo = (motivo or "").strip()
+    if motivo == "":
+        raise MotivoVacio
+
+    inscripcion = _inscripcion_bloqueada(session, inscripcion_id)
+    if override_vigente(session, inscripcion.id) is not None:
+        raise ForzadoYaVigente
+    automatico, _ = derivar_estado_automatico(session, inscripcion)
+    if automatico == estado_forzado:
+        raise ForzadoIgualAlAutomatico
+
+    override = OverrideHabilitacion(
+        inscripcion_id=inscripcion.id,
+        estado_forzado=estado_forzado,
+        motivo=motivo,
+        usuario_id=usuario.id,
+        activo=True,
+    )
+    session.add(override)
+    session.commit()
+    session.refresh(override)
+    return override
+
+
+def quitar_forzado(session: Session, inscripcion_id: int, usuario: Usuario) -> Inscripcion:
+    """Desactiva el forzado vigente y vuelve a la regla automática (HU #30).
+
+    La fila del override **no se borra**: queda con `activo = false` como historial, y la quita se
+    registra en `audit_log` con el usuario de la sesión. No toca categoría, importes ni cobranzas.
+    """
+    inscripcion = _inscripcion_bloqueada(session, inscripcion_id)
+    override = override_vigente(session, inscripcion.id)
+    if override is None:
+        raise SinForzadoVigente
+
+    override.activo = False
+    session.add(
+        AuditLog(
+            usuario_id=usuario.id,
+            accion="habilitacion.forzado.quitado",
+            entidad="inscripcion",
+            entidad_id=inscripcion.id,
+            detalle=json.dumps(
+                {
+                    "override_id": override.id,
+                    "estado_forzado": override.estado_forzado,
+                    "motivo": override.motivo,
+                },
+                ensure_ascii=False,
+            ),
+        )
+    )
+    session.commit()
+    return inscripcion

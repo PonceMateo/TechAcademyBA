@@ -436,7 +436,7 @@ export function createMockDataSource() {
     comisiones: structuredClone(COMISIONES),
     cursos: cursosDelCatalogo(COMISIONES),
     docentes: copiar(DOCENTES),
-    alumnos: copiar(ALUMNOS),
+    alumnos: structuredClone(ALUMNOS),
     empresas: copiar(EMPRESAS),
     sedes: copiar(SEDES),
     cobranzas: copiar(COBRANZAS),
@@ -448,6 +448,39 @@ export function createMockDataSource() {
     inscripciones: copiar(INSCRIPCIONES),
     // Bajas lógicas del ejemplo (HU 60): la fila se conserva y solo cambia su estado.
     bajas: new Set(),
+  }
+
+  // El acceso automático que tenía cada inscripción antes del forzado: la quita lo restaura tal
+  // cual, así el ejemplo conserva su causa de bloqueo original.
+  const accesosAutomaticos = new Map()
+
+  /**
+   * La inscripción del ejemplo por id, con su alumno y su acceso vigente.
+   *
+   * Se aceptan las dos formas del maquetado: la lista `inscripciones` del alumno (HU 64), la
+   * inscripción principal desnormalizada (`1000 + id`, HU 60) y la inscripción del shell del
+   * alumno, que no guarda id y se identifica con el id del alumno.
+   */
+  function inscripcionParaForzar(inscripcionId) {
+    const id = Number(inscripcionId)
+    for (const alumno of store.alumnos) {
+      const propia = (alumno.inscripciones ?? []).find((inscripcion) => inscripcion.id === id)
+      if (propia !== undefined) {
+        return { alumno, inscripcion: propia, principal: false }
+      }
+      if (1000 + alumno.id === id || (alumno.id === id && alumno.inscripciones === undefined)) {
+        return { alumno, inscripcion: alumno, principal: true }
+      }
+    }
+    return null
+  }
+
+  function cambiarAcceso({ alumno, inscripcion, principal }, acceso) {
+    if (principal) {
+      alumno.acceso = acceso
+    } else {
+      inscripcion.acceso = acceso
+    }
   }
 
   /** El padrón de una comisión: los alumnos que tiene, con el acceso que ya viene derivado (D9). */
@@ -1517,30 +1550,71 @@ export function createMockDataSource() {
     },
 
     /**
-     * Forzado de bloqueo (historia #27): guarda el motivo con el usuario y la fecha de la
-     * operación. El modelo no tiene columna de estado en la inscripción (D9): lo que se guarda es
-     * el override, y el estado vuelve a derivarse.
+     * Forzado manual del estado de **una inscripción** (H/U 30).
+     *
+     * El ejemplo guarda el override en el acceso de la inscripción, que es lo que las pantallas ya
+     * leen (D9). El motivo, el estado automático y la marca de forzado viajan juntos para que el
+     * modal pueda mostrar la situación completa y volver atrás.
      */
-    async forzarBloqueoManual({ alumnoId, motivo, usuario, fechaOperacion }) {
-      const alumno = store.alumnos.find((candidato) => candidato.id === alumnoId)
-      if (alumno === undefined) {
-        throw new Error('No hay un alumno con ese identificador en los datos de ejemplo.')
+    async forzarHabilitacionInscripcion(inscripcionId, { estado, motivo }) {
+      const objetivo = inscripcionParaForzar(inscripcionId)
+      if (objetivo === null) {
+        throw new Error('La inscripción no existe.')
       }
-      if (String(motivo ?? '').trim() === '') {
-        throw new Error('El motivo es obligatorio.')
+      const { alumno, inscripcion, principal } = objetivo
+      if ((inscripcion.estado ?? 'ACTIVA') !== 'ACTIVA') {
+        throw new Error('Solo una inscripción activa puede tener un estado forzado.')
+      }
+      if (!['HABILITADO', 'BLOQUEADO'].includes(estado)) {
+        throw new Error('El estado forzado tiene que ser HABILITADO o BLOQUEADO.')
+      }
+      const limpio = String(motivo ?? '').trim()
+      if (limpio === '') {
+        throw new Error('El motivo del forzado es obligatorio.')
+      }
+      const actual = principal ? alumno.acceso : inscripcion.acceso
+      if (actual?.forzado === true) {
+        throw new Error(
+          'La inscripción ya tiene un estado forzado vigente. Quitalo antes de forzar otro.',
+        )
+      }
+      const automatico = actual?.estado ?? 'BLOQUEADO'
+      if (automatico === estado) {
+        throw new Error('El estado forzado tiene que ser el contrario al estado automático.')
       }
 
-      const acceso = {
-        estado: 'BLOQUEADO',
-        causa: motivo.trim(),
-        forzado: { usuario, fecha_operacion: fechaOperacion, motivo: motivo.trim() },
+      accesosAutomaticos.set(Number(inscripcionId), actual === undefined ? null : { ...actual })
+      cambiarAcceso(
+        { alumno, inscripcion, principal },
+        {
+          estado,
+          causa: limpio,
+          forzado: true,
+          estado_automatico: automatico,
+          motivo: limpio,
+        },
+      )
+      return { estado, causa: limpio, forzado: true }
+    },
+
+    /** Quita el forzado vigente y restaura el acceso automático que tenía la inscripción. */
+    async quitarForzadoHabilitacion(inscripcionId) {
+      const objetivo = inscripcionParaForzar(inscripcionId)
+      if (objetivo === null) {
+        throw new Error('La inscripción no existe.')
       }
-      // El forzado es sobre el alumno, así que alcanza a cada una de sus inscripciones (HU 64).
-      alumno.acceso = acceso
-      for (const inscripcion of alumno.inscripciones ?? []) {
-        inscripcion.acceso = { ...acceso }
+      const { alumno, inscripcion, principal } = objetivo
+      const actual = principal ? alumno.acceso : inscripcion.acceso
+      if (actual?.forzado !== true) {
+        throw new Error('La inscripción no tiene un estado forzado vigente.')
       }
-      return { ...alumno }
+
+      const anterior = accesosAutomaticos.get(Number(inscripcionId)) ?? {
+        estado: actual.estado_automatico ?? 'HABILITADO',
+        causa: null,
+      }
+      cambiarAcceso({ alumno, inscripcion, principal }, { ...anterior })
+      return { estado: anterior.estado, causa: anterior.causa ?? null, forzado: false }
     },
 
     /**

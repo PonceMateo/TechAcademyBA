@@ -61,6 +61,19 @@ class InscripcionBaja(BaseModel):
     comision_id: int = Field(gt=0)
 
 
+class HabilitacionForzadaUpdate(BaseModel):
+    """Cuerpo de `POST /inscripciones/{id}/habilitacion` (HU #30).
+
+    El motivo se recorta antes de validar: un texto de solo espacios queda vacío y la API responde
+    422. El usuario no viaja en el cuerpo porque sale de la sesión autenticada.
+    """
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    estado: str = Field(min_length=1, max_length=20)
+    motivo: str = Field(min_length=1, max_length=500)
+
+
 class AlumnoDeInscripcionOut(BaseModel):
     """El alumno tal como lo lista la gestión de la comisión: nombre y documento (HU 60)."""
 

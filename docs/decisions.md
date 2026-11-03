@@ -2556,3 +2556,34 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `backend/alembic/versions/0010_inscripcion_importe_base.py`,
   `frontend/src/services/mockDataSource.js`.
 
+
+### D78 — El forzado de habilitación se administra por inscripción desde la ficha
+
+- **Fecha:** 2026-11-03
+- **Autor:** Santiago Torrens
+- **Contexto:** la pantalla `Habilitación de Accesos` llamaba a
+  `/habilitaciones/override/{alumnoId}`, un endpoint que nunca existió, y el modelo real
+  (`OverrideHabilitacion`) relaciona el forzado con una **inscripción**. El equipo acordó retirar la
+  pantalla independiente y forzar desde `Ver ficha`, donde la categoría y el estado ya se leen por
+  inscripción.
+- **Decisión:** se elimina la sección `Habilitación de Accesos`, su ítem del menú y la ruta
+  `/admin/habilitacion` (responde la 404 existente). El forzado se expone en
+  `POST /inscripciones/{id}/habilitacion` y `DELETE /inscripciones/{id}/habilitacion`, con el
+  administrador tomado de la sesión. El alcance es la inscripción y solo aplica a inscripciones
+  `ACTIVA`; el estado forzado debe ser el contrario al automático y el motivo es obligatorio. La
+  operación bloquea la fila con `SELECT ... FOR UPDATE`, igual que la baja de la HU 60, para que dos
+  pedidos no dejen dos forzados vigentes. Quitar el forzado desactiva la fila, conserva el
+  historial, registra `habilitacion.forzado.quitado` en `AuditLog` y vuelve a derivar el estado con
+  la regla automática. El detalle del alumno informa `estado_automatico` y `motivo` para que el
+  modal pueda ofrecer el estado contrario y mostrar el forzado vigente.
+- **Por qué:** no hace falta migración (`override_habilitacion` ya tiene estado, motivo, usuario,
+  fecha y vigencia) y el bloqueo transaccional evita duplicados sin agregar un índice parcial. Se
+  reutiliza `derivar_estado` como única lectura, así el forzado prevalece también en la ficha, el
+  listado de la comisión, el autoservicio del alumno y el acceso a las clases.
+- **Dónde:** `backend/app/services/habilitacion.py`, `backend/app/services/alumnos.py`,
+  `backend/app/schemas/alumnos.py`, `backend/app/schemas/inscripciones.py`,
+  `backend/app/api/inscripciones.py`, `frontend/src/App.jsx`,
+  `frontend/src/admin/navegacion.js`, `frontend/src/admin/FichaAlumnoModal.jsx`,
+  `frontend/src/admin/HabilitacionInscripcionModal.jsx`,
+  `frontend/src/admin/StudentsPage.jsx`, `frontend/src/services/dataService.js`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`.

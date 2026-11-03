@@ -13,6 +13,7 @@ import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
 import { FichaAlumnoModal } from './FichaAlumnoModal'
 import { CategoriaInscripcionModal } from './CategoriaInscripcionModal'
+import { HabilitacionInscripcionModal } from './HabilitacionInscripcionModal'
 import { dniConForma, emailConForma } from '../domain/validacion'
 import {
   buscarAlumnoReactivable,
@@ -163,7 +164,8 @@ export function StudentsPage() {
   const [guardandoNomina, setGuardandoNomina] = useState(false)
 
   const [inscripcionCategoria, setInscripcionCategoria] = useState(null)
-  // Cambiar la categoría desde la ficha recarga solo el detalle de la ficha (HU 61).
+  const [inscripcionHabilitacion, setInscripcionHabilitacion] = useState(null)
+  // Cambiar la categoría o la habilitación desde la ficha recarga solo el detalle (HU 61).
   const [fichaVersion, setFichaVersion] = useState(0)
 
   useEffect(() => {
@@ -491,6 +493,27 @@ export function StudentsPage() {
     setMensaje(`Categoría actualizada en ${comision}.`)
   }
 
+  /** El lápiz de `Estado de habilitación` abre el modal de esa inscripción (H/U 30). */
+  function abrirFormularioHabilitacion(inscripcion) {
+    setInscripcionHabilitacion(inscripcion)
+  }
+
+  function cerrarModalHabilitacion() {
+    setInscripcionHabilitacion(null)
+  }
+
+  /** Guardar o quitar el forzado recarga la ficha sin perder la comisión elegida. */
+  function habilitacionGuardada(resultado) {
+    const comision = `${inscripcionHabilitacion.comision.codigo} ${inscripcionHabilitacion.comision.nombre}`
+    cerrarModalHabilitacion()
+    setFichaVersion((version) => version + 1)
+    setMensaje(
+      resultado === 'forzado'
+        ? `Estado de habilitación forzado en ${comision}.`
+        : `Se quitó el forzado de ${comision}: vuelve a la regla automática.`,
+    )
+  }
+
   function validarEmpresa() {
     const encontrados = {}
 
@@ -698,6 +721,7 @@ export function StudentsPage() {
           onRestablecerPassword={abrirPassword}
           onEliminar={abrirBaja}
           onCambiarCategoria={abrirFormularioCategoria}
+          onEditarHabilitacion={abrirFormularioHabilitacion}
         />
       )}
 
@@ -1011,6 +1035,15 @@ export function StudentsPage() {
           empresas={empresas}
           onClose={cerrarModalCategoria}
           onGuardado={categoriaGuardada}
+        />
+      )}
+
+      {inscripcionHabilitacion !== null && (
+        <HabilitacionInscripcionModal
+          alumno={alumnoFicha}
+          inscripcion={inscripcionHabilitacion}
+          onClose={cerrarModalHabilitacion}
+          onGuardado={habilitacionGuardada}
         />
       )}
 

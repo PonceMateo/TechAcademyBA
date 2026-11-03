@@ -375,6 +375,81 @@ describe('ficha del alumno en modal (HU 61)', () => {
     expect(await within(ficha).findByText('Becado parcial 40%')).toBeInTheDocument()
   })
 
+  it('muestra el lápiz de categoría y el de habilitación en la misma fila de estado', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    expect(await within(ficha).findByText('Particular')).toBeInTheDocument()
+    expect(within(ficha).getByRole('button', { name: 'Editar categoría' })).toBeInTheDocument()
+
+    const lapiz = within(ficha).getByRole('button', { name: 'Editar habilitación' })
+    expect(lapiz).toHaveAttribute('title', 'Editar habilitación')
+
+    await user.click(lapiz)
+
+    const modal = await screen.findByRole('dialog', { name: 'Estado de habilitación' })
+    expect(within(modal).getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(within(modal).getByText('CUR-101 Python Inicial')).toBeInTheDocument()
+    expect(within(modal).getByText('Estado calculado automáticamente')).toBeInTheDocument()
+
+    // Sin motivo no hay forzado: el error queda junto al campo.
+    await user.click(within(modal).getByRole('button', { name: 'Forzar BLOQUEADO' }))
+    expect(within(modal).getByText('El motivo es obligatorio.')).toBeInTheDocument()
+    expect(screen.queryByText(/Estado de habilitación forzado/)).not.toBeInTheDocument()
+
+    await user.type(within(modal).getByLabelText(/^Motivo/), 'Revisión de comprobante')
+    await user.click(within(modal).getByRole('button', { name: 'Forzar BLOQUEADO' }))
+    expect(
+      within(modal).getByText('¿Confirmás forzar el estado BLOQUEADO de esta inscripción?'),
+    ).toBeInTheDocument()
+
+    await user.click(within(modal).getByRole('button', { name: 'Confirmar forzado' }))
+
+    expect(
+      await screen.findByText('Estado de habilitación forzado en CUR-101 Python Inicial.'),
+    ).toBeInTheDocument()
+    expect(await within(ficha).findByText('BLOQUEADO')).toBeInTheDocument()
+  })
+
+  it('vuelve a la regla automática y conserva la comisión elegida', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    const selector = await within(ficha).findByRole('combobox', {
+      name: /Seleccionar comisión/,
+    })
+    await user.click(selector)
+    await user.click(within(ficha).getByRole('option', { name: 'CUR-106 Machine Learning Aplicado' }))
+    expect(within(ficha).getByText('Corporativo')).toBeInTheDocument()
+
+    await user.click(within(ficha).getByRole('button', { name: 'Editar habilitación' }))
+    const modal = await screen.findByRole('dialog', { name: 'Estado de habilitación' })
+    await user.type(within(modal).getByLabelText(/^Motivo/), 'Revisión de la empresa')
+    await user.click(within(modal).getByRole('button', { name: 'Forzar BLOQUEADO' }))
+    await user.click(within(modal).getByRole('button', { name: 'Confirmar forzado' }))
+    await screen.findByText('Estado de habilitación forzado en CUR-106 Machine Learning Aplicado.')
+
+    expect(
+      within(ficha).getByRole('combobox', { name: /Seleccionar comisión/ }),
+    ).toHaveTextContent('CUR-106 Machine Learning Aplicado')
+    expect(within(ficha).getByText('Corporativo')).toBeInTheDocument()
+
+    await user.click(within(ficha).getByRole('button', { name: 'Editar habilitación' }))
+    const forzado = await screen.findByRole('dialog', { name: 'Estado de habilitación' })
+    expect(within(forzado).getByText('El estado fue modificado manualmente.')).toBeInTheDocument()
+    expect(within(forzado).getByText(/Motivo vigente: Revisión de la empresa/)).toBeInTheDocument()
+
+    await user.click(within(forzado).getByRole('button', { name: 'Volver a estado automático' }))
+
+    expect(
+      await screen.findByText(
+        'Se quitó el forzado de CUR-106 Machine Learning Aplicado: vuelve a la regla automática.',
+      ),
+    ).toBeInTheDocument()
+    expect(await within(ficha).findByText('HABILITADO')).toBeInTheDocument()
+    expect(screen.queryByText('El estado fue modificado manualmente.')).not.toBeInTheDocument()
+  })
+
   it('muestra el bloqueo con su causa y el (i) de bloqueo solo cuando está bloqueado', async () => {
     cleanup()
     stubDataSource({

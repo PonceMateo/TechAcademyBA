@@ -1,6 +1,6 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forzarBloqueoManual } from '../services/dataService'
+import { forzarHabilitacionInscripcion } from '../services/dataService'
 import {
   renderAppAs,
   resetDataSource,
@@ -65,11 +65,9 @@ describe('tarjeta del curso inscripto', () => {
 
 describe('la tarjeta bloqueada', () => {
   beforeEach(async () => {
-    await forzarBloqueoManual({
-      alumnoId: 2,
+    await forzarHabilitacionInscripcion(2, {
+      estado: 'BLOQUEADO',
       motivo: 'comprobante ilegible',
-      usuario: 'Secretaria BA',
-      fechaOperacion: '2026-05-21',
     })
 
     cleanup()

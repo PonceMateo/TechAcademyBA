@@ -1,7 +1,7 @@
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forzarBloqueoManual } from '../services/dataService'
+import { forzarHabilitacionInscripcion } from '../services/dataService'
 import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
 
 /**
@@ -93,11 +93,9 @@ describe('el link de la clase todavía no se reparte', () => {
 
 describe('acceso bloqueado', () => {
   beforeEach(async () => {
-    await forzarBloqueoManual({
-      alumnoId: 2,
+    await forzarHabilitacionInscripcion(2, {
+      estado: 'BLOQUEADO',
       motivo: 'debe saldo',
-      usuario: 'Secretaria BA',
-      fechaOperacion: '2026-05-21',
     })
 
     cleanup()

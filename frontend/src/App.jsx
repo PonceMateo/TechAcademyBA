@@ -1,5 +1,4 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { AccessPage } from './admin/AccessPage'
 import { AdminLayout } from './admin/AdminLayout'
 import { CommissionEnrollmentsPage } from './admin/CommissionEnrollmentsPage'
 import { CoursesPage } from './admin/CoursesPage'
@@ -58,7 +57,7 @@ function RootRedirect() {
  * tres rutas sin cambiar quién puede verlas (M10).
  *
  * **Cada sección cuelga de su layout y el layout no sabe qué pantalla hay.** Administración tiene sus
- * seis pantallas, Docente cuatro y Alumno cinco —`Dashboard`, `Mis Cursos`, el detalle de una
+ * cinco pantallas, Docente cuatro y Alumno cinco —`Dashboard`, `Mis Cursos`, el detalle de una
  * cursada, `Mis Pagos` y `Mi Perfil`—; `/docente/notas`, `/alumno/pagar-la-cuota` y
  * `/alumno/certificados` no existen, porque los ítems Won't no son enlaces (D20). Agregar una
  * pantalla es agregar una ruta hija: ni el armazón ni el guard de rol cambian.
@@ -94,7 +93,6 @@ export function AppRoutes() {
         <Route path="docentes" element={<TeachersPage />} />
         <Route path="alumnos" element={<StudentsPage />} />
         <Route path="cobranzas" element={<PaymentsPage />} />
-        <Route path="habilitacion" element={<AccessPage />} />
       </Route>
 
       <Route

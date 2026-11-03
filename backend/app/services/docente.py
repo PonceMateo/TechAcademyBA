@@ -165,6 +165,7 @@ def obtener_padron_comision(
     alumnos = []
     for inscripcion in inscripciones:
         estado, causa, forzado = habilitacion.derivar_estado(session, inscripcion)
+        estado_automatico, _ = habilitacion.derivar_estado_automatico(session, inscripcion)
         alumnos.append(
             AlumnoPadronDocenteOut(
                 id=inscripcion.alumno.id,
@@ -178,7 +179,13 @@ def obtener_padron_comision(
                 comision={"codigo": comision.codigo, "nombre": comision.curso.nombre},
                 categoria=inscripcion.categoria,
                 porcentaje_beca=inscripcion.porcentaje_beca,
-                acceso=AccesoAlumnoOut(estado=estado, causa=causa, forzado=forzado),
+                acceso=AccesoAlumnoOut(
+                    estado=estado,
+                    causa=causa,
+                    forzado=forzado,
+                    estado_automatico=estado_automatico,
+                    motivo=causa if forzado else None,
+                ),
             )
         )
     return PadronComisionDocenteOut(

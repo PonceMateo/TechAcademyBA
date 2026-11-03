@@ -317,7 +317,14 @@ def _perfil(alumno: Alumno) -> PerfilAlumnoOut:
 def _acceso(session: Session, inscripcion: Inscripcion) -> AccesoAlumnoOut:
     """El estado derivado con su causa, tal como lo ve Administración (HU 42)."""
     estado, causa, forzado = habilitacion.derivar_estado(session, inscripcion)
-    return AccesoAlumnoOut(estado=estado, causa=causa, forzado=forzado)
+    estado_automatico, _ = habilitacion.derivar_estado_automatico(session, inscripcion)
+    return AccesoAlumnoOut(
+        estado=estado,
+        causa=causa,
+        forzado=forzado,
+        estado_automatico=estado_automatico,
+        motivo=causa if forzado else None,
+    )
 
 
 def _horarios(comision: Comision) -> list[HorarioCursadaOut]:

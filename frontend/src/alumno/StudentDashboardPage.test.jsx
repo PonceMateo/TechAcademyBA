@@ -1,6 +1,6 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forzarBloqueoManual } from '../services/dataService'
+import { forzarHabilitacionInscripcion } from '../services/dataService'
 import {
   accountForRole,
   renderAppAs,
@@ -84,11 +84,9 @@ describe('el tablero no es la lista de cursadas', () => {
   })
 
   it('muestra el acceso bloqueado con su causa en el indicador', async () => {
-    await forzarBloqueoManual({
-      alumnoId: 2,
+    await forzarHabilitacionInscripcion(2, {
+      estado: 'BLOQUEADO',
       motivo: 'comprobante ilegible',
-      usuario: 'Secretaria BA',
-      fechaOperacion: '2026-05-21',
     })
 
     cleanup()
