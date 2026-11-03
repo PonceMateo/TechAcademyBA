@@ -10,13 +10,12 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import Comision, clases_del_periodo
+from app.models.catalogo import ZONA_HORARIA_DOMINIO, Comision, clases_del_periodo
 from app.models.clases import AuditLog
 from app.models.enums import CategoriaInscripcion, EstadoInscripcion
 from app.models.inscripciones import Empresa, Inscripcion
@@ -51,9 +50,6 @@ class CupoLleno(Exception):
 
 class ProrrateoNoDisponible(Exception):
     """No se puede calcular el importe de la inscripción."""
-
-
-ZONA_HORARIA_DOMINIO = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def calcular_importe_arancel(

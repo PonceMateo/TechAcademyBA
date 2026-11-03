@@ -2504,3 +2504,55 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`,
   `frontend/src/services/mockDataSource.js`,
   `frontend/src/admin/CommissionEnrollmentsPage.test.jsx`.
+
+### D75 — El estado de la comisión se deriva de `fecha_fin`, sin columna ni job
+
+- **Fecha:** 2026-11-03
+- **Autor:** Mateo Ponce
+- **Contexto:** la H/U 70 necesita distinguir comisiones vigentes de terminadas para bloquear
+  inscripciones y mostrarlas en Administración y en la vista del docente. Hasta hoy el modelo solo
+  tenía `activo`, que es la baja lógica, y ninguna columna de estado de comisión (D10 deja el cupo
+  derivado por el mismo motivo).
+- **Decisión:** el estado `Vigente`/`Finalizada` se calcula en una única función del dominio,
+  comparando `fecha_fin` con el día corriente en `America/Argentina/Buenos_Aires`. `fecha_fin` hoy o
+  posterior deja `Vigente`; anterior deja `Finalizada`; una comisión heredada sin `fecha_fin` queda
+  `Vigente` para no bloquear altas sobre datos incompletos. Se expone como `Comision.estado` y en
+  `ComisionOut`; no se persiste.
+- **Por qué:** una columna o un cron se desincronizan en la ventana entre el cambio de día y la
+  corrida. Una sola función evita que Administración, el docente, inscripciones y nómina digan cosas
+  distintas.
+- **Dónde:** `backend/app/models/catalogo.py`, `backend/app/models/enums.py`,
+  `backend/app/schemas/catalogo.py`, `backend/app/services/inscripciones.py`,
+  `backend/app/services/nomina.py`, `backend/app/services/docente.py`.
+
+### D76 — La reactivación de una comisión es editar su `fecha_fin`
+
+- **Fecha:** 2026-11-03
+- **Autor:** Mateo Ponce
+- **Contexto:** la H/U 70 pide que una comisión finalizada vuelva a estar vigente y que se vuelva a
+  chequear el solapamiento del docente.
+- **Decisión:** no se agrega endpoint ni acción de reactivación. Editar `fecha_fin` a hoy o a una
+  fecha futura cambia el estado derivado y la edición ya ejecuta el chequeo de solapamiento con el
+  período nuevo; un cruce responde `409` y conserva el período anterior.
+- **Por qué:** la regla ya existe en la edición de comisión; un camino nuevo sería una segunda forma
+  de hacer lo mismo y otra puerta que mantener.
+- **Dónde:** `backend/app/services/catalogo.py`, `backend/app/api/catalogo.py`.
+
+### D77 — `inscripcion.importe_arancel` guarda el prorrateado sin descuento de beca
+
+- **Fecha:** 2026-11-03
+- **Autor:** Mateo Ponce
+- **Contexto:** la H/U 50 hizo que el alta guardara el importe final ya descontado, y
+  `habilitacion.derivar_montos` lo usa como monto requerido cuando no es nulo. Cambiar la categoría
+  después del alta deja el importe viejo y la beca no se aplica (issue #111).
+- **Decisión:** `importe_arancel` pasa a guardar el importe **base** prorrateado por clases
+  restantes, sin el descuento de beca. El descuento se aplica siempre al derivar el monto requerido,
+  sobre ese base, y se redondea a centavos. La migración `0010` des-aplica el descuento de las filas
+  `BECADO_PARCIAL` existentes con la fórmula inversa; el desvío máximo del backfill es un centavo.
+- **Por qué:** el monto requerido queda como una función pura de `(base, categoría, porcentaje)`.
+  Cambiar la categoría no necesita reconstruir el base ni re-prorratear, y el importe histórico de
+  la cursada se conserva.
+- **Dónde:** `backend/app/services/inscripciones.py`, `backend/app/services/habilitacion.py`,
+  `backend/alembic/versions/0010_inscripcion_importe_base.py`,
+  `frontend/src/services/mockDataSource.js`.
+
