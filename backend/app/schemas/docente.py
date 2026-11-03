@@ -11,9 +11,11 @@ incluye el identificador del sistema ni la contraseña, que no se editan ni se e
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.alumnos import AlumnoOut
+from app.schemas.alumnos import AccesoAlumnoOut, ComisionAsignadaOut
 from app.schemas.validators import EmailConForma, TelefonoOpcional
 
 
@@ -38,13 +40,37 @@ class ComisionAsignadaDocenteOut(BaseModel):
     bloqueados: int = 0
 
 
+class AlumnoPadronDocenteOut(BaseModel):
+    """Fila del padrón de la comisión, con el acceso derivado (10.3).
+
+    `AlumnoOut` no sirve para esto: describe solo los datos del alumno y no declara `acceso`, así
+    que serializar el padrón con ese esquema borraba el estado de habilitación y la pantalla del
+    docente rompía al filtrar los habilitados.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nombre: str
+    documento: str | None = None
+    tipo_documento: str | None = None
+    email: str
+    telefono: str | None = None
+    activo: bool
+    inscripcion_id: int
+    comision: ComisionAsignadaOut
+    categoria: str
+    porcentaje_beca: Decimal | None = None
+    acceso: AccesoAlumnoOut
+
+
 class PadronComisionDocenteOut(BaseModel):
     """Padrón de una comisión que el docente tiene asignada."""
 
     codigo: str
     nombre_curso: str
     horario: str
-    alumnos: list[AlumnoOut] = Field(default_factory=list)
+    alumnos: list[AlumnoPadronDocenteOut] = Field(default_factory=list)
 
 
 class PerfilDocenteOut(BaseModel):
