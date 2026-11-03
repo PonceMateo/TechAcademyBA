@@ -295,3 +295,34 @@ def test_inscripciones_activas_del_alumno(
             },
         }
     ]
+
+
+def test_un_pago_sobre_una_comision_finalizada_se_registra_y_deriva_igual(
+    api_client: TestClient, db_session: Session, admin_headers
+) -> None:
+    """H/U 70: cobrar una cursada terminada se permite y la habilitación sigue la regla de deuda."""
+    hoy = date.today()
+    comision = crear_comision(
+        db_session,
+        con_sede=False,
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+    alumno = crear_alumno(db_session)
+    inscripcion = crear_inscripcion(db_session, alumno=alumno, comision=comision)
+
+    respuesta = api_client.post(
+        "/cobranzas",
+        json=pago(
+            alumno_id=alumno.id,
+            inscripcion_id=inscripcion.id,
+            importe="52000.00",
+        ),
+        headers=admin_headers,
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    detalle = api_client.get(f"/alumnos/{alumno.id}", headers=admin_headers)
+    [fila] = detalle.json()["inscripciones"]
+    assert fila["acceso"]["estado"] == "HABILITADO"
+

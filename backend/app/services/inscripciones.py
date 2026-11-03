@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalogo import ZONA_HORARIA_DOMINIO, Comision, clases_del_periodo
 from app.models.clases import AuditLog
-from app.models.enums import CategoriaInscripcion, EstadoInscripcion
+from app.models.enums import CategoriaInscripcion, EstadoComision, EstadoInscripcion
 from app.models.inscripciones import Empresa, Inscripcion
 from app.models.padron import Alumno, Usuario
 from app.schemas.inscripciones import (
@@ -46,6 +46,10 @@ class InscripcionDuplicada(Exception):
 
 class CupoLleno(Exception):
     """La comisión no tiene vacantes."""
+
+
+class ComisionFinalizada(Exception):
+    """La comisión ya terminó y no admite inscripciones (H/U 70)."""
 
 
 class ProrrateoNoDisponible(Exception):
@@ -111,6 +115,11 @@ def crear_inscripcion(session: Session, datos: InscripcionCreate) -> Inscripcion
     )
     if comision is None:
         raise ComisionNoEncontrada("La comisión no existe.")
+
+    # H/U 70: una comisión terminada no admite altas. Va antes del cupo y del duplicado para que
+    # el motivo informado sea el real cuando además está llena o el alumno ya está inscripto.
+    if comision.estado == EstadoComision.FINALIZADA.value:
+        raise ComisionFinalizada("La comisión ya finalizó.")
 
     existente = session.scalar(
         select(Inscripcion).where(

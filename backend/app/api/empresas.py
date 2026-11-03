@@ -45,6 +45,8 @@ def cargar_nomina(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     except nomina.ComisionNoEncontrada as error:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except nomina.ComisionFinalizada as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     except nomina.CupoInsuficiente as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except nomina.NominaInvalida as error:

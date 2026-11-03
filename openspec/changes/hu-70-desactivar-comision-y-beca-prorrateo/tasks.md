@@ -17,9 +17,9 @@
 
 ## 4. Rechazos en comisiones finalizadas
 
-- [ ] 4.1 Rechazar el alta de inscripción con `422` y mensaje «La comisión ya finalizó.» antes del chequeo de cupo. Verificar con tests de alta sobre comisión finalizada (no crea fila) y sobre comisión vigente (sigue creando).
-- [ ] 4.2 Rechazar la carga de nómina corporativa con `422` sobre una comisión finalizada, sin crear inscripciones ni contrato. Verificar con `pytest backend/app/tests/test_nomina_api.py` o el archivo equivalente de nómina.
-- [ ] 4.3 Cubrir que registrar o imputar un pago en una inscripción de comisión finalizada sigue permitido y no cambia su estado de habilitación. Verificar con un test de cobranzas sobre comisión finalizada.
+- [x] 4.1 Rechazar el alta de inscripción con `422` y mensaje «La comisión ya finalizó.» antes del chequeo de cupo. Verificar con tests de alta sobre comisión finalizada (no crea fila) y sobre comisión vigente (sigue creando).
+- [x] 4.2 Rechazar la carga de nómina corporativa con `422` sobre una comisión finalizada, sin crear inscripciones ni contrato. Verificar con `pytest backend/app/tests/test_nomina_api.py` o el archivo equivalente de nómina.
+- [x] 4.3 Cubrir que registrar o imputar un pago en una inscripción de comisión finalizada sigue permitido y no cambia su estado de habilitación. Verificar con un test de cobranzas sobre comisión finalizada.
 
 ## 5. Corrección del descuento de beca (#111)
 

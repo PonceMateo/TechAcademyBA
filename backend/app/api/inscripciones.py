@@ -68,6 +68,8 @@ def crear_inscripcion(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
     except inscripciones.CupoLleno as error:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except inscripciones.ComisionFinalizada as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     except inscripciones.CategoriaInvalida as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     except inscripciones.PorcentajeInvalido as error:

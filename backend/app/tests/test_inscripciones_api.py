@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.enums import CategoriaInscripcion
@@ -80,6 +81,31 @@ def test_inscripcion_repetida_es_409(
         json={"alumno_id": alumno.id, "comision_id": comision.id},
     )
     assert segunda.status_code == 409
+
+
+def test_no_inscribe_en_una_comision_finalizada(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    """H/U 70: el alta se rechaza con 422 y no deja ninguna fila."""
+    curso = crear_curso(db_session)
+    hoy = date.today()
+    comision = crear_comision(
+        db_session,
+        curso=curso,
+        cupo_maximo=5,
+        fecha_inicio=hoy - timedelta(days=60),
+        fecha_fin=hoy - timedelta(days=1),
+    )
+    alumno = crear_alumno(db_session)
+
+    respuesta = cliente_admin.post(
+        "/inscripciones",
+        json={"alumno_id": alumno.id, "comision_id": comision.id},
+    )
+
+    assert respuesta.status_code == 422, respuesta.text
+    assert respuesta.json()["detail"] == "La comisión ya finalizó."
+    assert db_session.scalars(select(Inscripcion)).all() == []
 
 
 def test_comision_completa_es_409(
