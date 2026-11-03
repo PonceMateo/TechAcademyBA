@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
@@ -13,16 +13,7 @@ import { renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../te
  * pagó" y "no se pudo leer el comprobante".
  */
 
-const COLUMNAS_ALUMNOS = [
-  'DNI',
-  'NOMBRE',
-  'EMAIL',
-  'TELÉFONO',
-  'COMISIÓN ASIGNADA',
-  'CATEGORÍA ARANCELARIA',
-  'ACCESO PLATAFORMA',
-  'ACCIONES',
-]
+const COLUMNAS_ALUMNOS = ['DNI', 'NOMBRE', 'EMAIL', 'TELÉFONO', 'ACCIONES']
 
 const COLUMNAS_EMPRESAS = [
   'RAZÓN SOCIAL',
@@ -75,6 +66,20 @@ function filaDe(nombre) {
   return within(tablaAlumnos())
     .getAllByRole('row')
     .find((fila) => fila.cells[1].textContent === nombre)
+}
+
+/** Abre la ficha del alumno desde su fila (HU 61) y devuelve el usuario y el diálogo. */
+async function abrirFichaDe(nombre) {
+  const user = userEvent.setup()
+  await user.click(within(filaDe(nombre)).getByText(nombre))
+  const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+  return { user, ficha }
+}
+
+/** Elige una acción del menú ⋮ de la ficha abierta. */
+async function elegirEnMenu(user, ficha, nombre) {
+  await user.click(within(ficha).getByRole('button', { name: 'Acciones del alumno' }))
+  await user.click(within(ficha).getByRole('menuitem', { name: nombre }))
 }
 
 async function abrirModal() {
@@ -154,61 +159,23 @@ describe('padrón de alumnos', () => {
     expect(filaDe('Alumno Normalizado').cells[0]).toHaveTextContent('30.111.222')
   })
 
-  it('muestra la categoría con su color', () => {
-    expect(filaDe('Juan Ignacio Pérez').cells[5].textContent).toContain('PARTICULAR')
-    expect(filaDe('Juan Ignacio Pérez').cells[5].querySelector('.text-slate-700')).not.toBeNull()
-    expect(filaDe('Agustina Benítez').cells[5].textContent).toContain('BECADO PARCIAL')
-    expect(filaDe('Agustina Benítez').cells[5].querySelector('.text-violet-800')).not.toBeNull()
-  })
+  it('tiene una sola acción por fila: Ver ficha ↗', async () => {
+    const user = userEvent.setup()
+    const fila = filaDe('Juan Ignacio Pérez')
 
-  it('muestra el porcentaje de descuento del becado parcial', () => {
-    expect(filaDe('Camila Rodríguez').cells[5]).toHaveTextContent('50% de descuento')
-    expect(filaDe('Agustina Benítez').cells[5]).toHaveTextContent('50% de descuento')
-  })
-
-  it('deja las categorías con colores distintos entre sí', () => {
-    // BECADO TOTAL y CORPORATIVO son del enum y del spec, pero el padrón del maquetado no tiene
-    // filas de esas dos. Lo verificable acá es que las dos que aparecen no comparten color.
-    const colorDe = (nombre) => {
-      const insignia = filaDe(nombre).cells[5].querySelector('[data-ui="badge"]')
-      return insignia.className
-    }
-
-    expect(colorDe('Juan Ignacio Pérez')).toContain('text-slate-700')
-    expect(colorDe('Agustina Benítez')).toContain('text-violet-800')
-    expect(colorDe('Juan Ignacio Pérez')).not.toBe(colorDe('Agustina Benítez'))
-  })
-
-  it('muestra HABILITADO en verde para los cuatro accesos al día', () => {
-    const habilitados = screen.getAllByText('HABILITADO')
-
-    expect(habilitados).toHaveLength(4)
-    for (const habilitado of habilitados) {
-      expect(habilitado.className).toContain('text-green-800')
-    }
-  })
-
-  it('mantiene los botones de acciones en una sola línea', () => {
-    const botones = within(filaDe('Juan Ignacio Pérez')).getAllByRole('button')
-
-    expect(botones.map((boton) => boton.textContent)).toEqual([
-      'Editar',
-      'Restablecer contraseña',
-      'Eliminar alumno',
+    expect(
+      within(tablaAlumnos())
+        .getAllByRole('columnheader')
+        .map((th) => th.textContent),
+    ).toEqual(COLUMNAS_ALUMNOS)
+    expect(within(fila).getAllByRole('button').map((boton) => boton.textContent)).toEqual([
+      'Ver ficha ↗',
     ])
-    botones.forEach((boton) => expect(boton).toHaveClass('whitespace-nowrap'))
-  })
 
-  it('muestra cada bloqueo con su causa al lado del estado', () => {
-    const bloqueos = screen.getAllByText('BLOQUEADO')
+    await user.click(within(fila).getByRole('button', { name: 'Ver ficha ↗' }))
 
-    expect(bloqueos).toHaveLength(2)
-    for (const bloqueo of bloqueos) {
-      expect(bloqueo.className).toContain('text-red-800')
-    }
-
-    expect(filaDe('Agustina Benítez').cells[6]).toHaveTextContent('comprobante ilegible')
-    expect(filaDe('Valeria Rossi').cells[6]).toHaveTextContent('debe saldo')
+    // El click en el botón abre una sola ficha: no dispara además el de la fila.
+    expect(await screen.findAllByRole('dialog', { name: 'Ficha del alumno' })).toHaveLength(1)
   })
 
   it('informa que la búsqueda no arrojó resultados', async () => {
@@ -228,7 +195,7 @@ describe('padrón de alumnos', () => {
     expect(screen.getByText('Valeria Rossi')).toBeInTheDocument()
   })
 
-  it('deja Sin comisión y guiones en la fila del alumno sin inscripción', async () => {
+  it('deja el guion del teléfono vacío y no agrega columnas de inscripción', async () => {
     cleanup()
     stubDataSource({
       buscarAlumnos: async () => [
@@ -240,10 +207,6 @@ describe('padrón de alumnos', () => {
           email: 'nuevo@techacademy.invalid',
           telefono: null,
           activo: true,
-          comision: null,
-          categoria: null,
-          porcentaje_beca: null,
-          acceso: null,
         },
       ],
     })
@@ -253,9 +216,7 @@ describe('padrón de alumnos', () => {
 
     const fila = filaDe('Nuevo Alumno')
     expect(fila.cells[3]).toHaveTextContent('—')
-    expect(fila.cells[4]).toHaveTextContent('Sin comisión')
-    expect(fila.cells[5]).toHaveTextContent('—')
-    expect(fila.cells[6]).toHaveTextContent('—')
+    expect(fila.cells).toHaveLength(5)
   })
 
   it('muestra el teléfono del alumno en formato nacional', async () => {
@@ -283,6 +244,350 @@ describe('padrón de alumnos', () => {
 
     // El padrón guarda E.164; la tabla muestra el número como lo lee la secretaría.
     expect(filaDe('Alumna Con Teléfono').cells[3]).toHaveTextContent('011 15-4000-0005')
+  })
+})
+
+describe('ficha del alumno en modal (HU 61)', () => {
+  async function abrirFichaConMouse(nombre) {
+    const user = userEvent.setup()
+    await user.click(within(filaDe(nombre)).getByText(nombre))
+    return user
+  }
+
+  /** El valor de una fila etiqueta/valor de la ficha. */
+  function valorDe(ficha, etiqueta) {
+    return within(ficha).getByText(etiqueta).parentElement
+  }
+
+  it('abre la ficha con el mouse y muestra los datos en modo lectura', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(within(ficha).getByText('38.456.789')).toBeInTheDocument()
+    expect(within(ficha).getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(within(ficha).getByText('juan.perez@gmail.com')).toBeInTheDocument()
+    expect(within(ficha).getByText('—')).toBeInTheDocument()
+    // No hay campos editables: la ficha es de lectura.
+    expect(within(ficha).queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('abre la misma ficha con Enter sobre la fila enfocada', async () => {
+    const user = userEvent.setup()
+    const fila = filaDe('Camila Rodríguez')
+    fila.focus()
+
+    await user.keyboard('{Enter}')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(within(ficha).getByText('Camila Rodríguez')).toBeInTheDocument()
+    expect(within(ficha).getByText('011 4788-1122')).toBeInTheDocument()
+  })
+
+  it('cierra con Escape y devuelve el foco a la fila que la abrió', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const fila = filaDe('Juan Ignacio Pérez')
+    await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Ficha del alumno' })).not.toBeInTheDocument(),
+    )
+    expect(fila).toHaveFocus()
+  })
+
+  it('ofrece Editar, Restablecer contraseña y Eliminar en el menú ⋮', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(within(ficha).getByRole('button', { name: 'Acciones del alumno' }))
+
+    expect(within(ficha).getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Editar',
+      'Restablecer contraseña',
+      'Eliminar',
+    ])
+  })
+
+  it('muestra el motivo y no inventa inscripciones cuando el detalle falla', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerAlumno: async () => {
+        throw new Error('No pudimos conectar con el servidor.')
+      },
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(
+      await within(ficha).findByText('No pudimos conectar con el servidor.'),
+    ).toBeInTheDocument()
+    expect(within(ficha).queryByText(/CUR-\d{3}/)).not.toBeInTheDocument()
+  })
+
+  it('elige la comisión con un selector y no con chips', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    const selector = await within(ficha).findByRole('combobox', {
+      name: /Seleccionar comisión/,
+    })
+    // La primera inscripción viene elegida y no hay pestañas.
+    expect(selector).toHaveTextContent('CUR-101 Python Inicial')
+    expect(within(ficha).queryByRole('tab')).not.toBeInTheDocument()
+
+    await user.click(selector)
+
+    expect(within(ficha).getAllByRole('option').map((opcion) => opcion.textContent)).toEqual([
+      'CUR-101 Python Inicial',
+      'CUR-106 Machine Learning Aplicado',
+    ])
+
+    await user.click(within(ficha).getByRole('option', { name: 'CUR-106 Machine Learning Aplicado' }))
+
+    expect(within(ficha).getByText('Corporativo')).toBeInTheDocument()
+    expect(within(ficha).getByText('Tech Solutions S.A.')).toBeInTheDocument()
+    expect(within(ficha).getByText('A cargo de la empresa')).toBeInTheDocument()
+  })
+
+  it('muestra la categoría con su lápiz y el mismo flujo de edición', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    expect(await within(ficha).findByText('Particular')).toBeInTheDocument()
+    const lapiz = within(ficha).getByRole('button', { name: 'Editar categoría' })
+    expect(lapiz).toHaveAttribute('title', 'Editar categoría')
+
+    await user.click(lapiz)
+
+    const formulario = await screen.findByRole('dialog', { name: 'Asignar categoría' })
+    expect(within(formulario).getByLabelText('Categoría')).toHaveValue('PARTICULAR')
+    await user.selectOptions(within(formulario).getByLabelText('Categoría'), 'BECADO_PARCIAL')
+    await user.type(within(formulario).getByLabelText(/Porcentaje de descuento/), '40')
+    await user.click(within(formulario).getByRole('button', { name: 'Guardar' }))
+
+    expect(
+      await screen.findByText('Categoría actualizada en CUR-101 Python Inicial.'),
+    ).toBeInTheDocument()
+    expect(await within(ficha).findByText('Becado parcial 40%')).toBeInTheDocument()
+  })
+
+  it('muestra el bloqueo con su causa y el (i) de bloqueo solo cuando está bloqueado', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerAlumno: async () => ({
+        id: 1,
+        nombre: 'Juan Ignacio Pérez',
+        documento: '38.456.789',
+        email: 'juan.perez@gmail.com',
+        telefono: null,
+        inscripciones: [
+          {
+            id: 11,
+            estado: 'ACTIVA',
+            comision: { codigo: 'CUR-101', nombre: 'Python Inicial' },
+            categoria: 'PARTICULAR',
+            porcentaje_beca: null,
+            empresa: null,
+            acceso: { estado: 'BLOQUEADO', causa: 'debe saldo', forzado: false },
+            arancel: 45000,
+            monto_requerido: 45000,
+            total_pagado: 20000,
+            total_observado: 0,
+            saldo_pendiente: 25000,
+          },
+          {
+            id: 12,
+            estado: 'COMPLETADA',
+            comision: { codigo: 'CUR-106', nombre: 'Machine Learning Aplicado' },
+            categoria: 'PARTICULAR',
+            porcentaje_beca: null,
+            empresa: null,
+            acceso: null,
+            arancel: 52000,
+            monto_requerido: 52000,
+            total_pagado: 0,
+            total_observado: 0,
+            saldo_pendiente: 52000,
+          },
+        ],
+      }),
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Juan Ignacio Pérez')
+
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    expect(await within(ficha).findByText('BLOQUEADO')).toBeInTheDocument()
+    expect(within(ficha).getByRole('button', { name: 'Motivo del bloqueo' })).toBeInTheDocument()
+  })
+
+  it('muestra el arancel, lo pagado y el saldo con centavos', async () => {
+    await abrirFichaConMouse('Valeria Rossi')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Arancel a abonar')
+
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('$52.000,00')
+    expect(valorDe(ficha, 'Total pagado')).toHaveTextContent('$0,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('$52.000,00')
+  })
+
+  it('avisa lo observado en el saldo solo cuando hay comprobantes observados', async () => {
+    const user = await abrirFichaConMouse('Valeria Rossi')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    const indicador = await within(ficha).findByRole('button', {
+      name: 'Comprobantes observados',
+    })
+    expect(within(ficha).queryByRole('tooltip')).not.toBeInTheDocument()
+
+    await user.hover(indicador)
+
+    const ayuda = await screen.findByRole('tooltip')
+    expect(ayuda).toHaveTextContent('Incluye $26.000,00 en comprobantes observados')
+    expect(indicador).toHaveAttribute('aria-describedby', ayuda.id)
+  })
+
+  it('no muestra el aviso de observados cuando no hay nada observado', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Arancel a abonar')
+
+    expect(
+      within(ficha).queryByRole('button', { name: 'Comprobantes observados' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('exime la beca total: arancel y pagado en cero, saldo exento', async () => {
+    await abrirFichaConMouse('Matías Fernández')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Becado total')
+
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('$0,00')
+    expect(valorDe(ficha, 'Total pagado')).toHaveTextContent('$0,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('Exento')
+    expect(
+      within(ficha).queryByRole('button', { name: 'Comprobantes observados' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('descuenta la beca parcial del arancel', async () => {
+    await abrirFichaConMouse('Camila Rodríguez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    await within(ficha).findByText('Becado parcial 50%')
+
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('$26.000,00')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('$0,00')
+  })
+
+  it('deja el arancel corporativo en guion y el saldo a cargo de la empresa', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('combobox', { name: /Seleccionar comisión/ }))
+    await user.click(within(ficha).getByRole('option', { name: /CUR-106/ }))
+
+    expect(valorDe(ficha, 'Arancel a abonar')).toHaveTextContent('—')
+    expect(valorDe(ficha, 'Saldo pendiente')).toHaveTextContent('A cargo de la empresa')
+    expect(
+      within(ficha).queryByRole('button', { name: 'Comprobantes observados' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('informa cuando el alumno no tiene inscripciones y no dibuja el selector', async () => {
+    cleanup()
+    stubDataSource({
+      buscarAlumnos: async () => [
+        {
+          id: 9,
+          nombre: 'Nuevo Alumno',
+          documento: '30.111.222',
+          tipo_documento: 'DNI',
+          email: 'nuevo@techacademy.invalid',
+          telefono: null,
+          activo: true,
+        },
+      ],
+      obtenerAlumno: async () => ({ id: 9, nombre: 'Nuevo Alumno', inscripciones: [] }),
+    })
+    renderAppAs('ADMIN', '/admin/alumnos')
+    await screen.findByText('Nuevo Alumno')
+
+    await abrirFichaConMouse('Nuevo Alumno')
+
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    expect(await within(ficha).findByText(/todavía no tiene inscripciones/)).toBeInTheDocument()
+    expect(within(ficha).queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
+  it('cierra con un click en el fondo y no con uno adentro', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+    const fondo = ficha.parentElement
+
+    fireEvent.mouseDown(ficha)
+    fireEvent.mouseUp(ficha)
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+
+    fireEvent.mouseDown(fondo)
+    fireEvent.mouseUp(fondo)
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Ficha del alumno' })).not.toBeInTheDocument(),
+    )
+  })
+
+  it('no cierra si el arrastre empezó adentro y terminó en el fondo', async () => {
+    await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    fireEvent.mouseDown(ficha)
+    fireEvent.mouseUp(ficha.parentElement)
+
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+  })
+
+  it('con el desplegable abierto, Escape cierra solo el desplegable', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('combobox', { name: /Seleccionar comisión/ }))
+    expect(within(ficha).getByRole('listbox')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(within(ficha).queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+  })
+
+  it('con el desplegable abierto, el click afuera no cierra el modal', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('combobox', { name: /Seleccionar comisión/ }))
+    // La capa del desplegable se queda con el primer click: cierra la lista, no el modal.
+    await user.click(within(ficha).getByRole('listbox').previousElementSibling)
+
+    expect(within(ficha).queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+  })
+
+  it('con el formulario de categoría encima, el click afuera no cierra la ficha', async () => {
+    const user = await abrirFichaConMouse('Juan Ignacio Pérez')
+    const ficha = await screen.findByRole('dialog', { name: 'Ficha del alumno' })
+
+    await user.click(await within(ficha).findByRole('button', { name: 'Editar categoría' }))
+    await screen.findByRole('dialog', { name: 'Asignar categoría' })
+
+    fireEvent.mouseDown(ficha.parentElement)
+    fireEvent.mouseUp(ficha.parentElement)
+
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Asignar categoría' })).toBeInTheDocument()
   })
 })
 
@@ -427,9 +732,9 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ editarAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Editar')
 
-    await user.click(within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Editar' }))
     const dialogo = screen.getByRole('dialog', { name: 'Editar Alumno' })
     expect(within(dialogo).getByLabelText(/^DNI/)).toHaveValue('38.456.789')
     expect(within(dialogo).getByLabelText(/^Nombre/)).toHaveValue('Juan Ignacio Pérez')
@@ -438,7 +743,8 @@ describe('edición y baja de alumnos', () => {
     await user.type(within(dialogo).getByLabelText(/^Nombre/), 'Juan Pérez Editado')
     await user.click(within(dialogo).getByRole('button', { name: 'Guardar Cambios' }))
 
-    expect(await screen.findByText('Juan Pérez Editado')).toBeInTheDocument()
+    expect(await within(ficha).findByText('Juan Pérez Editado')).toBeInTheDocument()
+    expect(within(tablaAlumnos()).getByText('Juan Pérez Editado')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('se actualizaron correctamente')
     expect(editarAlumno).toHaveBeenCalledWith(1, {
       documento: '38.456.789',
@@ -472,9 +778,9 @@ describe('edición y baja de alumnos', () => {
     })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Alumno Legacy')
-    const user = userEvent.setup()
+    const { user, ficha } = await abrirFichaDe('Alumno Legacy')
+    await elegirEnMenu(user, ficha, 'Editar')
 
-    await user.click(within(filaDe('Alumno Legacy')).getByRole('button', { name: 'Editar' }))
     const dialogo = screen.getByRole('dialog', { name: 'Editar Alumno' })
 
     // El valor crudo se conserva y no hay aviso al cargar; el rechazo aparece al guardar (D57).
@@ -495,15 +801,16 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ editarAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
-
-    await user.click(within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Editar' }))
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Editar')
     await user.click(screen.getByRole('button', { name: 'Guardar Cambios' }))
 
     expect(
       await screen.findByText('Ya hay un alumno registrado con ese documento.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Editar Alumno' })).toBeInTheDocument()
+    // La ficha queda debajo del modal apilado.
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
@@ -513,13 +820,9 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ restablecerPasswordAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Restablecer contraseña')
 
-    await user.click(
-      within(filaDe('Juan Ignacio Pérez')).getByRole('button', {
-        name: 'Restablecer contraseña',
-      }),
-    )
     const dialogo = screen.getByRole('dialog', { name: 'Restablecer contraseña' })
     await user.type(within(dialogo).getByLabelText(/^Nueva contraseña/), 'NuevaClave2026')
     await user.type(within(dialogo).getByLabelText(/^Confirmar contraseña/), 'NuevaClave2026')
@@ -531,6 +834,7 @@ describe('edición y baja de alumnos', () => {
     expect(
       screen.queryByRole('dialog', { name: 'Restablecer contraseña' }),
     ).not.toBeInTheDocument()
+    expect(ficha).toBeInTheDocument()
   })
 
   it('no restablece si las contraseñas no coinciden', async () => {
@@ -539,13 +843,9 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ restablecerPasswordAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Restablecer contraseña')
 
-    await user.click(
-      within(filaDe('Juan Ignacio Pérez')).getByRole('button', {
-        name: 'Restablecer contraseña',
-      }),
-    )
     const dialogo = screen.getByRole('dialog', { name: 'Restablecer contraseña' })
     await user.type(within(dialogo).getByLabelText(/^Nueva contraseña/), 'NuevaClave2026')
     await user.type(within(dialogo).getByLabelText(/^Confirmar contraseña/), 'OtraClave2026')
@@ -561,11 +861,9 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ eliminarAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Eliminar')
 
-    await user.click(
-      within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Eliminar alumno' }),
-    )
     const dialogo = screen.getByRole('dialog', { name: 'Eliminar Alumno' })
     expect(dialogo).toHaveTextContent('Juan Ignacio Pérez')
     expect(dialogo).not.toHaveTextContent('Es una baja lógica')
@@ -576,6 +874,8 @@ describe('edición y baja de alumnos', () => {
     await waitFor(() => expect(screen.queryByText('Juan Ignacio Pérez')).not.toBeInTheDocument())
     expect(screen.getByRole('status')).toHaveTextContent('dado de baja correctamente')
     expect(screen.queryByRole('dialog', { name: 'Eliminar Alumno' })).not.toBeInTheDocument()
+    // La baja cierra la ficha: ya no hay fila a la que volver.
+    expect(screen.queryByRole('dialog', { name: 'Ficha del alumno' })).not.toBeInTheDocument()
   })
 
   it('cancela la baja sin modificar el padrón', async () => {
@@ -584,16 +884,14 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ eliminarAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
-
-    await user.click(
-      within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Eliminar alumno' }),
-    )
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Eliminar')
     await user.click(screen.getByRole('button', { name: 'Cancelar' }))
 
     expect(eliminarAlumno).not.toHaveBeenCalled()
-    expect(screen.getByText('Juan Ignacio Pérez')).toBeInTheDocument()
+    expect(within(tablaAlumnos()).getByText('Juan Ignacio Pérez')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(ficha).toBeInTheDocument()
   })
 
   it('mantiene la confirmación abierta si la baja falla', async () => {
@@ -604,16 +902,28 @@ describe('edición y baja de alumnos', () => {
     stubDataSource({ eliminarAlumno })
     renderAppAs('ADMIN', '/admin/alumnos')
     await screen.findByText('Juan Ignacio Pérez')
-    const user = userEvent.setup()
-
-    await user.click(
-      within(filaDe('Juan Ignacio Pérez')).getByRole('button', { name: 'Eliminar alumno' }),
-    )
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Eliminar')
     await user.click(screen.getByRole('button', { name: 'Confirmar baja' }))
 
     expect(await screen.findByText('El alumno ya está dado de baja.')).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Eliminar Alumno' })).toBeInTheDocument()
     expect(filaDe('Juan Ignacio Pérez')).toBeTruthy()
+    expect(ficha).toBeInTheDocument()
+  })
+
+  it('apila la confirmación sobre la ficha y Escape cierra solo la de arriba', async () => {
+    const { user, ficha } = await abrirFichaDe('Juan Ignacio Pérez')
+    await elegirEnMenu(user, ficha, 'Eliminar')
+
+    expect(screen.getByRole('dialog', { name: 'Eliminar Alumno' })).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Eliminar Alumno' })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('dialog', { name: 'Ficha del alumno' })).toBeInTheDocument()
   })
 })
 

@@ -48,7 +48,6 @@ const PATHS = Object.freeze({
   nominaEmpresa: '/empresas/:empresaId/nomina',
   sedes: '/sedes',
   cobranzas: '/cobranzas',
-  habilitacion: '/habilitaciones/consulta',
   override: '/habilitaciones/override',
   comisionesAsignadas: '/docentes/mis-comisiones',
   perfilDocente: '/docente/mi-perfil',
@@ -325,11 +324,16 @@ export function createApiDataSource() {
     },
 
     /**
-     * Padrón de alumnos (historia #13). La respuesta trae los datos personales y deja en `null`
-     * comisión, categoría, porcentaje de beca y acceso mientras el alumno no tenga inscripción.
+     * Padrón de alumnos (historia #13 y HU 64). La respuesta trae solo los datos personales: la
+     * categoría arancelaria pertenece a la inscripción y se lee en `obtenerAlumno`.
      */
     async listarAlumnos() {
       return request(PATHS.alumnos)
+    },
+
+    /** Detalle del alumno con sus inscripciones (HU 64), por `GET /alumnos/{id}`. */
+    async obtenerAlumno(id) {
+      return request(`${PATHS.alumnos}/${id}`)
     },
 
     /**
@@ -420,10 +424,6 @@ export function createApiDataSource() {
     /** Inscripciones activas del alumno, para el selector de imputación (HU 21). */
     async listarInscripcionesDeAlumno(alumnoId) {
       return request(PATHS.inscripcionesDeAlumno, { params: { alumnoId } })
-    },
-
-    async buscarHabilitacion(consulta) {
-      return request(PATHS.habilitacion, { query: { q: consulta } })
     },
 
     async registrarCobranza(datos) {

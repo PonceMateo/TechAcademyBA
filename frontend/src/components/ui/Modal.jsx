@@ -4,13 +4,17 @@ import { MARCA_UI } from './paleta'
 /**
  * Ventana modal (8.3).
  *
- * **Se cierra con Escape y con el botón de cerrar, y no con un click en el fondo.** El click en el
- * fondo se pierde: una pantalla que carga datos de ejemplo llega tarde, y el operador que está
- * completando el alta va a hacer click en el fondo sin querer y a perder lo que escribió.
+ * **Se cierra con Escape y con el botón de cerrar, y por omisión no con un click en el fondo.** El
+ * click en el fondo se pierde: una pantalla que carga datos de ejemplo llega tarde, y el operador
+ * que está completando el alta va a hacer click en el fondo sin querer y a perder lo que escribió.
+ * La ficha del alumno es de lectura y no tiene nada que perder, así que la pide con
+ * `cerrarAlClickAfuera` (HU 61). Cierra solo si el `mousedown` y el `mouseup` ocurrieron sobre el
+ * fondo: arrastrar un texto desde adentro hacia afuera no cierra la ventana.
  *
  * **Un modal puede abrir otro, y por eso hay una pila.** El selector de horarios se abre sobre el
  * formulario de comisión (historia #48): sin pila, `Escape` cerraría los dos y el operador perdería
- * el alta que estaba cargando. El tope de la pila es el único que responde al teclado.
+ * el alta que estaba cargando. El tope de la pila es el único que responde al teclado y al click en
+ * el fondo.
  *
  * **El foco no se escapa del modal mientras está abierto.** Al abrirlo se lleva el foco al
  * contenedor, `Tab` cicla entre los controles de adentro y al cerrarlo vuelve al control que lo
@@ -34,9 +38,13 @@ const ENFOCABLES = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ')
 
-export function Modal({ abierto, titulo, onClose, children, pie }) {
+export function Modal({ abierto, titulo, onClose, children, pie, acciones = null, cerrarAlClickAfuera = false }) {
   const contenedorRef = useRef(null)
+  const fondoRef = useRef(null)
   const identificadorRef = useRef(null)
+  // El click en el fondo cierra solo si empezó y terminó ahí: arrastrar un texto desde adentro
+  // hacia afuera no puede cerrar la ventana.
+  const presionadoEnFondo = useRef(false)
   // El `onClose` se guarda en una referencia para que el efecto dependa **solo** de `abierto`.
   // Si dependiera de la función, cada render que la redeclara sacaría y volvería a poner el modal
   // en la pila, y en un modal anidado el de abajo pasaría a estar arriba y se llevaría el `Escape`.
@@ -116,8 +124,33 @@ export function Modal({ abierto, titulo, onClose, children, pie }) {
     return null
   }
 
+  function alPresionarElFondo(evento) {
+    presionadoEnFondo.current = evento.target === fondoRef.current
+  }
+
+  function alSoltarEnElFondo(evento) {
+    if (!cerrarAlClickAfuera) {
+      return
+    }
+    // Solo el modal de arriba responde: uno tapado no se cierra por un click que no lo alcanza.
+    if (PILA[PILA.length - 1] !== identificadorRef.current) {
+      return
+    }
+    const empezoYTerminoEnElFondo =
+      presionadoEnFondo.current && evento.target === fondoRef.current
+    presionadoEnFondo.current = false
+    if (empezoYTerminoEnElFondo) {
+      cerrarRef.current()
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
+    <div
+      ref={fondoRef}
+      onMouseDown={alPresionarElFondo}
+      onMouseUp={alSoltarEnElFondo}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm"
+    >
       <div
         {...{ [MARCA_UI]: 'modal' }}
         ref={contenedorRef}
@@ -127,16 +160,19 @@ export function Modal({ abierto, titulo, onClose, children, pie }) {
         tabIndex={-1}
         className="mt-10 max-h-[calc(100vh-5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl outline-none"
       >
-        <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-semibold text-slate-900">{titulo}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="foco-acento rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            {acciones}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="foco-acento rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="px-5 py-4">{children}</div>

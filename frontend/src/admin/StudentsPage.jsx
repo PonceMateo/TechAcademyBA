@@ -7,12 +7,11 @@ import {
   Card,
   Input,
   Modal,
-  StatusIndicator,
   Table,
 } from '../components/ui'
 import { formatDocumento, formatTelefono } from '../utils/formato'
 import { TONO } from '../components/ui/paleta'
-import { CATEGORIA_INSCRIPCION } from '../domain/enums'
+import { FichaAlumnoModal } from './FichaAlumnoModal'
 import { dniConForma, emailConForma } from '../domain/validacion'
 import {
   actualizarCategoriaInscripcion,
@@ -63,33 +62,10 @@ import {
  * consulta llega al servidor cuando el endpoint la resuelve.
  */
 
-/** Las cuatro categorías del enum con el color que las distingue en pantalla. */
-const CATEGORIAS = new Map([
-  [CATEGORIA_INSCRIPCION.PARTICULAR, { etiqueta: 'PARTICULAR', tono: TONO.GRIS }],
-  [CATEGORIA_INSCRIPCION.BECADO_PARCIAL, { etiqueta: 'BECADO PARCIAL', tono: TONO.VIOLETA }],
-  [CATEGORIA_INSCRIPCION.BECADO_TOTAL, { etiqueta: 'BECADO TOTAL', tono: TONO.MAGENTA }],
-  [CATEGORIA_INSCRIPCION.CORPORATIVO, { etiqueta: 'CORPORATIVO', tono: TONO.CELESTE }],
-])
-
 /** Lo que el cliente escribe en la planilla cuando el alumno no tiene documento (D30). */
 const SIN_DOCUMENTO = 'Sin DNI (alumno exterior)'
 
-/** Lo que la fila muestra cuando el alumno todavía no tiene inscripción (D43). */
-const SIN_COMISION = 'Sin comisión'
 const SIN_DATO = '—'
-
-function columnaCategoria(categoria, porcentajeBeca) {
-  const definicion = CATEGORIAS.get(categoria)
-
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <Badge tono={definicion?.tono ?? TONO.GRIS}>{definicion?.etiqueta ?? categoria}</Badge>
-      {definicion?.etiqueta === 'BECADO PARCIAL' && (
-        <span className="text-xs text-violet-800">{porcentajeBeca}% de descuento</span>
-      )}
-    </span>
-  )
-}
 
 const COLUMNAS_ALUMNOS = [
   {
@@ -107,37 +83,6 @@ const COLUMNAS_ALUMNOS = [
     clave: 'telefono',
     titulo: 'TELÉFONO',
     render: (fila) => (fila.telefono ? formatTelefono(fila.telefono) : SIN_DATO),
-  },
-  {
-    clave: 'comision',
-    titulo: 'COMISIÓN ASIGNADA',
-    render: (fila) =>
-      fila.comision === null || fila.comision === undefined ? (
-        <span className="text-slate-500">{SIN_COMISION}</span>
-      ) : (
-        <span>
-          <span className="font-medium">{fila.comision.codigo}</span>{' '}
-          <span className="text-slate-500">{fila.comision.nombre}</span>
-        </span>
-      ),
-  },
-  {
-    clave: 'categoria',
-    titulo: 'CATEGORÍA ARANCELARIA',
-    render: (fila) =>
-      fila.categoria === null || fila.categoria === undefined
-        ? SIN_DATO
-        : columnaCategoria(fila.categoria, fila.porcentaje_beca),
-  },
-  {
-    clave: 'acceso',
-    titulo: 'ACCESO PLATAFORMA',
-    render: (fila) =>
-      fila.acceso === null || fila.acceso === undefined ? (
-        SIN_DATO
-      ) : (
-        <StatusIndicator estado={fila.acceso.estado} causa={fila.acceso.causa} forzado={fila.acceso.forzado} />
-      ),
   },
 ]
 
@@ -173,7 +118,8 @@ export function StudentsPage() {
   const [alumnos, setAlumnos] = useState([])
   const [empresas, setEmpresas] = useState([])
   const [consulta, setConsulta] = useState('')
-  const [comisionFiltro, setComisionFiltro] = useState('')
+  // La fila cuya ficha está abierta (HU 61). La ficha pide el detalle al abrirse.
+  const [alumnoFicha, setAlumnoFicha] = useState(null)
   const [modalAlumnoAbierto, setModalAlumnoAbierto] = useState(false)
   const [camposAlumno, setCamposAlumno] = useState(CAMPOS_ALUMNO_VACIOS)
   const [erroresAlumno, setErroresAlumno] = useState({})
@@ -217,12 +163,14 @@ export function StudentsPage() {
   const [guardandoNomina, setGuardandoNomina] = useState(false)
 
   const [modalCategoriaAbierto, setModalCategoriaAbierto] = useState(false)
-  const [alumnoCategoria, setAlumnoCategoria] = useState(null)
+  const [inscripcionCategoria, setInscripcionCategoria] = useState(null)
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('PARTICULAR')
   const [porcentajeCategoria, setPorcentajeCategoria] = useState('')
   const [empresaCategoria, setEmpresaCategoria] = useState('')
   const [falloCategoria, setFalloCategoria] = useState(null)
   const [guardandoCategoria, setGuardandoCategoria] = useState(false)
+  // Cambiar la categoría desde la ficha recarga solo el detalle de la ficha (HU 61).
+  const [fichaVersion, setFichaVersion] = useState(0)
 
   useEffect(() => {
     // El filtro va al servicio, no sobre el arreglo ya cargado: el mismo criterio tiene que
@@ -380,18 +328,13 @@ export function StudentsPage() {
       setAlumnos((anteriores) =>
         anteriores.map((fila) =>
           fila.id === actualizado.id
-            ? {
-                ...fila,
-                ...actualizado,
-                // La respuesta de edición no calcula comisión, categoría ni acceso: se conserva
-                // lo que la fila ya mostraba para no borrar datos de otras historias.
-                comision: fila.comision,
-                categoria: fila.categoria,
-                porcentaje_beca: fila.porcentaje_beca,
-                acceso: fila.acceso,
-              }
+            ? { ...fila, ...actualizado }
             : fila,
         ),
+      )
+      // La ficha abierta muestra los datos nuevos sin volver a abrirse.
+      setAlumnoFicha((actual) =>
+        actual !== null && actual.id === actualizado.id ? actualizado : actual,
       )
       cerrarEdicion()
       setMensaje(`Los datos de ${actualizado.nombre} se actualizaron correctamente.`)
@@ -463,8 +406,11 @@ export function StudentsPage() {
     setFalloBaja(null)
     try {
       const nombre = alumnoAEliminar.nombre
-      await eliminarAlumno(alumnoAEliminar.id)
-      setAlumnos((anteriores) => anteriores.filter((fila) => fila.id !== alumnoAEliminar.id))
+      const id = alumnoAEliminar.id
+      await eliminarAlumno(id)
+      setAlumnos((anteriores) => anteriores.filter((fila) => fila.id !== id))
+      // La ficha del alumno dado de baja se cierra: ya no hay fila a la que volver.
+      setAlumnoFicha((actual) => (actual !== null && actual.id === id ? null : actual))
       cerrarBaja()
       setMensaje(`Alumno ${nombre} dado de baja correctamente.`)
     } catch (error) {
@@ -531,28 +477,33 @@ export function StudentsPage() {
     setFalloEmpresa(null)
   }
 
-  function abrirModalCategoria(alumno) {
-    setAlumnoCategoria(alumno)
-    setCategoriaSeleccionada(alumno.categoria ?? 'PARTICULAR')
-    setPorcentajeCategoria(alumno.porcentaje_beca ?? '')
-    setEmpresaCategoria('')
+  /**
+   * La acción Categoría opera sobre **una inscripción** (HU 64 y 61). La ficha abre el formulario
+   * de la pestaña abierta; el padrón ya no ofrece la acción en la fila.
+   */
+  function abrirFormularioCategoria(inscripcion) {
+    setInscripcionCategoria(inscripcion)
+    setCategoriaSeleccionada(inscripcion.categoria)
+    setPorcentajeCategoria(inscripcion.porcentaje_beca ?? '')
+    setEmpresaCategoria(inscripcion.empresa?.id != null ? String(inscripcion.empresa.id) : '')
     setFalloCategoria(null)
     setModalCategoriaAbierto(true)
   }
 
   function cerrarModalCategoria() {
     setModalCategoriaAbierto(false)
-    setAlumnoCategoria(null)
+    setInscripcionCategoria(null)
     setFalloCategoria(null)
   }
 
   async function guardarCategoria() {
-    if (alumnoCategoria === null || alumnoCategoria.inscripcion_id == null) {
-      setFalloCategoria('El alumno no tiene inscripción.')
+    if (inscripcionCategoria === null) {
+      setFalloCategoria('Elegí la inscripción a la que le asignás la categoría.')
       return
     }
     setGuardandoCategoria(true)
     setFalloCategoria(null)
+    const comision = `${inscripcionCategoria.comision.codigo} ${inscripcionCategoria.comision.nombre}`
     try {
       const porcentaje =
         categoriaSeleccionada === 'BECADO_PARCIAL' && porcentajeCategoria !== ''
@@ -562,24 +513,14 @@ export function StudentsPage() {
         categoriaSeleccionada === 'CORPORATIVO' && empresaCategoria !== ''
           ? Number(empresaCategoria)
           : null
-      await actualizarCategoriaInscripcion(alumnoCategoria.inscripcion_id, {
+      await actualizarCategoriaInscripcion(inscripcionCategoria.id, {
         categoria: categoriaSeleccionada,
         porcentaje_beca: porcentaje,
         empresa_id: empresaId,
       })
-      setAlumnos((anteriores) =>
-        anteriores.map((alumno) =>
-          alumno.id === alumnoCategoria.id
-            ? {
-                ...alumno,
-                categoria: categoriaSeleccionada,
-                porcentaje_beca: porcentaje,
-              }
-            : alumno,
-        ),
-      )
       cerrarModalCategoria()
-      setMensaje('Categoría actualizada.')
+      setFichaVersion((version) => version + 1)
+      setMensaje(`Categoría actualizada en ${comision}.`)
     } catch (error) {
       setFalloCategoria(error?.message ?? 'No se pudo actualizar la categoría.')
     } finally {
@@ -712,59 +653,24 @@ export function StudentsPage() {
     }
   }
 
+  // El padrón tiene una sola acción por fila: abrir la ficha (HU 61). Editar, restablecer la
+  // contraseña, eliminar y cambiar la categoría viven adentro de la ficha.
   const columnasAlumnos = [
     ...COLUMNAS_ALUMNOS,
     {
       clave: 'acciones',
       titulo: 'ACCIONES',
       render: (fila) => (
-        <div className="flex flex-wrap items-center gap-1">
-          {fila.inscripcion_id != null && (
-            <Button
-              variante="secundario"
-              tamano="chico"
-              className="whitespace-nowrap"
-              onClick={() => abrirModalCategoria(fila)}
-            >
-              Categoría
-            </Button>
-          )}
-          <Button
-            variante="secundario"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirEdicion(fila)}
-          >
-            Editar
-          </Button>
-          <Button
-            variante="secundario"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirPassword(fila)}
-          >
-            Restablecer contraseña
-          </Button>
-          <Button
-            variante="peligro"
-            tamano="chico"
-            className="whitespace-nowrap"
-            onClick={() => abrirBaja(fila)}
-          >
-            Eliminar alumno
-          </Button>
-        </div>
+        <Button
+          variante="enlace"
+          tamano="chico"
+          onClick={() => setAlumnoFicha(fila)}
+        >
+          Ver ficha ↗
+        </Button>
       ),
     },
   ]
-
-  const comisionesDisponibles = Array.from(
-    new Set(alumnos.map((alumno) => alumno.comision?.codigo).filter(Boolean)),
-  )
-  const alumnosFiltrados =
-    comisionFiltro === ''
-      ? alumnos
-      : alumnos.filter((alumno) => alumno.comision?.codigo === comisionFiltro)
 
   const columnasEmpresas = [
     ...COLUMNAS_EMPRESAS,
@@ -808,32 +714,29 @@ export function StudentsPage() {
             placeholder="Buscar por DNI o Nombre…"
           />
           </div>
-          <div className="max-w-xs">
-            <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="filtro-comision">
-              Filtrar por comisión
-            </label>
-            <select
-              id="filtro-comision"
-              className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
-              value={comisionFiltro}
-              onChange={(evento) => setComisionFiltro(evento.target.value)}
-            >
-              <option value="">Todas</option>
-              {comisionesDisponibles.map((codigo) => (
-                <option key={codigo} value={codigo}>
-                  {codigo}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <Table
           columnas={columnasAlumnos}
-          filas={alumnosFiltrados}
+          filas={alumnos}
           vacio={<p className="text-sm text-slate-500">No se encontraron resultados.</p>}
+          onFila={setAlumnoFicha}
+          etiquetaDeFila={(fila) => `Abrir la ficha de ${fila.nombre}`}
         />
       </Card>
+
+      {alumnoFicha !== null && (
+        <FichaAlumnoModal
+          key={alumnoFicha.id}
+          alumno={alumnoFicha}
+          version={fichaVersion}
+          onClose={() => setAlumnoFicha(null)}
+          onEditar={abrirEdicion}
+          onRestablecerPassword={abrirPassword}
+          onEliminar={abrirBaja}
+          onCambiarCategoria={abrirFormularioCategoria}
+        />
+      )}
 
       <Modal
         abierto={credenciales !== null}
@@ -1155,6 +1058,11 @@ export function StudentsPage() {
         }
       >
         <div className="grid gap-4">
+          {inscripcionCategoria !== null && (
+            <p className="text-sm text-slate-700">
+              {`${inscripcionCategoria.comision.codigo} ${inscripcionCategoria.comision.nombre}`}
+            </p>
+          )}
           <label className="text-sm text-slate-700">
             Categoría
             <select

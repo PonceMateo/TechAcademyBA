@@ -3,7 +3,7 @@ import { MARCA_UI } from './paleta'
 /**
  * Botón de la interfaz (8.3).
  *
- * Cuatro variantes y nada más. Un botón que acepta quince props de estilo termina siendo una hoja
+ * Cinco variantes y nada más. Un botón que acepta quince props de estilo termina siendo una hoja
  * de clases escrito en cada pantalla, que es exactamente lo que los componentes compartidos vienen
  * a evitar.
  *
@@ -18,6 +18,9 @@ const VARIANTES = {
   secundario: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 foco-acento',
   peligro: 'bg-red-700 text-white hover:bg-red-800 foco-acento',
   fantasma: 'text-slate-600 hover:bg-slate-100 foco-acento',
+  // Enlace de acción dentro de una tabla o ficha: toma el acento del shell y no se subraya hasta
+  // el hover, para que la fila siga leyéndose como una fila (HU 61).
+  enlace: 'text-[var(--acento-texto)] hover:underline underline-offset-2 foco-acento',
 }
 
 const TAMANOS = {
