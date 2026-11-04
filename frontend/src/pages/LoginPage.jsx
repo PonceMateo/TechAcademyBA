@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router'
+import { GraduationCap } from 'lucide-react'
 import { AuthError } from '../auth/authClient'
 import { SESSION_STATUS, useSession } from '../auth/SessionContext'
 import { CHANGE_PASSWORD_PATH, homePathForRole } from '../auth/roleRoutes'
+import { Button, Card, Input } from '../components/ui'
 
 /**
  * Aviso informativo del patrón único de login del prototipo (desviación 12 de
@@ -56,60 +58,68 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200/80 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-semibold text-slate-900">TechAcademy BA</h1>
-        <p className="mt-1 text-sm text-slate-600">Ingresá con tu correo y tu contraseña.</p>
+    <main
+      data-acento="secretaria"
+      className="flex min-h-screen items-center justify-center px-4 py-10"
+    >
+      <div className="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1fr_420px] lg:gap-16">
+        <header className="text-center lg:text-left">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--acento-fuerte)] text-white shadow-sm">
+            <GraduationCap className="h-7 w-7" aria-hidden="true" />
+          </span>
+          <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl xl:text-6xl">
+            TechAcademy <span className="text-[var(--acento-texto)]">BA</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-md text-base leading-7 text-slate-600 lg:mx-0">
+            Cursos, comisiones, alumnos y accesos a clase, en un solo lugar.
+          </p>
+          <p className="mt-4 text-sm text-slate-500">Acceso para Secretaría, Docentes y Alumnos.</p>
+        </header>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-              Correo electrónico
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="foco-acento mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="foco-acento mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-            />
-          </div>
-
-          {error !== null && (
-            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
+        <div>
+          <Card className="shadow-[0_18px_50px_-24px_rgba(15,23,42,0.35)]">
+            <h2 className="text-lg font-semibold text-slate-900">Ingresá a tu cuenta</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Usá el correo y la contraseña de la academia.
             </p>
-          )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="boton-primario foco-acento w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-60"
-          >
-            {submitting ? 'Ingresando…' : 'Ingresar'}
-          </button>
-        </form>
+            <form className="mt-5 space-y-4" onSubmit={handleSubmit} noValidate>
+              <Input
+                etiqueta="Correo electrónico"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                valor={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="nombre@techacademy.invalid"
+              />
 
-        <p className="mt-6 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          {DEMO_NOTICE}
-        </p>
+              <Input
+                etiqueta="Contraseña"
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                valor={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Tu contraseña"
+              />
+
+              {error !== null && (
+                <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </p>
+              )}
+
+              <Button type="submit" disabled={submitting} className="w-full">
+                {submitting ? 'Ingresando…' : 'Ingresar'}
+              </Button>
+            </form>
+          </Card>
+
+          <p className="mt-5 text-center text-xs leading-5 text-slate-500">{DEMO_NOTICE}</p>
+        </div>
       </div>
     </main>
   )
