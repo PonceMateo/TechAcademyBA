@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.alumno import EncuentroOut
 from app.schemas.alumnos import AccesoAlumnoOut, ComisionAsignadaOut
 from app.schemas.validators import EmailConForma, TelefonoOpcional
 
@@ -38,6 +39,8 @@ class ComisionAsignadaDocenteOut(BaseModel):
     # H/U 70: mismo estado derivado que ve Administración, sin columna (D75).
     estado: str
     proxima_clase: str | None = None
+    #: Clases de los próximos días, para la agenda del tablero (H/U 56).
+    proximos_encuentros: list[EncuentroOut] = Field(default_factory=list)
     habilitados: int = 0
     bloqueados: int = 0
 

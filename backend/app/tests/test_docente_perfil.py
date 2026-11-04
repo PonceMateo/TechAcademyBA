@@ -8,13 +8,14 @@ tienen acceso, y una cuenta con cambio de contraseña pendiente tampoco (D45). E
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.api.deps import MENSAJE_CAMBIO_PASSWORD_PENDIENTE, MENSAJE_SIN_PERMISOS
+from app.models.catalogo import ZONA_HORARIA_DOMINIO
 from app.models.padron import Docente, Usuario
 from app.tests.factories import (
     PASSWORD_DE_PRUEBA,
@@ -90,7 +91,7 @@ def test_el_perfil_mantiene_la_comision_finalizada_con_su_estado(
     cliente_docente: TestClient, db_session: Session, docente: Docente
 ) -> None:
     """H/U 70: una comisión terminada sigue en la vista del docente, marcada `Finalizada`."""
-    hoy = date.today()
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     comision = crear_comision(
         db_session,
         docente=docente,
@@ -114,7 +115,7 @@ def test_el_tablero_trae_el_estado_de_cada_comision_asignada(
     El tablero usa `/docentes/mis-comisiones`, no el perfil: si esa respuesta no trae `estado`, la
     columna se dibuja vacía aunque el perfil lo informe.
     """
-    hoy = date.today()
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     # Un solo curso y sin sede: el padrón del test no puede repetir nombre de curso ni de sede.
     curso = crear_curso(db_session)
     crear_comision(

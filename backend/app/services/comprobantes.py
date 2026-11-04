@@ -698,6 +698,11 @@ def serializar(comprobante: ComprobanteAlumno) -> ComprobanteAlumnoOut:
     )
 
 
+def serializar_para_revision(comprobante: ComprobanteAlumno) -> ComprobantePendienteOut:
+    """Forma pública de la fila de revisión, para el agregado del tablero."""
+    return _serializar_pendiente(comprobante)
+
+
 def _serializar_pendiente(comprobante: ComprobanteAlumno) -> ComprobantePendienteOut:
     base = serializar(comprobante)
     return ComprobantePendienteOut(

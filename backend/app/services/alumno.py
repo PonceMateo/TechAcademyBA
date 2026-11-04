@@ -15,7 +15,7 @@ en la capa de API habría dos lugares donde agregar un campo.
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, datetime, time
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -31,13 +31,13 @@ from app.schemas.alumno import (
     ComisionCursadaOut,
     CronogramaOut,
     DetalleCursadaOut,
-    EncuentroOut,
     HorarioCursadaOut,
     InscripcionAlumnoOut,
     PerfilAlumnoOut,
     PerfilAlumnoUpdate,
 )
 from app.services import habilitacion
+from app.services.agenda import proximos_encuentros
 from app.services.emails import EmailAlreadyRegistered, ensure_email_available
 
 
@@ -111,22 +111,6 @@ def _a_inscripcion(session: Session, inscripcion: Inscripcion) -> InscripcionAlu
     )
 
 
-#: Cuántos encuentros venideros muestra el detalle. Cuatro es lo que entra sin scroll en la
-#: tarjeta del cronograma; la lista completa espera a que exista la fecha de fin de la comisión.
-ENCUENTROS_VISIBLES = 4
-
-#: Día de la semana de Python (`Monday=0`) para cada día del enum `DiaSemana`.
-DIA_DE_LA_SEMANA = {
-    "LUN": 0,
-    "MAR": 1,
-    "MIE": 2,
-    "JUE": 3,
-    "VIE": 4,
-    "SAB": 5,
-    "DOM": 6,
-}
-
-
 def obtener_detalle(
     session: Session, usuario: Usuario, codigo: str, *, hoy: date | None = None
 ) -> DetalleCursadaOut:
@@ -158,7 +142,9 @@ def obtener_detalle(
         # Las dos fechas del período van juntas o ninguna (D64): la comisión heredada informa que
         # todavía no está definida en lugar de completarla con una fecha de ejemplo.
         cronograma=CronogramaOut(inicio=comision.fecha_inicio, fin=comision.fecha_fin),
-        proximos_encuentros=_proximos_encuentros(session, comision, hoy or date.today()),
+        proximos_encuentros=proximos_encuentros(
+            session, comision, hoy or datetime.now(ZONA_HORARIA_DOMINIO).date()
+        ),
     )
 
 
@@ -183,81 +169,6 @@ def _inscripcion_por_codigo(session: Session, alumno: Alumno, codigo: str) -> In
 def _clave_de_codigo(codigo: str) -> str:
     """El código comparable: sin espacios y sin distinguir mayúsculas, como el frontend."""
     return (codigo or "").strip().upper()
-
-
-def _proximos_encuentros(session: Session, comision: Comision, desde: date) -> list[EncuentroOut]:
-    """Los próximos `ENCUENTROS_VISIBLES` días de cursada, del más cercano al más lejano.
-
-    **Los días salen de los horarios, cada uno trae su hora y el tema de `Clase`.** El `horario` del
-    encuentro es el rango de ese día de la semana en la grilla de la comisión, así la agenda y el
-    detalle dicen a qué hora se dicta y no solo en qué fecha. Mientras nadie haya cargado la clase
-    de esa fecha —la carga llega con las historias #33 y #34— el encuentro viaja sin tema, en lugar
-    de completarlo con un texto de ejemplo: no hay ningún "tema a confirmar" que mostrar.
-
-    ponytail: el cálculo no conoce feriados ni suspensiones, así que un día que se dicta y no se
-    dictó igual aparece. Cuando #33/#34 carguen las clases reales, la fuente del encuentro pasa a
-    ser `Clase` y esto queda como respaldo.
-    """
-    dias = {DIA_DE_LA_SEMANA[horario.dia] for horario in comision.horarios}
-    fechas = _dias_de_cursada(comision, desde, dias)
-    if not fechas:
-        return []
-
-    temas = dict(
-        session.execute(
-            select(Clase.fecha, Clase.tema).where(
-                Clase.comision_id == comision.id,
-                Clase.fecha.in_(fechas),
-            )
-        ).all()
-    )
-
-    return [
-        EncuentroOut(
-            fecha=fecha,
-            horario=", ".join(_rangos_del_dia(comision, fecha)) or None,
-            tema=temas.get(fecha),
-        )
-        for fecha in fechas
-    ]
-
-
-def _rangos_del_dia(comision: Comision, fecha: date) -> list[str]:
-    """Los rangos `HH:MM-HH:MM` de esa fecha en la grilla de la comisión, en orden de carga.
-
-    Una comisión puede dictar más de un tramo el mismo día: los dos viajan, separados por coma.
-    """
-    return [
-        f"{_hora(horario.inicio)}-{_hora(horario.fin)}"
-        for horario in comision.horarios
-        if DIA_DE_LA_SEMANA[horario.dia] == fecha.weekday()
-    ]
-
-
-def _dias_de_cursada(comision: Comision, desde: date, dias: set[int]) -> list[date]:
-    """Las fechas de cursada del período, desde `desde`, en orden cronológico.
-
-    Arranca en el día corriente o en la fecha de inicio de la comisión, la que sea posterior, así
-    que una comisión que todavía no empezó no muestra encuentros del pasado. Termina en la fecha
-    de fin: una cursada terminada no informa encuentros y la lista no puede pasarse del cierre
-    (historia #49). Sin días cargados no hay nada que derivar: devuelve una lista vacía en vez de
-    girar para siempre.
-    """
-    if not dias:
-        return []
-
-    fecha = desde
-    if comision.fecha_inicio is not None:
-        fecha = max(desde, comision.fecha_inicio)
-
-    fechas: list[date] = []
-    while len(fechas) < ENCUENTROS_VISIBLES:
-        if comision.fecha_fin is not None and fecha > comision.fecha_fin:
-            break
-        if fecha.weekday() in dias:
-            fechas.append(fecha)
-        fecha += timedelta(days=1)
-    return fechas
 
 
 def obtener_perfil(usuario: Usuario) -> PerfilAlumnoOut:

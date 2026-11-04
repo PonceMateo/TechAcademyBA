@@ -1,88 +1,34 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, Users } from 'lucide-react'
 import { useSession } from '../auth/SessionContext'
-import { Badge, Card, Table } from '../components/ui'
+import { AgendaSemanal } from '../components/dashboard/AgendaSemanal'
+import { AvisosAtencion } from '../components/dashboard/AvisosAtencion'
+import { Indicador } from '../components/dashboard/Indicador'
+import { Badge, Card } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
 import { ESTADO_COMISION } from '../domain/enums'
 import { obtenerComisionesAsignadas } from '../services/dataService'
-import { formatFechaLarga } from '../utils/formato'
+import { formatFechaLarga, formatFechaCorta } from '../utils/formato'
 
 /**
- * Tablero del docente (10.2): comisiones asignadas, con la composición del diseño
- * (`docs/design/figma-dashboards-overhaul/`).
+ * Tablero del docente (H/U 56).
  *
- * **Los tres indicadores salen de la misma lista que la tabla.** `COMISIONES ACTIVAS`,
- * `ALUMNOS HABILITADOS` y `BLOQUEADOS` se cuentan sobre las comisiones que la fila muestra, así que
- * el escenario del spec que pide cruzar el `1` del indicador con el padrón de `CUR-101` se cumple
- * por construcción: no hay dos números que puedan dejar de coincidir.
+ * **Los cuatro indicadores salen de la misma lista que las tarjetas de comisión.** `COMISIONES
+ * ACTIVAS`, `ALUMNOS HABILITADOS`, `BLOQUEADOS` y `PRÓXIMA CLASE` se derivan de las comisiones y
+ * sus encuentros, así que el indicador y la tarjeta no pueden contradecirse.
  *
- * **La columna se titula `ACCESO` y no `RESTRICCIONES`.** Es una corrección intencional del
- * prototipo que el spec fija: las celdas contienen conteos de acceso, no restricciones.
+ * **La tabla del prototipo pasa a tarjetas accionables.** Cada comisión muestra su estado, su
+ * horario, sus contadores de acceso y su próxima clase, y el código abre el padrón. La columna
+ * `RESTRICCIONES` del Figma no existe: las celdas son conteos de acceso.
  *
- * **Una sola comisión y no se completa el bloque.** El docente del maquetado tiene exactamente una
- * comisión asignada en los datos del cliente; agregar filas para que el cuadro se vea lleno sería
- * inventar comisiones.
- *
- * **Los contadores hablan en singular y en plural.** `1 bloqueado` y `4 bloqueados` son el mismo
- * dato con la palabra correcta, y un `1 bloqueados` en pantalla hace dudar de la cuenta.
- *
- * **La columna derecha es la agenda de la única comisión, y los bloques del prototipo que no
- * tienen datos no están.** `Correcciones pendientes`, `Novedades` y `Mensajes` del Figma no se
- * construyen: el maquetado no registra entregas por corregir ni mensajes (D40). La agenda se arma
- * con el horario y la próxima clase de la comisión, que son los mismos datos del bloque de arriba.
- *
- * **La línea de fecha del encabezado es la fecha real del día**, no un literal del maquetado (D43), y
- * no anuncia cantidades de clases ni de entregas porque esos valores no están en el maquetado (D40).
- *
- * **El pendiente se distingue del vacío real.** `comisiones` arranca en `null` y queda en `null` en el
- * rechazo: mientras la lectura no resuelve o falla, los cuatro indicadores muestran `—`; con la
- * lectura resuelta vuelven los valores derivados, incluido un `0` real, y la tabla y la agenda caen a
- * sus mensajes de vacío (D43).
+ * **Lo que no tiene fuente no se construye.** `Correcciones pendientes`, `Novedades`, `Mensajes` y
+ * `Entregas por corregir` no están en el modelo; en su lugar, `Requiere tu atención` muestra los
+ * alumnos bloqueados y las comisiones finalizadas, que sí existen.
  */
 
-/** Los contadores de acceso, con el tono que los distingue. */
-const TONOS_ACCESO = { habilitado: TONO.VERDE, bloqueado: TONO.ROJO }
+const NO_SE_PUDO_LEER = 'No pudimos cargar tus comisiones. Volvé a intentar en un momento.'
 
-const COLUMNAS = [
-  {
-    clave: 'codigo',
-    titulo: 'CÓDIGO',
-    render: (fila) => (
-      <Link
-        to={`/docente/alumnos/${fila.codigo}`}
-        className="foco-acento texto-acento rounded font-medium underline"
-      >
-        {fila.codigo}
-      </Link>
-    ),
-  },
-  { clave: 'curso', titulo: 'CURSO', render: (fila) => fila.nombre_curso },
-  { clave: 'docente', titulo: 'DOCENTE', render: (fila) => fila.docente_nombre },
-  { clave: 'horario', titulo: 'HORARIO', render: (fila) => fila.horario },
-  {
-    clave: 'estado',
-    titulo: 'ESTADO',
-    // H/U 70: la comisión terminada sigue listada; el chip gris la distingue de la vigente.
-    render: (fila) => (
-      <Badge tono={fila.estado === ESTADO_COMISION.FINALIZADA ? TONO.GRIS : TONO.EMERALDA}>
-        {fila.estado}
-      </Badge>
-    ),
-  },
-  { clave: 'proxima', titulo: 'PRÓXIMA CLASE', render: (fila) => fila.proxima_clase ?? '' },
-  {
-    clave: 'acceso',
-    titulo: 'ACCESO',
-    render: (fila) => (
-      <span className="inline-flex flex-wrap items-center gap-1">
-        <Badge tono={TONOS_ACCESO.habilitado}>{pluralizar(fila.habilitados, 'habilitado')}</Badge>
-        <Badge tono={TONOS_ACCESO.bloqueado}>{pluralizar(fila.bloqueados, 'bloqueado')}</Badge>
-      </span>
-    ),
-  },
-]
-
-/** `1 bloqueado` y `4 bloqueados`: la cantidad manda sobre la palabra. */
 function pluralizar(cantidad, palabra) {
   return `${cantidad} ${cantidad === 1 ? palabra : `${palabra}s`}`
 }
@@ -90,84 +36,208 @@ function pluralizar(cantidad, palabra) {
 export function TeacherCommissionsPage() {
   const { session } = useSession()
   const [comisiones, setComisiones] = useState(null)
+  const [fallo, setFallo] = useState(false)
 
   useEffect(() => {
+    let vigente = true
     obtenerComisionesAsignadas()
-      .then(setComisiones)
-      .catch(() => setComisiones(null))
+      .then((respuesta) => {
+        if (vigente) {
+          setComisiones(respuesta)
+          setFallo(false)
+        }
+      })
+      .catch(() => {
+        if (vigente) {
+          setFallo(true)
+        }
+      })
+    return () => {
+      vigente = false
+    }
   }, [])
 
   const pendiente = comisiones === null
   const lista = comisiones ?? []
   const habilitados = lista.reduce((total, fila) => total + fila.habilitados, 0)
   const bloqueados = lista.reduce((total, fila) => total + fila.bloqueados, 0)
-  const proxima = lista.find((fila) => fila.proxima_clase !== null)?.proxima_clase ?? '—'
+  const encuentros = lista
+    .flatMap((comision) =>
+      (comision.proximos_encuentros ?? []).map((encuentro) => ({
+        ...encuentro,
+        codigo: comision.codigo,
+        nombre_curso: comision.nombre_curso,
+      })),
+    )
+    .sort((izquierda, derecha) =>
+      `${izquierda.fecha} ${izquierda.horario ?? ''}`.localeCompare(
+        `${derecha.fecha} ${derecha.horario ?? ''}`,
+      ),
+    )
+    .slice(0, 8)
+  const proxima = encuentros[0] ?? null
+  const finalizadas = lista.filter(
+    (comision) => comision.estado === ESTADO_COMISION.FINALIZADA,
+  ).length
 
-  const indicadores = [
-    { rotulo: 'COMISIONES ACTIVAS', valor: pendiente ? '—' : String(lista.length) },
-    { rotulo: 'ALUMNOS HABILITADOS', valor: pendiente ? '—' : String(habilitados) },
-    { rotulo: 'BLOQUEADOS', valor: pendiente ? '—' : String(bloqueados) },
-    { rotulo: 'PRÓXIMA CLASE', valor: pendiente ? '—' : proxima },
-  ]
+  const avisos = []
+  if (bloqueados > 0) {
+    avisos.push({
+      texto: 'Alumnos bloqueados',
+      detalle: 'Revisá el acceso en el padrón de tus comisiones.',
+      cantidad: bloqueados,
+      ruta: '/docente/alumnos',
+    })
+  }
+  if (finalizadas > 0) {
+    avisos.push({
+      texto: 'Comisiones finalizadas',
+      detalle: 'Siguen visibles como historial, sin clases próximas.',
+      cantidad: finalizadas,
+      ruta: '/docente/alumnos',
+    })
+  }
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[var(--texto-valor)]">
           {`Buen día, ${session.nombre}`}
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-[var(--texto-etiqueta)]">
           {`${formatFechaLarga()} · Tu agenda y tus comisiones en un solo lugar.`}
         </p>
       </header>
 
+      {fallo && (
+        <p role="alert" className="text-sm text-red-700">
+          {NO_SE_PUDO_LEER}
+        </p>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {indicadores.map((indicador) => (
-          <Card key={indicador.rotulo}>
-            <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
-              {indicador.rotulo}
-            </p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-900">{indicador.valor}</p>
-          </Card>
-        ))}
+        <Indicador
+          rotulo="COMISIONES ACTIVAS"
+          valor={pendiente ? '—' : String(lista.length)}
+          apoyo={pendiente ? '' : `${finalizadas} finalizadas`}
+          icono={BookOpen}
+        />
+        <Indicador
+          rotulo="ALUMNOS HABILITADOS"
+          valor={pendiente ? '—' : String(habilitados)}
+          apoyo={pendiente ? '' : 'con acceso a la clase'}
+          icono={CheckCircle2}
+        />
+        <Indicador
+          rotulo="BLOQUEADOS"
+          valor={pendiente ? '—' : String(bloqueados)}
+          apoyo={pendiente ? '' : 'requieren revisión'}
+          icono={Users}
+        />
+        <Indicador
+          rotulo="PRÓXIMA CLASE"
+          valor={
+            pendiente
+              ? '—'
+              : proxima
+                ? formatFechaCorta(proxima.fecha)
+                : '—'
+          }
+          apoyo={proxima?.nombre_curso ?? ''}
+          icono={CalendarDays}
+        />
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Card titulo="Comisiones asignadas">
-          <Table
-            columnas={COLUMNAS}
-            filas={lista}
-            claveDeFila={(fila) => fila.codigo}
-            vacio={
-              <p className="text-sm text-slate-500">
+        <div className="space-y-4">
+          <Card
+            titulo="Comisiones asignadas"
+            descripcion="Abrí el padrón desde el código de cada comisión."
+          >
+            {pendiente ? (
+              <p className="text-sm text-[var(--texto-etiqueta)]">Cargando comisiones…</p>
+            ) : lista.length === 0 ? (
+              <p className="text-sm text-[var(--texto-etiqueta)]">
                 No tenés comisiones asignadas en este período lectivo.
               </p>
-            }
-          />
-        </Card>
+            ) : (
+              <ul className="space-y-3">
+                {lista.map((comision) => (
+                  <li
+                    key={comision.codigo}
+                    className="rounded-xl border border-[var(--borde-superficie)] bg-[var(--superficie-tarjeta)] p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <Link
+                          to={`/docente/alumnos/${comision.codigo}`}
+                          className="foco-acento texto-acento rounded text-sm font-semibold underline"
+                        >
+                          {comision.codigo}
+                        </Link>
+                        <p className="mt-0.5 truncate text-sm font-semibold text-[var(--texto-valor)]">
+                          {comision.nombre_curso}
+                        </p>
+                      </div>
+                      <Badge
+                        tono={
+                          comision.estado === ESTADO_COMISION.FINALIZADA
+                            ? TONO.GRIS
+                            : TONO.EMERALDA
+                        }
+                      >
+                        {comision.estado}
+                      </Badge>
+                    </div>
 
-        <Card titulo="Tu agenda">
-          {lista.length === 0 ? (
-            <p className="text-sm text-slate-500">No tenés clases programadas en este período.</p>
-          ) : (
-            <ul className="space-y-3">
-              {lista.map((comision) => (
-                <li
-                  key={comision.codigo}
-                  className="rounded-xl bg-slate-50 px-4 py-3 last:mb-0"
-                >
-                  <p className="text-sm font-semibold text-slate-800">
-                    {comision.proxima_clase ?? 'Sin próxima clase'}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {`${comision.nombre_curso} · ${comision.codigo}`}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">{comision.horario}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+                    <p className="mt-2 text-xs text-[var(--texto-etiqueta)]">{comision.horario}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge tono={TONO.VERDE}>
+                        {pluralizar(comision.habilitados, 'habilitado')}
+                      </Badge>
+                      <Badge tono={TONO.ROJO}>
+                        {pluralizar(comision.bloqueados, 'bloqueado')}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-[var(--texto-apoyo)]">
+                      {comision.proxima_clase
+                        ? `Próxima clase: ${comision.proxima_clase}`
+                        : 'Sin próxima clase en el período.'}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card titulo="Tu agenda">
+            <AgendaSemanal
+              encuentros={encuentros}
+              vacio={
+                pendiente
+                  ? 'Cargando agenda…'
+                  : 'No tenés clases programadas en este período.'
+              }
+            />
+          </Card>
+
+          <Card titulo="Requiere tu atención">
+            <AvisosAtencion
+              avisos={avisos}
+              vacio="No tenés alumnos bloqueados ni comisiones finalizadas."
+            />
+          </Card>
+
+          <Link
+            to="/docente/alumnos"
+            className="foco-acento inline-flex items-center gap-1 text-sm font-semibold texto-acento"
+          >
+            Ir a mis alumnos
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </div>
       </div>
     </div>
   )

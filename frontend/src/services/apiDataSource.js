@@ -59,6 +59,7 @@ const PATHS = Object.freeze({
   perfilAlumno: '/alumno/mi-perfil',
   comprobantesAlumno: '/alumno/comprobantes',
   comprobantesPendientes: '/comprobantes',
+  dashboardAdmin: '/admin/dashboard',
 })
 
 async function request(path, { method = 'GET', body, query, params } = {}) {
@@ -573,6 +574,11 @@ export function createApiDataSource() {
     /** Panel de Secretaría: comprobantes de alumnos, pendientes primero (HU 54). */
     async listarComprobantes({ estado } = {}) {
       return request(PATHS.comprobantesPendientes, { query: { estado } })
+    },
+
+    /** Agregado del tablero de Administración (H/U 55). */
+    async obtenerDashboardAdmin() {
+      return request(PATHS.dashboardAdmin)
     },
 
     /** Detalle de un comprobante para Secretaría (HU 54). */

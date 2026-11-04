@@ -1644,6 +1644,121 @@ export function createMockDataSource() {
      * que el cliente nombró alumno por alumno —dos filas—, no las veintitrés inscripciones que
      * registra el catálogo, que es lo que el spec prohíbe completar de a inventar.
      */
+    /**
+     * Agregado del tablero de Administración (H/U 55) sobre el mismo store del ejemplo.
+     *
+     * **No inventa filas:** cuenta las inscripciones, las comisiones y las cobranzas que ya tiene
+     * el maquetado, y deja la agenda vacía cuando las comisiones del ejemplo no traen encuentros.
+     * Los tests de la pantalla sustituyen esta función para fijar los valores que quieren ver.
+     */
+    async obtenerDashboardAdmin() {
+      const comisiones = store.comisiones.filter((candidata) => candidata.activo !== false)
+      const vigentes = comisiones.filter(
+        (candidata) => candidata.estado !== ESTADO_COMISION.FINALIZADA,
+      )
+      const inscripciones = store.alumnos.flatMap((alumno) =>
+        alumno.inscripciones ?? (alumno.comision ? [{ comision: alumno.comision }] : []),
+      )
+      const activas = inscripciones.filter(
+        (inscripcion) => (inscripcion.estado ?? 'ACTIVA') === 'ACTIVA',
+      )
+      const porComision = new Map()
+      for (const inscripcion of activas) {
+        const codigo = inscripcion.comision?.codigo
+        if (codigo) {
+          porComision.set(codigo, (porComision.get(codigo) ?? 0) + 1)
+        }
+      }
+
+      const ocupacion = vigentes
+        .map((candidata) => {
+          const inscriptos = porComision.get(candidata.codigo) ?? candidata.inscriptos ?? 0
+          const cupo = candidata.cupo_maximo ?? candidata.cupo ?? 0
+          const porcentaje = cupo > 0 ? Math.min((inscriptos * 100) / cupo, 100) : 0
+          return {
+            codigo: candidata.codigo,
+            nombre_curso: candidata.curso?.nombre ?? candidata.nombre_curso ?? '',
+            inscriptos,
+            cupo,
+            porcentaje: Number(porcentaje.toFixed(1)),
+          }
+        })
+        .sort((izquierda, derecha) => derecha.porcentaje - izquierda.porcentaje)
+
+      const acreditadas = store.cobranzas.filter(
+        (cobranza) => cobranza.estado === ESTADO_COBRANZA.ACREDITADO,
+      )
+      const hoy = new Date()
+      const cobros_por_mes = []
+      for (let desplazamiento = 5; desplazamiento >= 0; desplazamiento -= 1) {
+        const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - desplazamiento, 1)
+        const mes = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`
+        const importe = acreditadas
+          .filter((cobranza) => String(cobranza.fecha).slice(0, 7) === mes)
+          .reduce((suma, cobranza) => suma + Number(cobranza.importe ?? 0), 0)
+        cobros_por_mes.push({ mes, importe })
+      }
+
+      const comprobantes = [...store.comprobantes]
+        .filter(
+          (comprobante) => comprobante.estado !== ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_CARGA,
+        )
+        .sort((izquierda, derecha) =>
+          String(derecha.enviado_at).localeCompare(String(izquierda.enviado_at)),
+        )
+        .slice(0, 5)
+        .map((comprobante) => {
+          const alumno = store.alumnos.find((candidato) => candidato.id === comprobante.alumno_id)
+          const inscripcion = alumno?.inscripciones?.find(
+            (candidata) => candidata.id === comprobante.inscripcion_id,
+          )
+          return {
+            ...comprobante,
+            alumno: alumno?.nombre ?? '',
+            alumno_email: alumno?.email ?? '',
+            alumno_documento: alumno?.documento ?? null,
+            inscripcion: {
+              codigo: inscripcion?.comision?.codigo ?? alumno?.comision?.codigo ?? '',
+              nombre_curso:
+                inscripcion?.comision?.curso?.nombre ?? alumno?.comision?.curso?.nombre ?? '',
+            },
+          }
+        })
+
+      const comprobantesPendientes = store.comprobantes.filter(
+        (comprobante) => comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
+      ).length
+      const cobranzasObservadas = store.cobranzas.filter(
+        (cobranza) => cobranza.estado === ESTADO_COBRANZA.OBSERVADO,
+      ).length
+
+      return {
+        indicadores: {
+          alumnos_inscriptos: store.alumnos.length,
+          inscripciones_activas: activas.length,
+          cupo_promedio_ocupado:
+            ocupacion.length > 0
+              ? Number(
+                  (
+                    ocupacion.reduce((suma, fila) => suma + fila.porcentaje, 0) /
+                    ocupacion.length
+                  ).toFixed(1),
+                )
+              : null,
+          comisiones: comisiones.length,
+          comisiones_vigentes: vigentes.length,
+          cobros_pendientes: comprobantesPendientes + cobranzasObservadas,
+          comprobantes_pendientes: comprobantesPendientes,
+          cobranzas_observadas: cobranzasObservadas,
+          cobrado_mes_actual: cobros_por_mes[cobros_por_mes.length - 1]?.importe ?? 0,
+        },
+        cobros_por_mes,
+        ocupacion_por_comision: ocupacion.slice(0, 3),
+        comprobantes_recientes: comprobantes,
+        agenda: [],
+      }
+    },
+
     async obtenerComisionesAsignadas() {
       return store.comisiones
         .filter((candidata) => candidata.docente_id === DOCENTE_DEL_MAQUETADO)
@@ -1655,8 +1770,10 @@ export function createMockDataSource() {
             codigo: candidata.codigo,
             nombre_curso: candidata.curso.nombre,
             docente_nombre: candidata.docente_nombre,
-            horario: candidata.horario_legible,
-            proxima_clase: candidata.proxima_clase ?? null,
+            horario: candidata.horario_legible,                proxima_clase: candidata.proxima_clase ?? null,
+                proximos_encuentros: (candidata.proximos_encuentros ?? []).map(
+                  (encuentro) => ({ ...encuentro }),
+                ),
             estado: estadoDeComision(candidata),
             habilitados: habilitados.length,
             bloqueados: alumnos.length - habilitados.length,

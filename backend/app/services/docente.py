@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import Comision
+from app.models.catalogo import ZONA_HORARIA_DOMINIO, Comision
 from app.models.enums import DiaSemana, EstadoHabilitacion, EstadoInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Docente, Usuario
@@ -30,7 +30,7 @@ from app.schemas.docente import (
     PerfilDocenteOut,
     PerfilDocenteUpdate,
 )
-from app.services import habilitacion
+from app.services import agenda, habilitacion
 from app.services.emails import EmailAlreadyRegistered, ensure_email_available
 
 
@@ -55,7 +55,7 @@ DIA_DE_LA_SEMANA = {
 
 def _proxima_clase(comision: Comision, hoy: date | None = None) -> str | None:
     """Devuelve la próxima fecha y hora de la grilla de la comisión."""
-    hoy = hoy or date.today()
+    hoy = hoy or datetime.now(ZONA_HORARIA_DOMINIO).date()
     inicio = max(hoy, comision.fecha_inicio) if comision.fecha_inicio else hoy
     if comision.fecha_fin is not None and inicio > comision.fecha_fin:
         return None
@@ -126,7 +126,8 @@ def listar_comisiones_asignadas(
                 docente_nombre=f"{docente.nombre} {docente.apellido}",
                 horario=comision.resumen_horarios,
                 estado=comision.estado,
-                proxima_clase=_proxima_clase(comision),
+                proxima_clase=_proxima_clase(comision, hoy),
+                proximos_encuentros=agenda.proximos_encuentros(session, comision, hoy),
                 habilitados=habilitados,
                 bloqueados=len(inscripciones) - habilitados,
             )

@@ -31,6 +31,12 @@
   --acento-borde: var(--color-blue-200);
   --acento-texto: var(--color-blue-700);
   --anillo-acento: var(--color-blue-500);
+  --superficie-tarjeta: #f0f5fc;
+  --superficie-interna: #e8f0ff;
+  --borde-superficie: #e8edf0;
+  --texto-etiqueta: #6e7c8c;
+  --texto-valor: #253347;
+  --texto-apoyo: #2d5da9;
 }
 
 [data-acento='docente'] {
@@ -41,6 +47,12 @@
   --acento-borde: var(--color-emerald-200);
   --acento-texto: var(--color-emerald-700);
   --anillo-acento: var(--color-emerald-500);
+  --superficie-tarjeta: #eff7f3;
+  --superficie-interna: #e5f2eb;
+  --borde-superficie: #e8edf0;
+  --texto-etiqueta: #6e7c8c;
+  --texto-valor: #253347;
+  --texto-apoyo: #226b58;
 }
 
 [data-acento='alumno'] {
@@ -51,6 +63,12 @@
   --acento-borde: var(--color-yellow-200);
   --acento-texto: var(--color-yellow-700);
   --anillo-acento: var(--color-yellow-600);
+  --superficie-tarjeta: #fcf8e9;
+  --superficie-interna: #fbf2ce;
+  --borde-superficie: #e8edf0;
+  --texto-etiqueta: #6e7c8c;
+  --texto-valor: #253347;
+  --texto-apoyo: #806217;
 }
 
 /*
@@ -115,6 +133,13 @@
  */
 :root {
   --alto-barra-superior: 4.5rem;
+  /* Fuera de un shell, las superficies vuelven al blanco del sistema. */
+  --superficie-tarjeta: #ffffff;
+  --superficie-interna: var(--color-slate-50);
+  --borde-superficie: var(--color-slate-200);
+  --texto-etiqueta: var(--color-slate-500);
+  --texto-valor: var(--color-slate-900);
+  --texto-apoyo: var(--color-slate-500);
 }
 
 html {

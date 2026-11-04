@@ -16,16 +16,18 @@ export function Card({ titulo, descripcion, acciones = null, className = '', chi
   return (
     <section
       {...{ [MARCA_UI]: 'card' }}
-      className={`rounded-2xl border border-slate-200/80 bg-white shadow-sm ${className}`}
+      className={`rounded-2xl border border-[var(--borde-superficie)] bg-[var(--superficie-tarjeta)] ${className}`}
     >
       {(titulo !== null && titulo !== undefined) || acciones !== null ? (
-        <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--borde-superficie)] px-5 py-4">
           <div>
             {titulo !== null && titulo !== undefined && (
-              <h2 className="text-sm font-semibold tracking-wide text-slate-800">{titulo}</h2>
+              <h2 className="text-sm font-semibold tracking-wide text-[var(--texto-valor)]">
+                {titulo}
+              </h2>
             )}
             {descripcion !== null && descripcion !== undefined && (
-              <p className="mt-1 text-xs text-slate-500">{descripcion}</p>
+              <p className="mt-1 text-xs text-[var(--texto-etiqueta)]">{descripcion}</p>
             )}
           </div>
           {acciones}

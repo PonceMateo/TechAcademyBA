@@ -1,6 +1,5 @@
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forzarHabilitacionInscripcion } from '../services/dataService'
 import {
   accountForRole,
   renderAppAs,
@@ -11,235 +10,193 @@ import {
 import { formatFechaLarga } from '../utils/formato'
 
 /**
- * Dashboard del alumno (11.2).
+ * Tablero del alumno (H/U 57).
  *
- * **La raíz del shell es el tablero y no lista cursadas.** Los cuatro indicadores y `Tu agenda`
- * viven en `/alumno`; las tarjetas de las inscripciones son `Mis Cursos` (`/alumno/cursos`) y se
- * prueban en su propio archivo. Por eso acá se afirma, además de los indicadores, que el tablero
- * **no** ofrece `Ver detalle`.
- *
- * **El tablero conserva su forma.** Las cuatro tarjetas y `Tu agenda` se pintan siempre; donde la
- * fuente no puede responder el valor es `—`, y `CURSOS EN MARCHA` muestra un `0` real cuando la
- * lectura resuelve sin inscripciones (D43).
- *
- * **Los indicadores salen de los datos reales**: `CURSOS EN MARCHA` de las inscripciones y
- * `PRÓXIMA CLASE` del cronograma. La fecha del encabezado se afirma a través de `formatFechaLarga()`
- * —el formato queda clavado en `formato.test.js`— y nunca con un literal.
- *
- * **La agenda trae la hora de cada encuentro** y el tema solo cuando está cargado: un encuentro sin
- * clase no lleva texto de tema y la pantalla no completa ninguno en su lugar.
+ * `COMPROBANTES ACREDITADOS` deja de ser un `—` y sale de `/alumno/pagos`; `Tu situación de pagos`
+ * y `Comprobantes recientes` completan el circuito con las mismas etiquetas de `Mis Pagos`. La
+ * agenda sigue siendo una sola línea de tiempo y el acceso conserva el peor estado entre cursadas.
+ * Progreso, tareas y asistencia promedio siguen sin existir y no se dibujan.
  */
 
-/** El tablero abre con el saludo de la cuenta de la sesión. */
 const SALUDO = `Buen día, ${accountForRole('ALUMNO').nombre}`
-const RESUMEN = `${formatFechaLarga()} · Cada paso cuenta. Este es tu espacio para avanzar.`
 
-/** La tarjeta de un indicador: el rótulo es un `<p>` y su contenedor es el `<section>` de `Card`. */
-function tarjeta(rotulo) {
-  return screen.getByText(rotulo, { selector: 'p' }).parentElement
+const CURSADA = {
+  codigo: 'CUR-102-1',
+  nombre_curso: 'Desarrollo Web Full Stack',
+  docente_nombre: 'Lic. Laura Benítez',
+  horario: 'Lun y Mié · 18:30 a 21:30',
+  horarios: [{ dia: 'LUN', inicio: '18:30', fin: '21:30' }],
+  categoria: 'PARTICULAR',
+  porcentaje_beca: null,
+  acceso: { estado: 'HABILITADO', causa: null, forzado: false },
 }
 
-function agenda() {
-  return within(screen.getByRole('heading', { name: 'Tu agenda' }).closest('section'))
+const PAGO = {
+  id: 1,
+  fecha: '2026-05-18',
+  importe: 45000,
+  medio: 'TRANSFERENCIA',
+  estado: 'ACREDITADO',
+  causa: null,
+  pagado_por_tercero: false,
+}
+
+const PENDIENTE = {
+  id: 7,
+  estado: 'PENDIENTE_REVISION',
+  fecha_pago: '2026-05-18',
+  importe: 45000,
+  medio: 'TRANSFERENCIA',
+  enviado_at: '2026-05-18T10:00:00Z',
+  motivo: null,
+}
+
+function tarjeta(rotulo) {
+  return screen.getByText(rotulo, { selector: 'p' }).closest('section')
+}
+
+function fuente(datos = {}) {
+  return {
+    listarInscripcionesAlumno: async () => [CURSADA],
+    obtenerDetalleInscripcion: async () => ({
+      proximos_encuentros: [
+        { fecha: '2026-05-25', horario: '18:30-21:30', tema: 'Componentes y props' },
+      ],
+    }),
+    listarPagosAlumno: async () => [PAGO],
+    listarComprobantesAlumno: async () => [PENDIENTE],
+    ...datos,
+  }
 }
 
 beforeEach(async () => {
   resetDataSource()
   stubBackend()
+  stubDataSource(fuente())
   renderAppAs('ALUMNO', '/alumno')
   await screen.findByRole('heading', { name: SALUDO })
-  // El tablero no lista cursadas: el código aparece en el texto de apoyo del indicador.
-  await waitFor(() => expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('CUR-102'))
+  await waitFor(() => expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('1'))
 })
 
-describe('encabezado', () => {
+describe('encabezado e indicadores', () => {
   it('muestra la fecha real del día', () => {
-    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        `${formatFechaLarga()} · Cada paso cuenta. Este es tu espacio para avanzar.`,
+      ),
+    ).toBeInTheDocument()
   })
-})
 
-describe('indicadores derivados de los datos reales', () => {
   it('deriva CURSOS EN MARCHA de las inscripciones', () => {
     expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('1')
-    expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('CUR-102 · Desarrollo Web Full Stack')
+    expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent(
+      'CUR-102-1 · Desarrollo Web Full Stack',
+    )
   })
 
-  it('deriva PRÓXIMA CLASE del cronograma real', () => {
+  it('muestra COMPROBANTES ACREDITADOS con los pagos reales', () => {
+    expect(tarjeta('COMPROBANTES ACREDITADOS')).toHaveTextContent('1')
+    expect(tarjeta('COMPROBANTES ACREDITADOS')).toHaveTextContent('$45.000')
+  })
+
+  it('deriva PRÓXIMA CLASE del cronograma', () => {
     expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('25/05/2026')
     expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('Desarrollo Web Full Stack')
   })
 
-  it('refleja el estado real de la inscripción en ACCESO A LA CLASE', () => {
+  it('muestra el acceso habilitado', () => {
     expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('HABILITADO')
   })
 
-  it('muestra COMPROBANTES ACREDITADOS con —, porque ninguna fuente respalda su valor', () => {
-    expect(tarjeta('COMPROBANTES ACREDITADOS')).toHaveTextContent('—')
+  it('no dibuja progreso, tareas ni asistencia promedio', () => {
+    expect(screen.queryByText(/Progreso general/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Tareas pendientes/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Mi asistencia/)).not.toBeInTheDocument()
   })
 })
 
-describe('el tablero no es la lista de cursadas', () => {
-  it('no ofrece Ver detalle: esa tarjeta vive en Mis Cursos', () => {
-    expect(screen.queryByRole('link', { name: 'Ver detalle' })).not.toBeInTheDocument()
+describe('situación de pagos y comprobantes', () => {
+  it('resume lo acreditado, lo pendiente y lo observado', () => {
+    const bloque = screen.getByRole('heading', { name: 'Tu situación de pagos' }).closest('section')
+
+    expect(bloque).toHaveTextContent('$45.000')
+    expect(bloque).toHaveTextContent('Pendientes de revisión')
+    expect(bloque).toHaveTextContent('1')
+    expect(bloque).toHaveTextContent('Observados')
   })
 
-  it('muestra el acceso bloqueado con su causa en el indicador', async () => {
-    await forzarHabilitacionInscripcion(2, {
-      estado: 'BLOQUEADO',
-      motivo: 'comprobante ilegible',
-    })
+  it('muestra el comprobante reciente con la etiqueta de Mis Pagos', () => {
+    const bloque = screen.getByRole('heading', { name: 'Comprobantes recientes' }).closest('section')
 
-    cleanup()
-    renderAppAs('ALUMNO', '/alumno')
-    await screen.findByRole('heading', { name: SALUDO })
-    await waitFor(() => expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('BLOQUEADO'))
-    // Sin la tarjeta de la cursada, la causa aparece una sola vez: la del indicador.
-    expect(screen.getAllByText(/Causa: comprobante ilegible/)).toHaveLength(1)
-  })
-})
-
-describe('la agenda', () => {
-  it('muestra la fecha con el horario del día y el tema cargado', async () => {
-    const encuentro = agenda().getByText(/25\/05\/2026/)
-
-    expect(encuentro).toHaveTextContent('25/05/2026 · 18:30-21:30')
-    expect(agenda().getByText('Componentes y props')).toBeInTheDocument()
-  })
-
-  it('muestra el horario de un encuentro sin tema y nunca un tema inventado', async () => {
-    cleanup()
-    stubDataSource({
-      obtenerDetalleInscripcion: async () => ({
-        proximos_encuentros: [{ fecha: '2026-05-25', horario: '18:30-21:30', tema: null }],
-      }),
-    })
-    renderAppAs('ALUMNO', '/alumno')
-    await screen.findByRole('heading', { name: SALUDO })
-
-    expect(await agenda().findByText('25/05/2026 · 18:30-21:30')).toBeInTheDocument()
-    expect(agenda().queryByText(/tema/i)).not.toBeInTheDocument()
+    expect(bloque).toHaveTextContent('$45.000')
+    expect(bloque).toHaveTextContent('Pago del 18/05/2026')
+    expect(bloque).toHaveTextContent('Pendiente de revisión')
   })
 })
 
-/** Una cursada para los tests de más de una inscripción: la API devuelve una lista, no una fila. */
-function cursada(codigo, nombreCurso) {
-  return {
-    codigo,
-    nombre_curso: nombreCurso,
-    docente_nombre: 'Lic. Laura Benítez',
-    horario: 'Lun y Miér · 18:30 a 21:30',
-    horarios: [{ dia: 'LUN', inicio: '18:30', fin: '21:30' }],
-    categoria: 'PARTICULAR',
-    porcentaje_beca: null,
-    acceso: { estado: 'HABILITADO', causa: null, forzado: false },
-  }
-}
-
-describe('varias cursadas al mismo tiempo', () => {
-  it('ordena la agenda por fecha y toma la clase más cercana de todas', async () => {
-    cleanup()
-    stubDataSource({
-      listarInscripcionesAlumno: async () => [
-        cursada('CUR-200', 'Curso A'),
-        cursada('CUR-100', 'Curso B'),
-      ],
-      obtenerDetalleInscripcion: async (codigo) => ({
-        proximos_encuentros:
-          codigo === 'CUR-200'
-            ? [{ fecha: '2026-05-30', horario: '10:00-12:00', tema: null }]
-            : [{ fecha: '2026-05-25', horario: '18:30-21:30', tema: null }],
-      }),
-    })
-    renderAppAs('ALUMNO', '/alumno')
-    await waitFor(() => expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('25/05/2026'))
-
-    // La agenda es una sola línea de tiempo: no sale la fecha del primer curso si es más lejana.
-    const filas = agenda().getAllByText(/\d{2}\/\d{2}\/\d{4}/).map((nodo) => nodo.textContent)
-    expect(filas).toEqual(['25/05/2026 · 18:30-21:30', '30/05/2026 · 10:00-12:00'])
-    expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('Curso B')
+describe('agenda y avisos', () => {
+  it('muestra la clase con horario y tema', () => {
+    expect(screen.getByText('25/05/2026 · 18:30-21:30')).toBeInTheDocument()
+    expect(screen.getByText('Componentes y props')).toBeInTheDocument()
   })
 
-  it('conserva la agenda de las demás cursadas cuando el detalle de una falla', async () => {
-    cleanup()
-    stubDataSource({
-      listarInscripcionesAlumno: async () => [
-        cursada('CUR-ROTO', 'Curso roto'),
-        cursada('CUR-100', 'Curso B'),
-      ],
-      obtenerDetalleInscripcion: async (codigo) => {
-        if (codigo === 'CUR-ROTO') {
-          throw new Error('No pudimos conectar con el servidor.')
-        }
-        return {
-          proximos_encuentros: [{ fecha: '2026-05-25', horario: '18:30-21:30', tema: null }],
-        }
-      },
-    })
-    renderAppAs('ALUMNO', '/alumno')
-    await waitFor(() => expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('25/05/2026'))
-
-    expect(agenda().getAllByText(/\d{2}\/\d{2}\/\d{4}/)).toHaveLength(1)
-    // El fallo fue de un detalle, no de la lectura de inscripciones: los indicadores siguen bien.
-    expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('2')
+  it('no muestra avisos cuando el acceso y los comprobantes están al día', () => {
     expect(
-      screen.queryByText('No pudimos cargar tus cursos. Volvé a intentar en un momento.'),
-    ).not.toBeInTheDocument()
+      screen.getByText(
+        'No tenés avisos pendientes. Tu acceso y tus comprobantes están al día.',
+      ),
+    ).toBeInTheDocument()
   })
 
-  it('muestra el estado bloqueado aunque la primera inscripción esté habilitada', async () => {
-    const habilitada = cursada('CUR-100', 'Curso habilitado')
-    const bloqueada = {
-      ...cursada('CUR-200', 'Curso bloqueado'),
-      acceso: { estado: 'BLOQUEADO', causa: 'pago pendiente', forzado: false },
-    }
-
+  it('lleva el acceso bloqueado y el comprobante observado a Mis Pagos', async () => {
     cleanup()
-    stubDataSource({
-      listarInscripcionesAlumno: async () => [habilitada, bloqueada],
-    })
+    stubDataSource(
+      fuente({
+        listarInscripcionesAlumno: async () => [
+          {
+            ...CURSADA,
+            acceso: { estado: 'BLOQUEADO', causa: 'pago pendiente', forzado: false },
+          },
+        ],
+        listarComprobantesAlumno: async () => [
+          { ...PENDIENTE, estado: 'OBSERVADO', motivo: 'comprobante ilegible' },
+        ],
+      }),
+    )
     renderAppAs('ALUMNO', '/alumno')
-    await waitFor(() => expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('BLOQUEADO'))
 
-    // El orden de la respuesta lo decide la base: el indicador refleja el peor estado, no el primero.
-    expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('Causa: pago pendiente')
+    expect(
+      await screen.findByRole('link', { name: /Tu acceso está bloqueado/ }),
+    ).toHaveAttribute('href', '/alumno/pagos')
+    expect(
+      screen.getByRole('link', { name: /Tenés un comprobante observado/ }),
+    ).toHaveAttribute('href', '/alumno/pagos')
+    expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('BLOQUEADO')
   })
 })
 
-describe('alumno sin inscripciones', () => {
-  it('muestra CURSOS EN MARCHA con un 0 real y el resto con —', async () => {
+describe('casos vacíos y de error', () => {
+  it('sin inscripciones ni pagos muestra ceros reales y los vacíos', async () => {
     cleanup()
-    stubDataSource({ listarInscripcionesAlumno: async () => [] })
+    stubDataSource(
+      fuente({
+        listarInscripcionesAlumno: async () => [],
+        listarPagosAlumno: async () => [],
+        listarComprobantesAlumno: async () => [],
+      }),
+    )
     renderAppAs('ALUMNO', '/alumno')
 
-    // La lectura resuelve sin inscripciones: `CURSOS EN MARCHA` pasa de `—` a un `0` real.
+    await screen.findByText('No tenés encuentros programados por ahora.')
     await waitFor(() => expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('0'))
-    expect(tarjeta('CURSOS EN MARCHA')).not.toHaveTextContent('—')
     expect(tarjeta('ACCESO A LA CLASE')).toHaveTextContent('—')
+    expect(tarjeta('COMPROBANTES ACREDITADOS')).toHaveTextContent('0')
     expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('—')
-    expect(tarjeta('COMPROBANTES ACREDITADOS')).toHaveTextContent('—')
-    expect(screen.getByText('No tenés encuentros programados por ahora.')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Ver detalle' })).not.toBeInTheDocument()
+    expect(screen.getByText('Todavía no enviaste comprobantes.')).toBeInTheDocument()
+    expect(screen.getByText('$0')).toBeInTheDocument()
   })
-})
 
-describe('alumno esperando la respuesta de la API', () => {
-  it('pinta el tablero con — y nunca un 0 mientras la lectura no resuelve', async () => {
-    cleanup()
-    stubDataSource({ listarInscripcionesAlumno: () => new Promise(() => {}) })
-    renderAppAs('ALUMNO', '/alumno')
-    await screen.findByRole('heading', { name: SALUDO })
-
-    for (const rotulo of ['CURSOS EN MARCHA', 'ACCESO A LA CLASE', 'PRÓXIMA CLASE']) {
-      expect(tarjeta(rotulo)).toHaveTextContent('—')
-      expect(tarjeta(rotulo)).not.toHaveTextContent('0')
-    }
-    expect(tarjeta('COMPROBANTES ACREDITADOS')).toHaveTextContent('—')
-    expect(screen.getByText('No tenés encuentros programados por ahora.')).toBeInTheDocument()
-  })
-})
-
-describe('alumno sin respuesta de la API', () => {
-  it('informa que no pudo leer los cursos en vez de afirmar que no tiene', async () => {
+  it('si la lectura de cursos falla lo informa y no afirma que no tiene cursos', async () => {
     cleanup()
     stubDataSource({
       listarInscripcionesAlumno: async () => {
@@ -248,12 +205,12 @@ describe('alumno sin respuesta de la API', () => {
     })
     renderAppAs('ALUMNO', '/alumno')
 
-    expect(
-      await screen.findByText('No pudimos cargar tus cursos. Volvé a intentar en un momento.'),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos cargar tus cursos. Volvé a intentar en un momento.',
+    )
+    expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('—')
     expect(
       screen.queryByText('No tenés encuentros programados por ahora.'),
     ).not.toBeInTheDocument()
-    expect(tarjeta('CURSOS EN MARCHA')).toHaveTextContent('—')
   })
 })

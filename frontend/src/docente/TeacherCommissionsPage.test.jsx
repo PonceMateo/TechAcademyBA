@@ -1,137 +1,138 @@
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { accountForRole, renderAppAs, resetDataSource, stubBackend, stubDataSource } from '../test/support'
-import { obtenerComisionesAsignadas } from '../services/dataService'
+import {
+  accountForRole,
+  renderAppAs,
+  resetDataSource,
+  stubBackend,
+  stubDataSource,
+} from '../test/support'
 import { formatFechaLarga } from '../utils/formato'
 
 /**
- * Comisiones asignadas del docente (10.2).
+ * Tablero del docente (H/U 56).
  *
- * Lo que se verifica es el par de cosas que el spec ata entre sí: los tres indicadores tienen que
- * coincidir con el padrón de la única comisión, y los contadores tienen que hablar en singular o en
- * plural según la cantidad. El caso de los cuatro bloqueados no existe en los datos del cliente —la
- * comisión del maqueteado tiene uno— así que se renderiza con la fuente de datos sustituida, que es
- * para lo que existe: ver un estado que el ejemplo no tiene sin inventar filas de ejemplo.
- *
- * **El encabezado es el saludo del tablero, no el título `Mis Comisiones`.** Desde el change
- * `ui-figma-dashboards` el índice del docente abre con `Buen día, {cuenta}` y su línea de fecha real
- * del día; el nombre de la sección vive en el ítem del menú y en el breadcrumb del armazón.
+ * La comisión se muestra como tarjeta accionable y no como fila de tabla. Los cuatro indicadores se
+ * derivan de esa misma lista y de sus encuentros; el test fija ambos para comprobar que el
+ * indicador y la tarjeta no se contradicen. `Requiere tu atención` solo aparece con cantidades
+ * reales, y lo que el Figma inventaba —entregas, mensajes, asistencia promedio— no existe.
  */
 
-const COLUMNAS = ['CÓDIGO', 'CURSO', 'DOCENTE', 'HORARIO', 'ESTADO', 'PRÓXIMA CLASE', 'ACCESO']
-
-/** El tablero abre con el saludo de la cuenta de la sesión. */
 const SALUDO = `Buen día, ${accountForRole('DOCENTE').nombre}`
-const RESUMEN = `${formatFechaLarga()} · Tu agenda y tus comisiones en un solo lugar.`
+
+const COMISION = {
+  codigo: 'CUR-101-1',
+  nombre_curso: 'Python Inicial',
+  docente_nombre: 'Profe Martín',
+  horario: 'Mar y Jue · 19 a 21 hs',
+  proxima_clase: 'Hoy · 19:00',
+  proximos_encuentros: [
+    {
+      fecha: '2026-05-25',
+      horario: '19:00-21:00',
+      tema: 'Introducción a Python',
+    },
+  ],
+  estado: 'Vigente',
+  habilitados: 4,
+  bloqueados: 1,
+}
+
+function tarjeta(rotulo) {
+  return screen.getByText(rotulo, { selector: 'p' }).closest('section')
+}
 
 beforeEach(async () => {
   resetDataSource()
   stubBackend()
+  stubDataSource({ obtenerComisionesAsignadas: async () => [COMISION] })
   renderAppAs('DOCENTE', '/docente')
   await screen.findByRole('heading', { name: SALUDO })
-  await screen.findByText('CUR-101')
+  await screen.findByText('CUR-101-1')
 })
 
-describe('encabezado', () => {
+describe('encabezado e indicadores', () => {
   it('muestra la fecha real del día', () => {
-    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
-  })
-})
-
-describe('indicadores', () => {
-  it('muestra los cuatro indicadores con los rótulos del spec', () => {
-    const rotulos = ['COMISIONES ACTIVAS', 'ALUMNOS HABILITADOS', 'BLOQUEADOS', 'PRÓXIMA CLASE']
-
-    for (const rotulo of rotulos) {
-      // El selector `p` desambigua: `PRÓXIMA CLASE` es también el título de una columna de la tabla.
-      expect(screen.getByText(rotulo, { selector: 'p' })).toBeInTheDocument()
-    }
-  })
-
-  it('muestra los valores que pide el spec', () => {
     expect(
-      screen.getByText('COMISIONES ACTIVAS', { selector: 'p' }).parentElement,
-    ).toHaveTextContent('1')
-    expect(
-      screen.getByText('ALUMNOS HABILITADOS', { selector: 'p' }).parentElement,
-    ).toHaveTextContent('1')
-    expect(screen.getByText('BLOQUEADOS', { selector: 'p' }).parentElement).toHaveTextContent('1')
-    expect(screen.getByText('PRÓXIMA CLASE', { selector: 'p' }).parentElement).toHaveTextContent(
-      'Hoy · 19:00',
-    )
+      screen.getByText(`${formatFechaLarga()} · Tu agenda y tus comisiones en un solo lugar.`),
+    ).toBeInTheDocument()
   })
 
-  it('no muestra el avance de cursada, porque la fuente no declara cuántas clases tiene', () => {
-    expect(screen.queryByText(/Clase \d+ de \d+/)).not.toBeInTheDocument()
+  it('deriva los cuatro indicadores de las comisiones', () => {
+    expect(tarjeta('COMISIONES ACTIVAS')).toHaveTextContent('1')
+    expect(tarjeta('ALUMNOS HABILITADOS')).toHaveTextContent('4')
+    expect(tarjeta('BLOQUEADOS')).toHaveTextContent('1')
+    expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('25/05/2026')
+    expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('Python Inicial')
   })
 })
 
 describe('comisiones asignadas', () => {
-  it('muestra las columnas en el orden que fija el spec, con ACCESO y no RESTRICCIONES', () => {
-    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual(COLUMNAS)
+  it('muestra la comisión como tarjeta accionable, con estado y contadores', () => {
+    expect(screen.getByRole('link', { name: 'CUR-101-1' })).toHaveAttribute(
+      'href',
+      '/docente/alumnos/CUR-101-1',
+    )
+    expect(screen.getAllByText('Python Inicial').length).toBeGreaterThan(0)
+    expect(screen.getByText('Mar y Jue · 19 a 21 hs')).toBeInTheDocument()
+    expect(screen.getByText('Vigente')).toBeInTheDocument()
+    expect(screen.getByText('4 habilitados')).toBeInTheDocument()
+    expect(screen.getByText('1 bloqueado')).toBeInTheDocument()
     expect(screen.queryByText('RESTRICCIONES')).not.toBeInTheDocument()
   })
 
-  it('muestra una sola fila, la del cliente, sin completar el bloque', () => {
-    const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
-
-    expect(filas).toHaveLength(1)
-    expect(filas[0].cells[0]).toHaveTextContent('CUR-101')
-    expect(filas[0].cells[1]).toHaveTextContent('Python Inicial')
-    expect(filas[0].cells[2]).toHaveTextContent('Profe Martín')
-    expect(filas[0].cells[3]).toHaveTextContent('Mar y Jue · 19 a 21 hs')
-    expect(filas[0].cells[4]).toHaveTextContent('Vigente')
-    expect(filas[0].cells[5]).toHaveTextContent('Hoy · 19:00')
-  })
-
-  it('muestra el habilitado en verde y el bloqueado en rojo', () => {
-    const habilitado = screen.getByText('1 habilitado')
-    const bloqueado = screen.getByText('1 bloqueado')
-
-    expect(habilitado.className).toContain('green')
-    expect(bloqueado.className).toContain('red')
+  it('no inventa entregas, mensajes ni asistencia promedio', () => {
+    expect(screen.queryByText(/Entregas por corregir/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Correcciones pendientes/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Asistencia promedio/)).not.toBeInTheDocument()
   })
 })
 
-describe('singular y plural de los contadores', () => {
-  /**
-   * Renderiza la pantalla con una comisión que tiene cuatro de cada clase. La del ejemplo tiene una
-   * de cada, así que sin sustituir la fuente el plural no llegaría a verse nunca.
-   */
-  async function renderCon(cantidades) {
-    cleanup()
-    const [comision] = await obtenerComisionesAsignadas()
+describe('agenda y avisos', () => {
+  it('muestra la clase con fecha, horario, curso y tema', () => {
+    expect(screen.getByText('25/05/2026 · 19:00-21:00')).toBeInTheDocument()
+    expect(screen.getByText('Python Inicial · CUR-101-1')).toBeInTheDocument()
+    expect(screen.getByText('Introducción a Python')).toBeInTheDocument()
+  })
 
+  it('muestra los alumnos bloqueados con su enlace', () => {
+    expect(screen.getByRole('link', { name: /Alumnos bloqueados/ })).toHaveAttribute(
+      'href',
+      '/docente/alumnos',
+    )
+  })
+})
+
+describe('casos vacíos y de error', () => {
+  it('con una comisión finalizada la muestra y no le inventa una próxima clase', async () => {
+    cleanup()
     stubDataSource({
-      obtenerComisionesAsignadas: async () => [{ ...comision, ...cantidades }],
+      obtenerComisionesAsignadas: async () => [
+        { ...COMISION, estado: 'Finalizada', proxima_clase: null, proximos_encuentros: [] },
+      ],
     })
     renderAppAs('DOCENTE', '/docente')
 
-    await screen.findByRole('heading', { name: SALUDO })
-  }
-
-  it('usa el plural cuando la cantidad no es uno', async () => {
-    await renderCon({ habilitados: 4, bloqueados: 4 })
-
-    // El encabezado se dibuja antes de que lleguen las comisiones: hay que esperar al dato.
-    expect(await screen.findByText('4 habilitados')).toBeInTheDocument()
-    expect(screen.getByText('4 bloqueados')).toBeInTheDocument()
+    await screen.findByText('Finalizada')
+    expect(screen.getByText('Sin próxima clase en el período.')).toBeInTheDocument()
+    expect(screen.getByText('No tenés clases programadas en este período.')).toBeInTheDocument()
+    expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('—')
   })
 
-  it('usa el singular cuando la cantidad es uno', () => {
-    expect(screen.getByText('1 habilitado')).toBeInTheDocument()
-    expect(screen.queryByText('1 habilitados')).not.toBeInTheDocument()
+  it('sin comisiones muestra ceros reales y el vacío de cada bloque', async () => {
+    cleanup()
+    stubDataSource({ obtenerComisionesAsignadas: async () => [] })
+    renderAppAs('DOCENTE', '/docente')
+
+    await screen.findByText('No tenés comisiones asignadas en este período lectivo.')
+    expect(tarjeta('COMISIONES ACTIVAS')).toHaveTextContent('0')
+    expect(tarjeta('ALUMNOS HABILITADOS')).toHaveTextContent('0')
+    expect(tarjeta('BLOQUEADOS')).toHaveTextContent('0')
+    expect(tarjeta('PRÓXIMA CLASE')).toHaveTextContent('—')
+    expect(screen.getByText('No tenés clases programadas en este período.')).toBeInTheDocument()
   })
 
-  it('usa el plural con cero, porque en español el cero no es singular', async () => {
-    await renderCon({ habilitados: 0, bloqueados: 0 })
-
-    await waitFor(() => expect(screen.getByText('0 bloqueados')).toBeInTheDocument())
-  })
-})
-
-describe('comisiones sin endpoint', () => {
-  it('conserva la forma con los cuatro indicadores en —, nunca en 0, y la tabla en su vacío', async () => {
+  it('si la lectura falla lo informa y deja los indicadores en —', async () => {
     cleanup()
     stubDataSource({
       obtenerComisionesAsignadas: async () => {
@@ -140,87 +141,9 @@ describe('comisiones sin endpoint', () => {
     })
     renderAppAs('DOCENTE', '/docente')
 
-    await screen.findByRole('heading', { name: SALUDO })
-    expect(
-      await screen.findByText('No tenés comisiones asignadas en este período lectivo.'),
-    ).toBeInTheDocument()
-    for (const rotulo of ['COMISIONES ACTIVAS', 'ALUMNOS HABILITADOS', 'BLOQUEADOS', 'PRÓXIMA CLASE']) {
-      const indicador = screen.getByText(rotulo, { selector: 'p' }).parentElement
-      expect(indicador).toHaveTextContent('—')
-      expect(indicador).not.toHaveTextContent('0')
-    }
-    expect(screen.getByText('Tu agenda')).toBeInTheDocument()
-    expect(screen.getByText('No tenés clases programadas en este período.')).toBeInTheDocument()
-  })
-})
-
-describe('docente sin comisiones asignadas', () => {
-  it('muestra un 0 real en los tres conteos y — en la próxima clase', async () => {
-    cleanup()
-    stubDataSource({ obtenerComisionesAsignadas: async () => [] })
-    renderAppAs('DOCENTE', '/docente')
-
-    // La lectura resuelve vacía: los conteos pasan de `—` a un `0` real.
-    await waitFor(() =>
-      expect(
-        screen.getByText('COMISIONES ACTIVAS', { selector: 'p' }).parentElement,
-      ).toHaveTextContent('0'),
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos cargar tus comisiones. Volvé a intentar en un momento.',
     )
-    expect(
-      screen.getByText('No tenés comisiones asignadas en este período lectivo.'),
-    ).toBeInTheDocument()
-    for (const rotulo of ['ALUMNOS HABILITADOS', 'BLOQUEADOS']) {
-      const indicador = screen.getByText(rotulo, { selector: 'p' }).parentElement
-      expect(indicador).toHaveTextContent('0')
-      expect(indicador).not.toHaveTextContent('—')
-    }
-    expect(screen.getByText('PRÓXIMA CLASE', { selector: 'p' }).parentElement).toHaveTextContent('—')
-  })
-})
-
-/**
- * H/U 70: la comisión que terminó no desaparece de la vista del docente.
- *
- * Sigue listada y lo que cambia es el estado, que ahora sale de `fecha_fin` y no de
- * `cerrada_por_cupo`: la etiqueta `Cerrada por cupo` se fue con la regla anterior.
- */
-describe('la comisión finalizada', () => {
-  beforeEach(async () => {
-    cleanup()
-    const [comision] = await obtenerComisionesAsignadas()
-
-    stubDataSource({
-      obtenerComisionesAsignadas: async () => [{ ...comision, estado: 'Finalizada' }],
-    })
-    renderAppAs('DOCENTE', '/docente')
-
-    await screen.findByRole('heading', { name: SALUDO })
-  })
-
-  it('sigue listada con el estado Finalizada y sin la etiqueta de cupo', async () => {
-    const fila = within(await screen.findByRole('table')).getAllByRole('row')[1]
-
-    expect(fila.cells[0]).toHaveTextContent('CUR-101')
-    expect(fila.cells[4]).toHaveTextContent('Finalizada')
-    expect(fila.cells[4].className).toContain('text-slate-700')
-    expect(screen.queryByText('Cerrada por cupo')).not.toBeInTheDocument()
-  })
-})
-
-describe('el docente espera mientras cargan sus comisiones', () => {
-  it('pinta el tablero con — en los cuatro indicadores y ninguno en 0', async () => {
-    cleanup()
-    stubDataSource({ obtenerComisionesAsignadas: () => new Promise(() => {}) })
-    renderAppAs('DOCENTE', '/docente')
-    await screen.findByRole('heading', { name: SALUDO })
-
-    for (const rotulo of ['COMISIONES ACTIVAS', 'ALUMNOS HABILITADOS', 'BLOQUEADOS', 'PRÓXIMA CLASE']) {
-      const indicador = screen.getByText(rotulo, { selector: 'p' }).parentElement
-      expect(indicador).toHaveTextContent('—')
-      expect(indicador).not.toHaveTextContent('0')
-    }
-    // La tabla y la agenda se siguen pintando, cada una con su mensaje de vacío.
-    expect(screen.getByText('Comisiones asignadas')).toBeInTheDocument()
-    expect(screen.getByText('Tu agenda')).toBeInTheDocument()
+    expect(tarjeta('COMISIONES ACTIVAS')).toHaveTextContent('—')
   })
 })
