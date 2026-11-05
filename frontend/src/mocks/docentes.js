@@ -16,8 +16,9 @@ import { markAsExample } from './placeholderNotice'
  * comisiones, que es lo que la pantalla muestra.
  *
  * El estado va como `activo` y no como texto: el modelo hace baja lógica con un booleano y no
- * tiene columna de estado de docente. La columna `ESTADO` de la pantalla muestra el literal
- * `Activa` cuando `activo` es verdadero.
+ * tiene columna de estado de docente. La columna `ESTADO` de la pantalla **no** usa ese booleano:
+ * deriva de `cursando` (una comisión Vigente del docente) y muestra `Activo` o `Inactivo`. El
+ * `activo` queda como concepto reservado para cuando la baja se implemente.
  */
 export const DOCENTES = markAsExample([
   {
@@ -27,7 +28,6 @@ export const DOCENTES = markAsExample([
     cuil: '20-28114402-4',
     email: 'profe.martin@techacademy.invalid',
     telefono: '+54 11 4455-1020',
-    catedra: 'Programación',
     comisiones_asignadas: 1,
     activo: true,
   },
@@ -38,7 +38,6 @@ export const DOCENTES = markAsExample([
     cuil: '27-31902118-6',
     email: 'laura.benitez@techacademy.invalid',
     telefono: '+54 11 5566-2310',
-    catedra: 'Desarrollo Web',
     comisiones_asignadas: 1,
     activo: true,
   },
@@ -49,7 +48,6 @@ export const DOCENTES = markAsExample([
     cuil: '20-33450771-8',
     email: 'santi.ads@techacademy.invalid',
     telefono: '+54 11 6677-8890',
-    catedra: 'Marketing',
     comisiones_asignadas: 2,
     activo: true,
   },
@@ -60,7 +58,6 @@ export const DOCENTES = markAsExample([
     cuil: '23-26771905-5',
     email: 'marcelo.rios@techacademy.invalid',
     telefono: '+54 11 3322-7745',
-    catedra: 'Datos',
     comisiones_asignadas: 1,
     activo: true,
   },
@@ -71,7 +68,6 @@ export const DOCENTES = markAsExample([
     cuil: '20-30665330-2',
     email: 'gonzalez@techacademy.invalid',
     telefono: '+54 11 7788-1120',
-    catedra: 'Programación',
     comisiones_asignadas: 1,
     activo: true,
   },

@@ -286,6 +286,18 @@ function comisionesDelDocente(store, docenteId) {
 }
 
 /**
+ * `cursando` del ejemplo, con el mismo criterio que el backend: verdadero cuando el docente
+ * tiene al menos una comisión Vigente (`fecha_fin >= hoy` o nula).
+ */
+function cursandoDocente(store, docenteId) {
+  return store.comisiones.some(
+    (comision) =>
+      comision.docente_id === docenteId &&
+      estadoDeComision(comision) === ESTADO_COMISION.VIGENTE,
+  )
+}
+
+/**
  * Cursos del ejemplo derivados de las comisiones: es lo único que el catálogo trae.
  *
  * El identificador se asigna por orden de aparición porque el ejemplo no guarda cursos sueltos.
@@ -383,19 +395,19 @@ function compararClaves(izquierda, derecha) {
 
 function buscarDocentesEnStore(store, texto) {
   const aguja = String(texto ?? '').trim()
-  const activos = store.docentes.filter((docente) => docente.activo !== false)
   const encontrados =
     aguja === ''
-      ? activos
-      : activos
+      ? [...store.docentes]
+      : store.docentes
           .map((docente) => ({ docente, clave: claveDeCoincidencia(docente, aguja) }))
           .filter(({ clave }) => clave !== null)
           .sort((izquierda, derecha) => compararClaves(izquierda.clave, derecha.clave))
           .map(({ docente }) => docente)
 
-  return encontrados.map((docente) =>
-    filaDeDocente(docente, comisionesDelDocente(store, docente.id)),
-  )
+  return encontrados.map((docente) => ({
+    ...filaDeDocente(docente, comisionesDelDocente(store, docente.id)),
+    cursando: cursandoDocente(store, docente.id),
+  }))
 }
 
 function buscarPorTexto(registros, texto, campos) {
@@ -686,9 +698,10 @@ export function createMockDataSource() {
     },
 
     async listarDocentes() {
-      return store.docentes
-        .filter((docente) => docente.activo !== false)
-        .map((docente) => filaDeDocente(docente, comisionesDelDocente(store, docente.id)))
+      return store.docentes.map((docente) => ({
+        ...filaDeDocente(docente, comisionesDelDocente(store, docente.id)),
+        cursando: cursandoDocente(store, docente.id),
+      }))
     },
 
     /** Búsqueda por nombre, apellido, DNI o email: lo que el buscador de la pantalla promete. */
@@ -714,9 +727,8 @@ export function createMockDataSource() {
         email,
         telefono,
         activo: true,
-        catedra: null,
       })
-      return { ...fila, password_inicial: passwordInicial(nombre, dni) }
+      return { ...fila, cursando: false, password_inicial: passwordInicial(nombre, dni) }
     },
 
     /**
@@ -753,7 +765,10 @@ export function createMockDataSource() {
       if (cuil !== undefined) {
         docente.cuil = cuil
       }
-      return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
+      return {
+        ...filaDeDocente(docente, comisionesDelDocente(store, docente.id)),
+        cursando: cursandoDocente(store, docente.id),
+      }
     },
 
     /**
@@ -769,7 +784,10 @@ export function createMockDataSource() {
       if (String(newPassword).length < 8) {
         throw new Error('La contraseña nueva tiene que tener al menos 8 caracteres.')
       }
-      return filaDeDocente(docente, comisionesDelDocente(store, docente.id))
+      return {
+        ...filaDeDocente(docente, comisionesDelDocente(store, docente.id)),
+        cursando: cursandoDocente(store, docente.id),
+      }
     },
 
     /** Cursos del ejemplo, con la misma forma que devuelve la fuente real. */

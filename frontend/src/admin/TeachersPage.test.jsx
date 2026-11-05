@@ -22,7 +22,6 @@ const COLUMNAS = [
   'CUIL',
   'EMAIL',
   'TELÉFONO',
-  'CÁTEDRA O ESPECIALIDAD',
   'COMISIONES ASIGNADAS',
   'ESTADO',
   'ACCIONES',
@@ -47,8 +46,8 @@ function docenteCreado(datos, extra = {}) {
     cuil: datos.cuil ?? null,
     email: datos.email,
     telefono: datos.telefono ?? null,
-    catedra: null,
     activo: true,
+    cursando: true,
     comisiones: [],
     comisiones_asignadas: 0,
     password_inicial: `${primerNombre}${String(datos.dni).replace(/\D/g, '')}`,
@@ -65,8 +64,8 @@ function docenteDePrueba(id, nombre) {
     cuil: null,
     email: `docente${id}@techacademy.invalid`,
     telefono: null,
-    catedra: null,
     activo: true,
+    cursando: true,
     comisiones: [],
     comisiones_asignadas: 0,
   }
@@ -101,7 +100,7 @@ describe('listado de docentes', () => {
   it('muestra las comisiones reales de cada docente y Sin comisión cuando no tiene', () => {
     const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
     const asignadas = (nombre) =>
-      filas.find((fila) => fila.cells[0].textContent === nombre).cells[6].textContent
+      filas.find((fila) => fila.cells[0].textContent === nombre).cells[5].textContent
 
     expect(asignadas('Profe Martín')).toBe('CUR-101 · Python Inicial')
     expect(asignadas('Lic. Laura Benítez')).toBe('Sin comisión')
@@ -110,12 +109,28 @@ describe('listado de docentes', () => {
     expect(asignadas('Ing. González')).toBe('CUR-108 · Java Backend Spring')
   })
 
-  it('muestra el estado Activa en verde en las cinco filas', () => {
-    const estados = screen.getAllByText('Activa')
+  it('muestra Activo en verde en los docentes que tienen una comisión Vigente e Inactivo en el resto', () => {
+    const estado = (nombre) =>
+      within(screen.getByRole('table'))
+        .getAllByRole('row')
+        .find((fila) => fila.cells[0].textContent === nombre)
+        .cells[6].textContent
 
-    expect(estados).toHaveLength(5)
-    for (const estado of estados) {
+    expect(estado('Profe Martín')).toBe('Activo')
+    expect(estado('Lic. Laura Benítez')).toBe('Inactivo')
+    expect(estado('Santi Ads')).toBe('Activo')
+    expect(estado('Dr. Marcelo Ríos')).toBe('Inactivo')
+    expect(estado('Ing. González')).toBe('Activo')
+
+    const activos = screen.getAllByText('Activo')
+    const inactivos = screen.getAllByText('Inactivo')
+    expect(activos).toHaveLength(3)
+    expect(inactivos).toHaveLength(2)
+    for (const estado of activos) {
       expect(estado.className).toContain('text-green-800')
+    }
+    for (const estado of inactivos) {
+      expect(estado.className).not.toContain('text-green-800')
     }
   })
 
@@ -535,8 +550,8 @@ describe('edición de docente (historia #11)', () => {
           cuil: '27-30111222-6',
           email: 'rita.molina@techacademy.invalid',
           telefono: '+54 11 4000-1000',
-          catedra: null,
           activo: true,
+          cursando: true,
           comisiones: [{ id: 7, codigo: 'CUR107-1', nombre: 'Datos' }],
           comisiones_asignadas: 1,
         },
@@ -579,7 +594,7 @@ describe('edición de docente (historia #11)', () => {
     expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('011 15-9999-0000')
     // La edición no vuelve a resolver las comisiones: la fila que ya estaba en pantalla las
     // conserva (D52).
-    expect(filaDelDocente('Profe Martín').cells[6].textContent).toBe('CUR-101 · Python Inicial')
+    expect(filaDelDocente('Profe Martín').cells[5].textContent).toBe('CUR-101 · Python Inicial')
   })
 
   it('guarda el teléfono en E.164 y el CUIL del docente sin tocarlos', async () => {

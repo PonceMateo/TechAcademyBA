@@ -1201,6 +1201,7 @@ function VistaCursos({
   return (
     <Card
       titulo="Cursos"
+      tituloGrande
       acciones={
         <div className="flex items-center gap-2">
           <ChipCatalogo total={resumen.total_comisiones} />

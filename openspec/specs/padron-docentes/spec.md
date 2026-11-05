@@ -2,7 +2,7 @@
 
 ## Purpose
 Definir la consulta y la búsqueda administrativa del padrón de docentes, con sus criterios de
-coincidencia, el filtro de docentes activos y las comisiones asignadas que devuelve la respuesta.
+coincidencia, el listado completo y las comisiones asignadas que devuelve la respuesta.
 
 ## Requirements
 
@@ -47,11 +47,11 @@ caracteres.
 #### Scenario: Consulta vacía
 
 - **WHEN** `q` falta, está vacío o solo tiene espacios
-- **THEN** el sistema devuelve el listado habitual de docentes activos
+- **THEN** el sistema devuelve el listado habitual con todos los docentes
 
 #### Scenario: Sin coincidencias
 
-- **WHEN** ningún docente activo coincide con el criterio
+- **WHEN** ningún docente coincide con el criterio
 - **THEN** el sistema devuelve una lista vacía
 
 ### Requirement: Orden de resultados por coincidencia
@@ -82,17 +82,6 @@ orden estable por `id`.
 - **WHEN** el administrador busca una sola letra
 - **THEN** el sistema aplica el mismo orden por campo y posición que para una consulta más larga
 
-### Requirement: Solo docentes activos
-
-El sistema SHALL incluir en la consulta y en la búsqueda únicamente docentes con `activo = true`.
-Los docentes dados de baja SHALL NOT aparecer en el listado habitual ni en los resultados de una
-búsqueda.
-
-#### Scenario: Docente dado de baja
-
-- **WHEN** existe un docente con `activo = false`
-- **THEN** el sistema no lo devuelve en `GET /docentes`, ni siquiera cuando su nombre, DNI o email coinciden con la consulta
-
 ### Requirement: Comisiones asignadas en la respuesta
 
 La respuesta de `GET /docentes` SHALL incluir, para cada docente, la lista `comisiones` con el
@@ -100,6 +89,9 @@ La respuesta de `GET /docentes` SHALL incluir, para cada docente, la lista `comi
 desde las relaciones reales de `comision` en PostgreSQL y SHALL quedar vacía cuando el docente no
 tenga comisiones. El sistema SHALL NOT inventar comisiones ni datos de comisiones. La respuesta
 SHALL conservar `cantidad_comisiones`.
+La respuesta SHALL incluir además el campo `cursando`, un booleano derivado en el backend:
+verdadero cuando existe al menos una comisión asignada **Vigente** —`fecha_fin >= hoy` en
+`America/Argentina/Buenos_Aires`, o sin `fecha_fin`—, y falso en cualquier otro caso.
 
 #### Scenario: Docente con comisiones
 
@@ -109,7 +101,17 @@ SHALL conservar `cantidad_comisiones`.
 #### Scenario: Docente sin comisiones
 
 - **WHEN** el administrador consulta un docente que no está asignado a ninguna comisión
-- **THEN** la respuesta devuelve `comisiones: []` y `cantidad_comisiones: 0`
+- **THEN** la respuesta devuelve `comisiones: []`, `cantidad_comisiones: 0` y `cursando: false`
+
+#### Scenario: Docente con una comisión vigente
+
+- **WHEN** el administrador consulta un docente con al menos una comisión asignada cuya `fecha_fin` es `>=` a la fecha de hoy, o sin `fecha_fin`
+- **THEN** la respuesta incluye `cursando: true`
+
+#### Scenario: Docente sin comisión vigente
+
+- **WHEN** el administrador consulta un docente cuyas comisiones asignadas terminaron todas (`fecha_fin < hoy`)
+- **THEN** la respuesta incluye `cursando: false`
 
 ### Requirement: Autorización administrativa
 
@@ -119,9 +121,26 @@ SHALL conservar `cantidad_comisiones`.
 #### Scenario: Administrador autenticado
 
 - **WHEN** una cuenta con rol `ADMIN` consulta el padrón
-- **THEN** el sistema devuelve los docentes activos y sus comisiones
+- **THEN** el sistema devuelve el padrón completo y sus comisiones
 
 #### Scenario: Otro rol
 
 - **WHEN** una cuenta con rol `DOCENTE` o `ALUMNO` consulta `GET /docentes`
 - **THEN** el sistema responde `403` y no devuelve datos del padrón
+
+### Requirement: Listado completo del padrón
+
+El sistema SHALL incluir en la consulta y en la búsqueda a todos los docentes, incluidos los dados
+de baja. La búsqueda SHALL aplicar los mismos criterios de coincidencia a todas las filas. La
+baja lógica SHALL seguir existiendo en el modelo y SHALL NOT ocultar al docente del listado.
+
+#### Scenario: Docente dado de baja en el listado
+
+- **WHEN** existe un docente con `activo = false`
+- **THEN** el sistema lo devuelve en `GET /docentes` cuando coincide con la consulta o con el
+  listado habitual, igual que a cualquier otro docente
+
+#### Scenario: Consulta vacía devuelve el padrón completo
+
+- **WHEN** `q` falta, está vacío o solo tiene espacios
+- **THEN** el sistema devuelve el listado habitual con todos los docentes

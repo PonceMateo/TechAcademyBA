@@ -30,8 +30,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.security import MAX_PASSWORD_BYTES, hashear_password
-from app.models.catalogo import Comision
-from app.models.enums import Rol
+from app.models.catalogo import Comision, estado_comision
+from app.models.enums import EstadoComision, Rol
 from app.models.padron import Docente, Usuario
 from app.schemas.padron import DocenteCreate, DocenteUpdate
 from app.services.auth import PASSWORD_MIN_LENGTH, PasswordInvalida
@@ -250,20 +250,19 @@ def _usuario_del_docente(session: Session, docente: Docente) -> Usuario | None:
 
 
 def listar_docentes(session: Session, consulta: str | None = None) -> list[Docente]:
-    """Docentes activos, con sus comisiones y ordenados por coincidencia (historia #10).
+    """Todos los docentes, con sus comisiones y ordenados por coincidencia (historia #10).
 
-    La búsqueda compara desde el comienzo de las palabras del nombre y del apellido, en orden, y
-    desde el comienzo del DNI o del email. El orden resultante prioriza la coincidencia en la
-    primera palabra del nombre, después las palabras posteriores o el apellido, después el DNI y
-    al final el email; `id` desempata.
+    El listado incluye a los dados de baja: la columna `ESTADO` de la pantalla distingue el estado
+    de cursada (`cursando`), no la baja lógica. La búsqueda compara desde el comienzo de las
+    palabras del nombre y del apellido, en orden, y desde el comienzo del DNI o del email. El orden
+    resultante prioriza la coincidencia en la primera palabra del nombre, después las palabras
+    posteriores o el apellido, después el DNI y al final el email; `id` desempata.
 
     Las comisiones salen de una sola consulta con `selectinload(Comision.curso)`: recorrer las
     comisiones docente por docente sería una consulta por fila. `cantidad_comisiones` se deriva
     de esa misma lista y se conserva por compatibilidad con la pantalla anterior.
     """
-    docentes = list(
-        session.scalars(select(Docente).where(Docente.activo.is_(True)).order_by(Docente.id))
-    )
+    docentes = list(session.scalars(select(Docente).order_by(Docente.id)))
 
     aguja = consulta.strip() if consulta else ""
     if aguja:
@@ -357,7 +356,12 @@ def _clave_de_coincidencia(
 
 
 def _asignar_comisiones(session: Session, docentes: list[Docente]) -> None:
-    """Carga las comisiones de todos los docentes en una sola consulta."""
+    """Carga las comisiones de todos los docentes en una sola consulta.
+
+    Además deriva `cursando` de esa misma lista: verdadero cuando alguna comisión es Vigente
+    (`fecha_fin >= hoy` en `America/Argentina/Buenos_Aires`, o sin `fecha_fin`), que es la señal
+    que la pantalla usa para el badge `ESTADO`.
+    """
     identificadores = [docente.id for docente in docentes]
     por_docente: dict[int, list[SimpleNamespace]] = {}
 
@@ -374,6 +378,7 @@ def _asignar_comisiones(session: Session, docentes: list[Docente]) -> None:
                     id=comision.id,
                     codigo=comision.codigo,
                     nombre=comision.curso.nombre,
+                    fecha_fin=comision.fecha_fin,
                 )
             )
 
@@ -381,6 +386,9 @@ def _asignar_comisiones(session: Session, docentes: list[Docente]) -> None:
         asignadas = por_docente.get(docente.id, [])
         docente.comisiones = asignadas  # type: ignore[attr-defined]
         docente.cantidad_comisiones = len(asignadas)  # type: ignore[attr-defined]
+        docente.cursando = any(  # type: ignore[attr-defined]
+            estado_comision(comision) == EstadoComision.VIGENTE.value for comision in asignadas
+        )
 
 
 def _traducir_duplicado(error: IntegrityError) -> None:

@@ -59,11 +59,12 @@ def listar_docentes(
     _admin: Annotated[Usuario, Depends(_solo_admin)],
     q: str | None = Query(default=None, max_length=100),
 ) -> list[DocenteOut]:
-    """Padrón de docentes activos, con búsqueda opcional por nombre, apellido, DNI o email.
+    """Padrón completo de docentes, con búsqueda opcional por nombre, apellido, DNI o email.
 
     `q` busca desde el comienzo de las palabras del nombre o del apellido, en orden, y desde el
     comienzo del DNI o del email. Sin `q`, devuelve el listado habitual. La respuesta incluye las
-    comisiones reales de cada docente (historia #10).
+    comisiones reales de cada docente (historia #10) y `cursando`, que indica si tiene al menos una
+    comisión Vigente.
     """
     return [DocenteOut.model_validate(d) for d in padron.listar_docentes(session, q)]
 
@@ -107,6 +108,7 @@ def crear_docente(
     # comisiones asignadas.
     docente = alta.docente
     docente.cantidad_comisiones = 0
+    docente.cursando = False  # type: ignore[attr-defined]
     docente.comisiones = []  # type: ignore[attr-defined]
     return DocenteCreadoOut(
         **DocenteOut.model_validate(docente).model_dump(),

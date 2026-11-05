@@ -2734,3 +2734,58 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Dónde:** `frontend/src/components/dashboard/AgendaSemanal.jsx`,
   `frontend/src/admin/DashboardPage.jsx`, `frontend/src/docente/TeacherCommissionsPage.jsx`,
   `frontend/src/alumno/StudentDashboardPage.jsx`.
+
+### D88 — El padrón de docentes no muestra la columna CÁTEDRA O ESPECIALIDAD
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** la tabla de docentes mostraba la columna `CÁTEDRA O ESPECIALIDAD` heredada del
+  prototipo. El modelo de docente no registra ese dato, la fuente devuelve `null` y la columna
+  mostraba un guion en todas las filas.
+- **Decisión:** se elimina la columna del listado. Las columnas quedan, en orden literal,
+  `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`.
+  El ejemplo y los tests dejan de cargar `catedra`.
+- **Por qué:** una columna que siempre muestra un guion comunica ausencia de dato como si fuera un
+  dato; el padrón no tiene especialidad ni cátedra que mostrar.
+- **Dónde:** `frontend/src/admin/TeachersPage.jsx`,
+  `frontend/src/admin/TeachersPage.test.jsx`, `frontend/src/mocks/docentes.js`,
+  `frontend/src/services/mockDataSource.js`, `frontend/src/services/apiDataSource.js`,
+  `openspec/changes/baja-columna-catedra-docentes`.
+
+### D89 — Se quita del spec el escenario obsoleto "El modal de edición no pide CUIL"
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** `openspec/specs/admin-shell/spec.md` conservaba el escenario de `hu-11-editar-docente`
+  (2026-10-24) que negaba el campo CUIL en la edición. D57 agregó el CUIL opcional al contrato del
+  docente y la edición lo muestra y lo guarda; el escenario contradecía el comportamiento vigente.
+- **Decisión:** se elimina el escenario del requirement `Padrón de docentes`; los archivos de
+  `openspec/changes/archive/` se conservan como historia.
+- **Por qué:** el spec es contrato, no historia; un escenario que desdice D57 confunde la próxima
+  revisión y cualquier delta generado desde él.
+- **Dónde:** `openspec/specs/admin-shell/spec.md`.
+
+### D90 — El estado Activo/Inactivo del docente deriva de la cursada (`cursando`)
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** la columna `ESTADO` del padrón de docentes mostraba `Activa` mientras el docente no
+  tuviera la baja lógica aplicada, sin decir nada sobre si estaba dando clases. El cliente pidió
+  que responda a la cursada real. El modelo ya deriva `Vigente`/`Finalizada` de `comision.fecha_fin`
+  (`estado_comision`, D75) con `America/Argentina/Buenos_Aires`.
+- **Decisión:**
+  - `GET /docentes` devuelve **todos** los docentes (ya no filtra `activo = true`) y cada fila suma
+    `cursando: boolean`, derivado en el backend: verdadero si existe al menos una comisión asignada
+    Vigente (`fecha_fin >= hoy`, o nula para la heredada).
+  - La columna `ESTADO` muestra `Activo` en verde con `cursando: true` e `Inactivo` en gris con
+    `cursando: false`. Una comisión sin `fecha_fin` cuenta como Vigente, igual que la regla vigente.
+  - La baja lógica (`activo`) coexiste como concepto reservado: todavía no hay baja forzada de
+    docentes; el badge no la usa hasta que se implemente.
+- **Por qué:** el estado del padrón tiene que reflejar si el profesor está dando una comisión en ese
+  momento; la baja lógica y la cursada son conceptos distintos y ninguno reemplaza al otro. Derivar en
+  el backend mantiene una sola regla para el mock y la pantalla.
+- **Dónde:** `backend/app/services/padron.py`, `backend/app/schemas/padron.py`,
+  `backend/app/api/padron.py`, `frontend/src/admin/TeachersPage.jsx`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/admin/TeachersPage.test.jsx`, `frontend/src/services/dataService.test.jsx`,
+  `openspec/changes/estado-docente-segun-cursada`.

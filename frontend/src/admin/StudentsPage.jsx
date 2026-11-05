@@ -684,6 +684,7 @@ export function StudentsPage() {
 
       <Card
         titulo="Padrón de Alumnos Regulares"
+        tituloGrande
         acciones={
           <Button variante="secundario" onClick={() => setModalAlumnoAbierto(true)}>
             + Nuevo Alumno
