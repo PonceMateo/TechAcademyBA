@@ -39,3 +39,33 @@ recompuestas con la composición del diseño; no agrega pantallas, rutas, ítems
 funciones. El detalle de las decisiones está en
 [`design.md`](../../../openspec/changes/ui-figma-dashboards/design.md) y las tareas de aplicación
 en [`tasks.md`](../../../openspec/changes/ui-figma-dashboards/tasks.md).
+
+## Actualización 2026-11-04 — rediseño con datos reales
+
+El change [`rediseno-dashboards-figma`](../../../openspec/changes/rediseno-dashboards-figma/proposal.md)
+volvió a leer la página vigente del Figma y reemplazó los bloques que no tenían fuente por los datos
+reales de las H/U 55, 56 y 57.
+
+- **Archivo:** `Prototipo TechAcademy BA` (`QVNyPLVubV4A1szyQadoUe`).
+- **Página:** `Techacademy - UI Overhaul` (`53:2`).
+- **Tableros:** Admin / Secretario `53:716`, Profesor `53:355`, Alumno `53:3`.
+- **Superficies:** tarjetas `#f0f5fc` (Secretaría), `#eff7f3` (Docente) y `#fcf8e9` (Alumno);
+  fondos de shell `#eaf1fb`, `#eaf4ee` y `#f8f4e6`.
+- **Sombra del Figma:** `0 4px 18px rgba(54, 84, 107, 0.03)`, prácticamente plana. El contenido va
+  sin sombra; modal, menú, selector y tooltip la conservan.
+
+Las capturas y los JSON de este directorio siguen siendo referencia visual. El Figma es la
+autoridad de estilo y la fuente de la composición; los valores de negocio salen de la base.
+
+## Ajustes 2026-11-05 — campana y tarjetas docentes
+
+La revisión del rediseño agregó estos ajustes, registrados en `docs/decisions.md` (D85–D87):
+
+- La campana del armazón abre los avisos de la sesión; el bloque `Requiere tu atención` ya no se
+  renderiza en los tableros. El punto solo aparece cuando hay avisos.
+- En Docente, `Tus comisiones, a un vistazo` usa tarjetas de dos por fila, con fondo blanco y
+  `#EBF7F2`, borde `#E3F2E9` y hover `#E7F2ED`. La tarjeta entera abre la comisión y el carrusel no
+  muestra scrollbar.
+- Las comisiones finalizadas no se listan; las activas se ordenan por su próxima clase.
+- La agenda muestra hasta cinco encuentros y los accesos rápidos de Administración van arriba de
+  ella.

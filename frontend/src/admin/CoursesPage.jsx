@@ -1300,7 +1300,7 @@ function TarjetaCurso({ curso, total, onAbrir, onEditar }) {
       <button
         type="button"
         onClick={onAbrir}
-        className="foco-acento flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 pr-10 text-left shadow-sm hover:border-slate-300 hover:shadow"
+        className="foco-acento flex w-full flex-col gap-1 rounded-lg border border-slate-200 bg-[var(--superficie-tarjeta)] p-4 pr-10 text-left shadow-sm transition hover:border-slate-300 hover:shadow"
       >
         <span className="text-xs font-semibold tracking-wide text-slate-500">{curso.codigo}</span>
         <span className="text-sm font-semibold text-slate-800">{curso.nombre}</span>
@@ -1361,6 +1361,7 @@ function VistaComisiones({
     <Card
       titulo="Comisiones Activas"
       descripcion={`${curso.nombre} · ${curso.codigo}`}
+      className="[--borde-superficie:#e2e8f0]"
       acciones={
         <div className="flex items-center gap-2">
           <ChipCatalogo total={resumen.total_comisiones} />

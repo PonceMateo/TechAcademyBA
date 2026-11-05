@@ -65,7 +65,8 @@ describe('armazón del shell de Administración', () => {
   })
 
   it('muestra los ítems del menú en el orden que fija el spec', () => {
-    const enlaces = screen.getAllByRole('link')
+    const menu = screen.getByRole('navigation', { name: 'MENÚ OPERATIVO' })
+    const enlaces = within(menu).getAllByRole('link')
 
     expect(enlaces.map((enlace) => enlace.textContent)).toEqual(ETIQUETAS_ESPERADAS)
   })

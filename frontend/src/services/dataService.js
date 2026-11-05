@@ -68,6 +68,14 @@ export function obtenerResumenCatalogo() {
   return getDataSource().obtenerResumenCatalogo()
 }
 
+/**
+ * Agregado del tablero de Administración (H/U 55): indicadores, serie de cobros, ocupación,
+ * comprobantes recientes y agenda de todas las comisiones en una sola lectura.
+ */
+export function obtenerDashboardAdmin() {
+  return getDataSource().obtenerDashboardAdmin()
+}
+
 export function listarDocentes() {
   return getDataSource().listarDocentes()
 }

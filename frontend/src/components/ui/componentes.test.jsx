@@ -158,10 +158,10 @@ describe('Table', () => {
     expect(screen.getByRole('row', { name: 'CUR-101 $45.000' })).not.toHaveAttribute('tabindex')
   })
 
-  it('aplica el hover gris a la fila de datos', () => {
+  it('aplica el hover de la superficie interna a la fila de datos', () => {
     render(<Table columnas={COLUMNAS} filas={[{ id: 1, codigo: 'CUR-101', arancel: 45000 }]} />)
     const fila = screen.getByRole('row', { name: 'CUR-101 $45.000' })
-    expect(fila.className).toContain('hover:bg-slate-200')
+    expect(fila.className).toContain('hover:bg-[var(--superficie-interna)]')
   })
 })
 

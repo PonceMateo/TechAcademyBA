@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { Bell, ChevronDown, ChevronRight, GraduationCap, LogOut, Search } from 'lucide-react'
 import { useSession } from '../../auth/SessionContext'
+import { AvisosAtencion } from '../dashboard/AvisosAtencion'
 import { AvisoCambioContrasena } from '../session/AvisoCambioContrasena'
 import { Avatar, Badge, Button } from '../ui'
+import { useAvisosSesion } from './useAvisosSesion'
 import { MARCA_UI, TONO } from '../ui/paleta'
 import { inicialesDe } from '../../utils/formato'
 
@@ -22,6 +24,10 @@ import { inicialesDe } from '../../utils/formato'
  * foco, del botón primario y del avatar. Los tres son distinguibles entre sí: azul para
  * Secretaría, verde para Docente y dorado para Alumno (D40). Ninguna pantalla elige un color.
  *
+ * **La campana concentra los avisos de la sesión.** El bloque que cada tablero mostraba como
+ * `Requiere tu atención` vive acá, se abre con click y solo marca el punto cuando hay algo
+ * pendiente. La lectura se hace una vez por rol y el aviso sigue visible al cambiar de sección.
+ *
  * **El panel lateral ya no lleva rótulo visible.** El diseño no muestra títulos de sección, así
  * que el `<nav>` conserva `tituloMenu` como nombre accesible y nada más: quien navega con lector
  * de pantalla sigue oyendo de qué panel se trata.
@@ -29,8 +35,7 @@ import { inicialesDe } from '../../utils/formato'
  * **La barra superior es la del diseño, y lo que el diseño saca, sale.** El breadcrumb reemplaza a
  * los chips de rol y de sede; el período lectivo se muda al pie, y el nombre y el rol de la cuenta
  * viven en el bloque de perfil, que abre un menú con la única entrada real: `Cerrar sesión`. La
- * búsqueda `⌘ K` y la campana son composición inerte, igual que los botones del tablero que
- * ninguna historia cubre: se ven y no hacen nada, en vez de prometer una función que no existe.
+ * búsqueda `⌘ K` sigue siendo composición inerte; la campana ya abre los avisos de la sesión.
  *
  * **El cierre de sesión sigue siendo el botón compartido.** Cambió de lugar —del pie al menú de
  * perfil— pero no de implementación: la entrada del menú es `Button`, el mismo componente que usan
@@ -54,7 +59,14 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
   const { session, signOut } = useSession()
   const { pathname } = useLocation()
   const [menuPerfilAbierto, setMenuPerfilAbierto] = useState(false)
+  const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false)
   const contenedorPerfil = useRef(null)
+  const contenedorNotificaciones = useRef(null)
+  const { avisos, cargando: avisosCargando, fallo: avisosFallo } = useAvisosSesion()
+  const hayAvisos = avisos.length > 0
+  const etiquetaNotificaciones = hayAvisos
+    ? `Notificaciones, ${avisos.length} ${avisos.length === 1 ? 'pendiente' : 'pendientes'}`
+    : 'Notificaciones'
 
   const paleta = ACENTOS[acento]
 
@@ -72,7 +84,7 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
     }) ?? secciones[0]
 
   useEffect(() => {
-    if (!menuPerfilAbierto) {
+    if (!menuPerfilAbierto && !notificacionesAbiertas) {
       return undefined
     }
 
@@ -80,11 +92,18 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
       if (contenedorPerfil.current && !contenedorPerfil.current.contains(evento.target)) {
         setMenuPerfilAbierto(false)
       }
+      if (
+        contenedorNotificaciones.current &&
+        !contenedorNotificaciones.current.contains(evento.target)
+      ) {
+        setNotificacionesAbiertas(false)
+      }
     }
 
     function cerrarPorEscape(evento) {
       if (evento.key === 'Escape') {
         setMenuPerfilAbierto(false)
+        setNotificacionesAbiertas(false)
       }
     }
 
@@ -94,7 +113,7 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
       document.removeEventListener('mousedown', cerrarPorClickAfuera)
       document.removeEventListener('keydown', cerrarPorEscape)
     }
-  }, [menuPerfilAbierto])
+  }, [menuPerfilAbierto, notificacionesAbiertas])
 
   return (
     <div
@@ -169,21 +188,54 @@ export function ShellFrame({ acento, tituloMenu, secciones, periodoLectivo }) {
             <span>⌘ K</span>
           </div>
 
-          {/* Composición inerte: la bandeja de notificaciones todavía no existe. */}
-          <span
-            aria-hidden="true"
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--acento)] ring-2 ring-white" />
-          </span>
+          <div className="relative" ref={contenedorNotificaciones}>
+            <button
+              type="button"
+              aria-label={etiquetaNotificaciones}
+              aria-haspopup="dialog"
+              aria-expanded={notificacionesAbiertas}
+              onClick={() => {
+                setNotificacionesAbiertas((abierto) => !abierto)
+                setMenuPerfilAbierto(false)
+              }}
+              className="foco-acento relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/70"
+            >
+              <Bell className="h-4 w-4" aria-hidden="true" />
+              {hayAvisos && (
+                <span
+                  data-ui="notificacion-punto"
+                  className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--acento)] ring-2 ring-white"
+                />
+              )}
+            </button>
+
+            {notificacionesAbiertas && (
+              <div
+                role="dialog"
+                aria-label="Notificaciones"
+                className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+              >
+                <p className="mb-3 text-sm font-semibold text-slate-800">Requiere tu atención</p>
+                {avisosCargando ? (
+                  <p className="text-sm text-slate-500">Cargando avisos…</p>
+                ) : avisosFallo ? (
+                  <p className="text-sm text-red-700">No pudimos cargar los avisos.</p>
+                ) : (
+                  <AvisosAtencion avisos={avisos} vacio="No tenés avisos pendientes." />
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="relative" ref={contenedorPerfil}>
             <button
               type="button"
               aria-haspopup="menu"
               aria-expanded={menuPerfilAbierto}
-              onClick={() => setMenuPerfilAbierto((abierto) => !abierto)}
+              onClick={() => {
+                setMenuPerfilAbierto((abierto) => !abierto)
+                setNotificacionesAbiertas(false)
+              }}
               className="foco-acento flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-white/70"
             >
               <Avatar iniciales={inicialesDe(session.nombre)} />

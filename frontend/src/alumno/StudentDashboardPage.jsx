@@ -1,90 +1,77 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ArrowRight, BookOpen, CalendarDays, CreditCard, ShieldCheck } from 'lucide-react'
 import { useSession } from '../auth/SessionContext'
+import { AgendaSemanal } from '../components/dashboard/AgendaSemanal'
+import { Indicador } from '../components/dashboard/Indicador'
 import { Badge, Card } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
-import { ESTADO_HABILITACION } from '../domain/enums'
-import { listarInscripcionesAlumno, obtenerDetalleInscripcion } from '../services/dataService'
-import { formatFechaLarga, formatFechaCorta } from '../utils/formato'
+import {
+  ESTADO_COBRANZA,
+  ESTADO_COMPROBANTE_ALUMNO,
+  ESTADO_COMPROBANTE_LABELS,
+  ESTADO_HABILITACION,
+} from '../domain/enums'
+import {
+  listarComprobantesAlumno,
+  listarInscripcionesAlumno,
+  listarPagosAlumno,
+  obtenerDetalleInscripcion,
+} from '../services/dataService'
+import { formatFechaLarga, formatFechaCorta, formatMoneda } from '../utils/formato'
 
 /**
- * Dashboard del alumno (11.2), con la composición del diseño
- * (`docs/design/figma-dashboards-overhaul/`) y los datos reales de `GET /alumno/inscripciones`
- * (HUs 38 y 42).
+ * Tablero del alumno (H/U 57).
  *
- * **La raíz es el tablero y nada más.** Los cuatro indicadores y la agenda viven acá; las tarjetas
- * de las cursadas se mudaron a `Mis Cursos` (`/alumno/cursos`), que es una pantalla propia del
- * panel lateral. El tablero no lista inscripciones: resume el estado del alumno y le muestra su
- * próxima clase.
+ * **Los indicadores salen de datos reales.** `CURSOS EN MARCHA` cuenta las inscripciones,
+ * `ACCESO A LA CLASE` toma el peor estado entre sus cursadas, `PRÓXIMA CLASE` sale del cronograma
+ * y `COMPROBANTES ACREDITADOS` de los pagos imputados al alumno. El progreso, las tareas y la
+ * asistencia promedio del prototipo no existen en el modelo y no se inventan.
  *
- * **La pantalla distingue "no lo sé" de "no hay".** `inscripciones` arranca en `null` y sigue en
- * `null` si la consulta falla, así que el mensaje de que el alumno no tiene cursos **solo** aparece
- * cuando la fuente confirmó una lista vacía. Mientras carga se dice que está cargando, y si la
- * consulta falla se dice eso: hace unos commits la pantalla mostraba "no tenés cursos" en los tres
- * casos, que es afirmar algo que nadie verificó.
+ * **`Tu situación de pagos` reemplaza al bloque de progreso.** Muestra lo acreditado, lo que espera
+ * revisión y lo observado, con el mismo estado que `Mis Pagos`; `Comprobantes recientes` muestra
+ * los últimos cinco envíos. La campana del armazón lleva el acceso bloqueado y el comprobante
+ * observado a la pantalla donde se resuelven.
  *
- * **Los indicadores salen de los datos reales.** `CURSOS EN MARCHA` cuenta las inscripciones,
- * `PRÓXIMA CLASE` sale del cronograma derivado de los horarios y `ACCESO A LA CLASE` del estado de
- * la inscripción. `COMPROBANTES ACREDITADOS` sigue en `—` porque los pagos del alumno son la HU 40 y
- * ninguna fuente respalda su valor (D43).
- *
- * **La agenda muestra la hora y el tema solo cuando existe.** Cada encuentro trae el horario de su
- * día desde la grilla de la comisión; un encuentro sin clase cargada no lleva tema y la fila no
- * completa nada en su lugar: no existe un "tema a confirmar".
+ * **La agenda es una sola línea de tiempo.** Si el detalle de una cursada falla, la agenda de las
+ * otras sigue en pie (`Promise.allSettled`); el error de la lectura principal se informa sin
+ * afirmar que el alumno no tiene cursos.
  */
 
 const NO_SE_PUDO_LEER = 'No pudimos cargar tus cursos. Volvé a intentar en un momento.'
 const SIN_ENCUENTROS = 'No tenés encuentros programados por ahora.'
-
-/** Tarjeta de indicador del tablero: rótulo arriba, valor grande y una línea de apoyo. */
-function Indicador({ rotulo, children, apoyo }) {
-  return (
-    <Card>
-      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">{rotulo}</p>
-      <div className="mt-2 text-3xl font-extrabold text-slate-900">{children}</div>
-      <p className="mt-1 text-xs text-slate-500">{apoyo}</p>
-    </Card>
-  )
-}
-
-/** Un encuentro de la agenda: fecha con su hora, el curso y el tema si ya está cargado. */
-function FilaAgenda({ encuentro }) {
-  return (
-    <li className="rounded-xl bg-slate-50 px-4 py-3">
-      <p className="text-sm font-semibold text-slate-800">
-        {formatFechaCorta(encuentro.fecha)}
-        {encuentro.horario ? ` · ${encuentro.horario}` : ''}
-      </p>
-      <p className="mt-0.5 text-xs text-slate-500">{encuentro.nombre_curso}</p>
-      {encuentro.tema ? (
-        <p className="mt-0.5 text-sm text-slate-600">{encuentro.tema}</p>
-      ) : null}
-    </li>
-  )
-}
+const SIN_COMPROBANTES = 'Todavía no enviaste comprobantes.'
 
 export function StudentDashboardPage() {
   const { session } = useSession()
   const [inscripciones, setInscripciones] = useState(null)
   const [fallo, setFallo] = useState(false)
   const [agenda, setAgenda] = useState([])
+  const [pagos, setPagos] = useState(null)
+  const [comprobantes, setComprobantes] = useState(null)
 
   useEffect(() => {
+    let vigente = true
+
     listarInscripcionesAlumno()
       .then(async (resultado) => {
+        if (!vigente) {
+          return
+        }
         setInscripciones(resultado)
 
-        // La agenda son los próximos encuentros de las inscripciones que el alumno ya tiene, por el
-        // mismo servicio que usa el detalle del curso. Cada encuentro lleva el curso al que
-        // pertenece para que `PRÓXIMA CLASE` lo pueda nombrar y para que la clave de la lista no se
-        // repita cuando dos cursos caen el mismo día.
-        //
-        // **`allSettled` y no `all`:** si el detalle de una de las cursadas falla —una comisión que
-        // se desactivó entre las dos llamadas, por ejemplo— la agenda de las otras sigue en pie.
-        // Con `all` un solo rechazo borraba toda la agenda y la pantalla terminaba diciendo que no
-        // pudo cargar los cursos mientras los indicadores ya tenían datos.
-        const detalles = await Promise.allSettled(
-          resultado.map((inscripcion) => obtenerDetalleInscripcion(inscripcion.codigo)),
-        )
+        const [detalles, pagosLeidos, comprobantesLeidos] = await Promise.all([
+          Promise.allSettled(
+            resultado.map((inscripcion) => obtenerDetalleInscripcion(inscripcion.codigo)),
+          ),
+          listarPagosAlumno().catch(() => null),
+          listarComprobantesAlumno().catch(() => null),
+        ])
+
+        if (!vigente) {
+          return
+        }
+
         setAgenda(
           resultado
             .flatMap((inscripcion, indice) => {
@@ -97,56 +84,90 @@ export function StudentDashboardPage() {
                 nombre_curso: inscripcion.nombre_curso,
               }))
             })
-            // **La agenda es una sola línea de tiempo.** Los encuentros llegan agrupados por
-            // inscripción, así que sin ordenar aparecían fechas de un curso después de las de otro
-            // y `PRÓXIMA CLASE` tomaba la primera fila del primer curso, que no siempre es la más
-            // cercana de todas las cursadas.
             .sort((izquierda, derecha) =>
               String(izquierda.fecha).localeCompare(String(derecha.fecha)),
             ),
         )
+        setPagos(pagosLeidos)
+        setComprobantes(comprobantesLeidos)
       })
       .catch(() => {
-        // El rechazo deja `inscripciones` en `null`: la pantalla no sabe cuántas hay, no afirma que
-        // sean cero y lo dice en lugar de mostrar el mensaje de "no tenés cursos".
-        setFallo(true)
-        setAgenda([])
+        if (vigente) {
+          setFallo(true)
+          setAgenda([])
+        }
       })
+
+    return () => {
+      vigente = false
+    }
   }, [])
 
-  // El indicador refleja el **peor** estado entre las cursadas, no el de la primera fila: el orden
-  // de la respuesta lo decide la base y con estados mezclados —una habilitada y otra bloqueada—
-  // mostrar el primero podía decir `HABILITADO` mientras otra cursada está bloqueada.
   const bloqueada =
     inscripciones?.find(
       (inscripcion) => inscripcion.acceso.estado === ESTADO_HABILITACION.BLOQUEADO,
     ) ?? null
   const hayInscripciones = Boolean(inscripciones?.length)
-  const proxima = agenda[0]
+  const proxima = agenda[0] ?? null
+
+  const acreditados = (pagos ?? []).filter(
+    (pago) => pago.estado === ESTADO_COBRANZA.ACREDITADO,
+  )
+  const totalAcreditado = acreditados.reduce(
+    (total, pago) => total + Number(pago.importe ?? 0),
+    0,
+  )
+  const pendientes = (comprobantes ?? []).filter(
+    (comprobante) => comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.PENDIENTE_REVISION,
+  )
+  const observados = (comprobantes ?? []).filter(
+    (comprobante) => comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.OBSERVADO,
+  )
+  const recientes = [...(comprobantes ?? [])]
+    .sort((izquierda, derecha) =>
+      String(derecha.enviado_at ?? derecha.fecha_pago).localeCompare(
+        String(izquierda.enviado_at ?? izquierda.fecha_pago),
+      ),
+    )
+    .slice(0, 5)
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[var(--texto-valor)]">
           {`Buen día, ${session.nombre}`}
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-sm text-[var(--texto-etiqueta)]">
           {`${formatFechaLarga()} · Cada paso cuenta. Este es tu espacio para avanzar.`}
         </p>
       </header>
 
+      {fallo && (
+        <p role="alert" className="text-sm text-red-700">
+          {NO_SE_PUDO_LEER}
+        </p>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Indicador
           rotulo="CURSOS EN MARCHA"
+          valor={inscripciones === null ? '—' : inscripciones.length}
           apoyo={(inscripciones ?? [])
             .map((inscripcion) => `${inscripcion.codigo} · ${inscripcion.nombre_curso}`)
             .join(', ')}
-        >
-          {inscripciones === null ? '—' : inscripciones.length}
-        </Indicador>
-
+          icono={BookOpen}
+        />
         <Indicador
           rotulo="ACCESO A LA CLASE"
+          valor={
+            hayInscripciones ? (
+              <Badge tono={bloqueada ? TONO.ROJO : TONO.VERDE}>
+                {bloqueada ? 'BLOQUEADO' : 'HABILITADO'}
+              </Badge>
+            ) : (
+              '—'
+            )
+          }
           apoyo={
             hayInscripciones
               ? bloqueada
@@ -154,43 +175,139 @@ export function StudentDashboardPage() {
                 : 'Tu inscripción está habilitada en el período.'
               : ''
           }
-        >
-          {hayInscripciones ? (
-            <Badge tono={bloqueada ? TONO.ROJO : TONO.VERDE}>
-              {bloqueada ? 'BLOQUEADO' : 'HABILITADO'}
-            </Badge>
-          ) : (
-            '—'
-          )}
-        </Indicador>
-
-        <Indicador rotulo="COMPROBANTES ACREDITADOS">—</Indicador>
-
-        <Indicador rotulo="PRÓXIMA CLASE" apoyo={proxima ? proxima.nombre_curso : ''}>
-          {proxima ? (
-            <span className="text-2xl">{formatFechaCorta(proxima.fecha)}</span>
-          ) : (
-            '—'
-          )}
-        </Indicador>
+          icono={ShieldCheck}
+        />
+        <Indicador
+          rotulo="COMPROBANTES ACREDITADOS"
+          valor={pagos === null ? '—' : acreditados.length}
+          apoyo={pagos === null ? '' : `${formatMoneda(totalAcreditado)} acreditados`}
+          icono={CreditCard}
+        />
+        <Indicador
+          rotulo="PRÓXIMA CLASE"
+          valor={proxima ? formatFechaCorta(proxima.fecha) : '—'}
+          apoyo={proxima?.nombre_curso ?? ''}
+          icono={CalendarDays}
+        />
       </div>
 
-      <Card titulo="Tu agenda">
-        {fallo ? (
-          <p className="text-sm text-red-700">{NO_SE_PUDO_LEER}</p>
-        ) : agenda.length === 0 ? (
-          <p className="text-sm text-slate-500">{SIN_ENCUENTROS}</p>
-        ) : (
-          <ul className="space-y-3">
-            {agenda.map((encuentro) => (
-              <FilaAgenda
-                key={`${encuentro.codigo}-${encuentro.fecha}`}
-                encuentro={encuentro}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Card titulo="Tu situación de pagos">
+            {pagos === null ? (
+              <p className="text-sm text-[var(--texto-etiqueta)]">Cargando tus pagos…</p>
+            ) : (
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wide text-[var(--texto-etiqueta)] uppercase">
+                    Total acreditado
+                  </dt>
+                  <dd className="mt-1 text-lg font-extrabold text-[var(--texto-valor)]">
+                    {formatMoneda(totalAcreditado)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wide text-[var(--texto-etiqueta)] uppercase">
+                    Acreditados
+                  </dt>
+                  <dd className="mt-1 text-lg font-extrabold text-[var(--texto-valor)]">
+                    {acreditados.length}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wide text-[var(--texto-etiqueta)] uppercase">
+                    Pendientes de revisión
+                  </dt>
+                  <dd className="mt-1 text-lg font-extrabold text-[var(--texto-valor)]">
+                    {comprobantes === null ? '—' : pendientes.length}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold tracking-wide text-[var(--texto-etiqueta)] uppercase">
+                    Observados
+                  </dt>
+                  <dd className="mt-1 text-lg font-extrabold text-[var(--texto-valor)]">
+                    {comprobantes === null ? '—' : observados.length}
+                  </dd>
+                </div>
+              </dl>
+            )}
+            <Link
+              to="/alumno/pagos"
+              className="foco-acento mt-3 inline-flex items-center gap-1 text-sm font-semibold texto-acento"
+            >
+              Ir a Mis Pagos
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          </Card>
+
+          <Card
+            titulo="Comprobantes recientes"
+            acciones={
+              <Link
+                to="/alumno/pagos"
+                className="foco-acento inline-flex items-center gap-1 text-sm font-semibold texto-acento"
+              >
+                Ver todos
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            }
+          >
+            {comprobantes === null ? (
+              <p className="text-sm text-[var(--texto-etiqueta)]">Cargando comprobantes…</p>
+            ) : recientes.length === 0 ? (
+              <p className="text-sm text-[var(--texto-etiqueta)]">{SIN_COMPROBANTES}</p>
+            ) : (
+              <ul className="space-y-2">
+                {recientes.map((comprobante) => (
+                  <li
+                    key={comprobante.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--superficie-interna)] px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[var(--texto-valor)]">
+                        {formatMoneda(comprobante.importe)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--texto-apoyo)]">
+                        {`Pago del ${formatFechaCorta(comprobante.fecha_pago)}`}
+                      </p>
+                    </div>
+                    <Badge
+                      tono={
+                        comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.ACEPTADO
+                          ? TONO.VERDE
+                          : comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.OBSERVADO
+                            ? TONO.CELESTE
+                            : comprobante.estado === ESTADO_COMPROBANTE_ALUMNO.RECHAZADO
+                              ? TONO.ROJO
+                              : TONO.AMBAR
+                      }
+                    >
+                      {ESTADO_COMPROBANTE_LABELS[comprobante.estado] ?? comprobante.estado}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card titulo="Tu agenda">
+            <AgendaSemanal
+              encuentros={agenda}
+              vacio={
+                fallo
+                  ? NO_SE_PUDO_LEER
+                  : inscripciones === null
+                    ? 'Cargando agenda…'
+                    : SIN_ENCUENTROS
+              }
+            />
+          </Card>
+
+        </div>
+      </div>
     </div>
   )
 }

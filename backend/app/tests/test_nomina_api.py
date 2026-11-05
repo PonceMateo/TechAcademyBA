@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.catalogo import ZONA_HORARIA_DOMINIO
 from app.models.enums import CategoriaInscripcion
 from app.models.inscripciones import Inscripcion
 from app.tests.factories import (
@@ -146,7 +147,7 @@ def test_carga_nomina_en_comision_finalizada_es_422_y_no_crea_filas(
 ) -> None:
     """H/U 70: una comisión terminada no admite nómina nueva."""
     empresa = crear_empresa(db_session)
-    hoy = date.today()
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     comision = crear_comision(
         db_session,
         fecha_inicio=hoy - timedelta(days=60),

@@ -306,6 +306,7 @@ describe('vista de cursos', () => {
     expect(tarjeta).toHaveTextContent('CUR-101')
     expect(tarjeta).toHaveTextContent('1 comisión')
     expect(tarjeta).toHaveTextContent('Abrir comisiones')
+    expect(tarjeta).toHaveClass('border-slate-200')
   })
 
   it('abre el curso de la tarjeta y muestra la tabla de sus comisiones', async () => {

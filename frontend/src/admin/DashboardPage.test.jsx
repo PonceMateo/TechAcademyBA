@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   accountForRole,
   renderAppAs,
@@ -11,169 +11,220 @@ import {
 import { formatFechaLarga } from '../utils/formato'
 
 /**
- * Tablero operativo (9.2).
+ * Tablero de Administración (H/U 55).
  *
- * **La fila de cuatro tarjetas y el bloque de alertas se pintan siempre.** El tablero lee
- * `obtenerResumenCatalogo()` y muestra `COMISIONES` con el conteo que la fuente devuelve; las otras
- * tres tarjetas y el bloque de alertas no tienen endpoint detrás, así que su valor es `—`. Mientras
- * la lectura no resuelve —o rechaza— `COMISIONES` también es `—`, nunca un `0` (D43).
- *
- * **Los accesos rápidos se pueden pulsar y no pasa nada.** Un botón deshabilitado cumpliría el "no
- * pasa nada" y rompería el "se puede pulsar", así que la prueba las aprieta y verifica que la ruta no
- * cambie.
- *
- * **La fecha se afirma a través del helper**, nunca con un literal: el formato queda clavado en
- * `formato.test.js` y acá solo se verifica el cableado.
+ * **Todo lo que se afirma sale del agregado.** La fuente se sustituye con una respuesta completa
+ * para ver valores que el maquetado no tiene y para que el test no dependa de cuántas comisiones
+ * tenga el ejemplo. Lo que se cuida es el contrato: las cuatro tarjetas, la serie, los comprobantes
+ * recientes con las etiquetas de Cobranzas, la agenda de todas las comisiones y la campana con
+ * los avisos. Los números del prototipo (`1.248`, `32`, `8,4 M`, `12`) no se reproducen.
  */
 
-/** El tablero abre con el saludo de la cuenta de la sesión y no con el nombre de la sección. */
 const SALUDO = `Buen día, ${accountForRole('ADMIN').nombre}`
-const RESUMEN = `${formatFechaLarga()} · Todo lo que necesitás para gestionar tu academia.`
 
-const ACCESOS_RAPIDOS = [
-  'Registrar Cobranza',
-  'Verificar Habilitaciones',
-  'Descargar Reporte del Día',
-]
+const DASHBOARD = {
+  indicadores: {
+    alumnos_inscriptos: 12,
+    inscripciones_activas: 15,
+    cupo_promedio_ocupado: '62.5',
+    comisiones: 4,
+    comisiones_vigentes: 3,
+    cobros_pendientes: 5,
+    comprobantes_pendientes: 3,
+    cobranzas_observadas: 2,
+    cobrado_mes_actual: '125000',
+  },
+  cobros_por_mes: [
+    { mes: '2025-12', importe: '0' },
+    { mes: '2026-01', importe: '25000' },
+    { mes: '2026-02', importe: '0' },
+    { mes: '2026-03', importe: '40000' },
+    { mes: '2026-04', importe: '30000' },
+    { mes: '2026-05', importe: '125000' },
+  ],
+  ocupacion_por_comision: [
+    {
+      codigo: 'CUR-101-1',
+      nombre_curso: 'Python Inicial',
+      inscriptos: 10,
+      cupo: 20,
+      porcentaje: '50.0',
+    },
+  ],
+  comprobantes_recientes: [
+    {
+      id: 1,
+      alumno: 'Agustina Benítez',
+      inscripcion: { codigo: 'CUR-102-1', nombre_curso: 'Desarrollo Web Full Stack' },
+      fecha_pago: '2026-05-18',
+      importe: '45000',
+      medio: 'TRANSFERENCIA',
+      estado: 'PENDIENTE_REVISION',
+      enviado_at: '2026-05-18T10:00:00Z',
+      motivo: null,
+    },
+  ],
+  agenda: [
+    {
+      fecha: '2026-05-25',
+      horario: '18:30-21:30',
+      tema: 'Componentes y props',
+      codigo: 'CUR-101-1',
+      nombre_curso: 'Python Inicial',
+      docente_nombre: 'Profe Martín',
+    },
+  ],
+}
 
-const ROTULOS = [
-  'COMISIONES',
-  'ALUMNOS INSCRIPTOS',
-  'COBROS PENDIENTES DE COBRO',
-  'CUPO PROMEDIO OCUPADO',
-]
+function tarjeta(rotulo) {
+  return screen.getByText(rotulo, { selector: 'p' }).closest('section')
+}
 
-/** Monta el tablero con la fuente de datos de ejemplo o con la función sustituida que pida el caso. */
-async function entrar(overrides = null) {
+beforeEach(async () => {
   resetDataSource()
-  if (overrides !== null) {
-    stubDataSource(overrides)
-  }
   stubBackend()
+  stubDataSource({ obtenerDashboardAdmin: async () => DASHBOARD })
   renderAppAs('ADMIN', '/admin')
   await screen.findByRole('heading', { name: SALUDO })
-}
+  await waitFor(() => expect(tarjeta('ALUMNOS INSCRIPTOS')).toHaveTextContent('12'))
+})
 
-/** La tarjeta de un indicador: el rótulo es un `<p>` y su contenedor es el `<section>` de `Card`. */
-function tarjeta(rotulo) {
-  return screen.getByText(rotulo, { selector: 'p' }).parentElement
-}
+describe('encabezado y tarjetas', () => {
+  it('muestra la fecha real del día', () => {
+    expect(
+      screen.getByText(`${formatFechaLarga()} · Todo lo que necesitás para gestionar tu academia.`),
+    ).toBeInTheDocument()
+  })
 
-describe('encabezado', () => {
-  it('muestra la fecha real del día', async () => {
-    await entrar()
+  it('muestra los cuatro indicadores con los valores del agregado', () => {
+    expect(tarjeta('ALUMNOS INSCRIPTOS')).toHaveTextContent('12')
+    expect(tarjeta('ALUMNOS INSCRIPTOS')).toHaveTextContent('15 inscripciones activas')
+    expect(tarjeta('CUPO PROMEDIO OCUPADO')).toHaveTextContent('62,5 %')
+    expect(tarjeta('COMISIONES')).toHaveTextContent('4')
+    expect(tarjeta('COMISIONES')).toHaveTextContent('3 vigentes')
+    expect(tarjeta('COBROS PENDIENTES DE COBRO')).toHaveTextContent('5')
+    expect(tarjeta('COBROS PENDIENTES DE COBRO')).toHaveTextContent('3 comprobantes')
+  })
 
-    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
+  it('no reproduce los números fijos del prototipo', () => {
+    expect(screen.queryByText('1.248')).not.toBeInTheDocument()
+    expect(screen.queryByText('32')).not.toBeInTheDocument()
+    expect(screen.queryByText('8,4 M')).not.toBeInTheDocument()
   })
 })
 
-describe('los cuatro indicadores', () => {
-  it('muestra las cuatro tarjetas con sus rótulos', async () => {
-    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
-
-    for (const rotulo of ROTULOS) {
-      expect(screen.getByText(rotulo, { selector: 'p' })).toBeInTheDocument()
-    }
+describe('panorama de cobros', () => {
+  it('muestra el total del mes y el resumen accesible de la serie', () => {
+    expect(screen.getByText('$125.000')).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /Cobros acreditados de los últimos 6 meses/ }),
+    ).toHaveTextContent('Total $220.000')
   })
 
-  it('muestra COMISIONES con el conteo que devuelve el catálogo', async () => {
-    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
-
-    await waitFor(() => expect(tarjeta('COMISIONES')).toHaveTextContent('7'))
-    expect(screen.getByText('en el catálogo')).toBeInTheDocument()
-  })
-
-  it('muestra un 0 real cuando el catálogo informa cero', async () => {
-    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 0 }) })
-
-    await waitFor(() => expect(tarjeta('COMISIONES')).toHaveTextContent('0'))
-    expect(tarjeta('COMISIONES')).not.toHaveTextContent('—')
-  })
-
-  it('muestra las otras tres tarjetas con —, sin ningún número que las respalde', async () => {
-    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
-
-    for (const rotulo of ['ALUMNOS INSCRIPTOS', 'COBROS PENDIENTES DE COBRO', 'CUPO PROMEDIO OCUPADO']) {
-      expect(tarjeta(rotulo)).toHaveTextContent('—')
-    }
+  it('muestra la ocupación por comisión con inscriptos y cupo', () => {
+    expect(screen.getByText('Python Inicial')).toBeInTheDocument()
+    expect(screen.getByText('10/20 · 50 %')).toBeInTheDocument()
   })
 })
 
-describe('el bloque de alertas', () => {
-  it('muestra su encabezado con — en el cuerpo y sin las alertas inventadas', async () => {
-    await entrar({ obtenerResumenCatalogo: async () => ({ total_comisiones: 7 }) })
+describe('comprobantes recientes', () => {
+  it('usa las mismas etiquetas que Cobranzas y muestra el importe', () => {
+    const bloque = screen.getByRole('heading', { name: 'Comprobantes recientes' }).closest('section')
 
-    const alertas = screen.getByText('Alertas de Gestión Pendiente').closest('section')
-    expect(within(alertas).getByText('—')).toBeInTheDocument()
+    expect(within(bloque).getByText('Agustina Benítez')).toBeInTheDocument()
+    expect(within(bloque).getByText('$45.000')).toBeInTheDocument()
+    expect(within(bloque).getByText('Pendiente de revisión')).toBeInTheDocument()
+    expect(within(bloque).getByText(/18\/05\/2026/)).toBeInTheDocument()
+  })
 
-    for (const inventada of [
-      'Comprobante ilegible de Agustina Benítez',
-      'Cheque de Banco Federal pendiente de acreditación',
-      'Valeria Rossi debe la mitad del arancel',
-      /lista de espera.*CUR-104/,
-    ]) {
-      expect(screen.queryByText(inventada)).not.toBeInTheDocument()
-    }
-    expect(screen.queryByText('27%')).not.toBeInTheDocument()
+  it('lleva a Cobranzas con Ver todos', () => {
+    const bloque = screen.getByRole('heading', { name: 'Comprobantes recientes' }).closest('section')
+
+    expect(within(bloque).getByRole('link', { name: /Ver todos/ })).toHaveAttribute(
+      'href',
+      '/admin/cobranzas',
+    )
   })
 })
 
-describe('mientras la lectura del catálogo no resuelve', () => {
-  it('pinta las cuatro tarjetas y el bloque de alertas con —, nunca un 0', async () => {
-    await entrar({ obtenerResumenCatalogo: () => new Promise(() => {}) })
-
-    for (const rotulo of ROTULOS) {
-      expect(tarjeta(rotulo)).toHaveTextContent('—')
-      expect(tarjeta(rotulo)).not.toHaveTextContent('0')
-    }
-    expect(screen.getByText('Alertas de Gestión Pendiente')).toBeInTheDocument()
-    // Lo que no depende de la lectura sí se pinta.
-    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Registrar Cobranza' })).toBeInTheDocument()
+describe('agenda y avisos', () => {
+  it('muestra la clase de cualquier comisión con su horario y tema', () => {
+    expect(screen.getByText('25/05/2026 · 18:30-21:30')).toBeInTheDocument()
+    expect(screen.getByText('Python Inicial · CUR-101-1')).toBeInTheDocument()
+    expect(screen.getByText('Componentes y props')).toBeInTheDocument()
   })
 
-  it('conserva la forma con — si el catálogo rechaza', async () => {
-    await entrar({
-      obtenerResumenCatalogo: async () => {
+  it('abre la campana con los avisos del tablero', async () => {
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 2 pendientes' }))
+
+    expect(
+      screen.getByRole('link', { name: /Comprobantes sin revisar/ }),
+    ).toHaveAttribute('href', '/admin/cobranzas')
+    expect(screen.getByRole('link', { name: /Cobranzas observadas/ })).toHaveAttribute(
+      'href',
+      '/admin/cobranzas',
+    )
+  })
+
+  it('los accesos rápidos navegan a pantallas reales', () => {
+    expect(screen.getByRole('link', { name: 'Registrar Cobranza' })).toHaveAttribute(
+      'href',
+      '/admin/cobranzas',
+    )
+    expect(screen.getByRole('link', { name: 'Verificar Habilitaciones' })).toHaveAttribute(
+      'href',
+      '/admin/alumnos',
+    )
+    expect(screen.queryByText('Descargar Reporte del Día')).not.toBeInTheDocument()
+  })
+})
+
+describe('tablero vacío', () => {
+  it('muestra ceros reales y los mensajes de vacío sin inventar filas', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerDashboardAdmin: async () => ({
+        indicadores: {
+          alumnos_inscriptos: 0,
+          inscripciones_activas: 0,
+          cupo_promedio_ocupado: null,
+          comisiones: 0,
+          comisiones_vigentes: 0,
+          cobros_pendientes: 0,
+          comprobantes_pendientes: 0,
+          cobranzas_observadas: 0,
+          cobrado_mes_actual: '0',
+        },
+        cobros_por_mes: [],
+        ocupacion_por_comision: [],
+        comprobantes_recientes: [],
+        agenda: [],
+      }),
+    })
+    renderAppAs('ADMIN', '/admin')
+
+    await screen.findByText(/Todavía no hay comprobantes enviados/)
+    expect(tarjeta('ALUMNOS INSCRIPTOS')).toHaveTextContent('0')
+    expect(tarjeta('CUPO PROMEDIO OCUPADO')).toHaveTextContent('—')
+    expect(screen.getByText('No hay clases en los próximos siete días.')).toBeInTheDocument()
+  })
+})
+
+describe('error de lectura', () => {
+  it('lo informa y deja las tarjetas en — en vez de afirmar que no hay datos', async () => {
+    cleanup()
+    stubDataSource({
+      obtenerDashboardAdmin: async () => {
         throw new Error('No pudimos conectar con el servidor.')
       },
     })
+    renderAppAs('ADMIN', '/admin')
 
-    await waitFor(() => expect(tarjeta('COMISIONES')).toHaveTextContent('—'))
-    for (const rotulo of ROTULOS) {
-      expect(tarjeta(rotulo)).not.toHaveTextContent('0')
-    }
-    expect(screen.getByText('Alertas de Gestión Pendiente')).toBeInTheDocument()
-    expect(screen.getByText(RESUMEN)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Registrar Cobranza' })).toBeInTheDocument()
-  })
-})
-
-describe('accesos rápidos del personal', () => {
-  it('muestra las tres acciones', async () => {
-    await entrar()
-
-    expect(screen.getByText('Accesos Rápidos del Personal')).toBeInTheDocument()
-    for (const accion of ACCESOS_RAPIDOS) {
-      expect(screen.getByRole('button', { name: accion })).toBeInTheDocument()
-    }
-  })
-
-  it('no navega ni ejecuta lógica al pulsarlas', async () => {
-    await entrar()
-
-    const user = userEvent.setup()
-    const navegar = vi.fn()
-    window.addEventListener('popstate', navegar)
-
-    for (const accion of ACCESOS_RAPIDOS) {
-      await user.click(screen.getByRole('button', { name: accion }))
-    }
-
-    expect(navegar).not.toHaveBeenCalled()
-    // La sección sigue siendo el tablero: ninguna acción sacó a la secretaría de la pantalla.
-    await waitFor(() => expect(screen.getByRole('heading', { name: SALUDO })).toBeInTheDocument())
-
-    window.removeEventListener('popstate', navegar)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos cargar el tablero. Volvé a intentar en un momento.',
+    )
+    expect(tarjeta('COMISIONES')).toHaveTextContent('—')
   })
 })

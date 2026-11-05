@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.catalogo import ZONA_HORARIA_DOMINIO
 from app.models.enums import CategoriaInscripcion
 from app.models.inscripciones import Inscripcion
 from app.models.padron import Usuario
@@ -88,7 +89,7 @@ def test_no_inscribe_en_una_comision_finalizada(
 ) -> None:
     """H/U 70: el alta se rechaza con 422 y no deja ninguna fila."""
     curso = crear_curso(db_session)
-    hoy = date.today()
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     comision = crear_comision(
         db_session,
         curso=curso,
@@ -334,7 +335,7 @@ def test_el_cambio_de_categoria_aplica_la_beca_sobre_el_base_prorrateado(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """Issue #111: la beca se deriva del base guardado, no de un importe final congelado."""
-    hoy = date.today()
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     comision = crear_comision(
         db_session,
         arancel="52000.00",

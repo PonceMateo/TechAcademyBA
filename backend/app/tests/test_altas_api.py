@@ -19,7 +19,7 @@ Lo que estos tests afirma por debajo de la respuesta:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -393,9 +393,12 @@ def test_el_listado_informa_el_estado_derivado_de_cada_comision(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
     """H/U 70: la consulta trae todas, con `Vigente` o `Finalizada` según la fecha de fin."""
+    from datetime import datetime
+
+    from app.models.catalogo import ZONA_HORARIA_DOMINIO
     from app.tests.factories import crear_comision
 
-    hoy = date.today()
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     vigente = crear_comision(
         db_session,
         curso=crear_curso(db_session, nombre="Curso vigente"),

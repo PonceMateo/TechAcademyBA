@@ -2587,3 +2587,150 @@ alcance de este change; queda a criterio del equipo agregarlo.
   `frontend/src/admin/HabilitacionInscripcionModal.jsx`,
   `frontend/src/admin/StudentsPage.jsx`, `frontend/src/services/dataService.js`,
   `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`.
+
+### D79 — El tablero de Administración pide un solo agregado
+
+- **Fecha:** 2026-11-04
+- **Autor:** Mateo Ponce
+- **Contexto:** la H/U 55 necesita cuatro indicadores, una serie de cobros, ocupación, comprobantes
+  recientes y agenda de todas las comisiones. Calcularlo en la pantalla exigiría cinco lecturas y
+  agregados en el navegador, que el spec de `admin-shell` prohíbe.
+- **Decisión:** `GET /admin/dashboard` devuelve todo en una respuesta, con rol `ADMIN`. La pantalla
+  no cuenta ni suma nada: muestra los valores del servidor, incluidos `0` reales y `null` cuando no
+  hay comisiones vigentes.
+- **Por qué:** los números de una tarjeta y de una alerta no pueden contradecirse si salen de la
+  misma transacción de lectura. El endpoint es aditivo: no cambia contratos existentes.
+- **Dónde:** `backend/app/services/dashboard.py`, `backend/app/schemas/dashboard.py`,
+  `backend/app/api/dashboard.py`, `frontend/src/admin/DashboardPage.jsx`,
+  `frontend/src/services/dataService.js`, `frontend/src/services/apiDataSource.js`.
+
+### D80 — La agenda es una regla compartida por los tres roles
+
+- **Fecha:** 2026-11-04
+- **Autor:** Mateo Ponce
+- **Contexto:** el detalle del alumno y la próxima clase del docente ya derivaban encuentros de
+  `comision_horario`, cada uno con su propia implementación. El tablero del administrador necesita
+  la misma regla sobre todas las comisiones.
+- **Decisión:** `services/agenda.py` concentra el cálculo. La agenda empieza hoy, termina en
+  `fecha_fin` o en la ventana de siete días, no muestra fechas pasadas, no conoce feriados y ordena
+  por fecha y hora. El alumno ve cuatro por cursada, el docente cuatro por comisión y el
+  administrador ocho en total. Los temas se leen en una sola consulta por lote.
+- **Por qué:** tres implementaciones de "próxima clase" terminan mostrando fechas distintas para el
+  mismo horario. La regla por fecha —no por hora— es la que ya usaban los dos tableros existentes.
+- **Dónde:** `backend/app/services/agenda.py`, `backend/app/services/alumno.py`,
+  `backend/app/services/docente.py`, `backend/app/services/dashboard.py`,
+  `backend/app/schemas/docente.py`.
+
+### D81 — El gráfico del tablero usa fechas de pago, no de inscripción
+
+- **Fecha:** 2026-11-04
+- **Autor:** Mateo Ponce
+- **Contexto:** el Figma muestra una sección `La academia en números`, pero `inscripcion` no tiene
+  `created_at` y no hay forma de reconstruir altas históricas.
+- **Decisión:** la serie es el importe de cobranzas `ACREDITADO` por mes, últimos seis meses
+  calendario, con `0` en los meses sin cobros; el encabezado muestra el cobrado del mes corriente.
+  No se suman `OBSERVADO` ni `RECHAZADO` y no se completa con datos de ejemplo.
+- **Por qué:** es la única serie mensual que el modelo puede respaldar sin inventar fechas. Una
+  reportería de inscripciones por mes requiere registrar el alta desde ese momento y queda como
+  historia futura.
+- **Dónde:** `backend/app/services/dashboard.py`, `frontend/src/components/dashboard/CobrosPorMes.jsx`.
+
+### D82 — Chart.js 4 con `react-chartjs-2` 5.3.1
+
+- **Fecha:** 2026-11-04
+- **Autor:** Mateo Ponce
+- **Contexto:** el proyecto usa React 19.3 y necesita un gráfico de línea mantenido para la serie de
+  cobros.
+- **Decisión:** `chart.js@^4.6.1` con `react-chartjs-2@^5.3.1`. Se registran solo línea, puntos,
+  escalas, relleno y tooltip. En jsdom, donde no hay canvas, el componente muestra un resumen
+  textual accesible en lugar de fallar.
+- **Por qué:** `react-chartjs-2` declara React 19 en sus peers; Recharts tiene reportes de gráficos
+  en blanco con React 19.2/19.3. Un SVG propio evitaría la dependencia pero obligaría a mantener
+  ejes, tooltips y accesibilidad.
+- **Dónde:** `frontend/package.json`, `frontend/src/components/dashboard/CobrosPorMes.jsx`.
+
+### D83 — Superficies por rol y sin sombra en el contenido
+
+- **Fecha:** 2026-11-04
+- **Autor:** Mateo Ponce
+- **Contexto:** el Figma usa un fondo distinto por sesión y una sombra de `0 4px 18px` al 3 %, que a
+  ojo es plana. Las tarjetas del sistema eran blancas con `shadow-sm`.
+- **Decisión:** `index.css` publica tokens de superficie, superficie interna, borde, etiqueta, valor
+  y apoyo por `data-acento` (`#f0f5fc` Secretaría, `#eff7f3` Docente, `#fcf8e9` Alumno). `Card` y
+  `Table` los consumen y pierden la sombra; las tarjetas de curso también. Modal, menú, selector y
+  tooltip conservan elevación porque se separan del contenido.
+- **Por qué:** una sola declaración por rol evita que cada pantalla elija su color y que el mismo
+  bloque quede con sombra en una pantalla y sin sombra en otra.
+- **Dónde:** `frontend/src/index.css`, `frontend/src/components/ui/Card.jsx`,
+  `frontend/src/components/ui/Table.jsx`, `frontend/src/admin/CoursesPage.jsx`.
+
+### D84 — `Últimas inscripciones` pasa a `Comprobantes recientes`
+
+- **Fecha:** 2026-11-04
+- **Autor:** Mateo Ponce
+- **Contexto:** el prototipo mostraba inscripciones recientes, pero el modelo no guarda su fecha. El
+  bloque de Cobranzas sí tiene comprobantes con `enviado_at` y estados.
+- **Decisión:** el bloque muestra los cinco comprobantes más recientes de cualquier estado, con la
+  misma forma y las mismas etiquetas que `GET /comprobantes`. `Alertas de Gestión Pendiente` pasa a
+  `Requiere tu atención` con conteos y enlaces; los accesos rápidos navegan a Cobranzas y al padrón,
+  y `Descargar Reporte del Día` desaparece porque no hay reportería que lo respalde.
+- **Por qué:** así el tablero y Cobranzas no pueden decir cosas distintas sobre el mismo comprobante,
+  y ninguna acción visible queda inerte.
+- **Dónde:** `backend/app/services/dashboard.py`, `frontend/src/admin/DashboardPage.jsx`,
+  `frontend/src/components/dashboard/AvisosAtencion.jsx`.
+
+### D85 — Los avisos de la sesión viven en la campana del armazón
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** los tableros de los tres roles repetían un bloque `Requiere tu atención` que solo
+  se veía en la pantalla índice, mientras la campana de la barra superior era inerte. Al cambiar de
+  sección el aviso desaparecía y el mismo dato se dibujaba dos veces.
+- **Decisión:** los avisos se calculan una vez por sesión en `useAvisosSesion` y se muestran en la
+  campana del `ShellFrame`: se abre con click, se cierra con click afuera o `Escape` y solo pinta el
+  punto cuando hay al menos un aviso. Los tableros dejan de renderizar el bloque de página. En
+  Administración se conservan comprobantes pendientes y cobranzas observadas; en Docente, solo los
+  alumnos bloqueados de comisiones activas; en Alumno, el acceso bloqueado y los comprobantes
+  observados. Las comisiones finalizadas no generan aviso.
+- **Por qué:** el aviso sobrevive a la navegación, el punto no llama la atención cuando no hay nada
+  pendiente y cada rol tiene una única fuente para el mismo dato. La campana no es un centro de
+  notificaciones persistente: no agrega historial ni entrega correos.
+- **Dónde:** `frontend/src/components/shell/ShellFrame.jsx`,
+  `frontend/src/components/shell/useAvisosSesion.js`,
+  `frontend/src/components/dashboard/AvisosAtencion.jsx`, `frontend/src/admin/DashboardPage.jsx`,
+  `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/alumno/StudentDashboardPage.jsx`.
+
+### D86 — Las comisiones del docente se listan como tarjetas activas ordenadas por próxima clase
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** el tablero docente mostraba las comisiones como una tabla y la revisión visual pidió
+  el formato de tarjetas del Figma, con dos tarjetas visibles y una interacción más directa.
+- **Decisión:** cada comisión se muestra como una tarjeta entera cliqueable —código, estado, horario,
+  próxima clase, conteos de acceso, barra de acceso y `Ver comisión`—. Las tarjetas alternan blanco
+  y `#EBF7F2`, usan borde `#E3F2E9` en reposo y hover, y hover de fondo `#E7F2ED`; el carrusel oculta
+  su scrollbar. Solo se listan las comisiones activas, ordenadas por la fecha y hora de su próxima
+  clase; las finalizadas no se muestran y no hay un enlace suelto `Ir a mis alumnos` al pie.
+- **Por qué:** el formato coincide con la captura vigente y la tarjeta completa es un objetivo de
+  click más grande y accesible. Ocultar las finalizadas y ordenar por próxima clase responde a la
+  operación real del docente; la barra no muestra una asistencia que el modelo no registra.
+- **Dónde:** `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/docente/TeacherCommissionsPage.test.jsx`, `frontend/src/index.css`.
+
+### D87 — La agenda del tablero muestra cinco encuentros y los accesos del admin van arriba
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** la agenda compartida mostraba hasta ocho encuentros y, en Administración, los accesos
+  rápidos quedaban debajo de ella; la revisión pidió una lectura más corta y priorizar las acciones.
+- **Decisión:** `AgendaSemanal` lista hasta cinco encuentros y, cuando hay más, muestra
+  `Mostrando 5 de N encuentros.` con el total real. El backend conserva el límite de ocho del
+  agregado; el recorte es de presentación. En Administración, `Accesos Rápidos del Personal` va antes
+  de `Tu agenda`.
+- **Por qué:** la agenda es contexto y no debe dominar el tablero; las acciones operativas de
+  Secretaría tienen que estar antes de la lectura pasiva. El backend no cambia y la regla de la
+  agenda sigue siendo una sola.
+- **Dónde:** `frontend/src/components/dashboard/AgendaSemanal.jsx`,
+  `frontend/src/admin/DashboardPage.jsx`, `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/alumno/StudentDashboardPage.jsx`.

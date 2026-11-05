@@ -45,27 +45,30 @@ export function Table({
 
   return (
     <div className="overflow-x-auto">
-      <table {...{ [MARCA_UI]: 'table' }} className="min-w-full divide-y divide-slate-200 text-sm">
+      <table
+        {...{ [MARCA_UI]: 'table' }}
+        className="min-w-full divide-y divide-[var(--borde-superficie)] text-sm"
+      >
         <thead>
           <tr>
             {columnas.map((columna) => (
               <th
                 key={columna.clave}
                 scope="col"
-                className={`px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-slate-500 uppercase ${columna.ancho ?? ''}`}
+                className={`px-4 py-3 text-left text-[11px] font-semibold tracking-wide text-[var(--texto-etiqueta)] uppercase ${columna.ancho ?? ''}`}
               >
                 {columna.titulo}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
+        <tbody className="divide-y divide-[var(--borde-superficie)] bg-transparent">
           {filas.map((fila) => {
             const contenido = detalle === null ? null : detalle(fila)
             return (
               <Fragment key={claveDeFila(fila)}>
                 <tr
-                  className={`align-top transition hover:bg-slate-200 ${
+                  className={`align-top transition hover:bg-[var(--superficie-interna)] ${
                     accionable
                       ? 'cursor-pointer focus-visible:bg-slate-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-400'
                       : ''
@@ -90,13 +93,13 @@ export function Table({
                   onKeyDown={accionable ? (evento) => alPresionarTecla(evento, fila) : undefined}
                 >
                   {columnas.map((columna) => (
-                    <td key={columna.clave} className="px-4 py-3 text-slate-700 tabular-nums">
+                    <td key={columna.clave} className="px-4 py-3 text-[var(--texto-valor)] tabular-nums">
                       {columna.render(fila)}
                     </td>
                   ))}
                 </tr>
                 {contenido != null && (
-                  <tr className="bg-slate-50/80">
+                  <tr className="bg-[var(--superficie-interna)]">
                     <td colSpan={columnas.length} className="px-4 py-3">
                       {contenido}
                     </td>

@@ -18,20 +18,30 @@ de AFIP (pesos 5, 4, 3, 2, 7, 6, 5, 4, 3, 2; `dv = 11 - (suma mod 11)`, con 11 �
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import crear_token_acceso, hashear_password
-from app.models.catalogo import Comision, ComisionHorario, Curso, Sede, resumen_de_horarios
+from app.models.catalogo import (
+    ZONA_HORARIA_DOMINIO,
+    Comision,
+    ComisionHorario,
+    Curso,
+    Sede,
+    resumen_de_horarios,
+)
 from app.models.clases import Asistencia, Clase, OverrideHabilitacion
 from app.models.cobranza import Cobranza, Factura, Imputacion, Pagador
+from app.models.comprobantes import ComprobanteAlumno
 from app.models.enums import (
     CategoriaInscripcion,
     EstadoAsistencia,
     EstadoCobranza,
+    EstadoComprobanteAlumno,
     EstadoContrato,
     EstadoHabilitacion,
     EstadoInscripcion,
@@ -74,6 +84,11 @@ def _persistir(session: Session, instancia) -> object:
     session.add(instancia)
     session.flush()
     return instancia
+
+
+def _hoy_del_dominio() -> date:
+    """Día corriente en la zona de la academia, que es la que usan las reglas de estado."""
+    return datetime.now(ZONA_HORARIA_DOMINIO).date()
 
 
 def crear_sede(session: Session, nombre: str = "Sede Central") -> Sede:
@@ -141,7 +156,13 @@ def crear_comision(
     """
     sede_efectiva = None
     if con_sede:
-        sede_efectiva = sede or crear_sede(session)
+        # Reutiliza la sede por defecto: el nombre es único y varias comisiones de un test
+        # comparten la misma sede, como en la base real.
+        sede_efectiva = sede or session.scalar(
+            select(Sede).where(Sede.nombre == "Sede Central")
+        )
+        if sede_efectiva is None:
+            sede_efectiva = crear_sede(session)
     curso_efectivo = curso or crear_curso(session)
     if numero is None:
         mayor = session.scalar(
@@ -396,13 +417,14 @@ def crear_cobranza(
     causa: str | None = None,
     medio: str = MedioPago.TRANSFERENCIA.value,
     pagador_id: int | None = None,
+    fecha: date | None = None,
 ) -> Cobranza:
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     return _persistir(
         session,
         Cobranza(
-            fecha=date.today() - timedelta(days=3),
+            fecha=fecha or _hoy_del_dominio() - timedelta(days=3),
             importe=Decimal(importe),
             medio=medio,
             estado=estado,
@@ -508,5 +530,35 @@ def crear_factura(
             requerida=requerida,
             emitida=emitida,
             numero=None,
+        ),
+    )
+
+
+def crear_comprobante(
+    session: Session,
+    *,
+    alumno: Alumno | None = None,
+    inscripcion: Inscripcion | None = None,
+    estado: str = EstadoComprobanteAlumno.PENDIENTE_REVISION.value,
+    importe: Decimal | str = "45000.00",
+    fecha_pago: date | None = None,
+    enviado_at: datetime | None = None,
+    motivo: str | None = None,
+) -> ComprobanteAlumno:
+    """Comprobante enviado, con la clave de archivo que exige la tabla."""
+    alumno_efectivo = alumno or crear_alumno(session)
+    inscripcion_efectiva = inscripcion or crear_inscripcion(session, alumno=alumno_efectivo)
+    return _persistir(
+        session,
+        ComprobanteAlumno(
+            alumno_id=alumno_efectivo.id,
+            inscripcion_id=inscripcion_efectiva.id,
+            fecha_pago=fecha_pago or _hoy_del_dominio(),
+            importe=Decimal(importe),
+            medio=MedioPago.TRANSFERENCIA.value,
+            estado=estado,
+            enviado_at=enviado_at or datetime.now(UTC),
+            motivo=motivo,
+            archivo_clave=f"prueba/{uuid4().hex}",
         ),
     )

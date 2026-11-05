@@ -22,7 +22,8 @@ estar escrita en español rioplatense.
 The system SHALL renderizar una barra superior con, de izquierda a derecha: un breadcrumb
 `Mi espacio > [etiqueta del ítem activo]` que refleja la pantalla abierta; un campo de búsqueda
 `Buscar en la plataforma` con la tecla de atajo `⌘ K`, **inerte**, que SHALL mostrarse pero
-SHALL NOT filtrar ni navegar; una campana de notificaciones con punto de no leído, **inerte**;
+SHALL NOT filtrar ni navegar; una campana de notificaciones que abre los avisos de la sesión y solo
+muestra el punto cuando hay avisos pendientes;
 y un bloque de perfil con el avatar, el nombre de la cuenta de la sesión, el rol `Alumno` y un
 menú desplegable con una única entrada, `Cerrar sesión`, que sí funciona. La barra superior
 SHALL NOT renderizar el chip `Rol Alumno · Solo mi información` ni el texto
@@ -51,9 +52,13 @@ ninguna línea de `Última actualización`: el pie se limita al tagline y al per
 - **WHEN** el alumno elige un ítem de navegación
 - **THEN** el ítem queda destacado como activo y el breadcrumb de la barra superior refleja la sección elegida, incluso cuando abre el detalle de una cursada desde `Mis Cursos`
 
-#### Scenario: El alumno pulsa la búsqueda o la campana
-- **WHEN** el alumno escribe en el campo de búsqueda o pulsa la campana
-- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque ambos elementos son composición inerte
+#### Scenario: El alumno pulsa la búsqueda
+- **WHEN** el alumno escribe en el campo de búsqueda
+- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque la búsqueda es composición inerte
+
+#### Scenario: El alumno abre la campana
+- **WHEN** el alumno pulsa la campana
+- **THEN** se abre el panel de avisos de la sesión, que se cierra con un click afuera o con `Escape`
 
 #### Scenario: El alumno cierra la sesión desde su perfil
 - **WHEN** el alumno abre su perfil en la barra superior y elige `Cerrar sesión`
@@ -292,75 +297,113 @@ The system SHALL rechazar con 403 a un usuario autenticado con rol alumno que na
 ### Requirement: Tablero del Alumno en la ruta raíz
 
 The system SHALL mostrar en la raíz del shell del alumno —el ítem `Dashboard` del panel lateral— un
-encabezado de tablero con el saludo `Buen día, {nombre de la cuenta}` y una línea de fecha con la
-fecha real del día que la fuente informa, formateada para español rioplatense con el día de la
-semana capitalizado (por ejemplo `Viernes 9 de octubre`), seguida de la frase de apoyo `Cada paso
-cuenta. Este es tu espacio para avanzar.`. El nombre es el de la cuenta de la sesión y la fecha
-SHALL ser un valor calculado a partir del día corriente, no un literal del maquetado.
+encabezado con el saludo `Buen día, {nombre de la cuenta}` y una línea de fecha con la fecha real del
+día que la fuente informa, formateada para español rioplatense con el día de la semana capitalizado
+(por ejemplo `Viernes 9 de octubre`), seguida de la frase de apoyo `Cada paso cuenta. Este es tu
+espacio para avanzar.`. El nombre es el de la cuenta de la sesión y la fecha SHALL ser un valor
+calculado a partir del día corriente, no un literal del maquetado.
 
-The system SHALL mostrar cuatro tarjetas de indicador: `CURSOS EN MARCHA` cuyo valor SHALL ser la
-cantidad real de inscripciones del alumno y cuyo texto de apoyo SHALL nombrar esas inscripciones
-—código y nombre del curso—, con un `0` real cuando el alumno no tiene ninguna; `ACCESO A LA
-CLASE` con el valor tomado del estado real de sus inscripciones —cuando alguna está bloqueada,
-`BLOQUEADO` en rojo con la causa de esa inscripción, y `HABILITADO` en verde solo cuando todas lo
-están—, que es un campo existente y no un cálculo, con `—` cuando el alumno no tiene ninguna
-inscripción; `COMPROBANTES ACREDITADOS` con el valor `—`, porque no existe ningún
-endpoint de pagos del alumno que respalde su valor; y `PRÓXIMA CLASE` cuyo valor SHALL tomarse
-del cronograma real de la inscripción y cuyo texto de apoyo SHALL nombrar el curso real, con `—`
-cuando no hay ninguna próxima clase.
+The system SHALL mostrar cuatro tarjetas de indicador, cada una con su ícono, su rótulo, su valor y
+una línea de contexto: `CURSOS EN MARCHA` con la cantidad real de inscripciones y el contexto con sus
+códigos y cursos; `ACCESO A LA CLASE` con el estado real de sus inscripciones —`BLOQUEADO` en rojo con
+la causa cuando alguna lo está, y `HABILITADO` en verde solo cuando todas lo están— y `—` cuando no
+tiene ninguna; `COMPROBANTES ACREDITADOS` con la cantidad real de pagos en estado `ACREDITADO` que
+devuelve `GET /alumno/pagos` y el contexto con el total imputado y la cantidad en revisión; y `PRÓXIMA
+CLASE` con la próxima clase del cronograma real y el curso al que pertenece, o `—` cuando no hay
+ninguna.
+
+El sistema SHALL mostrar el bloque `Tu situación de pagos` con la cantidad de comprobantes acreditados
+y su importe total, la cantidad de comprobantes en revisión (`PENDIENTE_REVISION`) y la cantidad de
+comprobantes observados, cada uno con su enlace a `Mis Pagos` en `/alumno/pagos`. WHEN no tenga
+comprobantes, el bloque SHALL mostrar un mensaje de vacío con el enlace para cargar el primero. El
+bloque SHALL NOT mostrar progreso, lecciones completadas, tareas ni calificaciones: esas entidades no
+existen en el modelo.
+
+El sistema SHALL mostrar el bloque `Comprobantes recientes` con hasta cinco comprobantes enviados por
+el alumno, de cualquier estado, ordenados por fecha de recepción descendente, con fecha, importe, medio
+y estado. Las etiquetas de estado SHALL ser las mismas que las de `Mis Pagos` y el bloque SHALL ofrecer
+`Ver mis pagos`, que navega a `/alumno/pagos`. El bloque que el prototipo titula `Organizá tus
+próximas entregas` se reemplaza por este: el sistema no registra entregas.
+
+El sistema SHALL mostrar el bloque `Tu agenda` con la semana corriente y hasta cinco próximos
+encuentros de todas sus inscripciones, agrupados por fecha, ordenados por fecha y hora, con el rango
+horario de ese día, el curso y el tema solo cuando esté cargado. Los encuentros SHALL tomarse de los
+mismos datos que muestra el detalle del curso. WHEN haya más de cinco encuentros, el bloque SHALL
+mostrar `Mostrando 5 de {N} encuentros.` con el total real. WHEN no haya encuentros, SHALL mostrar su
+mensaje de vacío y, si la lectura falla, SHALL informar el fallo en lugar de afirmar que no hay
+encuentros.
+
+El sistema SHALL mostrar los avisos accionables en la campana del armazón: cada inscripción bloqueada,
+con su curso y su causa, y cada comprobante observado, con su motivo. Cada aviso SHALL navegar a
+`Mis Pagos` en `/alumno/pagos`. La campana SHALL abrirse al pulsarla y cerrarse con un click afuera o
+`Escape`, y SHALL mostrar un punto solo cuando haya avisos. WHEN no haya avisos, el panel SHALL mostrar
+un mensaje informativo y SHALL NOT quedar vacío. La campana SHALL NOT mostrar novedades, logros,
+mensajes ni recordatorios de cuota que el sistema no registra.
 
 El tablero SHALL conservar siempre su forma y SHALL NOT colapsar a su estado vacío: las cuatro
-tarjetas y el bloque `Tu agenda` SHALL renderizarse aunque su dato no exista todavía, y el tablero
-SHALL NOT eliminar una tarjeta ni un bloque porque la fuente no pueda responder. Donde la fuente no
-puede responder, el valor SHALL ser `—`; donde la fuente responde, SHALL mostrarse el valor real,
-incluido un `0` real. El valor `—` SHALL significar "todavía no lo sé" y SHALL NOT significar
-"cero". Mientras la lectura de las inscripciones no haya resuelto, cada valor que dependa de ella
-SHALL ser `—`, nunca un `0` ni un literal.
+tarjetas y los bloques `Tu situación de pagos`, `Comprobantes recientes` y `Tu agenda` SHALL
+renderizarse aunque su dato no exista todavía, y el tablero SHALL NOT eliminar una tarjeta ni un
+bloque porque la fuente no pueda responder. Los avisos no son un bloque del tablero: viven en la
+campana y no alteran esta forma. Donde la fuente no puede responder, el valor
+SHALL ser `—`; donde la fuente responde, SHALL mostrarse el valor real, incluido un `0` real. El valor
+`—` SHALL significar "todavía no lo sé" y SHALL NOT significar "cero". Mientras una lectura no haya
+resuelto, los valores que dependen de ella SHALL ser `—`, nunca un `0` ni un literal.
 
-El bloque `Tu agenda` SHALL mostrarse siempre y SHALL caer a su propio mensaje de vacío cuando no
-tenga ningún encuentro; si la lectura de las inscripciones falla, el bloque SHALL informar el fallo
-en lugar de afirmar que no hay encuentros. Cada fila de la agenda SHALL mostrar la fecha del
-encuentro junto a su horario y el curso al que pertenece, y SHALL mostrar el tema solo cuando esté
-cargado: el sistema SHALL NOT renderizar ningún texto de tema de relleno. Las tarjetas de las
-inscripciones NO forman parte del tablero: viven en la pantalla `Mis Cursos`, y la pantalla `Mis
-Cursos` es la que conserva su mensaje de vacío cuando el alumno no tiene ninguna inscripción.
-
-El tablero SHALL organizarse en dos bloques: arriba el encabezado y los cuatro indicadores, y
-debajo el bloque `Tu agenda` con una fila por próximo encuentro de las inscripciones, tomado de los
-mismos datos que muestra el detalle del curso y **ordenado por fecha, de más cercano a más lejano**,
-sin importar a qué cursada pertenece. El tablero SHALL NOT calcular porcentajes de
-progreso, asistencia ni avance, y SHALL NOT mostrar bloques de tareas, calificaciones ni
-novedades: el maquetado no tiene esas entidades y los valores del prototipo (`68 %` de progreso,
-`3` tareas pendientes, `96 %` de asistencia) no son datos del sistema.
+Las tarjetas de las inscripciones NO forman parte del tablero: viven en la pantalla `Mis Cursos`, que
+es la que conserva su mensaje de vacío cuando el alumno no tiene ninguna inscripción.
 
 #### Scenario: La alumna abre su tablero
 - **WHEN** la alumna abre la raíz de su shell
-- **THEN** ve el saludo con su nombre y la línea de fecha real del día, las cuatro tarjetas —`CURSOS EN MARCHA` con la cantidad real de inscripciones, `ACCESO A LA CLASE` con el estado real de la inscripción, `COMPROBANTES ACREDITADOS` con `—` y `PRÓXIMA CLASE` con la clase real o `—`— y `Tu agenda` con sus próximos encuentros, sin las tarjetas de las cursadas
+- **THEN** ve el saludo con su nombre y la fecha real, las cuatro tarjetas —`CURSOS EN MARCHA`, `ACCESO A LA CLASE`, `COMPROBANTES ACREDITADOS` y `PRÓXIMA CLASE`—, `Tu situación de pagos`, `Comprobantes recientes`, `Tu agenda` y la campana del armazón con sus avisos
 
 #### Scenario: La alumna espera mientras cargan sus inscripciones
-- **WHEN** la alumna abre la raíz de su shell y la consulta de sus inscripciones todavía no resolvió
-- **THEN** el tablero ya se pinta con su forma completa y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal, hasta que la consulta resuelve
+- **WHEN** la alumna abre la raíz de su shell y las consultas todavía no resolvieron
+- **THEN** el tablero ya se pinta con su forma completa y cada valor que depende de una lectura muestra `—`, nunca un `0` ni un literal
 
 #### Scenario: La alumna no tiene inscripciones
 - **WHEN** la alumna no tiene ninguna inscripción
-- **THEN** `CURSOS EN MARCHA` muestra un `0` real, `ACCESO A LA CLASE` y `PRÓXIMA CLASE` muestran `—`, el tablero no colapsa a un estado vacío y `Tu agenda` cae a su mensaje de vacío, mientras que la pantalla `Mis Cursos` es la que muestra el mensaje de que no tiene cursos activos
+- **THEN** `CURSOS EN MARCHA` muestra un `0` real, `ACCESO A LA CLASE` y `PRÓXIMA CLASE` muestran `—`, el tablero no colapsa y `Tu agenda` cae a su mensaje de vacío, mientras que `Mis Cursos` es la que muestra el mensaje de que no tiene cursos activos
 
 #### Scenario: La alumna compara el indicador de acceso con su tarjeta
 - **WHEN** la alumna revisa `ACCESO A LA CLASE` en el tablero y la tarjeta de su inscripción en `Mis Cursos`
 - **THEN** ambas muestran el mismo estado, porque el indicador refleja el campo de la inscripción y no un cálculo
 
 #### Scenario: La alumna tiene el acceso bloqueado
-- **WHEN** la inscripción de la alumna está bloqueada por un comprobante observado
-- **THEN** el indicador `ACCESO A LA CLASE` muestra `BLOQUEADO` en rojo con la causa, junto con la tarjeta de `Mis Cursos` que también la informa
+- **WHEN** la inscripción de la alumna está bloqueada
+- **THEN** `ACCESO A LA CLASE` muestra `BLOQUEADO` en rojo con la causa y la campana muestra un punto y, al abrirla, el aviso con su enlace a `Mis Pagos`
+
+#### Scenario: La alumna tiene comprobantes acreditados
+- **WHEN** `GET /alumno/pagos` devuelve dos pagos en estado `ACREDITADO` por $ 60.000 en total
+- **THEN** `COMPROBANTES ACREDITADOS` muestra `2` y su contexto informa el total y la cantidad en revisión
+
+#### Scenario: La alumna no tiene pagos acreditados
+- **WHEN** la consulta de pagos responde con una lista vacía
+- **THEN** `COMPROBANTES ACREDITADOS` muestra un `0` real y `Tu situación de pagos` cae a su mensaje de vacío
+
+#### Scenario: La alumna tiene comprobantes en revisión
+- **WHEN** la alumna envió comprobantes que siguen en `PENDIENTE_REVISION`
+- **THEN** `Tu situación de pagos` informa cuántos están en revisión y ofrece el enlace a `Mis Pagos`
+
+#### Scenario: La alumna tiene un comprobante observado
+- **WHEN** la alumna tiene un comprobante en estado `OBSERVADO` con su motivo y abre la campana
+- **THEN** el panel muestra el aviso con el motivo y el enlace a `Mis Pagos`
+
+#### Scenario: La alumna no tiene avisos
+- **WHEN** la alumna no tiene ninguna inscripción bloqueada ni comprobante observado
+- **THEN** la campana no muestra el punto y, al abrirla, el panel muestra un mensaje informativo y no un bloque vacío
 
 #### Scenario: La alumna revisa su agenda
 - **WHEN** la alumna mira un encuentro de `Tu agenda`
-- **THEN** ve la fecha junto al horario de ese día y el nombre del curso, ve el tema solo si la clase de esa fecha ya está cargada, sin ningún texto de tema de relleno, y los encuentros están ordenados por fecha
+- **THEN** ve la fecha agrupada, el horario de ese día y el curso, ve el tema solo si la clase de esa fecha ya está cargada, sin texto de relleno, y los encuentros están ordenados por fecha y hora
+
+#### Scenario: La agenda de la alumna se recorta a cinco encuentros
+- **WHEN** hay más de cinco encuentros próximos en las inscripciones de la alumna
+- **THEN** `Tu agenda` muestra los cinco más cercanos y `Mostrando 5 de {N} encuentros.` con el total real
 
 #### Scenario: La alumna compara el indicador de acceso con varias cursadas
 - **WHEN** la alumna tiene una cursada habilitada y otra bloqueada
-- **THEN** `ACCESO A LA CLASE` muestra `BLOQUEADO` en rojo con la causa de la cursada bloqueada, sin importar en qué orden devuelve la API las inscripciones
+- **THEN** `ACCESO A LA CLASE` muestra `BLOQUEADO` en rojo con la causa de la cursada bloqueada, sin importar el orden de la respuesta
 
 #### Scenario: La alumna busca sus tareas o sus calificaciones
 - **WHEN** la alumna recorre el tablero buscando tareas pendientes, calificaciones o un porcentaje de progreso
-- **THEN** no los encuentra, porque esas entidades no existen en el maquetado
+- **THEN** no los encuentra, porque esas entidades no existen en el modelo; los avisos accionables viven en la campana
