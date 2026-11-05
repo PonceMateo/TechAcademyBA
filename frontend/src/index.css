@@ -191,6 +191,16 @@ html {
   backdrop-filter: blur(12px);
 }
 
+/* Carrusel sin barra visible: se mueve con flechas, rueda o gesto, no con el scrollbar. */
+.carrusel-sin-barra {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.carrusel-sin-barra::-webkit-scrollbar {
+  display: none;
+}
+
 /* Avatar en el tono suave del acento; fuera de un shell, el azul de la marca. */
 [data-ui='avatar'] {
   background-color: var(--acento-suave);

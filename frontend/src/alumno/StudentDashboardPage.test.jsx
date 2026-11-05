@@ -1,4 +1,5 @@
 import { cleanup, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   accountForRole,
@@ -140,12 +141,14 @@ describe('agenda y avisos', () => {
     expect(screen.getByText('Componentes y props')).toBeInTheDocument()
   })
 
-  it('no muestra avisos cuando el acceso y los comprobantes están al día', () => {
-    expect(
-      screen.getByText(
-        'No tenés avisos pendientes. Tu acceso y tus comprobantes están al día.',
-      ),
-    ).toBeInTheDocument()
+  it('no marca la campana cuando el acceso y los comprobantes están al día', async () => {
+    const user = userEvent.setup()
+    const campana = await screen.findByRole('button', { name: 'Notificaciones' })
+
+    expect(campana.querySelector('[data-ui="notificacion-punto"]')).toBeNull()
+
+    await user.click(campana)
+    expect(await screen.findByText('No tenés avisos pendientes.')).toBeInTheDocument()
   })
 
   it('lleva el acceso bloqueado y el comprobante observado a Mis Pagos', async () => {
@@ -165,8 +168,11 @@ describe('agenda y avisos', () => {
     )
     renderAppAs('ALUMNO', '/alumno')
 
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 2 pendientes' }))
+
     expect(
-      await screen.findByRole('link', { name: /Tu acceso está bloqueado/ }),
+      screen.getByRole('link', { name: /Tu acceso está bloqueado/ }),
     ).toHaveAttribute('href', '/alumno/pagos')
     expect(
       screen.getByRole('link', { name: /Tenés un comprobante observado/ }),

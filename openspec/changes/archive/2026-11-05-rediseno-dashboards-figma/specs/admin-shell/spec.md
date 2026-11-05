@@ -37,29 +37,32 @@ comisión, el estado y la fecha de recepción. El bloque SHALL ofrecer `Ver todo
 el sistema no registra la fecha de inscripción.
 
 El sistema SHALL mostrar el bloque `Tu agenda` con la semana corriente y las próximas clases de todas
-las comisiones, ordenadas por fecha y hora, con un máximo de ocho encuentros dentro de los próximos
+las comisiones, ordenadas por fecha y hora, con un máximo de cinco encuentros dentro de los próximos
 siete días. Cada encuentro SHALL mostrar la fecha agrupada con el encabezado `HOY, {día de la semana}
 {día} DE {mes}` o su equivalente, el rango horario, el curso, el código de comisión y el docente
 cuando lo tenga. La agenda SHALL incluir las comisiones de todos los docentes y SHALL NOT mostrar
-clases de comisiones finalizadas. El bloque SHALL ofrecer `Ver comisiones`, que navega a
-`/admin/cursos`, y SHALL NOT mostrar controles de semana inerte.
+clases de comisiones finalizadas. WHEN haya más de cinco encuentros, el bloque SHALL mostrar
+`Mostrando 5 de {N} encuentros.` con el total real. El bloque SHALL NOT mostrar controles de semana
+inerte.
 
-El sistema SHALL mostrar el bloque `Requiere tu atención` con las alertas de gestión reales cuyo
-conteo sea mayor a cero: comprobantes pendientes de revisión, cobranzas observadas y comisiones sin
-vacantes. Cada alerta SHALL mostrar su cantidad y SHALL navegar a la pantalla donde se resuelve
-—`/admin/cobranzas` o `/admin/cursos`—. WHEN no haya ninguna alerta, el bloque SHALL mostrar un
-mensaje informativo y SHALL NOT quedar vacío ni mostrar líneas del prototipo.
+El sistema SHALL mostrar las alertas de gestión en la campana del armazón, junto al perfil: los
+comprobantes pendientes de revisión, las cobranzas observadas y las comisiones sin vacantes cuyo
+conteo sea mayor a cero. Cada alerta SHALL mostrar su cantidad y SHALL navegar a la pantalla donde se
+resuelve —`/admin/cobranzas` o `/admin/cursos`—. La campana SHALL abrirse al pulsarla y cerrarse con
+un click afuera o `Escape`; SHALL mostrar un punto solo cuando haya avisos. WHEN no haya ninguna
+alerta, el panel SHALL mostrar un mensaje informativo, SHALL NOT quedar vacío ni mostrar líneas del
+prototipo y la campana SHALL NOT mostrar el punto.
 
 El sistema SHALL mostrar el bloque `Accesos Rápidos del Personal` con dos acciones reales:
 `Registrar Cobranza`, que navega a `/admin/cobranzas`, y `Verificar Habilitaciones`, que navega a
-`/admin/alumnos`, donde vive la ficha con la habilitación por inscripción. La tercera acción del
-prototipo, `Descargar Reporte del Día`, SHALL NOT renderizarse porque no tiene historia ni endpoint
-detrás.
+`/admin/alumnos`, donde vive la ficha con la habilitación por inscripción. El bloque SHALL ubicarse
+arriba de `Tu agenda`. La tercera acción del prototipo, `Descargar Reporte del Día`, SHALL NOT
+renderizarse porque no tiene historia ni endpoint detrás.
 
 El tablero SHALL conservar siempre su forma: la fila de cuatro tarjetas y los bloques `Panorama de
-cobros`, `Comprobantes recientes`, `Tu agenda`, `Requiere tu atención` y `Accesos Rápidos del
-Personal` SHALL renderizarse aunque su dato no exista todavía, y el tablero SHALL NOT eliminar una
-tarjeta ni un bloque porque la fuente no pueda responder. Donde la fuente no puede responder, el valor
+cobros`, `Comprobantes recientes`, `Accesos Rápidos del Personal` y `Tu agenda` SHALL renderizarse
+—en ese orden— aunque su dato no exista todavía, y el tablero SHALL NOT eliminar una tarjeta ni un
+bloque porque la fuente no pueda responder. Donde la fuente no puede responder, el valor
 SHALL ser `—`; donde la fuente responde, SHALL mostrarse el valor real, incluido un `0` real. El valor
 `—` SHALL significar "todavía no lo sé" y SHALL NOT significar "cero". Mientras la lectura del
 agregado no haya resuelto, cada valor que dependa de ella SHALL ser `—`, nunca un `0` ni un literal.
@@ -67,7 +70,7 @@ Si la lectura falla, los bloques SHALL informar el fallo en lugar de afirmar que
 
 #### Scenario: El usuario abre el Dashboard
 - **WHEN** un usuario de Secretaría abre `Dashboard`
-- **THEN** ve el saludo con su nombre y la fecha real, las cuatro tarjetas con sus valores reales y su contexto, `Panorama de cobros`, `Comprobantes recientes`, `Tu agenda` y `Requiere tu atención`
+- **THEN** ve el saludo con su nombre y la fecha real, las cuatro tarjetas con sus valores reales y su contexto, `Panorama de cobros`, `Comprobantes recientes`, `Accesos Rápidos del Personal`, `Tu agenda` y la campana del armazón con sus avisos
 
 #### Scenario: El usuario compara los indicadores con el catálogo
 - **WHEN** el usuario contrasta `ALUMNOS INSCRIPTOS`, `CUPO PROMEDIO OCUPADO`, `COMISIONES` y `COBROS PENDIENTES DE COBRO` con el padrón, el catálogo y las cobranzas
@@ -75,7 +78,7 @@ Si la lectura falla, los bloques SHALL informar el fallo en lugar de afirmar que
 
 #### Scenario: El usuario espera mientras carga el tablero
 - **WHEN** el usuario abre `Dashboard` y el agregado todavía no resolvió
-- **THEN** la fila de cuatro tarjetas y los cinco bloques ya se pintan con su forma, y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal
+- **THEN** la fila de cuatro tarjetas y los bloques ya se pintan con su forma, y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal
 
 #### Scenario: El usuario lee el panorama de cobros
 - **WHEN** el usuario mira `Panorama de cobros`
@@ -95,23 +98,23 @@ Si la lectura falla, los bloques SHALL informar el fallo en lugar de afirmar que
 
 #### Scenario: El usuario recorre la agenda de todas las comisiones
 - **WHEN** el usuario mira `Tu agenda`
-- **THEN** ve las próximas clases de todas las comisiones, agrupadas por fecha, ordenadas por hora, con curso, código de comisión y docente, y sin clases de comisiones finalizadas
+- **THEN** ve hasta cinco próximas clases de todas las comisiones, agrupadas por fecha, ordenadas por hora, con curso, código de comisión y docente, sin clases de comisiones finalizadas y con `Mostrando 5 de {N} encuentros.` cuando hay más
 
 #### Scenario: El usuario no tiene clases próximas
 - **WHEN** no hay ninguna clase en los próximos siete días
 - **THEN** `Tu agenda` muestra su mensaje de vacío y no desaparece
 
 #### Scenario: El usuario lee la línea de lista de espera
-- **WHEN** el usuario recorre `Requiere tu atención` buscando la línea de lista de espera de `CUR-104`
-- **THEN** no la encuentra: el bloque muestra alertas reales o su mensaje informativo, y ninguna línea del prototipo
+- **WHEN** el usuario abre la campana buscando la línea de lista de espera de `CUR-104`
+- **THEN** no la encuentra: el panel muestra alertas reales o su mensaje informativo, y ninguna línea del prototipo
 
 #### Scenario: El usuario lee las alertas de gestión
-- **WHEN** hay comprobantes pendientes, cobranzas observadas o comisiones sin vacantes
-- **THEN** `Requiere tu atención` muestra cada alerta con su cantidad y su enlace a la pantalla donde se resuelve
+- **WHEN** hay comprobantes pendientes, cobranzas observadas o comisiones sin vacantes y el usuario abre la campana
+- **THEN** el panel muestra cada alerta con su cantidad y su enlace a la pantalla donde se resuelve
 
 #### Scenario: El usuario no tiene alertas
 - **WHEN** no hay comprobantes pendientes, cobranzas observadas ni comisiones sin vacantes
-- **THEN** `Requiere tu atención` muestra un mensaje informativo y no un bloque vacío
+- **THEN** la campana no muestra el punto y, al abrirla, el panel muestra un mensaje informativo y no un bloque vacío
 
 #### Scenario: El usuario pulsa una acción rápida
 - **WHEN** el usuario pulsa `Registrar Cobranza`
@@ -123,7 +126,7 @@ Si la lectura falla, los bloques SHALL informar el fallo en lugar de afirmar que
 
 #### Scenario: El usuario busca las alertas y los números inventados
 - **WHEN** el usuario recorre el tablero
-- **THEN** no encuentra `Comprobante ilegible de Agustina Benítez`, `Cheque de Banco Federal pendiente de acreditación`, `Valeria Rossi debe la mitad del arancel`, la lista de espera de `CUR-104` ni los números del prototipo
+- **THEN** no encuentra `Comprobante ilegible de Agustina Benítez`, `Cheque de Banco Federal pendiente de acreditación`, `Valeria Rossi debe la mitad del arancel`, la lista de espera de `CUR-104` ni los números del prototipo, ni en el tablero ni en la campana
 
 #### Scenario: Un valor real es cero
 - **WHEN** la fuente informa cero comprobantes pendientes y cero cobranzas observadas

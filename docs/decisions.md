@@ -2678,3 +2678,59 @@ alcance de este change; queda a criterio del equipo agregarlo.
   y ninguna acción visible queda inerte.
 - **Dónde:** `backend/app/services/dashboard.py`, `frontend/src/admin/DashboardPage.jsx`,
   `frontend/src/components/dashboard/AvisosAtencion.jsx`.
+
+### D85 — Los avisos de la sesión viven en la campana del armazón
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** los tableros de los tres roles repetían un bloque `Requiere tu atención` que solo
+  se veía en la pantalla índice, mientras la campana de la barra superior era inerte. Al cambiar de
+  sección el aviso desaparecía y el mismo dato se dibujaba dos veces.
+- **Decisión:** los avisos se calculan una vez por sesión en `useAvisosSesion` y se muestran en la
+  campana del `ShellFrame`: se abre con click, se cierra con click afuera o `Escape` y solo pinta el
+  punto cuando hay al menos un aviso. Los tableros dejan de renderizar el bloque de página. En
+  Administración se conservan comprobantes pendientes y cobranzas observadas; en Docente, solo los
+  alumnos bloqueados de comisiones activas; en Alumno, el acceso bloqueado y los comprobantes
+  observados. Las comisiones finalizadas no generan aviso.
+- **Por qué:** el aviso sobrevive a la navegación, el punto no llama la atención cuando no hay nada
+  pendiente y cada rol tiene una única fuente para el mismo dato. La campana no es un centro de
+  notificaciones persistente: no agrega historial ni entrega correos.
+- **Dónde:** `frontend/src/components/shell/ShellFrame.jsx`,
+  `frontend/src/components/shell/useAvisosSesion.js`,
+  `frontend/src/components/dashboard/AvisosAtencion.jsx`, `frontend/src/admin/DashboardPage.jsx`,
+  `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/alumno/StudentDashboardPage.jsx`.
+
+### D86 — Las comisiones del docente se listan como tarjetas activas ordenadas por próxima clase
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** el tablero docente mostraba las comisiones como una tabla y la revisión visual pidió
+  el formato de tarjetas del Figma, con dos tarjetas visibles y una interacción más directa.
+- **Decisión:** cada comisión se muestra como una tarjeta entera cliqueable —código, estado, horario,
+  próxima clase, conteos de acceso, barra de acceso y `Ver comisión`—. Las tarjetas alternan blanco
+  y `#EBF7F2`, usan borde `#E3F2E9` en reposo y hover, y hover de fondo `#E7F2ED`; el carrusel oculta
+  su scrollbar. Solo se listan las comisiones activas, ordenadas por la fecha y hora de su próxima
+  clase; las finalizadas no se muestran y no hay un enlace suelto `Ir a mis alumnos` al pie.
+- **Por qué:** el formato coincide con la captura vigente y la tarjeta completa es un objetivo de
+  click más grande y accesible. Ocultar las finalizadas y ordenar por próxima clase responde a la
+  operación real del docente; la barra no muestra una asistencia que el modelo no registra.
+- **Dónde:** `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/docente/TeacherCommissionsPage.test.jsx`, `frontend/src/index.css`.
+
+### D87 — La agenda del tablero muestra cinco encuentros y los accesos del admin van arriba
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** la agenda compartida mostraba hasta ocho encuentros y, en Administración, los accesos
+  rápidos quedaban debajo de ella; la revisión pidió una lectura más corta y priorizar las acciones.
+- **Decisión:** `AgendaSemanal` lista hasta cinco encuentros y, cuando hay más, muestra
+  `Mostrando 5 de N encuentros.` con el total real. El backend conserva el límite de ocho del
+  agregado; el recorte es de presentación. En Administración, `Accesos Rápidos del Personal` va antes
+  de `Tu agenda`.
+- **Por qué:** la agenda es contexto y no debe dominar el tablero; las acciones operativas de
+  Secretaría tienen que estar antes de la lectura pasiva. El backend no cambia y la regla de la
+  agenda sigue siendo una sola.
+- **Dónde:** `frontend/src/components/dashboard/AgendaSemanal.jsx`,
+  `frontend/src/admin/DashboardPage.jsx`, `frontend/src/docente/TeacherCommissionsPage.jsx`,
+  `frontend/src/alumno/StudentDashboardPage.jsx`.

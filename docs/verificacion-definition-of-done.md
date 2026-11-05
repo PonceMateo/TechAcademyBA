@@ -140,3 +140,33 @@ verde.
 El pull request es el **#45** y salió mergeado el 2026-10-03, así que la firma del recorrido se
 registró acá y no en el PR. La fila de **revisión de la lista** queda sin firmar: la hace alguien
 distinto de quien recorrió la interfaz, y todavía no la hizo nadie.
+
+## Rediseño de tableros — 2026-11-05
+
+- **Rama:** `feat/dashboards-redesign/Mateo-Ponce`
+- **Change:** `rediseno-dashboards-figma`
+- **Alcance:** ajustes de revisión D85–D87: campana de avisos, tarjetas docentes, agenda recortada a
+  cinco y accesos rápidos arriba de la agenda.
+
+### Verificación automatizada
+
+| Comando | Resultado |
+|---|---|
+| `docker compose exec -T backend ruff check app` | 0 errores |
+| `docker compose exec -T backend pytest -q` | 873 pruebas pasaron |
+| `npm test -- --reporter=dot` en `frontend` | 38 archivos, 727 pruebas pasaron |
+| `npm run lint` en `frontend` | 0 errores, 1 warning existente en `CoursesPage.jsx` |
+| `npm run build` en `frontend` | build correcto; warning existente de chunk > 500 kB |
+| `npx openspec validate --specs` | 18 specs válidos, 0 fallos |
+| `npx openspec validate rediseno-dashboards-figma` | change válido |
+
+Las pruebas cubren la campana con y sin avisos, el cierre por `Escape` y click afuera, la navegación
+por teclado, las tarjetas docentes con tarjeta entera clickeable, el orden por próxima clase, la
+ocultación de finalizadas, los fondos y el borde, la agenda de cinco encuentros con su contador y los
+accesos del admin antes de la agenda.
+
+### Limitación
+
+No se hizo un recorrido visual con navegador y las tres cuentas de demostración en esta etapa. La
+verificación es automatizada y de contrato; la revisión visual de los tres tableros queda pendiente
+de una pasada manual del equipo.

@@ -67,16 +67,15 @@ function agrupar(encuentros) {
   return [...grupos.entries()]
 }
 
-export function AgendaSemanal({ encuentros = [], vacio = 'No hay clases programadas.' }) {
+export function AgendaSemanal({ encuentros = [], vacio = 'No hay clases programadas.', limite = 5 }) {
   const hoy = new Date()
   const lunes = lunesDe(hoy)
-  const ordenados = [...encuentros]
-    .sort((izquierda, derecha) =>
-      `${izquierda.fecha} ${izquierda.horario ?? ''}`.localeCompare(
-        `${derecha.fecha} ${derecha.horario ?? ''}`,
-      ),
-    )
-    .slice(0, 8)
+  const ordenados = [...encuentros].sort((izquierda, derecha) =>
+    `${izquierda.fecha} ${izquierda.horario ?? ''}`.localeCompare(
+      `${derecha.fecha} ${derecha.horario ?? ''}`,
+    ),
+  )
+  const visibles = ordenados.slice(0, limite)
 
   return (
     <div className="space-y-4">
@@ -102,11 +101,11 @@ export function AgendaSemanal({ encuentros = [], vacio = 'No hay clases programa
         })}
       </div>
 
-      {ordenados.length === 0 ? (
+      {visibles.length === 0 ? (
         <p className="text-sm text-[var(--texto-etiqueta)]">{vacio}</p>
       ) : (
         <div className="space-y-4">
-          {agrupar(ordenados).map(([fecha, delDia]) => (
+          {agrupar(visibles).map(([fecha, delDia]) => (
             <section key={fecha}>
               <h3 className="mb-2 text-[11px] font-semibold tracking-wide text-[var(--texto-etiqueta)]">
                 {etiquetaDeGrupo(fecha)}
@@ -137,7 +136,9 @@ export function AgendaSemanal({ encuentros = [], vacio = 'No hay clases programa
 
       <p className="flex items-center gap-1.5 text-xs text-[var(--texto-etiqueta)]">
         <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-        Próximos siete días
+        {ordenados.length > visibles.length
+          ? `Mostrando ${visibles.length} de ${ordenados.length} encuentros.`
+          : 'Próximos siete días'}
       </p>
     </div>
   )

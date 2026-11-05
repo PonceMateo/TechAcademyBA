@@ -20,7 +20,8 @@ siguen siendo el mismo rol: la interfaz lo identifica siempre como `Secretaría`
 The system SHALL renderizar una barra superior con, de izquierda a derecha: un breadcrumb
 `Mi espacio > [etiqueta del ítem activo]` que refleja la pantalla abierta; un campo de búsqueda
 `Buscar en la plataforma` con la tecla de atajo `⌘ K`, **inerte**, que SHALL mostrarse pero
-SHALL NOT filtrar ni navegar; una campana de notificaciones con punto de no leído, **inerte**;
+SHALL NOT filtrar ni navegar; una campana de notificaciones que abre los avisos de la sesión y solo
+muestra el punto cuando hay avisos pendientes;
 y un bloque de perfil con el avatar, el nombre de la cuenta de la sesión, el rol `Secretaría` y
 un menú desplegable con una única entrada, `Cerrar sesión`, que sí funciona. La barra superior
 SHALL NOT renderizar el chip `Sede Constituciones`, ningún chip de rol ni el texto
@@ -46,9 +47,13 @@ ninguna línea de `Última actualización`: el pie se limita al tagline y al per
 - **WHEN** el usuario elige un ítem de navegación
 - **THEN** el ítem queda destacado como activo y el breadcrumb de la barra superior refleja la sección elegida
 
-#### Scenario: El usuario pulsa la búsqueda o la campana
-- **WHEN** el usuario escribe en el campo de búsqueda o pulsa la campana
-- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque ambos elementos son composición inerte
+#### Scenario: El usuario pulsa la búsqueda
+- **WHEN** el usuario escribe en el campo de búsqueda
+- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque la búsqueda es composición inerte
+
+#### Scenario: El usuario abre la campana
+- **WHEN** el usuario pulsa la campana
+- **THEN** se abre el panel de avisos de la sesión, que se cierra con un click afuera o con `Escape`
 
 #### Scenario: El usuario cierra la sesión desde su perfil
 - **WHEN** el usuario abre su perfil en la barra superior y elige `Cerrar sesión`
@@ -60,63 +65,133 @@ ninguna línea de `Última actualización`: el pie se limita al tagline y al per
 
 ### Requirement: Tablero operativo con indicadores del catálogo y valores pendientes
 
-The system SHALL mostrar, como encabezado del tablero, el saludo `Buen día, {nombre de la
-cuenta}` seguido de una línea de fecha con la fecha real del día que la fuente informa,
-formateada para español rioplatense con el día de la semana capitalizado (por ejemplo `Viernes
-9 de octubre`), y la frase de apoyo `Todo lo que necesitás para gestionar tu academia.`. El
-nombre es el de la cuenta de la sesión y la fecha SHALL ser un valor calculado a partir del día
-corriente, no un literal del maquetado.
+The system SHALL mostrar, como encabezado del tablero, el saludo `Buen día, {nombre de la cuenta}`
+seguido de una línea de fecha con la fecha real del día que la fuente informa, formateada para español
+rioplatense con el día de la semana capitalizado (por ejemplo `Viernes 9 de octubre`), y la frase de
+apoyo `Todo lo que necesitás para gestionar tu academia.`. El nombre es el de la cuenta de la sesión y
+la fecha SHALL ser un valor calculado a partir del día corriente, no un literal del maquetado.
 
-The system SHALL mostrar una fila de cuatro tarjetas de indicador. `COMISIONES` SHALL mostrar la
-cantidad de comisiones que informa el catálogo real y el texto de apoyo `en el catálogo`; el
-tablero SHALL leer ese conteo de la fuente y SHALL NOT calcular ningún agregado propio.
-`ALUMNOS INSCRIPTOS`, `COBROS PENDIENTES DE COBRO` y `CUPO PROMEDIO OCUPADO` SHALL mostrarse con
-el valor `—` y sin un número que las respalde, porque ningún endpoint respalda sus valores.
+El sistema SHALL mostrar una fila de cuatro tarjetas de indicador, cada una con su ícono, su rótulo,
+su valor y una línea de contexto: `ALUMNOS INSCRIPTOS` con la cantidad de alumnos distintos con al
+menos una inscripción activa y el contexto `{N} inscripciones activas`; `CUPO PROMEDIO OCUPADO` con el
+promedio del porcentaje de ocupación de las comisiones vigentes y el contexto `{N} comisiones
+vigentes`; `COMISIONES` con el total que informa el catálogo y el contexto `{N} vigentes`; y `COBROS
+PENDIENTES DE COBRO` con la suma de comprobantes pendientes de revisión y cobranzas observadas, y el
+contexto que separa ambas cantidades. Los cuatro valores SHALL venir calculados del agregado del
+tablero y la pantalla SHALL NOT calcular ningún agregado propio.
 
-The system SHALL mostrar el bloque `Alertas de Gestión Pendiente` con su encabezado y, en el
-cuerpo, el valor `—`, porque sus líneas no tienen fuente ni historia de usuario detrás. El
-bloque SHALL NOT mostrar las alertas del prototipo (`Comprobante ilegible de Agustina Benítez`,
-`Cheque de Banco Federal pendiente de acreditación`, `Valeria Rossi debe la mitad del arancel`)
-ni ninguna línea de lista de espera.
+El sistema SHALL mostrar el bloque `Panorama de cobros` con el valor destacado `Cobrado este mes`,
+que SHALL ser la suma real de las cobranzas acreditadas con fecha en el mes corriente, y con un
+gráfico de línea de los cobros acreditados por mes de los últimos seis meses, incluido el corriente y
+con los meses sin cobros en `0`. A la derecha del gráfico SHALL mostrar `Ocupación por comisión` con
+hasta tres comisiones vigentes y su porcentaje real. El bloque SHALL NOT graficar inscripciones por
+mes ni ningún valor sin fuente: el modelo no registra la fecha de inscripción. La pantalla SHALL NOT
+mostrar los números del prototipo (`1.248 alumnos activos`, `$ 8,4 M cobrados`, `84 % del objetivo`,
+`68 %`, `92 %`).
 
-The system SHALL mostrar el bloque `Accesos Rápidos del Personal` con las acciones `Registrar
-Cobranza`, `Verificar Habilitaciones` y `Descargar Reporte del Día`, que usan la misma
-denominación que los datos del cliente, como composición inerte: las tres acciones SHALL
-renderizarse y SHALL NOT navegar a ninguna pantalla.
+El sistema SHALL mostrar el bloque `Comprobantes recientes` con hasta cinco comprobantes enviados por
+alumnos, de cualquier estado, ordenados por fecha de recepción descendente. Las filas y las etiquetas
+de estado SHALL ser las mismas que las del bloque `Comprobantes de alumnos` de `Cobranzas e Ingresos`
+—`PENDIENTE DE REVISIÓN`, `ACEPTADO`, `OBSERVADO` y `RECHAZADO`—, con el alumno, el curso y la
+comisión, el estado y la fecha de recepción. El bloque SHALL ofrecer `Ver todos`, que navega a
+`/admin/cobranzas`. El bloque que el prototipo titula `Últimas inscripciones` se reemplaza por este:
+el sistema no registra la fecha de inscripción.
 
-El tablero SHALL conservar siempre su forma: la fila de cuatro tarjetas y el bloque `Alertas de
-Gestión Pendiente` SHALL renderizarse aunque su dato no exista todavía, y el tablero SHALL NOT
-eliminar una tarjeta ni un bloque porque la fuente no pueda responder. Donde la fuente no puede
-responder, el valor SHALL ser `—`; donde la fuente responde, SHALL mostrarse el valor real,
-incluido un `0` real. El valor `—` SHALL significar "todavía no lo sé" y SHALL NOT significar
-"cero". Mientras una lectura de la que depende un valor no haya resuelto, ese valor SHALL ser
-`—`, nunca un `0` ni un literal. El tablero SHALL NOT mostrar gráficos ni indicadores cuyos
-valores no estén fijados por este requisito: los números del prototipo (`1.248 alumnos activos`,
-`32 comisiones en curso`, `$ 8,4 M cobrados`) no son datos del maquetado y no se reproducen.
+El sistema SHALL mostrar el bloque `Tu agenda` con la semana corriente y las próximas clases de todas
+las comisiones, ordenadas por fecha y hora, con un máximo de cinco encuentros dentro de los próximos
+siete días. Cada encuentro SHALL mostrar la fecha agrupada con el encabezado `HOY, {día de la semana}
+{día} DE {mes}` o su equivalente, el rango horario, el curso, el código de comisión y el docente
+cuando lo tenga. La agenda SHALL incluir las comisiones de todos los docentes y SHALL NOT mostrar
+clases de comisiones finalizadas. WHEN haya más de cinco encuentros, el bloque SHALL mostrar
+`Mostrando 5 de {N} encuentros.` con el total real. El bloque SHALL NOT mostrar controles de semana
+inerte.
+
+El sistema SHALL mostrar las alertas de gestión en la campana del armazón, junto al perfil: los
+comprobantes pendientes de revisión, las cobranzas observadas y las comisiones sin vacantes cuyo
+conteo sea mayor a cero. Cada alerta SHALL mostrar su cantidad y SHALL navegar a la pantalla donde se
+resuelve —`/admin/cobranzas` o `/admin/cursos`—. La campana SHALL abrirse al pulsarla y cerrarse con
+un click afuera o `Escape`; SHALL mostrar un punto solo cuando haya avisos. WHEN no haya ninguna
+alerta, el panel SHALL mostrar un mensaje informativo, SHALL NOT quedar vacío ni mostrar líneas del
+prototipo y la campana SHALL NOT mostrar el punto.
+
+El sistema SHALL mostrar el bloque `Accesos Rápidos del Personal` con dos acciones reales:
+`Registrar Cobranza`, que navega a `/admin/cobranzas`, y `Verificar Habilitaciones`, que navega a
+`/admin/alumnos`, donde vive la ficha con la habilitación por inscripción. El bloque SHALL ubicarse
+arriba de `Tu agenda`. La tercera acción del prototipo, `Descargar Reporte del Día`, SHALL NOT
+renderizarse porque no tiene historia ni endpoint detrás.
+
+El tablero SHALL conservar siempre su forma: la fila de cuatro tarjetas y los bloques `Panorama de
+cobros`, `Comprobantes recientes`, `Accesos Rápidos del Personal` y `Tu agenda` SHALL renderizarse
+—en ese orden— aunque su dato no exista todavía, y el tablero SHALL NOT eliminar una tarjeta ni un
+bloque porque la fuente no pueda responder. Donde la fuente no puede responder, el valor
+SHALL ser `—`; donde la fuente responde, SHALL mostrarse el valor real, incluido un `0` real. El valor
+`—` SHALL significar "todavía no lo sé" y SHALL NOT significar "cero". Mientras la lectura del
+agregado no haya resuelto, cada valor que dependa de ella SHALL ser `—`, nunca un `0` ni un literal.
+Si la lectura falla, los bloques SHALL informar el fallo en lugar de afirmar que no hay datos.
 
 #### Scenario: El usuario abre el Dashboard
 - **WHEN** un usuario de Secretaría abre `Dashboard`
-- **THEN** ve el saludo con su nombre y la línea de fecha real del día, la fila de cuatro tarjetas —`COMISIONES` con el valor que informa el catálogo, y `ALUMNOS INSCRIPTOS`, `COBROS PENDIENTES DE COBRO` y `CUPO PROMEDIO OCUPADO` con `—`—, el bloque `Alertas de Gestión Pendiente` con su encabezado y `—` en el cuerpo, y los accesos rápidos
+- **THEN** ve el saludo con su nombre y la fecha real, las cuatro tarjetas con sus valores reales y su contexto, `Panorama de cobros`, `Comprobantes recientes`, `Accesos Rápidos del Personal`, `Tu agenda` y la campana del armazón con sus avisos
 
 #### Scenario: El usuario compara los indicadores con el catálogo
-- **WHEN** el usuario lee el tablero y lo contrasta con el listado de `Cursos y Comisiones`
-- **THEN** `COMISIONES` coincide con la cantidad de comisiones del catálogo real y las otras tres tarjetas muestran `—`, porque no existe ninguna fuente que respalde sus valores
+- **WHEN** el usuario contrasta `ALUMNOS INSCRIPTOS`, `CUPO PROMEDIO OCUPADO`, `COMISIONES` y `COBROS PENDIENTES DE COBRO` con el padrón, el catálogo y las cobranzas
+- **THEN** los cuatro valores coinciden con los calculados en el servidor y el tablero no calcula ningún agregado propio
 
 #### Scenario: El usuario espera mientras carga el tablero
-- **WHEN** el usuario abre `Dashboard` y la lectura del catálogo todavía no resolvió
-- **THEN** la fila de cuatro tarjetas y el bloque `Alertas de Gestión Pendiente` ya se pintan con su forma, y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal, hasta que la lectura resuelve
+- **WHEN** el usuario abre `Dashboard` y el agregado todavía no resolvió
+- **THEN** la fila de cuatro tarjetas y los bloques ya se pintan con su forma, y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal
 
-#### Scenario: El usuario lee la línea de lista de espera
-- **WHEN** el usuario lee el cuerpo de `Alertas de Gestión Pendiente`
-- **THEN** ve `—` y no encuentra ninguna de las alertas del prototipo ni la línea de lista de espera sobre el cupo alcanzado de `CUR-104`, porque el bloque conserva su encabezado pero ninguna fuente respalda sus líneas. El nombre del escenario conserva el de la regla anterior, que afirmaba esa línea, y queda acá como registro de la diferencia
+#### Scenario: El usuario lee el panorama de cobros
+- **WHEN** el usuario mira `Panorama de cobros`
+- **THEN** ve `Cobrado este mes` con la suma de las cobranzas acreditadas del mes y la línea de los últimos seis meses, con los meses sin cobros en `0`
 
-#### Scenario: El usuario pulsa una acción rápida
-- **WHEN** el usuario pulsa `Registrar Cobranza`, `Verificar Habilitaciones` o `Descargar Reporte del Día`
-- **THEN** no ocurre ninguna navegación ni se ejecuta ninguna lógica, porque las tres acciones son composición inerte y ninguna historia de usuario cubre esta pantalla
+#### Scenario: El usuario abre el tablero sin cobranzas
+- **WHEN** no hay ninguna cobranza acreditada en los últimos seis meses
+- **THEN** `Cobrado este mes` muestra `0`, la serie muestra seis meses en `0` y el bloque informa que todavía no hay cobros, sin inventar una curva
 
 #### Scenario: El usuario busca un gráfico del prototipo
-- **WHEN** el usuario recorre el tablero buscando la sección `La academia en números` con sus gráficos
-- **THEN** no la encuentra, porque los números del prototipo no corresponden a los datos del maquetado
+- **WHEN** el usuario recorre el tablero buscando la sección `La academia en números` o un gráfico de inscripciones por mes
+- **THEN** no las encuentra: el gráfico es `Panorama de cobros` y se construye con las fechas de pago, porque el modelo no guarda la fecha de inscripción
+
+#### Scenario: El usuario compara los comprobantes recientes con Cobranzas
+- **WHEN** el usuario abre `Cobranzas e Ingresos` y compara su bloque `Comprobantes de alumnos` con `Comprobantes recientes`
+- **THEN** las filas son los mismos comprobantes enviados por alumnos, con las mismas etiquetas de estado, y `Ver todos` abre `/admin/cobranzas`
+
+#### Scenario: El usuario recorre la agenda de todas las comisiones
+- **WHEN** el usuario mira `Tu agenda`
+- **THEN** ve hasta cinco próximas clases de todas las comisiones, agrupadas por fecha, ordenadas por hora, con curso, código de comisión y docente, sin clases de comisiones finalizadas y con `Mostrando 5 de {N} encuentros.` cuando hay más
+
+#### Scenario: El usuario no tiene clases próximas
+- **WHEN** no hay ninguna clase en los próximos siete días
+- **THEN** `Tu agenda` muestra su mensaje de vacío y no desaparece
+
+#### Scenario: El usuario lee la línea de lista de espera
+- **WHEN** el usuario abre la campana buscando la línea de lista de espera de `CUR-104`
+- **THEN** no la encuentra: el panel muestra alertas reales o su mensaje informativo, y ninguna línea del prototipo
+
+#### Scenario: El usuario lee las alertas de gestión
+- **WHEN** hay comprobantes pendientes, cobranzas observadas o comisiones sin vacantes y el usuario abre la campana
+- **THEN** el panel muestra cada alerta con su cantidad y su enlace a la pantalla donde se resuelve
+
+#### Scenario: El usuario no tiene alertas
+- **WHEN** no hay comprobantes pendientes, cobranzas observadas ni comisiones sin vacantes
+- **THEN** la campana no muestra el punto y, al abrirla, el panel muestra un mensaje informativo y no un bloque vacío
+
+#### Scenario: El usuario pulsa una acción rápida
+- **WHEN** el usuario pulsa `Registrar Cobranza`
+- **THEN** navega a `/admin/cobranzas`; WHEN pulsa `Verificar Habilitaciones` THEN navega a `/admin/alumnos`
+
+#### Scenario: El usuario busca el reporte del día
+- **WHEN** el usuario recorre los accesos rápidos buscando `Descargar Reporte del Día`
+- **THEN** no lo encuentra, porque no tiene historia ni endpoint detrás
+
+#### Scenario: El usuario busca las alertas y los números inventados
+- **WHEN** el usuario recorre el tablero
+- **THEN** no encuentra `Comprobante ilegible de Agustina Benítez`, `Cheque de Banco Federal pendiente de acreditación`, `Valeria Rossi debe la mitad del arancel`, la lista de espera de `CUR-104` ni los números del prototipo, ni en el tablero ni en la campana
+
+#### Scenario: Un valor real es cero
+- **WHEN** la fuente informa cero comprobantes pendientes y cero cobranzas observadas
+- **THEN** los indicadores muestran `0` y no `—`, porque la lectura resolvió y el cero es un dato
 
 ### Requirement: Comisiones activas y alta de comisión
 

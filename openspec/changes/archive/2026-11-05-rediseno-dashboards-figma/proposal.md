@@ -33,6 +33,22 @@ que envían los alumnos, que sí las registran.
   las tarjetas, la barra y el pie, como en el Figma. Los modales, menús y tooltips conservan su
   elevación porque flotan sobre el contenido.
 
+## Ajustes de revisión (2026-11-05)
+
+Después de la primera implementación, la revisión visual y funcional pidió cambios adicionales:
+
+- Los avisos de los tres roles se mudan a la campana del armazón; el bloque `Requiere tu atención`
+  deja de renderizarse en las pantallas índice. La campana solo marca el punto cuando hay avisos y
+  las comisiones finalizadas no generan alerta.
+- La agenda compartida muestra hasta cinco encuentros, con el total cuando recorta.
+- En Administración, `Accesos Rápidos del Personal` se ubica arriba de `Tu agenda`.
+- En Docente, las comisiones pasan a tarjetas de dos por fila con la tarjeta entera accionable,
+  alternancia blanco/`#EBF7F2`, borde `#E3F2E9`, hover `#E7F2ED` y sin scrollbar visible. Solo se
+  listan las activas, ordenadas por su próxima clase; las finalizadas se ocultan y se elimina el
+  enlace suelto `Ir a mis alumnos`.
+
+El detalle está en `docs/decisions.md` (D85–D87).
+
 ## Capabilities
 
 ### New Capabilities

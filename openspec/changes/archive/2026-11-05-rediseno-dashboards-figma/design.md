@@ -158,6 +158,18 @@ regla que ya usan el detalle del alumno y la próxima clase del docente; cambiar
 obligaría a comparar horas en zona horaria y a tocar tres pruebas existentes. Queda anotado como
 límite conocido y no como comportamiento deseado a futuro.
 
+**13. Ajustes de revisión posteriores al primer corte (2026-11-05).**
+
+La primera implementación dejó los avisos dentro de cada tablero y una agenda de ocho encuentros.
+La revisión los reemplaza sin cambiar el contrato del backend: los avisos se calculan una vez por
+sesión en la campana del shell (D85), la agenda de presentación recorta a cinco (D87) y el admin
+prioriza los accesos rápidos antes de la agenda. En Docente, el listado deja de ser una tabla: usa
+un carrusel de tarjetas activas, ordenadas por próxima clase, con la tarjeta entera como enlace y
+sin finalizadas. Las tarjetas alternan blanco y `#EBF7F2`, con borde `#E3F2E9` y hover `#E7F2ED`; la
+barra de acceso reemplaza a la asistencia promedio que el modelo no registra (D86). El bloque
+`Requiere tu atención` de la propuesta original queda reemplazado por la campana; su contenido y sus
+enlaces no cambian.
+
 ## Risks / Trade-offs
 
 - **[Pocos pagos reales]** La serie de seis meses puede verse casi plana o vacía → el bloque tiene

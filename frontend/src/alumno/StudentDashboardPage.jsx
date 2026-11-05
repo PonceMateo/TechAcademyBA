@@ -3,7 +3,6 @@ import { Link } from 'react-router'
 import { ArrowRight, BookOpen, CalendarDays, CreditCard, ShieldCheck } from 'lucide-react'
 import { useSession } from '../auth/SessionContext'
 import { AgendaSemanal } from '../components/dashboard/AgendaSemanal'
-import { AvisosAtencion } from '../components/dashboard/AvisosAtencion'
 import { Indicador } from '../components/dashboard/Indicador'
 import { Badge, Card } from '../components/ui'
 import { TONO } from '../components/ui/paleta'
@@ -31,7 +30,7 @@ import { formatFechaLarga, formatFechaCorta, formatMoneda } from '../utils/forma
  *
  * **`Tu situación de pagos` reemplaza al bloque de progreso.** Muestra lo acreditado, lo que espera
  * revisión y lo observado, con el mismo estado que `Mis Pagos`; `Comprobantes recientes` muestra
- * los últimos cinco envíos. `Requiere tu atención` lleva el acceso bloqueado y el comprobante
+ * los últimos cinco envíos. La campana del armazón lleva el acceso bloqueado y el comprobante
  * observado a la pantalla donde se resuelven.
  *
  * **La agenda es una sola línea de tiempo.** Si el detalle de una cursada falla, la agenda de las
@@ -131,24 +130,6 @@ export function StudentDashboardPage() {
       ),
     )
     .slice(0, 5)
-
-  const avisos = []
-  if (bloqueada) {
-    avisos.push({
-      texto: 'Tu acceso está bloqueado',
-      detalle: `Causa: ${bloqueada.acceso.causa}`,
-      cantidad: 1,
-      ruta: '/alumno/pagos',
-    })
-  }
-  if (observados.length > 0) {
-    avisos.push({
-      texto: 'Tenés un comprobante observado',
-      detalle: 'Revisá el motivo y reenviá el comprobante desde Mis Pagos.',
-      cantidad: observados.length,
-      ruta: '/alumno/pagos',
-    })
-  }
 
   return (
     <div className="space-y-6">
@@ -325,12 +306,6 @@ export function StudentDashboardPage() {
             />
           </Card>
 
-          <Card titulo="Requiere tu atención">
-            <AvisosAtencion
-              avisos={avisos}
-              vacio="No tenés avisos pendientes. Tu acceso y tus comprobantes están al día."
-            />
-          </Card>
         </div>
       </div>
     </div>

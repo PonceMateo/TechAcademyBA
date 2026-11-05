@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { useSession } from '../auth/SessionContext'
 import { AgendaSemanal } from '../components/dashboard/AgendaSemanal'
-import { AvisosAtencion } from '../components/dashboard/AvisosAtencion'
 import { CobrosPorMes } from '../components/dashboard/CobrosPorMes'
 import { Indicador } from '../components/dashboard/Indicador'
 import { Badge, Card } from '../components/ui'
@@ -29,7 +28,7 @@ import { formatFechaLarga, formatFechaCorta, formatMoneda } from '../utils/forma
  *
  * **Lo que el Figma mostraba sin fuente se reemplaza por lo real.** `Últimas inscripciones` pasa a
  * `Comprobantes recientes` —los cinco últimos de cualquier estado, con las etiquetas de Cobranzas—;
- * `Alertas de Gestión Pendiente` pasa a `Requiere tu atención` con conteos y enlaces; y
+ * `Alertas de Gestión Pendiente` se muda a la campana del armazón, con conteos y enlaces; y
  * `Descargar Reporte del Día` desaparece porque no hay reportería que respalde esa acción.
  *
  * **La pantalla distingue "no lo sé" de "no hay".** Mientras la lectura no resuelve, los valores
@@ -70,24 +69,6 @@ export function DashboardPage() {
   }, [])
 
   const indicadores = datos?.indicadores
-  const avisos = []
-
-  if (indicadores?.comprobantes_pendientes > 0) {
-    avisos.push({
-      texto: 'Comprobantes sin revisar',
-      detalle: 'Esperan la revisión de Secretaría.',
-      cantidad: indicadores.comprobantes_pendientes,
-      ruta: '/admin/cobranzas',
-    })
-  }
-  if (indicadores?.cobranzas_observadas > 0) {
-    avisos.push({
-      texto: 'Cobranzas observadas',
-      detalle: 'Tienen una causa pendiente de resolver.',
-      cantidad: indicadores.cobranzas_observadas,
-      ruta: '/admin/cobranzas',
-    })
-  }
 
   return (
     <div className="space-y-6">
@@ -256,24 +237,6 @@ export function DashboardPage() {
         </div>
 
         <div className="space-y-4">
-          <Card titulo="Tu agenda">
-            <AgendaSemanal
-              encuentros={datos?.agenda ?? []}
-              vacio={
-                datos === null
-                  ? 'Cargando agenda…'
-                  : 'No hay clases en los próximos siete días.'
-              }
-            />
-          </Card>
-
-          <Card titulo="Requiere tu atención">
-            <AvisosAtencion
-              avisos={avisos}
-              vacio="No hay comprobantes ni cobranzas pendientes."
-            />
-          </Card>
-
           <Card titulo="Accesos Rápidos del Personal">
             <div className="flex flex-col gap-2">
               <Link
@@ -291,6 +254,17 @@ export function DashboardPage() {
                 Verificar Habilitaciones
               </Link>
             </div>
+          </Card>
+
+          <Card titulo="Tu agenda">
+            <AgendaSemanal
+              encuentros={datos?.agenda ?? []}
+              vacio={
+                datos === null
+                  ? 'Cargando agenda…'
+                  : 'No hay clases en los próximos siete días.'
+              }
+            />
           </Card>
         </div>
       </div>

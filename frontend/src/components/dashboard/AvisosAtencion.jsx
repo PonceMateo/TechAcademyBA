@@ -4,7 +4,7 @@ import { Badge } from '../ui/Badge'
 import { TONO } from '../ui/paleta'
 
 /**
- * Bloque `Requiere tu atención` de los tres tableros (H/U 55, 56 y 57).
+ * Panel de avisos de la campana del armazón (H/U 55, 56 y 57).
  *
  * **Solo aparece lo que tiene cantidad y destino.** Un aviso sin número o sin ruta no se dibuja:
  * el prototipo mostraba líneas inertes y este bloque existe para que lo que se ve se pueda abrir.

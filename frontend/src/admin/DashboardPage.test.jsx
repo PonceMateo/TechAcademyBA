@@ -1,4 +1,5 @@
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   accountForRole,
@@ -15,8 +16,8 @@ import { formatFechaLarga } from '../utils/formato'
  * **Todo lo que se afirma sale del agregado.** La fuente se sustituye con una respuesta completa
  * para ver valores que el maquetado no tiene y para que el test no dependa de cuántas comisiones
  * tenga el ejemplo. Lo que se cuida es el contrato: las cuatro tarjetas, la serie, los comprobantes
- * recientes con las etiquetas de Cobranzas, la agenda de todas las comisiones y los avisos con
- * enlace. Los números del prototipo (`1.248`, `32`, `8,4 M`, `12`) no se reproducen.
+ * recientes con las etiquetas de Cobranzas, la agenda de todas las comisiones y la campana con
+ * los avisos. Los números del prototipo (`1.248`, `32`, `8,4 M`, `12`) no se reproducen.
  */
 
 const SALUDO = `Buen día, ${accountForRole('ADMIN').nombre}`
@@ -153,11 +154,14 @@ describe('agenda y avisos', () => {
     expect(screen.getByText('Componentes y props')).toBeInTheDocument()
   })
 
-  it('muestra los avisos con su conteo y su enlace', () => {
-    expect(screen.getByRole('link', { name: /Comprobantes sin revisar/ })).toHaveAttribute(
-      'href',
-      '/admin/cobranzas',
-    )
+  it('abre la campana con los avisos del tablero', async () => {
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 2 pendientes' }))
+
+    expect(
+      screen.getByRole('link', { name: /Comprobantes sin revisar/ }),
+    ).toHaveAttribute('href', '/admin/cobranzas')
     expect(screen.getByRole('link', { name: /Cobranzas observadas/ })).toHaveAttribute(
       'href',
       '/admin/cobranzas',
@@ -205,7 +209,6 @@ describe('tablero vacío', () => {
     expect(tarjeta('ALUMNOS INSCRIPTOS')).toHaveTextContent('0')
     expect(tarjeta('CUPO PROMEDIO OCUPADO')).toHaveTextContent('—')
     expect(screen.getByText('No hay clases en los próximos siete días.')).toBeInTheDocument()
-    expect(screen.getByText('No hay comprobantes ni cobranzas pendientes.')).toBeInTheDocument()
   })
 })
 

@@ -263,14 +263,17 @@ describe('navegación por teclado en los tres armazones (6.2)', () => {
 
     const user = userEvent.setup()
     // El lateral va primero en el DOM (ocupa toda la altura a la izquierda): las primeras paradas
-    // son sus enlaces y el perfil llega después. La búsqueda `⌘ K` y la campana son composición
-    // inerte y no reciben foco.
+    // son sus enlaces, después la campana y por último el perfil. La búsqueda `⌘ K` sigue sin foco.
     const enlaces = within(screen.getByRole('navigation', { name: marca })).getAllByRole('link')
     await user.tab()
     expect(document.activeElement).toBe(enlaces[0])
     for (let i = 1; i < enlaces.length; i += 1) {
       await user.tab()
     }
+    await user.tab()
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: /^Notificaciones/ }),
+    )
     await user.tab()
     const perfil = screen.getByRole('button', { name: new RegExp(accountForRole(rol).nombre) })
     expect(document.activeElement).toBe(perfil)
@@ -286,11 +289,11 @@ describe('navegación por teclado en los tres armazones (6.2)', () => {
     await screen.findByRole('navigation', { name: 'MENÚ OPERATIVO' })
 
     const user = userEvent.setup()
-    // El perfil llega después del lateral: se atraviesan sus enlaces antes de abrir el menú.
+    // El perfil llega después del lateral y de la campana: se atraviesan todos antes de abrir el menú.
     const enlaces = within(
       screen.getByRole('navigation', { name: 'MENÚ OPERATIVO' }),
     ).getAllByRole('link')
-    for (let i = 0; i < enlaces.length + 1; i += 1) {
+    for (let i = 0; i < enlaces.length + 2; i += 1) {
       await user.tab()
     }
     await user.keyboard('{Enter}')

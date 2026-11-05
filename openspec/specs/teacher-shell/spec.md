@@ -19,7 +19,8 @@ español rioplatense.
 The system SHALL renderizar una barra superior con, de izquierda a derecha: un breadcrumb
 `Mi espacio > [etiqueta del ítem activo]` que refleja la pantalla abierta; un campo de búsqueda
 `Buscar en la plataforma` con la tecla de atajo `⌘ K`, **inerte**, que SHALL mostrarse pero
-SHALL NOT filtrar ni navegar; una campana de notificaciones con punto de no leído, **inerte**;
+SHALL NOT filtrar ni navegar; una campana de notificaciones que abre los avisos de la sesión y solo
+muestra el punto cuando hay avisos pendientes;
 y un bloque de perfil con el avatar, el nombre de la cuenta de la sesión, el rol `Docente` y un
 menú desplegable con una única entrada, `Cerrar sesión`, que sí funciona. La barra superior
 SHALL NOT renderizar el chip `Rol Docente · Solo mis comisiones` ni el texto
@@ -48,9 +49,13 @@ ninguna línea de `Última actualización`: el pie se limita al tagline y al per
 - **WHEN** el docente elige un ítem de navegación
 - **THEN** el ítem queda destacado como activo y el breadcrumb de la barra superior refleja la sección elegida
 
-#### Scenario: El docente pulsa la búsqueda o la campana
-- **WHEN** el docente escribe en el campo de búsqueda o pulsa la campana
-- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque ambos elementos son composición inerte
+#### Scenario: El docente pulsa la búsqueda
+- **WHEN** el docente escribe en el campo de búsqueda
+- **THEN** el contenido de la pantalla no cambia y no se navega a ninguna parte, porque la búsqueda es composición inerte
+
+#### Scenario: El docente abre la campana
+- **WHEN** el docente pulsa la campana
+- **THEN** se abre el panel de avisos de la sesión, que se cierra con un click afuera o con `Escape`
 
 #### Scenario: El docente cierra la sesión desde su perfil
 - **WHEN** el docente abre su perfil en la barra superior y elige `Cerrar sesión`
@@ -58,80 +63,115 @@ ninguna línea de `Última actualización`: el pie se limita al tagline y al per
 
 ### Requirement: Listado de comisiones asignadas
 
-The system SHALL mostrar, como encabezado del tablero, el saludo `Buen día, {nombre de la
-cuenta}` seguido de una línea de fecha con la fecha real del día que la fuente informa,
-formateada para español rioplatense con el día de la semana capitalizado (por ejemplo `Viernes
-9 de octubre`), y la frase de apoyo `Tu agenda y tus comisiones en un solo lugar.`. La fecha
-SHALL ser un valor calculado a partir del día corriente, no un literal del maquetado. El texto
-SHALL NOT anunciar una cantidad de clases ni de entregas: esos valores no están en el
-maquetado.
+The system SHALL mostrar, como encabezado del tablero, el saludo `Buen día, {nombre de la cuenta}`
+seguido de una línea de fecha con la fecha real del día que la fuente informa, formateada para español
+rioplatense con el día de la semana capitalizado (por ejemplo `Viernes 9 de octubre`), y la frase de
+apoyo `Tu agenda y tus comisiones en un solo lugar.`. La fecha SHALL ser un valor calculado a partir
+del día corriente, no un literal del maquetado. El texto SHALL NOT anunciar una cantidad de clases ni
+de entregas.
 
-The system SHALL mostrar cuatro tarjetas de indicador —`COMISIONES ACTIVAS`, `ALUMNOS
-HABILITADOS`, `BLOQUEADOS` y `PRÓXIMA CLASE`— cuyos valores SHALL derivarse de las comisiones
-que el docente tiene asignadas: la cantidad de comisiones asignadas, los conteos de acceso de
-esas comisiones y la próxima clase que estas informan, con un `0` real cuando el conteo es cero y
-`—` cuando la fuente no puede responder (por ejemplo, cuando no hay ninguna próxima clase). Las
-tarjetas SHALL NOT mostrar valores literales fijos, sino los que resultan de las comisiones
-asignadas del docente. SHALL mostrar el bloque `Comisiones asignadas` con una fila por comisión
-asignada, con su código, su curso, su horario, su estado `Vigente` o `Finalizada`, su próxima clase y
-los conteos de habilitados y bloqueados de su padrón. Una comisión `Finalizada` SHALL seguir
-apareciendo en la vista del docente con su estado, sin eliminarse por haber terminado. El docente del
-maquetado tiene exactamente una comisión asignada en los datos del cliente, por lo que el maquetado
-SHALL NOT inventar comisiones adicionales para completar el bloque.
+The system SHALL mostrar cuatro tarjetas de indicador, cada una con su ícono, su rótulo, su valor y
+una línea de contexto: `COMISIONES ACTIVAS` con la cantidad de comisiones activas y el contexto `en
+el período lectivo`; `ALUMNOS HABILITADOS` con la suma de habilitados de sus comisiones activas y el
+contexto `con acceso a la clase`; `BLOQUEADOS` con la suma de bloqueados y el contexto `requieren
+revisión`; y `PRÓXIMA CLASE` con la próxima fecha que informan sus comisiones y el curso al que
+pertenece. Los valores SHALL derivarse de las comisiones activas, con un `0` real cuando el conteo es
+cero y `—` cuando la fuente no puede responder, por ejemplo cuando no hay ninguna próxima clase. Las
+tarjetas SHALL NOT mostrar valores literales fijos.
 
-El tablero SHALL conservar siempre su forma: las cuatro tarjetas, el bloque `Comisiones
-asignadas` y el bloque `Tu agenda` SHALL renderizarse aunque su dato no exista todavía, y el
-tablero SHALL NOT eliminar una tarjeta ni un bloque porque la fuente no pueda responder. Donde la
-fuente no puede responder, el valor SHALL ser `—`; donde la fuente responde, SHALL mostrarse el
-valor real, incluido un `0` real. El valor `—` SHALL significar "todavía no lo sé" y SHALL NOT
-significar "cero". Mientras la lectura de las comisiones asignadas no haya resuelto, cada valor
-que depende de ella SHALL ser `—`, nunca un `0` ni un literal.
+The system SHALL mostrar el bloque `Tus comisiones, a un vistazo` con una tarjeta por comisión
+activa, con su código, su curso, su horario, su estado `Vigente`, su próxima clase, los conteos de
+habilitados y bloqueados de su padrón como texto —no como chips— y una barra `Acceso habilitado` con
+el porcentaje de habilitados sobre el total del padrón. Cada tarjeta SHALL ser un único enlace que
+abre el padrón de esa comisión en `/docente/alumnos/{codigo}`; la acción `Ver comisión` es parte visual
+de la tarjeta y no contiene un enlace anidado. Las tarjetas SHALL alternar fondo blanco y `#EBF7F2`,
+con borde `#E3F2E9` en reposo y en hover, y fondo `#E7F2ED` al pasar el puntero. El carrusel SHALL
+mostrar dos tarjetas por fila en pantallas anchas, una en pantallas angostas, y SHALL NOT mostrar
+scrollbar visible.
 
-El tablero SHALL organizarse en dos columnas: a la izquierda, los indicadores y el bloque
-`Comisiones asignadas`; a la derecha, un bloque `Tu agenda` con una fila por clase de esa misma
-comisión, tomada de su horario y de su próxima clase. Cuando el docente no tiene comisiones
-asignadas, el bloque `Comisiones asignadas` SHALL caer a su mensaje de vacío y `Tu agenda` a su
-propio mensaje de vacío. El tablero SHALL NOT mostrar bloques de correcciones pendientes,
-novedades ni mensajes: el maquetado no registra entregas por corregir ni mensajes, y esos bloques
-del prototipo no tienen datos detrás.
+Solo las comisiones activas SHALL listarse, ordenadas por la fecha y hora de su próxima clase, con
+las que no tienen próxima clase al final y desempate por código. Una comisión `Finalizada` SHALL NOT
+aparecer en el bloque ni en los indicadores, y SHALL NOT generar un aviso en la campana. El sistema
+SHALL NOT inventar comisiones para completar el bloque.
 
-Los contadores SHALL renderizarse como chip verde para los habilitados y chip rojo para los
-bloqueados, y la forma singular o plural SHALL coincidir con la cantidad. El encabezado que el
-prototipo titula `RESTRICCIONES` SHALL renombrarse `ACCESO`, porque sus celdas contienen
-conteos de acceso y no restricciones. Este renombrado es una corrección intencional de una
-inconsistencia del prototipo.
+El tablero SHALL conservar siempre su forma: las cuatro tarjetas, el bloque `Tus comisiones, a un
+vistazo` y el bloque `Tu agenda` SHALL renderizarse aunque su dato no exista todavía, y el tablero
+SHALL NOT eliminar una tarjeta ni un bloque porque la fuente no pueda responder. Donde la fuente no
+puede responder, el valor SHALL ser `—`; donde la fuente responde, SHALL mostrarse el valor real,
+incluido un `0` real. El valor `—` SHALL significar "todavía no lo sé" y SHALL NOT significar
+"cero". Mientras la lectura de las comisiones asignadas no haya resuelto, cada valor que dependa de
+ella SHALL ser `—`, nunca un `0` ni un literal.
+
+El tablero SHALL organizarse en dos columnas: a la izquierda, los indicadores y el bloque `Tus
+comisiones, a un vistazo` con sus tarjetas; a la derecha, el bloque `Tu agenda` con la semana corriente
+y las próximas clases de todas sus comisiones activas —hasta cinco encuentros dentro de los próximos
+siete días, ordenados por fecha y hora, cada uno con el rango horario, el curso y el código de
+comisión—. WHEN haya más de cinco encuentros, la agenda SHALL mostrar `Mostrando 5 de {N}
+encuentros.` con el total real. Los avisos de alumnos bloqueados SHALL mostrarse en la campana del
+armazón, no en un bloque del tablero.
+
+El tablero SHALL NOT mostrar bloques de entregas por corregir, asistencia promedio, correcciones,
+novedades ni mensajes: el maquetado no registra esas entidades y sus valores del prototipo (`18`
+entregas, `92 %` de asistencia, `4` comisiones) no son datos del sistema. Tampoco SHALL mostrar un
+enlace suelto `Ir a mis alumnos` al pie: la navegación al padrón vive en cada tarjeta. El encabezado de
+los conteos de acceso SHALL seguir llamándose `ACCESO` y no `RESTRICCIONES`, porque las tarjetas
+muestran conteos de acceso y no restricciones.
 
 #### Scenario: El docente abre sus comisiones
 - **WHEN** el docente abre `Mis Comisiones`
-- **THEN** ve el saludo con su nombre y la línea de fecha real del día, las cuatro tarjetas —`COMISIONES ACTIVAS`, `ALUMNOS HABILITADOS`, `BLOQUEADOS` y `PRÓXIMA CLASE`— con los valores derivados de sus comisiones asignadas, el bloque `Comisiones asignadas` y, en la columna derecha, el bloque `Tu agenda`
+- **THEN** ve el saludo con su nombre y la fecha real, las cuatro tarjetas con sus valores derivados, el bloque `Tus comisiones, a un vistazo` con una tarjeta por comisión activa, `Tu agenda` y la campana del armazón con los alumnos bloqueados
 
 #### Scenario: El docente espera mientras cargan sus comisiones
-- **WHEN** el docente abre `Mis Comisiones` y la consulta de sus comisiones asignadas todavía no resolvió
-- **THEN** el tablero ya se pinta con su forma completa y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal, hasta que la consulta resuelve
+- **WHEN** el docente abre `Mis Comisiones` y la consulta todavía no resolvió
+- **THEN** el tablero ya se pinta con su forma completa y cada valor que depende de la lectura muestra `—`, nunca un `0` ni un literal
 
 #### Scenario: El docente no tiene comisiones asignadas
 - **WHEN** el docente no tiene ninguna comisión asignada
-- **THEN** las cuatro tarjetas muestran un `0` real o `—` según lo que la fuente respalde, el bloque `Comisiones asignadas` cae a su mensaje de vacío y `Tu agenda` a su propio mensaje de vacío, sin eliminar ninguna tarjeta ni bloque
+- **THEN** las cuatro tarjetas muestran un `0` real o `—` según lo que la fuente respalde, `Tus comisiones, a un vistazo` cae a su mensaje de vacío y `Tu agenda` a su propio mensaje de vacío, sin eliminar ninguna tarjeta ni bloque
 
 #### Scenario: El docente compara los contadores de acceso
-- **WHEN** el docente recorre los contadores de cada comisión
-- **THEN** los habilitados aparecen en chip verde y los bloqueados en chip rojo, y las etiquetas usan singular o plural según la cantidad, por ejemplo `1 bloqueado` frente a `4 bloqueados`
+- **WHEN** el docente recorre una tarjeta de comisión
+- **THEN** los habilitados y los bloqueados aparecen como texto con singular o plural según la cantidad, por ejemplo `1 bloqueado` frente a `4 bloqueados`, y la barra `Acceso habilitado` muestra el porcentaje del padrón
 
 #### Scenario: El docente cruza los indicadores con su única comisión
-- **WHEN** el docente compara `COMISIONES ACTIVAS` con el contenido del bloque `Comisiones asignadas`
-- **THEN** los conteos de las tarjetas coinciden con las comisiones asignadas y su padrón, porque los indicadores se derivan de las comisiones asignadas y no de valores fijos
+- **WHEN** el docente compara `COMISIONES ACTIVAS`, `ALUMNOS HABILITADOS` y `BLOQUEADOS` con las tarjetas de `Comisiones asignadas`
+- **THEN** los conteos coinciden con las comisiones activas y sus padrones, porque los indicadores se derivan de esas comisiones y no de valores fijos
+
+#### Scenario: El docente abre el padrón desde su tablero
+- **WHEN** el docente pulsa cualquier parte de una tarjeta de `Tus comisiones, a un vistazo`
+- **THEN** navega al padrón de esa comisión en `/docente/alumnos/{codigo}`
 
 #### Scenario: El docente ve una comisión finalizada
 - **WHEN** el docente tiene asignada una comisión cuya `fecha_fin` es anterior a hoy en `America/Argentina/Buenos_Aires`
-- **THEN** la comisión sigue apareciendo en el bloque `Comisiones asignadas` con el estado `Finalizada`
+- **THEN** la comisión no aparece en `Tus comisiones, a un vistazo` ni en los indicadores, porque solo se listan las activas
 
-#### Scenario: El docente busca la columna de restricciones
-- **WHEN** el docente lee los encabezados de la tabla de comisiones
-- **THEN** la columna de conteos se titula `ACCESO` y no `RESTRICCIONES`
+#### Scenario: El docente ordena sus comisiones por próxima clase
+- **WHEN** el docente tiene dos o más comisiones activas con próximas clases distintas
+- **THEN** las tarjetas aparecen de la próxima clase más cercana a la más lejana, y las que no tienen próxima clase quedan al final
+
+#### Scenario: El docente revisa su agenda
+- **WHEN** el docente mira `Tu agenda`
+- **THEN** ve hasta cinco próximas clases de todas sus comisiones activas, agrupadas por fecha, ordenadas por hora, con el rango horario, el curso y el código de comisión, y `Mostrando 5 de {N} encuentros.` cuando hay más
+
+#### Scenario: El docente no tiene clases próximas
+- **WHEN** no hay ninguna clase en los próximos siete días
+- **THEN** `Tu agenda` muestra su mensaje de vacío y no desaparece
+
+#### Scenario: El docente lee los avisos en la campana
+- **WHEN** el docente tiene alumnos bloqueados en comisiones activas y abre la campana
+- **THEN** el panel muestra la alerta con su cantidad y su enlace, y las comisiones finalizadas no generan ningún aviso
+
+#### Scenario: El docente no tiene avisos
+- **WHEN** el docente no tiene alumnos bloqueados en comisiones activas
+- **THEN** la campana no muestra el punto y, al abrirla, el panel muestra un mensaje informativo y no un bloque vacío
 
 #### Scenario: El docente busca entregas o mensajes
-- **WHEN** el docente recorre el tablero buscando `Correcciones pendientes` o novedades
-- **THEN** no los encuentra, porque el maquetado no registra entregas por corregir ni mensajes
+- **WHEN** el docente recorre el tablero buscando `Entregas por corregir`, `Correcciones pendientes` o `Asistencia promedio`
+- **THEN** no los encuentra, porque el maquetado no registra entregas ni promedios de asistencia; el único aviso vive en la campana
+
+#### Scenario: El docente busca la columna de restricciones
+- **WHEN** el docente lee los conteos de acceso de una tarjeta de comisión
+- **THEN** no encuentra una columna `RESTRICCIONES`, porque la tarjeta usa conteos de acceso
 
 ### Requirement: Detalle de comisión con padrón de solo lectura
 

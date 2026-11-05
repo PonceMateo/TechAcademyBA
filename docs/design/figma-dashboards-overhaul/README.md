@@ -56,3 +56,16 @@ reales de las H/U 55, 56 y 57.
 
 Las capturas y los JSON de este directorio siguen siendo referencia visual. El Figma es la
 autoridad de estilo y la fuente de la composición; los valores de negocio salen de la base.
+
+## Ajustes 2026-11-05 — campana y tarjetas docentes
+
+La revisión del rediseño agregó estos ajustes, registrados en `docs/decisions.md` (D85–D87):
+
+- La campana del armazón abre los avisos de la sesión; el bloque `Requiere tu atención` ya no se
+  renderiza en los tableros. El punto solo aparece cuando hay avisos.
+- En Docente, `Tus comisiones, a un vistazo` usa tarjetas de dos por fila, con fondo blanco y
+  `#EBF7F2`, borde `#E3F2E9` y hover `#E7F2ED`. La tarjeta entera abre la comisión y el carrusel no
+  muestra scrollbar.
+- Las comisiones finalizadas no se listan; las activas se ordenan por su próxima clase.
+- La agenda muestra hasta cinco encuentros y los accesos rápidos de Administración van arriba de
+  ella.
