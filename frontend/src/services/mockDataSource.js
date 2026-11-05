@@ -714,7 +714,6 @@ export function createMockDataSource() {
         email,
         telefono,
         activo: true,
-        catedra: null,
       })
       return { ...fila, password_inicial: passwordInicial(nombre, dni) }
     },

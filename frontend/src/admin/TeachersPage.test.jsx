@@ -22,7 +22,6 @@ const COLUMNAS = [
   'CUIL',
   'EMAIL',
   'TELÉFONO',
-  'CÁTEDRA O ESPECIALIDAD',
   'COMISIONES ASIGNADAS',
   'ESTADO',
   'ACCIONES',
@@ -47,7 +46,6 @@ function docenteCreado(datos, extra = {}) {
     cuil: datos.cuil ?? null,
     email: datos.email,
     telefono: datos.telefono ?? null,
-    catedra: null,
     activo: true,
     comisiones: [],
     comisiones_asignadas: 0,
@@ -65,7 +63,6 @@ function docenteDePrueba(id, nombre) {
     cuil: null,
     email: `docente${id}@techacademy.invalid`,
     telefono: null,
-    catedra: null,
     activo: true,
     comisiones: [],
     comisiones_asignadas: 0,
@@ -101,7 +98,7 @@ describe('listado de docentes', () => {
   it('muestra las comisiones reales de cada docente y Sin comisión cuando no tiene', () => {
     const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
     const asignadas = (nombre) =>
-      filas.find((fila) => fila.cells[0].textContent === nombre).cells[6].textContent
+      filas.find((fila) => fila.cells[0].textContent === nombre).cells[5].textContent
 
     expect(asignadas('Profe Martín')).toBe('CUR-101 · Python Inicial')
     expect(asignadas('Lic. Laura Benítez')).toBe('Sin comisión')
@@ -535,7 +532,6 @@ describe('edición de docente (historia #11)', () => {
           cuil: '27-30111222-6',
           email: 'rita.molina@techacademy.invalid',
           telefono: '+54 11 4000-1000',
-          catedra: null,
           activo: true,
           comisiones: [{ id: 7, codigo: 'CUR107-1', nombre: 'Datos' }],
           comisiones_asignadas: 1,
@@ -579,7 +575,7 @@ describe('edición de docente (historia #11)', () => {
     expect(filaDelDocente('Profe Martín').cells[4].textContent).toBe('011 15-9999-0000')
     // La edición no vuelve a resolver las comisiones: la fila que ya estaba en pantalla las
     // conserva (D52).
-    expect(filaDelDocente('Profe Martín').cells[6].textContent).toBe('CUR-101 · Python Inicial')
+    expect(filaDelDocente('Profe Martín').cells[5].textContent).toBe('CUR-101 · Python Inicial')
   })
 
   it('guarda el teléfono en E.164 y el CUIL del docente sin tocarlos', async () => {

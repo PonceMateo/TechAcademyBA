@@ -636,9 +636,6 @@ export function createApiDataSource() {
  * que muestra el código y el nombre del curso (historia #10), y el conte se conserva como derivado
  * de esa misma lista.
  *
- * `catedra` no existe en el modelo: se manda `null` para que la columna muestre un guion en vez de
- * inventar un dato.
- *
  * **`nombre` de la fila es el nombre completo y `nombres` el de pila.** La tabla muestra el primero;
  * el modal de edición (historia #11) necesita los dos por separado, y la respuesta del backend los
  * trae así. Sin `nombres` el formulario precargaría el apellido dentro del nombre y guardarlo sin
@@ -650,7 +647,6 @@ function filaDeDocente(docente) {
     ...docente,
     nombre: `${docente.nombre} ${docente.apellido}`,
     nombres: docente.nombre,
-    catedra: null,
     comisiones,
     comisiones_asignadas: docente.cantidad_comisiones ?? comisiones.length,
   }

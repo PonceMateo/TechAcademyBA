@@ -36,10 +36,6 @@ import { formatDocumento, formatTelefono } from '../utils/formato'
  * **El teléfono se carga con selector de país y viaja en E.164 o `null`** (D57): la API dejó de
  * aceptar texto libre, así que el formulario valida antes de enviar.
  *
- * **La columna CÁTEDRA no la puede llenar nadie.** El modelo no tiene ese campo, así que la fuente
- * real devuelve `null` y la pantalla muestra un guion. Se mantiene porque es una columna del
- * prototipo que el cliente pidió, y se deja a la vista que hoy no hay dato en vez de inventarlo.
- *
  * **Un alta fallida no cierra el formulario ni confirma nada.** Deja lo que la secretaría completó
  * y muestra el motivo que devuelve la fuente, que dice si se repitió el DNI o el email (D36).
  *
@@ -77,7 +73,6 @@ const COLUMNAS = [
     titulo: 'TELÉFONO',
     render: (fila) => (fila.telefono ? formatTelefono(fila.telefono) : '—'),
   },
-  { clave: 'catedra', titulo: 'CÁTEDRA O ESPECIALIDAD', render: (fila) => fila.catedra ?? '—' },
   {
     clave: 'comisiones',
     titulo: 'COMISIONES ASIGNADAS',

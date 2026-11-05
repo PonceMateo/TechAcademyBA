@@ -502,13 +502,13 @@ de numeración solo aparece ante dos altas simultáneas del mismo curso.
 ### Requirement: Padrón de docentes
 
 The system SHALL mostrar la pantalla `Docentes` con un listado cuyas columnas, en este orden
-literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`,
-`COMISIONES ASIGNADAS` y `ESTADO`, con un campo de búsqueda por nombre, apellido, DNI o email, y
+literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `COMISIONES ASIGNADAS`,
+`ESTADO` y `ACCIONES`, con un campo de búsqueda por nombre, apellido, DNI o email, y
 la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y
 SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila
-válida. Las filas del maquetado son, en este orden: Profe Martín con `Programación` y estado
-`Activa`; Lic. Laura Benítez con `Desarrollo Web` y `Activa`; Santi Ads con `Marketing` y
-`Activa`; Dr. Marcelo Ríos con `Datos` y `Activa`; e Ing. González con `Programación` y `Activa`.
+válida. Las filas del maquetado son, en este orden: Profe Martín con estado `Activa`; Lic. Laura
+Benítez con `Activa`; Santi Ads con `Activa`; Dr. Marcelo Ríos con `Activa`; e Ing. González con
+`Activa`.
 La columna `ESTADO` SHALL renderizar `Activa` en verde.
 
 El campo de búsqueda SHALL filtrar automáticamente mientras el administrador escribe, sin exigir
@@ -546,7 +546,7 @@ del alta y del control deshabilitado SHALL conservarse sin cambios.
 #### Scenario: El usuario abre el padrón de docentes
 
 - **WHEN** un usuario de Secretaría abre `Docentes`
-- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `CÁTEDRA O ESPECIALIDAD`, `COMISIONES ASIGNADAS` y `ESTADO`, los docentes activos que devuelve la fuente, sus datos de contacto, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
+- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, los docentes activos que devuelve la fuente, sus datos de contacto, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
 
 #### Scenario: El usuario localiza a un docente por CUIL
 
@@ -642,11 +642,6 @@ del alta y del control deshabilitado SHALL conservarse sin cambios.
 
 - **WHEN** el usuario escribe dos contraseñas distintas en el modal de restablecimiento
 - **THEN** la pantalla no envía la operación y muestra que las contraseñas no coinciden
-
-#### Scenario: El modal de edición no pide CUIL
-
-- **WHEN** el usuario abre `Editar Docente`
-- **THEN** ve nombre, apellido, DNI, mail y teléfono, y no ve ningún campo de CUIL
 
 ### Requirement: Alumnos, categorías arancelarias y cuentas corporativas
 
