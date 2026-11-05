@@ -16,6 +16,7 @@ import {
   listarAlumnos,
   listarComisiones,
   listarCursos,
+  listarDocentes,
   obtenerAlumno,
   obtenerPerfilAlumno,
   reactivarAlumno,
@@ -187,6 +188,24 @@ describe('la implementación de ejemplo', () => {
     const [laura] = await buscarDocentes('laura')
     expect(laura.comisiones).toEqual([])
     expect(laura.comisiones_asignadas).toBe(0)
+  })
+
+  it('deriva cursando desde las comisiones Vigentes del docente', async () => {
+    configurarFuenteDeDatos(createMockDataSource())
+
+    const [santi] = await buscarDocentes('santi')
+    expect(santi.cursando).toBe(true)
+    const [laura] = await buscarDocentes('laura')
+    expect(laura.cursando).toBe(false)
+
+    const listado = await listarDocentes()
+    expect(listado.map((docente) => [docente.id, docente.cursando])).toEqual([
+      [1, true],
+      [2, false],
+      [3, true],
+      [4, false],
+      [5, true],
+    ])
   })
 
   it('agrega el alumno dado de alta al padrón de ejemplo, sin inscripción', async () => {

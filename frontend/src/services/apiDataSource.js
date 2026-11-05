@@ -647,6 +647,7 @@ function filaDeDocente(docente) {
     ...docente,
     nombre: `${docente.nombre} ${docente.apellido}`,
     nombres: docente.nombre,
+    cursando: docente.cursando ?? false,
     comisiones,
     comisiones_asignadas: docente.cantidad_comisiones ?? comisiones.length,
   }

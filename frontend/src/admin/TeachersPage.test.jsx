@@ -47,6 +47,7 @@ function docenteCreado(datos, extra = {}) {
     email: datos.email,
     telefono: datos.telefono ?? null,
     activo: true,
+    cursando: true,
     comisiones: [],
     comisiones_asignadas: 0,
     password_inicial: `${primerNombre}${String(datos.dni).replace(/\D/g, '')}`,
@@ -64,6 +65,7 @@ function docenteDePrueba(id, nombre) {
     email: `docente${id}@techacademy.invalid`,
     telefono: null,
     activo: true,
+    cursando: true,
     comisiones: [],
     comisiones_asignadas: 0,
   }
@@ -107,12 +109,28 @@ describe('listado de docentes', () => {
     expect(asignadas('Ing. González')).toBe('CUR-108 · Java Backend Spring')
   })
 
-  it('muestra el estado Activa en verde en las cinco filas', () => {
-    const estados = screen.getAllByText('Activa')
+  it('muestra Activo en verde en los docentes que tienen una comisión Vigente e Inactivo en el resto', () => {
+    const estado = (nombre) =>
+      within(screen.getByRole('table'))
+        .getAllByRole('row')
+        .find((fila) => fila.cells[0].textContent === nombre)
+        .cells[6].textContent
 
-    expect(estados).toHaveLength(5)
-    for (const estado of estados) {
+    expect(estado('Profe Martín')).toBe('Activo')
+    expect(estado('Lic. Laura Benítez')).toBe('Inactivo')
+    expect(estado('Santi Ads')).toBe('Activo')
+    expect(estado('Dr. Marcelo Ríos')).toBe('Inactivo')
+    expect(estado('Ing. González')).toBe('Activo')
+
+    const activos = screen.getAllByText('Activo')
+    const inactivos = screen.getAllByText('Inactivo')
+    expect(activos).toHaveLength(3)
+    expect(inactivos).toHaveLength(2)
+    for (const estado of activos) {
       expect(estado.className).toContain('text-green-800')
+    }
+    for (const estado of inactivos) {
+      expect(estado.className).not.toContain('text-green-800')
     }
   })
 
@@ -533,6 +551,7 @@ describe('edición de docente (historia #11)', () => {
           email: 'rita.molina@techacademy.invalid',
           telefono: '+54 11 4000-1000',
           activo: true,
+          cursando: true,
           comisiones: [{ id: 7, codigo: 'CUR107-1', nombre: 'Datos' }],
           comisiones_asignadas: 1,
         },

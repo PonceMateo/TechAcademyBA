@@ -93,8 +93,8 @@ class DocenteOut(BaseModel):
     """Fila de `GET /docentes` y respuesta de `POST /docentes`.
 
     `cuil` viene en 11 dígitos o `None` (D57), `comisiones` sale de las relaciones reales de
-    `comision` (historia #10) y `cantidad_comisiones` se conserva como derivación de esa misma
-    lista.
+    `comision` (historia #10), `cantidad_comisiones` se conserva como derivación de esa misma
+    lista y `cursando` indica si el docente tiene al menos una comisión Vigente asignada.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -108,6 +108,7 @@ class DocenteOut(BaseModel):
     telefono: str | None
     activo: bool
     cantidad_comisiones: int
+    cursando: bool = False
     comisiones: list[ComisionDeDocenteOut] = Field(default_factory=list)
 
 

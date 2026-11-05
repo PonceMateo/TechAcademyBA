@@ -506,10 +506,13 @@ literal, son `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `COMISIONES ASIGNAD
 `ESTADO` y `ACCIONES`, con un campo de búsqueda por nombre, apellido, DNI o email, y
 la acción `+ Nuevo Docente`. La columna `CUIL` SHALL mostrar el dato cuando el docente lo tenga y
 SHALL NOT exigirlo: el CUIL es único pero opcional en el modelo, y un docente sin CUIL es una fila
-válida. Las filas del maquetado son, en este orden: Profe Martín con estado `Activa`; Lic. Laura
-Benítez con `Activa`; Santi Ads con `Activa`; Dr. Marcelo Ríos con `Activa`; e Ing. González con
-`Activa`.
-La columna `ESTADO` SHALL renderizar `Activa` en verde.
+válida. Las filas del maquetado son, en este orden: Profe Martín con estado `Activo`; Lic. Laura
+Benítez con `Inactivo`; Santi Ads con `Activo`; Dr. Marcelo Ríos con `Inactivo`; e Ing. González
+con `Activo`.
+La columna `ESTADO` SHALL renderizar `Activo` en verde cuando la fuente devuelve `cursando: true`
+e `Inactivo` en gris cuando devuelve `cursando: false`. El estado deriva de la cursada: el docente
+está activo mientras tiene al menos una comisión Vigente asignada. La baja lógica coexiste como
+concepto reservado: mientras no se implemente para docentes, el badge deriva de la cursada.
 
 El campo de búsqueda SHALL filtrar automáticamente mientras el administrador escribe, sin exigir
 que presione `Enter`, y SHALL aceptar coincidencias por el comienzo de las palabras del nombre o
@@ -524,8 +527,7 @@ después DNI y al final email— y, dentro del nombre, por la posición de la pr
 coincide, priorizando el inicio del nombre sobre las palabras posteriores o el apellido. La
 pantalla SHALL esperar aproximadamente 300 ms desde la última tecla antes de consultar a la fuente
 y SHALL descartar la respuesta de cualquier consulta anterior que llegue después de una más
-reciente. WHEN el campo queda vacío, la pantalla SHALL volver al listado habitual de docentes
-activos.
+reciente. WHEN el campo queda vacío, la pantalla SHALL volver al listado habitual del padrón.
 
 La columna `COMISIONES ASIGNADAS` SHALL mostrar las comisiones que devuelve la fuente para el
 docente, con el código y el nombre del curso de cada una. WHEN el docente no tiene comisiones,
@@ -533,20 +535,22 @@ SHALL mostrar `Sin comisión`. WHEN la búsqueda no tiene coincidencias, la pant
 `No se encontraron docentes`. La pantalla SHALL NOT inventar comisiones ni datos personales para
 completar una fila.
 
-La pantalla SHALL mostrar solo docentes activos. Los docentes dados de baja SHALL NOT aparecer en
-el listado ni en los resultados de búsqueda.
+La pantalla SHALL mostrar todos los docentes, incluidos los dados de baja: ni el listado habitual
+ni la búsqueda filtran por `activo`.
 
 La acción `+ Nuevo Docente` SHALL abrir el modal `Nuevo Docente`, con los campos `Nombre`,
-`Apellido`, `DNI`, `Mail` y `Teléfono`, y sin ningún campo de CUIL porque el contrato del alta no
-lo admite. El sistema SHALL NOT renderizar un formulario de edición de docente. El control de
+`Apellido`, `DNI`, `Mail`, `Teléfono` y un CUIL opcional que se arma con prefijo, el DNI de solo
+lectura y un verificador de un dígito; un CUIL parcial no se envía. El control de
 clases dictadas por el profesor queda fuera del alcance mínimo: la pantalla SHALL mostrar un ítem
 deshabilitado con la etiqueta `Próximamente` y sin ninguna pantalla detrás. Estos comportamientos
-del alta y del control deshabilitado SHALL conservarse sin cambios.
+del alta y del control deshabilitado SHALL conservarse sin cambios. La edición de datos personales
+y el restablecimiento de contraseña viven en el mismo padrón (HU #11): la fila ofrece `Editar` y
+`Restablecer contraseña`.
 
 #### Scenario: El usuario abre el padrón de docentes
 
 - **WHEN** un usuario de Secretaría abre `Docentes`
-- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, los docentes activos que devuelve la fuente, sus datos de contacto, sus comisiones asignadas y el estado `Activa` en verde, más la acción `+ Nuevo Docente`
+- **THEN** ve el listado con las columnas `DOCENTE`, `DNI`, `CUIL`, `EMAIL`, `TELÉFONO`, `COMISIONES ASIGNADAS`, `ESTADO` y `ACCIONES`, los docentes que devuelve la fuente, sus datos de contacto, sus comisiones asignadas y el estado `Activo` en verde o `Inactivo` en gris según la cursada de cada uno, más la acción `+ Nuevo Docente`
 
 #### Scenario: El usuario localiza a un docente por CUIL
 
@@ -557,6 +561,11 @@ del alta y del control deshabilitado SHALL conservarse sin cambios.
 
 - **WHEN** el usuario recorre la columna `COMISIONES ASIGNADAS`
 - **THEN** ve que Santi Ads tiene 2 comisiones asignadas y los otros cuatro docentes tienen 1 cada uno
+
+#### Scenario: El usuario compara los estados de los docentes
+
+- **WHEN** el usuario recorre la columna `ESTADO`
+- **THEN** ve `Activo` en verde en Profe Martín, Santi Ads e Ing. González, e `Inactivo` en gris en Lic. Laura Benítez y Dr. Marcelo Ríos
 
 #### Scenario: El usuario busca un docente
 
@@ -591,11 +600,11 @@ del alta y del control deshabilitado SHALL conservarse sin cambios.
 #### Scenario: El usuario vacía el buscador
 
 - **WHEN** el usuario borra todo el texto del buscador
-- **THEN** la pantalla vuelve a mostrar el listado habitual de docentes activos
+- **THEN** la pantalla vuelve a mostrar el listado habitual del padrón
 
 #### Scenario: La búsqueda no arroja resultados
 
-- **WHEN** el usuario busca un dato que no coincide con ningún docente activo
+- **WHEN** el usuario busca un dato que no coincide con ningún docente
 - **THEN** la pantalla muestra `No se encontraron docentes`
 
 #### Scenario: El usuario recorre las comisiones asignadas
@@ -610,18 +619,18 @@ del alta y del control deshabilitado SHALL conservarse sin cambios.
 
 #### Scenario: El usuario busca un docente dado de baja
 
-- **WHEN** el usuario busca por el nombre, DNI o email de un docente con `activo = false`
-- **THEN** la pantalla no lo muestra, porque el padrón visible solo incluye docentes activos
+- **WHEN** el usuario busca por el nombre, DNI o email de un docente con `activo = false` o sin ninguna comisión Vigente
+- **THEN** la pantalla lo muestra; el badge refleja su cursada (`Activo` o `Inactivo`)
 
 #### Scenario: El usuario abre el alta de docente
 
 - **WHEN** el usuario pulsa `+ Nuevo Docente`
-- **THEN** se abre el modal `Nuevo Docente` con los campos `Nombre`, `Apellido`, `DNI`, `Mail` y `Teléfono`, sin CUIL, con la misma identidad visual y sin cambios en el alta
+- **THEN** se abre el modal `Nuevo Docente` con los campos `Nombre`, `Apellido`, `DNI`, `Mail`, `Teléfono` y un CUIL opcional, con la misma identidad visual y sin cambios en el alta
 
 #### Scenario: El usuario busca edición o control de clases
 
 - **WHEN** el usuario revisa la pantalla buscando editar a un docente o controlar las clases que dicta
-- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, no hay control de edición, y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
+- **THEN** la acción `+ Nuevo Docente` abre el formulario de alta real, la fila ofrece `Editar` y `Restablecer contraseña` (HU #11), y el control de clases dictadas aparece como ítem deshabilitado con la etiqueta `Próximamente` que no abre ninguna pantalla
 
 #### Scenario: El usuario edita los datos de un docente
 

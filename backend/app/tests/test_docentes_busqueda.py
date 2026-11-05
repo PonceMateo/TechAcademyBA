@@ -3,10 +3,12 @@
 La búsqueda se prueba en el servicio y a través de la ruta porque el contrato tiene dos partes:
 el orden de prioridad y la forma de la respuesta con comisiones. Las dos salen de la base, no de
 un doble: las comisiones son filas reales y el orden se resuelve en Python después de leer los
-docentes activos.
+docentes.
 """
 
 from __future__ import annotations
+
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -209,7 +211,9 @@ def test_una_sola_letra_dispara_la_busqueda(cliente_admin: TestClient, db_sessio
     assert [fila["id"] for fila in _buscar(cliente_admin, "a")] == [docente.id]
 
 
-def test_solo_devuelve_docentes_activos(cliente_admin: TestClient, db_session: Session) -> None:
+def test_el_listado_incluye_docentes_dados_de_baja(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
     activo = crear_docente(
         db_session,
         nombre="Ana",
@@ -217,20 +221,20 @@ def test_solo_devuelve_docentes_activos(cliente_admin: TestClient, db_session: S
         dni="30000008",
         email="ana.activa@techacademy.invalid",
     )
-    inactivo = crear_docente(
+    dados_de_baja = crear_docente(
         db_session,
         nombre="Ana",
         apellido="Inactiva",
         dni="30000009",
         email="ana.inactiva@techacademy.invalid",
     )
-    inactivo.activo = False
+    dados_de_baja.activo = False
     db_session.flush()
 
-    assert [fila["id"] for fila in _buscar(cliente_admin, "ana")] == [activo.id]
+    assert {fila["id"] for fila in _buscar(cliente_admin, "ana")} == {activo.id, dados_de_baja.id}
     sin_consulta = cliente_admin.get("/docentes")
     assert sin_consulta.status_code == 200, sin_consulta.text
-    assert [fila["id"] for fila in sin_consulta.json()] == [activo.id]
+    assert {fila["id"] for fila in sin_consulta.json()} == {activo.id, dados_de_baja.id}
 
 
 def test_sin_coincidencias_devuelve_una_lista_vacia(cliente_admin: TestClient) -> None:
@@ -295,6 +299,79 @@ def test_la_respuesta_trae_las_comisiones_reales_y_su_cantidad(
     ]
 
 
+def test_cursando_es_verdadero_con_una_comision_vigente(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    docente = crear_docente(
+        db_session,
+        nombre="Rita",
+        apellido="Molina",
+        dni="30111230",
+        email="rita.vigente@techacademy.invalid",
+    )
+    futura = date.today() + timedelta(days=30)
+    comision = crear_comision(
+        db_session,
+        curso=crear_curso(db_session, nombre="Python Inicial"),
+        fecha_inicio=date.today() - timedelta(days=30),
+        fecha_fin=futura,
+    )
+    comision.docente_id = docente.id
+    db_session.flush()
+
+    filas = _buscar(cliente_admin, "rita.vigente")
+
+    assert [fila["cursando"] for fila in filas] == [True]
+
+
+def test_cursando_es_verdadero_con_una_comision_heredada_sin_fecha_fin(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    docente = crear_docente(
+        db_session,
+        nombre="Rita",
+        apellido="Sinfecha",
+        dni="30111231",
+        email="rita.sinfecha@techacademy.invalid",
+    )
+    comision = crear_comision(
+        db_session,
+        curso=crear_curso(db_session, nombre="Java Backend"),
+    )
+    comision.docente_id = docente.id
+    comision.fecha_fin = None
+    db_session.flush()
+
+    filas = _buscar(cliente_admin, "rita.sinfecha")
+
+    assert [fila["cursando"] for fila in filas] == [True]
+
+
+def test_cursando_es_falso_cuando_todas_las_comisiones_terminaron(
+    cliente_admin: TestClient, db_session: Session
+) -> None:
+    docente = crear_docente(
+        db_session,
+        nombre="Rita",
+        apellido="Terminada",
+        dni="30111232",
+        email="rita.terminada@techacademy.invalid",
+    )
+    ayer = date.today() - timedelta(days=1)
+    comision = crear_comision(
+        db_session,
+        curso=crear_curso(db_session, nombre="Marketing Digital"),
+        fecha_inicio=ayer - timedelta(days=60),
+        fecha_fin=ayer,
+    )
+    comision.docente_id = docente.id
+    db_session.flush()
+
+    filas = _buscar(cliente_admin, "rita.terminada")
+
+    assert [fila["cursando"] for fila in filas] == [False]
+
+
 def test_un_docente_sin_comisiones_trae_la_lista_vacia(
     cliente_admin: TestClient, db_session: Session
 ) -> None:
@@ -311,6 +388,7 @@ def test_un_docente_sin_comisiones_trae_la_lista_vacia(
     assert fila["id"] == docente.id
     assert fila["comisiones"] == []
     assert fila["cantidad_comisiones"] == 0
+    assert fila["cursando"] is False
 
 
 def test_la_busqueda_exige_rol_de_administracion(

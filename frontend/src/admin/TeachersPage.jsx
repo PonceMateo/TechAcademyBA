@@ -95,8 +95,12 @@ const COLUMNAS = [
   {
     clave: 'estado',
     titulo: 'ESTADO',
+    // El estado deriva de la cursada: activo mientras el docente tiene una comisión Vigente.
+    // La baja lógica coexiste como concepto reservado y se mostrará cuando se implemente.
     render: (fila) => (
-      <Badge tono={fila.activo ? TONO.VERDE : TONO.GRIS}>{fila.activo ? 'Activa' : 'Baja'}</Badge>
+      <Badge tono={fila.cursando ? TONO.VERDE : TONO.GRIS}>
+        {fila.cursando ? 'Activo' : 'Inactivo'}
+      </Badge>
     ),
   },
 ]

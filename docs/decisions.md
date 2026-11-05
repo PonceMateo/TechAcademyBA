@@ -2764,3 +2764,28 @@ alcance de este change; queda a criterio del equipo agregarlo.
 - **Por qué:** el spec es contrato, no historia; un escenario que desdice D57 confunde la próxima
   revisión y cualquier delta generado desde él.
 - **Dónde:** `openspec/specs/admin-shell/spec.md`.
+
+### D90 — El estado Activo/Inactivo del docente deriva de la cursada (`cursando`)
+
+- **Fecha:** 2026-11-05
+- **Autor:** Mateo Ponce
+- **Contexto:** la columna `ESTADO` del padrón de docentes mostraba `Activa` mientras el docente no
+  tuviera la baja lógica aplicada, sin decir nada sobre si estaba dando clases. El cliente pidió
+  que responda a la cursada real. El modelo ya deriva `Vigente`/`Finalizada` de `comision.fecha_fin`
+  (`estado_comision`, D75) con `America/Argentina/Buenos_Aires`.
+- **Decisión:**
+  - `GET /docentes` devuelve **todos** los docentes (ya no filtra `activo = true`) y cada fila suma
+    `cursando: boolean`, derivado en el backend: verdadero si existe al menos una comisión asignada
+    Vigente (`fecha_fin >= hoy`, o nula para la heredada).
+  - La columna `ESTADO` muestra `Activo` en verde con `cursando: true` e `Inactivo` en gris con
+    `cursando: false`. Una comisión sin `fecha_fin` cuenta como Vigente, igual que la regla vigente.
+  - La baja lógica (`activo`) coexiste como concepto reservado: todavía no hay baja forzada de
+    docentes; el badge no la usa hasta que se implemente.
+- **Por qué:** el estado del padrón tiene que reflejar si el profesor está dando una comisión en ese
+  momento; la baja lógica y la cursada son conceptos distintos y ninguno reemplaza al otro. Derivar en
+  el backend mantiene una sola regla para el mock y la pantalla.
+- **Dónde:** `backend/app/services/padron.py`, `backend/app/schemas/padron.py`,
+  `backend/app/api/padron.py`, `frontend/src/admin/TeachersPage.jsx`,
+  `frontend/src/services/apiDataSource.js`, `frontend/src/services/mockDataSource.js`,
+  `frontend/src/admin/TeachersPage.test.jsx`, `frontend/src/services/dataService.test.jsx`,
+  `openspec/changes/estado-docente-segun-cursada`.

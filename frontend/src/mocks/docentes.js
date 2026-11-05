@@ -16,8 +16,9 @@ import { markAsExample } from './placeholderNotice'
  * comisiones, que es lo que la pantalla muestra.
  *
  * El estado va como `activo` y no como texto: el modelo hace baja lógica con un booleano y no
- * tiene columna de estado de docente. La columna `ESTADO` de la pantalla muestra el literal
- * `Activa` cuando `activo` es verdadero.
+ * tiene columna de estado de docente. La columna `ESTADO` de la pantalla **no** usa ese booleano:
+ * deriva de `cursando` (una comisión Vigente del docente) y muestra `Activo` o `Inactivo`. El
+ * `activo` queda como concepto reservado para cuando la baja se implemente.
  */
 export const DOCENTES = markAsExample([
   {
