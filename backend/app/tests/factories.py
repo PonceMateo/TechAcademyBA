@@ -419,7 +419,7 @@ def crear_cobranza(
     pagador_id: int | None = None,
     fecha: date | None = None,
 ) -> Cobranza:
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     return _persistir(
         session,

@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalogo import ORDEN_DIA, Comision
+from app.models.catalogo import ORDEN_DIA, ZONA_HORARIA_DOMINIO, Comision
 from app.models.clases import Clase
 from app.models.enums import DiaSemana, EstadoInscripcion
 from app.models.inscripciones import Inscripcion

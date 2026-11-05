@@ -180,11 +180,15 @@ describe('el tablero de Administración dibuja con los componentes compartidos',
     await screen.findByText('COMISIONES')
   })
 
-  it('marca el tablero con tarjetas y botones compartidos', () => {
+  it('marca el tablero con tarjetas y acciones reales', () => {
     // El tablero ya no dibuja `Badge`: las alertas que lo usaban se cayeron con el change
-    // `quitar-datos-inventados-frontend` porque dependían de endpoints que no existen.
+    // `quitar-datos-inventados-frontend` porque dependían de endpoints que no existen. Los accesos
+    // rápidos son enlaces de navegación, no botones sin acción.
     expect(document.querySelectorAll('[data-ui="card"]').length).toBeGreaterThan(0)
-    expect(document.querySelectorAll('[data-ui="button"]').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'Registrar Cobranza' })).toHaveAttribute(
+      'href',
+      '/admin/cobranzas',
+    )
   })
 })
 

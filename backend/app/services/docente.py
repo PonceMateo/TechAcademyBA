@@ -99,6 +99,7 @@ def listar_comisiones_asignadas(
 ) -> list[ComisionAsignadaDocenteOut]:
     """Comisiones activas del docente autenticado y sus contadores de acceso."""
     docente = docente_de(usuario)
+    hoy = datetime.now(ZONA_HORARIA_DOMINIO).date()
     comisiones = session.scalars(
         select(Comision)
         .where(Comision.docente_id == docente.id, Comision.activo.is_(True))
