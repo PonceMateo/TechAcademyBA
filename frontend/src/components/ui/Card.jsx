@@ -11,8 +11,12 @@ import { MARCA_UI } from './paleta'
  * **El título se muestra tal cual lo pasa la pantalla**, sin transformarlo con `uppercase`: los
  * rótulos del spec de `admin-shell` son literales y en las dos partes —lo que se ve y lo que se
  * copia— tienen que ser el mismo texto.
+ *
+ * `tituloGrande` lo usa el encabezado de página (`Padrón de Docentes`, `Padrón de Alumnos
+ * Regulares`, `Cursos`): más grande que un rótulo de bloque pero más chico que el saludo del
+ * dashboard (`text-2xl`).
  */
-export function Card({ titulo, descripcion, acciones = null, className = '', children }) {
+export function Card({ titulo, descripcion, acciones = null, className = '', tituloGrande = false, children }) {
   return (
     <section
       {...{ [MARCA_UI]: 'card' }}
@@ -22,7 +26,13 @@ export function Card({ titulo, descripcion, acciones = null, className = '', chi
         <header className="flex items-start justify-between gap-4 border-b border-[var(--borde-superficie)] px-5 py-4">
           <div>
             {titulo !== null && titulo !== undefined && (
-              <h2 className="text-sm font-semibold tracking-wide text-[var(--texto-valor)]">
+              <h2
+                className={
+                  tituloGrande
+                    ? 'text-xl font-bold tracking-tight text-[var(--texto-valor)]'
+                    : 'text-sm font-semibold tracking-wide text-[var(--texto-valor)]'
+                }
+              >
                 {titulo}
               </h2>
             )}

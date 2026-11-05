@@ -497,6 +497,7 @@ export function TeachersPage() {
     <div className="space-y-4">
       <Card
         titulo="Padrón de Docentes"
+        tituloGrande
         acciones={
           <Button variante="secundario" onClick={() => setModalAbierto(true)}>
             + Nuevo Docente
